@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-dir-size"
+description = "Enables the get_dir_size command without any pre-configured scope."
+commands.allow = ["get_dir_size"]
+
+[[permission]]
+identifier = "deny-get-dir-size"
+description = "Denies the get_dir_size command without any pre-configured scope."
+commands.deny = ["get_dir_size"]

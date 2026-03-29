@@ -1,0 +1,75 @@
+import React from "react";
+import { usePanelStore } from "../../store/panelStore";
+import { ChevronRight, Home, RefreshCw } from "lucide-react";
+import { clsx } from "clsx";
+import { getBreadcrumbParts } from "../../utils/path";
+import { useFileSystem } from "../../hooks/useFileSystem";
+
+interface AddressBarProps {
+  panelId: "left" | "right";
+}
+
+export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
+  const currentPath = usePanelStore((s) =>
+    panelId === "left" ? s.leftPanel.currentPath : s.rightPanel.currentPath
+  );
+  const setPath = usePanelStore((s) => s.setPath);
+  const refreshPanel = usePanelStore((s) => s.refreshPanel);
+  const setActivePanel = usePanelStore((s) => s.setActivePanel);
+  const activePanel = usePanelStore((s) => s.activePanel);
+  const isActive = activePanel === panelId;
+  const { getHomeDir } = useFileSystem();
+
+  const parts = getBreadcrumbParts(currentPath);
+
+  const handleNavigate = (path: string) => {
+    setActivePanel(panelId);
+    setPath(panelId, path);
+  };
+
+  const handleGoHome = async () => {
+    const homeDir = await getHomeDir();
+    handleNavigate(homeDir);
+  };
+
+  return (
+    <div className={clsx(
+      "flex h-8 items-center px-2 border-b text-sm transition-colors",
+      isActive ? "bg-bg-panel border-accent-color/50" : "bg-bg-secondary border-border-color"
+    )}>
+      <button
+        type="button"
+        onClick={() => void handleGoHome()}
+        className="flex items-center text-text-secondary gap-1 mr-2 px-1 hover:text-text-primary cursor-pointer hover:bg-bg-hover rounded transition-colors"
+        title="Go to home directory"
+      >
+        <Home size={14} />
+      </button>
+      
+      <div className="flex items-center flex-1 overflow-hidden">
+        {parts.map((part, index) => (
+          <React.Fragment key={part.path}>
+            {index > 0 && <ChevronRight size={14} className="text-text-secondary mx-0.5 shrink-0" />}
+            <button
+              type="button"
+              onClick={() => handleNavigate(part.path)}
+              className="hover:bg-bg-hover hover:text-text-primary px-1 rounded cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis transition-colors text-text-secondary"
+              title={part.path}
+            >
+              {part.label}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => refreshPanel(panelId)}
+        className="flex items-center text-text-secondary gap-1 ml-2 px-1 hover:text-text-primary cursor-pointer hover:bg-bg-hover rounded transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw size={14} />
+      </button>
+    </div>
+  );
+};
