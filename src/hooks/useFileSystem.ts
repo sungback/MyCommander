@@ -54,9 +54,9 @@ const fileSystem = {
     await invoke("quit_app");
   },
 
-  listDirectory: async (path: string): Promise<FileEntry[]> => {
+  listDirectory: async (path: string, showHidden: boolean = false): Promise<FileEntry[]> => {
     try {
-      return await invoke<FileEntry[]>("list_directory", { path });
+      return await invoke<FileEntry[]>("list_directory", { path, show_hidden: showHidden });
     } catch (e) {
       console.error("Failed to list directory:", e);
       throw e;

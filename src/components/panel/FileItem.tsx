@@ -12,7 +12,7 @@ interface FileItemProps {
   isSelected?: boolean;
   isCursor?: boolean;
   isActivePanel?: boolean;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
   onToggleExpand?: () => void;
 }

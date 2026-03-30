@@ -5,6 +5,8 @@ use serde::Serialize;
 use std::time::UNIX_EPOCH;
 
 #[cfg(target_os = "macos")]
+use std::os::macos::fs::MetadataExt;
+#[cfg(target_os = "macos")]
 use trash::macos::{DeleteMethod, TrashContextExtMacos};
 
 #[derive(Serialize)]
@@ -20,7 +22,7 @@ pub struct FileEntry {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
     let dir_path = Path::new(&path);
     if !dir_path.is_dir() {
         return Err(format!("{} is not a directory", path));
@@ -46,12 +48,14 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
             let metadata = entry.metadata().map_err(|e| e.to_string());
             let file_name = entry.file_name().to_string_lossy().to_string();
             let file_path = entry.path().to_string_lossy().to_string();
-            
-            // Basic hidden file check (Unix: starts with dot)
-            // On Windows, proper attribute check is needed for robust app
-            let is_hidden = file_name.starts_with('.');
 
             if let Ok(meta) = metadata {
+                let is_hidden = is_hidden_entry(&file_name, &meta);
+
+                if is_hidden && !show_hidden {
+                    continue;
+                }
+
                 let kind = if meta.is_dir() {
                     "directory".to_string()
                 } else if meta.is_symlink() {
@@ -99,6 +103,28 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
     });
 
     Ok(files)
+}
+
+fn is_hidden_entry(file_name: &str, metadata: &fs::Metadata) -> bool {
+    if file_name == "." || file_name == ".." {
+        return false;
+    }
+
+    if file_name.starts_with('.') {
+        return true;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        const UF_HIDDEN: u32 = 0x0000_8000;
+        return metadata.st_flags() & UF_HIDDEN != 0;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = metadata;
+        false
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]

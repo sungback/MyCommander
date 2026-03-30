@@ -6,9 +6,12 @@ interface AppState {
   rightPanel: PanelState;
   sizeCache: Record<string, number>;
   activePanel: "left" | "right";
+  showHiddenFiles: boolean;
   setActivePanel: (panel: "left" | "right") => void;
+  setShowHiddenFiles: (show: boolean) => void;
   setPath: (panel: "left" | "right", path: string) => void;
   setFiles: (panel: "left" | "right", files: FileEntry[]) => void;
+  setSelection: (panel: "left" | "right", paths: string[]) => void;
   toggleSelection: (panel: "left" | "right", path: string) => void;
   selectOnly: (panel: "left" | "right", path: string | null) => void;
   clearSelection: (panel: "left" | "right") => void;
@@ -25,6 +28,7 @@ interface PersistedPanelState {
   activePanel?: PanelId;
   leftPath?: string;
   rightPath?: string;
+  showHiddenFiles?: boolean;
 }
 
 const PANEL_STATE_STORAGE_KEY = "total-commander:panel-state";
@@ -49,6 +53,8 @@ const readPersistedPanelState = (): PersistedPanelState => {
           : undefined,
       leftPath: typeof parsed.leftPath === "string" ? parsed.leftPath : undefined,
       rightPath: typeof parsed.rightPath === "string" ? parsed.rightPath : undefined,
+      showHiddenFiles:
+        typeof parsed.showHiddenFiles === "boolean" ? parsed.showHiddenFiles : undefined,
     };
   } catch (error) {
     console.error("Failed to restore panel state:", error);
@@ -152,12 +158,14 @@ const updatePanelEntrySize = (
 const persistVisiblePanelState = (
   leftPanel: PanelState,
   rightPanel: PanelState,
-  activePanel: PanelId
+  activePanel: PanelId,
+  showHiddenFiles: boolean
 ) => {
   writePersistedPanelState({
     activePanel,
     leftPath: leftPanel.currentPath,
     rightPath: rightPanel.currentPath,
+    showHiddenFiles,
   });
 };
 
@@ -166,11 +174,28 @@ export const usePanelStore = create<AppState>((set) => ({
   rightPanel: defaultPanelState("right", persistedPanelState.rightPath),
   sizeCache: {},
   activePanel: persistedPanelState.activePanel ?? "left",
+  showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
 
   setActivePanel: (activePanel) =>
     set((state) => {
-      persistVisiblePanelState(state.leftPanel, state.rightPanel, activePanel);
+      persistVisiblePanelState(
+        state.leftPanel,
+        state.rightPanel,
+        activePanel,
+        state.showHiddenFiles
+      );
       return { activePanel };
+    }),
+
+  setShowHiddenFiles: (showHiddenFiles) =>
+    set((state) => {
+      persistVisiblePanelState(
+        state.leftPanel,
+        state.rightPanel,
+        state.activePanel,
+        showHiddenFiles
+      );
+      return { showHiddenFiles };
     }),
 
   setPath: (panel, path) =>
@@ -191,7 +216,8 @@ export const usePanelStore = create<AppState>((set) => ({
       persistVisiblePanelState(
         panel === "left" ? nextPanelState : state.leftPanel,
         panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel
+        state.activePanel,
+        state.showHiddenFiles
       );
 
       return nextState;
@@ -211,6 +237,17 @@ export const usePanelStore = create<AppState>((set) => ({
         [panelKey]: {
           ...pState,
           files: sortedFiles,
+        },
+      };
+    }),
+
+  setSelection: (panel, paths) =>
+    set((state) => {
+      const panelKey = panel === "left" ? "leftPanel" : "rightPanel";
+      return {
+        [panelKey]: {
+          ...state[panelKey],
+          selectedItems: new Set(paths),
         },
       };
     }),

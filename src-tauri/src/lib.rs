@@ -1,8 +1,136 @@
 mod commands;
 
+#[cfg(target_os = "macos")]
+use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, PredefinedMenuItem, Submenu};
+#[cfg(target_os = "macos")]
+use tauri::{AppHandle, Emitter, Runtime};
+
+#[cfg(target_os = "macos")]
+const SHOW_HIDDEN_MENU_ITEM_ID: &str = "show_hidden_files";
+#[cfg(target_os = "macos")]
+const VIEW_MENU_ID: &str = "view";
+
+#[cfg(target_os = "macos")]
+fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let pkg_info = app.package_info();
+    let config = app.config();
+    let about_metadata = AboutMetadata {
+        name: Some(pkg_info.name.clone()),
+        version: Some(pkg_info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config.bundle.publisher.clone().map(|publisher| vec![publisher]),
+        ..Default::default()
+    };
+
+    let show_hidden_files = CheckMenuItem::with_id(
+        app,
+        SHOW_HIDDEN_MENU_ITEM_ID,
+        "Show Hidden Files",
+        true,
+        false,
+        Some("CmdOrCtrl+Shift+Period"),
+    )?;
+
+    let window_menu = Submenu::with_items(
+        app,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+
+    let help_menu = Submenu::with_items(app, "Help", true, &[])?;
+
+    Menu::with_items(
+        app,
+        &[
+            &Submenu::with_items(
+                app,
+                pkg_info.name.clone(),
+                true,
+                &[
+                    &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::services(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::hide(app, None)?,
+                    &PredefinedMenuItem::hide_others(app, None)?,
+                    &PredefinedMenuItem::show_all(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::quit(app, None)?,
+                ],
+            )?,
+            &Submenu::with_items(
+                app,
+                "File",
+                true,
+                &[&PredefinedMenuItem::close_window(app, None)?],
+            )?,
+            &Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(app, None)?,
+                    &PredefinedMenuItem::redo(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::cut(app, None)?,
+                    &PredefinedMenuItem::copy(app, None)?,
+                    &PredefinedMenuItem::paste(app, None)?,
+                    &PredefinedMenuItem::select_all(app, None)?,
+                ],
+            )?,
+            &Submenu::with_id_and_items(
+                app,
+                VIEW_MENU_ID,
+                "View",
+                true,
+                &[
+                    &show_hidden_files,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::fullscreen(app, None)?,
+                ],
+            )?,
+            &window_menu,
+            &help_menu,
+        ],
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .menu(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                build_app_menu(app)
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                tauri::menu::Menu::default(app)
+            }
+        })
+        .on_menu_event(|app, event| {
+            #[cfg(target_os = "macos")]
+            if event.id().as_ref() == SHOW_HIDDEN_MENU_ITEM_ID {
+                if let Some(menu) = app.menu() {
+                    if let Some(view_menu) = menu.get(VIEW_MENU_ID).and_then(|item| item.as_submenu().cloned()) {
+                        if let Some(checked) = view_menu
+                            .get(SHOW_HIDDEN_MENU_ITEM_ID)
+                            .and_then(|item| item.as_check_menuitem().cloned())
+                            .and_then(|item| item.is_checked().ok())
+                        {
+                            let _ = app.emit("show-hidden-files-changed", checked);
+                        }
+                    }
+                }
+            }
+        })
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
@@ -14,6 +142,7 @@ pub fn run() {
             commands::system_commands::open_in_terminal,
             commands::system_commands::open_in_editor,
             commands::system_commands::quit_app,
+            commands::system_commands::set_show_hidden_menu_checked,
             commands::fs_commands::list_directory,
             commands::fs_commands::create_directory,
             commands::fs_commands::create_file,

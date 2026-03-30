@@ -27,6 +27,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
+  const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const toggleSelection = usePanelStore((s) => s.toggleSelection);
   const setCursor = usePanelStore((s) => s.setCursor);
@@ -47,7 +48,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   useEffect(() => {
     // Initial fetch
     let activePath = panelState.currentPath;
-    
+
     const loadDir = async () => {
       const resolveHomeDirectory = async () => {
         const home = await fs.getHomeDir();
@@ -57,12 +58,17 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       };
 
       try {
+        // Correct initial path if it's the root placeholder or default Windows C:\
+        if (activePath === "/" || activePath === "C:\\" || activePath === "D:\\") {
+          await resolveHomeDirectory();
+        }
+
         const entries = await fs.listDirectory(activePath);
         setFiles(id, entries);
       } catch (err) {
         try {
           const home = await resolveHomeDirectory();
-          const entries = await fs.listDirectory(home);
+          const entries = await fs.listDirectory(home, showHiddenFiles);
           setFiles(id, entries);
         } catch (fallbackError) {
           console.error("Failed loading dir: ", err);
@@ -72,7 +78,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     };
 
     loadDir();
-  }, [id, panelState.currentPath, panelState.lastUpdated, setFiles, setPath, fs]);
+  }, [fs, id, panelState.currentPath, panelState.lastUpdated, setFiles, setPath, showHiddenFiles]);
 
   useEffect(() => {
     backgroundSchedulerRef.current = {
@@ -193,9 +199,9 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const handleEnter = (entry: any) => {
     if (entry.kind === "directory") {
       if (entry.name === "..") {
-         setPath(id, getParentPath(panelState.currentPath));
+        setPath(id, getParentPath(panelState.currentPath));
       } else {
-         setPath(id, entry.path);
+        setPath(id, entry.path);
       }
     } else {
       console.log("Cannot enter file, need to open:", entry.path);
@@ -203,7 +209,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   };
 
   return (
-    <div 
+    <div
       ref={panelRef}
       className={clsx(
         "flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-opacity bg-bg-panel",
@@ -218,7 +224,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       <DriveList panelId={id} />
       <TabBar panelId={id} />
       <AddressBar panelId={id} />
-      <ColumnHeader 
+      <ColumnHeader
         sortField={panelState.sortField}
         sortDirection={panelState.sortDirection}
         onSort={(field) => usePanelStore.getState().setSort(id, field)}

@@ -24,6 +24,8 @@ interface VisibleEntryRow {
   canExpand: boolean;
 }
 
+const isSelectableEntry = (entry: FileEntry) => entry.name !== "..";
+
 const getVisibleRows = (
   entries: FileEntry[],
   expandedPaths: Set<string>,
@@ -69,8 +71,13 @@ export const FileList: React.FC<FileListProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const { getDirSize, listDirectory } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const setSelection = usePanelStore((s) => s.setSelection);
+  const selectOnly = usePanelStore((s) => s.selectOnly);
+  const clearSelection = usePanelStore((s) => s.clearSelection);
+  const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<Record<string, FileEntry[]>>({});
+  const selectionAnchorIndexRef = useRef<number | null>(null);
   const visibleRows = getVisibleRows(files, expandedPaths, childEntriesByPath);
 
   const rowVirtualizer = useVirtualizer({
@@ -90,7 +97,8 @@ export const FileList: React.FC<FileListProps> = ({
   useEffect(() => {
     setExpandedPaths(new Set());
     setChildEntriesByPath({});
-  }, [currentPath]);
+    selectionAnchorIndexRef.current = null;
+  }, [currentPath, showHiddenFiles]);
 
   useEffect(() => {
     if (visibleRows.length === 0) {
@@ -121,7 +129,7 @@ export const FileList: React.FC<FileListProps> = ({
 
     if (!childEntriesByPath[entry.path]) {
       try {
-        const children = await listDirectory(entry.path);
+        const children = await listDirectory(entry.path, showHiddenFiles);
         setChildEntriesByPath((current) => ({
           ...current,
           [entry.path]: children.filter((child) => child.name !== ".."),
@@ -139,11 +147,69 @@ export const FileList: React.FC<FileListProps> = ({
     });
   };
 
+  const getRangePaths = (startIndex: number, endIndex: number) => {
+    const start = Math.min(startIndex, endIndex);
+    const end = Math.max(startIndex, endIndex);
+
+    return visibleRows
+      .slice(start, end + 1)
+      .map((row) => row.entry)
+      .filter(isSelectableEntry)
+      .map((entry) => entry.path);
+  };
+
+  const handleRowClick = (
+    event: React.MouseEvent<HTMLDivElement>,
+    rowIndex: number,
+    entry: FileEntry
+  ) => {
+    setCursorIndex(rowIndex);
+    containerRef.current?.focus({ preventScroll: true });
+
+    if (!isSelectableEntry(entry)) {
+      clearSelection(panelId);
+      selectionAnchorIndexRef.current = null;
+      return;
+    }
+
+    const additiveSelection = event.metaKey || event.ctrlKey;
+
+    if (event.shiftKey) {
+      const anchorIndex = selectionAnchorIndexRef.current ?? cursorIndex ?? rowIndex;
+      const rangePaths = getRangePaths(anchorIndex, rowIndex);
+
+      if (additiveSelection) {
+        const mergedPaths = new Set(selectedItems);
+        rangePaths.forEach((path) => mergedPaths.add(path));
+        setSelection(panelId, Array.from(mergedPaths));
+      } else {
+        setSelection(panelId, rangePaths);
+      }
+      return;
+    }
+
+    selectionAnchorIndexRef.current = rowIndex;
+
+    if (additiveSelection) {
+      onSelect(entry.path, true);
+      return;
+    }
+
+    selectOnly(panelId, entry.path);
+  };
+
   return (
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto overflow-x-hidden bg-bg-panel focus:outline-none"
       tabIndex={0}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          clearSelection(panelId);
+          selectionAnchorIndexRef.current = null;
+          containerRef.current?.focus({ preventScroll: true });
+        }
+      }}
       onKeyDown={(e) => {
         if (!isActivePanel) return;
         if (visibleRows.length === 0) return;
@@ -206,8 +272,8 @@ export const FileList: React.FC<FileListProps> = ({
                 isSelected={selectedItems.has(entry.path)}
                 isCursor={cursorIndex === virtualItem.index}
                 isActivePanel={isActivePanel}
-                onClick={() => {
-                  setCursorIndex(virtualItem.index);
+                onClick={(event) => {
+                  handleRowClick(event, virtualItem.index, entry);
                 }}
                 onDoubleClick={() => onEnter(entry)}
                 onToggleExpand={() => {

@@ -112,7 +112,7 @@ export const DialogContainer: React.FC = () => {
     if (openDialog === "copy" || openDialog === "move") {
       setInputValue(targetPanel.currentPath);
     } else if (openDialog === "mkdir") {
-      setInputValue("New Folder");
+      setInputValue("");
     } else if (openDialog === "newfile") {
       setInputValue("New File.txt");
     } else {

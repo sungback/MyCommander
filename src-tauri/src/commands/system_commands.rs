@@ -165,6 +165,38 @@ pub fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub fn set_show_hidden_menu_checked(app: tauri::AppHandle, checked: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let menu = app
+            .menu()
+            .ok_or_else(|| "Application menu is not available".to_string())?;
+
+        let view_menu = menu
+            .get("view")
+            .and_then(|item| item.as_submenu().cloned())
+            .ok_or_else(|| "View menu is not available".to_string())?;
+
+        let show_hidden_item = view_menu
+            .get("show_hidden_files")
+            .and_then(|item| item.as_check_menuitem().cloned())
+            .ok_or_else(|| "Show Hidden Files menu item is not available".to_string())?;
+
+        show_hidden_item
+            .set_checked(checked)
+            .map_err(|error| error.to_string())?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        let _ = checked;
+    }
+
+    Ok(())
+}
+
 fn resolve_existing_path(path: &Path) -> Result<PathBuf, String> {
     let mut candidate = path;
 
