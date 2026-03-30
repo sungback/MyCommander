@@ -1,10 +1,15 @@
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(not(target_os = "windows"))]
 use sysinfo::Disks;
 
 #[cfg(target_os = "windows")]
-use windows::Win32::Storage::FileSystem::GetLogicalDrives;
+use std::os::windows::ffi::OsStrExt;
+#[cfg(target_os = "windows")]
+use windows::core::PCWSTR;
+#[cfg(target_os = "windows")]
+use windows::Win32::Storage::FileSystem::{GetDiskFreeSpaceExW, GetLogicalDrives};
 
 #[derive(Serialize)]
 pub struct DriveInfo {
@@ -91,15 +96,50 @@ pub async fn get_available_space(path: String) -> Result<u64, String> {
 
 fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
     let resolved_path = resolve_existing_path(path)?;
+
+    #[cfg(target_os = "windows")]
+    {
+        return get_available_space_for_windows_path(&resolved_path);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
     let disks = Disks::new_with_refreshed_list();
 
-    disks
-        .list()
-        .iter()
-        .filter(|disk| resolved_path.starts_with(disk.mount_point()))
-        .max_by_key(|disk| disk.mount_point().to_string_lossy().len())
-        .map(|disk| disk.available_space())
-        .ok_or_else(|| format!("Could not find a mounted volume for {}", resolved_path.display()))
+        disks
+            .list()
+            .iter()
+            .filter(|disk| resolved_path.starts_with(disk.mount_point()))
+            .max_by_key(|disk| disk.mount_point().to_string_lossy().len())
+            .map(|disk| disk.available_space())
+            .ok_or_else(|| format!("Could not find a mounted volume for {}", resolved_path.display()))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn get_available_space_for_windows_path(path: &Path) -> Result<u64, String> {
+    let wide_path: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let mut free_bytes = 0_u64;
+
+    unsafe {
+        GetDiskFreeSpaceExW(
+            PCWSTR(wide_path.as_ptr()),
+            Some(&mut free_bytes as *mut u64),
+            None,
+            None,
+        )
+    }
+    .map(|_| free_bytes)
+    .map_err(|error| {
+        format!(
+            "Failed to get available space for {}: {error}",
+            path.display()
+        )
+    })
 }
 
 #[tauri::command(rename_all = "snake_case")]
