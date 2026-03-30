@@ -57,11 +57,6 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       };
 
       try {
-        // Correct initial path if it's the root placeholder or default Windows C:\
-        if (activePath === "/" || activePath === "C:\\" || activePath === "D:\\") {
-           await resolveHomeDirectory();
-        }
-
         const entries = await fs.listDirectory(activePath);
         setFiles(id, entries);
       } catch (err) {
