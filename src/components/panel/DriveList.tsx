@@ -36,7 +36,7 @@ export const DriveList: React.FC<DriveListProps> = ({ panelId }) => {
                 ? "text-text-primary bg-bg-hover" 
                 : "text-text-secondary"
             )}
-            title={`${drive.name} (${drive.drive_type})`}
+            title={`${drive.name} (${drive.type})`}
           >
             <HardDrive size={14} />
             <span className="font-bold">

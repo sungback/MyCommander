@@ -12,8 +12,7 @@ export interface FileEntry {
 export type SortField = "name" | "ext" | "size" | "date";
 export type SortDirection = "asc" | "desc";
 
-export interface PanelState {
-  id: "left" | "right";
+export interface PanelViewState {
   currentPath: string;
   history: string[];
   historyIndex: number;
@@ -23,4 +22,14 @@ export interface PanelState {
   sortField: SortField;
   sortDirection: SortDirection;
   lastUpdated: number;
+}
+
+export interface PanelTabState extends PanelViewState {
+  id: string;
+}
+
+export interface PanelState extends PanelViewState {
+  id: "left" | "right";
+  tabs: PanelTabState[];
+  activeTabId: string;
 }

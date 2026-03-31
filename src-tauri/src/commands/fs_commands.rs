@@ -182,6 +182,13 @@ pub async fn move_files(source_paths: Vec<String>, target_dir: String) -> Result
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn extract_zip(path: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || extract_zip_archive(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn read_file_content(path: String) -> Result<String, String> {
     use std::io::Read;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
@@ -218,6 +225,90 @@ fn compute_path_size(path: &str) -> Result<u64, String> {
     }
 
     get_dir_size_with_walkdir(path)
+}
+
+fn extract_zip_archive(path: &str) -> Result<String, String> {
+    use std::process::Command;
+
+    let archive_path = Path::new(path);
+    if !archive_path.is_file() {
+        return Err(format!("{path} is not a file"));
+    }
+
+    let extension = archive_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default();
+    if !extension.eq_ignore_ascii_case("zip") {
+        return Err(format!("{path} is not a zip archive"));
+    }
+
+    let target_dir = get_unique_extraction_dir(archive_path)?;
+
+    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    let status = Command::new("ditto")
+        .args(["-x", "-k"])
+        .arg(archive_path)
+        .arg(&target_dir)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    let status = Command::new("unzip")
+        .args(["-q"])
+        .arg(archive_path)
+        .args(["-d"])
+        .arg(&target_dir)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1]",
+        ])
+        .arg(archive_path)
+        .arg(&target_dir)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    if !status.success() {
+        let _ = fs::remove_dir_all(&target_dir);
+        return Err(format!("Failed to extract archive into {}", target_dir.display()));
+    }
+    Ok(target_dir.to_string_lossy().to_string())
+}
+
+fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
+    let parent_dir = archive_path
+        .parent()
+        .ok_or_else(|| format!("Could not find parent directory for {}", archive_path.display()))?;
+    let stem = archive_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Archive");
+
+    let initial_target = parent_dir.join(stem);
+    if !initial_target.exists() {
+        return Ok(initial_target);
+    }
+
+    for suffix in 2.. {
+        let candidate = parent_dir.join(format!("{stem} {suffix}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not find a unique extraction directory for {}",
+        archive_path.display()
+    ))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]

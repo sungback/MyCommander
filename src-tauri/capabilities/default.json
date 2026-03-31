@@ -18,6 +18,7 @@
     "allow-get-available-space",
     "allow-open-in-terminal",
     "allow-open-in-editor",
+    "allow-open-file",
     "allow-quit-app",
     "allow-list-directory",
     "allow-create-directory",
@@ -26,6 +27,7 @@
     "allow-rename-file",
     "allow-copy-files",
     "allow-move-files",
+    "allow-extract-zip",
     "allow-read-file-content",
     "allow-search-files",
     "allow-get-dir-size"

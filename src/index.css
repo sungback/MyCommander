@@ -26,6 +26,12 @@
   --error-color: #fa5252;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background-color: var(--bg-primary);

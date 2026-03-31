@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-extract-zip"
+description = "Enables the extract_zip command without any pre-configured scope."
+commands.allow = ["extract_zip"]
+
+[[permission]]
+identifier = "deny-extract-zip"
+description = "Denies the extract_zip command without any pre-configured scope."
+commands.deny = ["extract_zip"]

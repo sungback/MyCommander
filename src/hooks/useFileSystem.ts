@@ -4,7 +4,10 @@ import { FileEntry } from "../types/file";
 export interface DriveInfo {
   mount_point: string;
   name: string;
-  drive_type: string;
+  type: string;
+  icon: string;
+  isEjectable: boolean;
+  availableSpace?: number | null;
 }
 
 export interface SearchResult {
@@ -50,6 +53,10 @@ const fileSystem = {
     await invoke("open_in_editor", { path });
   },
 
+  openFile: async (path: string): Promise<void> => {
+    await invoke("open_file", { path });
+  },
+
   quitApp: async (): Promise<void> => {
     await invoke("quit_app");
   },
@@ -87,6 +94,10 @@ const fileSystem = {
       source_paths: sourcePaths,
       target_dir: targetDir,
     });
+  },
+
+  extractZip: async (path: string): Promise<string> => {
+    return await invoke<string>("extract_zip", { path });
   },
 
   renameFile: async (oldPath: string, newPath: string): Promise<void> => {

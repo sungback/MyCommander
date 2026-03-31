@@ -4,10 +4,9 @@ import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
 import { FileList } from "./FileList";
 import { clsx } from "clsx";
-
 import { DriveList } from "./DriveList";
 import { TabBar } from "./TabBar";
-import { useFileSystem } from "../../hooks/useFileSystem";
+import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getParentPath } from "../../utils/path";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 
@@ -33,6 +32,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const setCursor = usePanelStore((s) => s.setCursor);
   const setPath = usePanelStore((s) => s.setPath);
   const setFiles = usePanelStore((s) => s.setFiles);
+  const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const openContextMenu = useContextMenuStore((s) => s.openContextMenu);
@@ -46,12 +46,15 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const isActive = activePanelId === id;
 
   useEffect(() => {
-    // Initial fetch
+    let cancelled = false;
     let activePath = panelState.currentPath;
 
     const loadDir = async () => {
       const resolveHomeDirectory = async () => {
         const home = await fs.getHomeDir();
+        if (cancelled) {
+          return home;
+        }
         activePath = home;
         setPath(id, home);
         return home;
@@ -64,21 +67,49 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         }
 
         const entries = await fs.listDirectory(activePath, showHiddenFiles);
+        if (cancelled) {
+          return;
+        }
         setFiles(id, entries);
       } catch (err) {
+        if (cancelled) {
+          return;
+        }
         try {
           const home = await resolveHomeDirectory();
+          if (cancelled) {
+            return;
+          }
           const entries = await fs.listDirectory(home, showHiddenFiles);
+          if (cancelled) {
+            return;
+          }
           setFiles(id, entries);
         } catch (fallbackError) {
+          if (cancelled) {
+            return;
+          }
           console.error("Failed loading dir: ", err);
           console.error("Failed loading fallback home dir: ", fallbackError);
         }
       }
     };
 
-    loadDir();
-  }, [fs, id, panelState.currentPath, panelState.lastUpdated, setFiles, setPath, showHiddenFiles]);
+    void loadDir();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fs,
+    id,
+    panelState.activeTabId,
+    panelState.currentPath,
+    panelState.lastUpdated,
+    setFiles,
+    setPath,
+    showHiddenFiles,
+  ]);
 
   useEffect(() => {
     backgroundSchedulerRef.current = {
@@ -86,7 +117,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       queue: [],
       queuedPaths: new Set(),
     };
-  }, [id, panelState.currentPath]);
+  }, [id, panelState.activeTabId, panelState.currentPath]);
 
   useEffect(() => {
     const scheduler = backgroundSchedulerRef.current;
@@ -196,7 +227,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     };
   }, [id, openContextMenu, panelState.selectedItems, selectOnly, setActivePanel, setCursor]);
 
-  const handleEnter = (entry: any) => {
+  const handleEnter = async (entry: any) => {
     if (entry.kind === "directory") {
       if (entry.name === "..") {
         setPath(id, getParentPath(panelState.currentPath));
@@ -204,7 +235,34 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         setPath(id, entry.path);
       }
     } else {
-      console.log("Cannot enter file, need to open:", entry.path);
+      const isZipArchive =
+        typeof entry.name === "string" && entry.name.toLowerCase().endsWith(".zip");
+      const isDmgFile =
+        typeof entry.name === "string" && entry.name.toLowerCase().endsWith(".dmg");
+
+      if (!isZipArchive && !isDmgFile) {
+        console.log("Cannot enter file, need to open:", entry.path);
+        return;
+      }
+
+      try {
+        if (isZipArchive) {
+          await fs.extractZip(entry.path);
+          refreshPanel(id);
+        } else {
+          await fs.openFile(entry.path);
+        }
+      } catch (error) {
+        console.error("Failed to open archive file:", error);
+        window.alert(
+          getErrorMessage(
+            error,
+            isZipArchive
+              ? "Failed to extract zip archive."
+              : "Failed to open disk image."
+          )
+        );
+      }
     }
   };
 

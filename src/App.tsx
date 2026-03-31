@@ -75,7 +75,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-hidden relative">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         <DualPanel />
       </div>
       <StatusBar />
