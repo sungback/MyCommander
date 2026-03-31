@@ -63,7 +63,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           await resolveHomeDirectory();
         }
 
-        const entries = await fs.listDirectory(activePath);
+        const entries = await fs.listDirectory(activePath, showHiddenFiles);
         setFiles(id, entries);
       } catch (err) {
         try {

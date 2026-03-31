@@ -48,7 +48,7 @@ const getAvailableSpaceText = (availableSpace: number | null | undefined) => {
     return "Unknown available";
   }
 
-  return `${formatSize(availableSpace)} available`;
+  return `${formatSize(availableSpace, { base: 1000 })} available`;
 };
 
 const shouldSkipAvailableSpaceRequest = (panel: PanelState) =>
