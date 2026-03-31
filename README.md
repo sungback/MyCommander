@@ -96,6 +96,208 @@ Tauri 전체 빌드:
 npm run tauri build
 ```
 
+## 개발 시 Git 사용법
+
+이 프로젝트에서 가장 안전한 기본 흐름은 아래 순서입니다.
+
+1. 현재 상태 확인
+2. 원격 변경 가져오기
+3. 내 변경만 스테이징
+4. 커밋
+5. 푸시
+
+### 1. 현재 상태 확인
+
+작업 전후로 먼저 아래 명령을 확인합니다.
+
+```bash
+git status -sb
+```
+
+자주 보는 상태 예시:
+
+- `working tree clean`: 커밋할 변경 없음
+- `M README.md`: 수정된 파일이 있음
+- `?? some-file.txt`: Git이 아직 추적하지 않는 새 파일
+- `ahead 1`: 로컬 커밋이 원격보다 1개 앞섬. `git push` 필요
+- `behind 1`: 원격 커밋이 로컬보다 1개 앞섬. `git pull` 필요
+
+### 2. 먼저 원격 변경 가져오기
+
+협업 중이거나 GitHub 원격 저장소를 같이 쓰는 경우, 커밋 전에 먼저 최신 변경을 받는 편이 안전합니다.
+
+```bash
+git pull
+```
+
+`git pull`은 보통 아래 두 동작을 한 번에 수행합니다.
+
+- `git fetch`: 원격 변경 가져오기
+- `git merge`: 가져온 변경을 현재 브랜치에 병합
+
+원격과 내 로컬 변경이 서로 다르면 자동 머지 커밋이 생길 수 있습니다.
+
+### 3. 변경 파일 스테이징
+
+모든 변경을 한 번에 올리려면:
+
+```bash
+git add -A
+```
+
+특정 파일만 올리려면:
+
+```bash
+git add README.md
+git add src-tauri/src/main.rs
+```
+
+스테이징 후 확인:
+
+```bash
+git status
+```
+
+### 4. 커밋
+
+```bash
+git commit -m "변경 내용을 설명하는 커밋 메시지"
+```
+
+좋은 커밋 메시지 예시:
+
+- `Add cargo clean troubleshooting guide`
+- `Fix file delete error on Windows`
+- `Improve directory size calculation`
+
+### 5. 푸시
+
+```bash
+git push
+```
+
+로컬 브랜치가 원격보다 앞서 있으면 이 명령으로 GitHub에 반영됩니다.
+
+### 권장 작업 순서 예시
+
+이미 수정한 파일이 있는 상태에서 일반적으로는 아래 순서가 무난합니다.
+
+```bash
+git status -sb
+git pull
+git add -A
+git commit -m "설명"
+git push
+```
+
+아직 수정한 것이 없고 단순히 원격 최신 상태만 받고 싶다면:
+
+```bash
+git pull
+```
+
+이미 로컬 커밋을 만들어 둔 상태라면:
+
+```bash
+git pull
+git push
+```
+
+### `nothing to commit, working tree clean`의 의미
+
+아래 메시지는 에러라기보다 "새로 커밋할 파일이 없다"는 뜻입니다.
+
+```text
+nothing to commit, working tree clean
+```
+
+이 경우는 보통 둘 중 하나입니다.
+
+- 이미 이전에 커밋을 만들어 둔 상태
+- `git pull`이 자동 머지 커밋을 만든 뒤 더 이상 추가 변경이 없는 상태
+
+즉, 새 커밋이 필요 없는 상황일 수 있으므로 `git status -sb`와 `git log --oneline --decorate -5`로 현재 상태를 확인한 뒤 그냥 `git push`만 하면 되는 경우가 많습니다.
+
+### `git add -A && git commit ... && git push` 사용 시 주의
+
+아래처럼 명령을 한 줄로 묶어 쓰는 경우:
+
+```bash
+git add -A && git commit -m "메시지" && git push
+```
+
+`git commit` 단계에서 커밋할 내용이 없으면 그 명령은 성공으로 처리되지 않을 수 있고, 그 뒤의 `git push`가 실행되지 않을 수 있습니다.
+
+즉 아래 상황이 가능합니다.
+
+- 이미 커밋은 만들어져 있음
+- 작업 트리는 깨끗함
+- 그런데 `git commit`이 중단되어 `git push`가 안 됨
+
+이럴 때는 다시:
+
+```bash
+git push
+```
+
+만 실행하면 됩니다.
+
+### 자주 쓰는 확인 명령
+
+최근 커밋 보기:
+
+```bash
+git log --oneline --decorate -5
+```
+
+브랜치 상태 간단히 보기:
+
+```bash
+git status -sb
+```
+
+원격 저장소 확인:
+
+```bash
+git remote -v
+```
+
+### 이 프로젝트에서 보통 커밋하지 않는 것
+
+아래 항목은 생성물 또는 의존성이라 일반적으로 Git에 올리지 않습니다.
+
+- `node_modules/`
+- `dist/`
+- `src-tauri/target/`
+
+이들은 `.gitignore`에 의해 제외되며, 필요할 때 다시 생성됩니다.
+
+### 충돌이나 머지가 생겼을 때
+
+`git pull` 후 자동 머지가 실패하면 충돌 파일을 수정한 뒤 다시 커밋해야 합니다.
+
+기본 흐름:
+
+```bash
+git status
+```
+
+충돌 파일 수정 후:
+
+```bash
+git add 충돌난파일
+git commit
+git push
+```
+
+### 최소 권장 습관
+
+- 작업 시작 전 `git status -sb`
+- 푸시 전 `git pull`
+- 커밋 후 `git push`
+- 이상할 때는 먼저 `git status`와 `git log --oneline --decorate -5` 확인
+- 빌드 산출물보다 실제 소스 변경만 커밋
+
 ## 설치 파일 만들기
 
 현재 `src-tauri/tauri.conf.json` 에서 `bundle.targets` 가 `"all"` 로 설정되어 있어서, 각 운영체제에서 아래 명령을 실행하면 해당 OS에서 지원하는 번들이 생성됩니다.
