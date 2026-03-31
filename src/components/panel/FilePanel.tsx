@@ -61,8 +61,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       };
 
       try {
-        // Correct initial path if it's the root placeholder or default Windows C:\
-        if (activePath === "/" || activePath === "C:\\" || activePath === "D:\\") {
+        // Only replace the generic root placeholder. Windows drive roots are real targets.
+        if (activePath === "/") {
           await resolveHomeDirectory();
         }
 
