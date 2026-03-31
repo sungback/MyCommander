@@ -236,6 +236,67 @@ lsof -ti tcp:1420 | xargs kill
 npm run tauri dev
 ```
 
+### 3. `src-tauri/target` 폴더가 너무 커질 때
+
+Rust/Tauri 프로젝트는 빌드할 때 `src-tauri/target/` 아래에 많은 산출물을 생성합니다.
+
+이 폴더에는 다음이 포함됩니다.
+
+- 디버그 빌드 산출물
+- 릴리스 빌드 산출물
+- 증분 컴파일 캐시(`incremental`)
+- 라이브러리/오브젝트 파일(`.rlib`, `.lib`, `.o`)
+- 디버그 심볼 파일(`.pdb`)
+- 설치 파일 번들 중간 산출물
+
+프로젝트를 여러 번 빌드하거나 `dev`, `build`를 반복하면 이 폴더가 수 GB에서 수십 GB까지 커질 수 있습니다.
+
+이럴 때는 `cargo clean`으로 Rust 빌드 산출물을 정리할 수 있습니다.
+
+프로젝트 루트에서 실행:
+
+```bash
+cargo clean --manifest-path src-tauri/Cargo.toml
+```
+
+또는 `src-tauri`로 이동해서 실행:
+
+```bash
+cd src-tauri
+cargo clean
+cd ..
+```
+
+`cargo clean`이 하는 일:
+
+- `src-tauri/target/` 아래의 컴파일 결과물을 삭제합니다.
+- 다음 빌드 때 필요한 파일은 자동으로 다시 생성됩니다.
+- 소스 코드(`src/`, `src-tauri/src/`)는 삭제하지 않습니다.
+- `node_modules`나 프런트엔드 결과물은 정리하지 않습니다.
+
+이 프로젝트에서 특히 효과가 큰 이유:
+
+- Tauri 앱은 프런트엔드뿐 아니라 Rust 백엔드도 함께 빌드합니다.
+- Windows에서는 `.pdb`, `.lib`, `.rlib` 같은 파일이 크게 생성될 수 있습니다.
+- `debug`와 `release` 빌드를 모두 수행하면 `target/` 안에 캐시가 중복으로 쌓입니다.
+
+언제 실행하면 좋은가:
+
+- 프로젝트 폴더 용량이 갑자기 크게 늘었을 때
+- Rust/Tauri 빌드를 오래 반복해서 `target/`이 비대해졌을 때
+- 디스크 공간이 부족할 때
+- 빌드 캐시를 초기화하고 다시 깨끗하게 빌드하고 싶을 때
+
+주의:
+
+- 다음 `npm run tauri dev` 또는 `npm run tauri build` 실행 시 Rust 쪽을 다시 컴파일하므로 첫 빌드는 더 오래 걸릴 수 있습니다.
+- `cargo clean`은 속도를 위해 저장해 둔 캐시를 지우는 것이므로, 용량 절약과 빌드 시간 사이의 교환이 있습니다.
+
+참고:
+
+- `src-tauri/target/`은 Git 추적 대상이 아니므로 정리해도 버전 관리에는 영향이 없습니다.
+- 프런트엔드 용량까지 함께 정리하려면 필요에 따라 `dist/`나 `node_modules/`도 별도로 관리해야 합니다.
+
 ## 개발 메모
 
 - Tauri 개발 실행: `npm run tauri dev`
