@@ -9,6 +9,14 @@ use tauri::{AppHandle, Emitter, Runtime};
 const SHOW_HIDDEN_MENU_ITEM_ID: &str = "show_hidden_files";
 #[cfg(target_os = "macos")]
 const VIEW_MENU_ID: &str = "view";
+#[cfg(target_os = "macos")]
+const THEME_MENU_ID: &str = "theme";
+#[cfg(target_os = "macos")]
+const THEME_AUTO_MENU_ITEM_ID: &str = "theme_auto";
+#[cfg(target_os = "macos")]
+const THEME_LIGHT_MENU_ITEM_ID: &str = "theme_light";
+#[cfg(target_os = "macos")]
+const THEME_DARK_MENU_ITEM_ID: &str = "theme_dark";
 
 #[cfg(target_os = "macos")]
 fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -29,6 +37,38 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         false,
         Some("CmdOrCtrl+Shift+Period"),
+    )?;
+
+    let theme_auto = CheckMenuItem::with_id(
+        app,
+        THEME_AUTO_MENU_ITEM_ID,
+        "Auto",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let theme_light = CheckMenuItem::with_id(
+        app,
+        THEME_LIGHT_MENU_ITEM_ID,
+        "Light",
+        true,
+        false,
+        None::<&str>,
+    )?;
+    let theme_dark = CheckMenuItem::with_id(
+        app,
+        THEME_DARK_MENU_ITEM_ID,
+        "Dark",
+        true,
+        false,
+        None::<&str>,
+    )?;
+    let theme_menu = Submenu::with_id_and_items(
+        app,
+        THEME_MENU_ID,
+        "Theme",
+        true,
+        &[&theme_auto, &theme_light, &theme_dark],
     )?;
 
     let window_menu = Submenu::with_items(
@@ -91,6 +131,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 true,
                 &[
                     &show_hidden_files,
+                    &theme_menu,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::fullscreen(app, None)?,
                 ],
@@ -117,17 +158,32 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             #[cfg(target_os = "macos")]
-            if event.id().as_ref() == SHOW_HIDDEN_MENU_ITEM_ID {
-                if let Some(menu) = app.menu() {
-                    if let Some(view_menu) = menu.get(VIEW_MENU_ID).and_then(|item| item.as_submenu().cloned()) {
-                        if let Some(checked) = view_menu
-                            .get(SHOW_HIDDEN_MENU_ITEM_ID)
-                            .and_then(|item| item.as_check_menuitem().cloned())
-                            .and_then(|item| item.is_checked().ok())
-                        {
-                            let _ = app.emit("show-hidden-files-changed", checked);
+            {
+                let event_id = event.id().as_ref();
+
+                if event_id == SHOW_HIDDEN_MENU_ITEM_ID {
+                    if let Some(menu) = app.menu() {
+                        if let Some(view_menu) = menu.get(VIEW_MENU_ID).and_then(|item| item.as_submenu().cloned()) {
+                            if let Some(checked) = view_menu
+                                .get(SHOW_HIDDEN_MENU_ITEM_ID)
+                                .and_then(|item| item.as_check_menuitem().cloned())
+                                .and_then(|item| item.is_checked().ok())
+                            {
+                                let _ = app.emit("show-hidden-files-changed", checked);
+                            }
                         }
                     }
+                }
+
+                let theme = match event_id {
+                    THEME_AUTO_MENU_ITEM_ID => Some("auto"),
+                    THEME_LIGHT_MENU_ITEM_ID => Some("light"),
+                    THEME_DARK_MENU_ITEM_ID => Some("dark"),
+                    _ => None,
+                };
+
+                if let Some(theme) = theme {
+                    let _ = app.emit("theme-preference-changed", theme);
                 }
             }
         })
@@ -144,6 +200,7 @@ pub fn run() {
             commands::system_commands::open_file,
             commands::system_commands::quit_app,
             commands::system_commands::set_show_hidden_menu_checked,
+            commands::system_commands::set_theme_menu_selection,
             commands::fs_commands::list_directory,
             commands::fs_commands::create_directory,
             commands::fs_commands::create_file,

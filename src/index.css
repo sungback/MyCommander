@@ -24,6 +24,64 @@
   --border-color: #373a40;
   --accent-color: #3bc9db;
   --error-color: #fa5252;
+  --selection-text-color: #f8f9fa;
+  --folder-color: #8ecff2;
+  --folder-name-color: #cbe8ff;
+  --hidden-text-color: rgba(248, 249, 250, 0.75);
+}
+
+:root[data-theme="light"] {
+  --color-bg-primary: #e8edf3;
+  --color-bg-secondary: #dbe4ee;
+  --color-bg-panel: #ffffff;
+  --color-bg-hover: #d6e1ee;
+  --color-bg-selected: #c7d9ec;
+  --color-text-primary: #0f1724;
+  --color-text-secondary: #36475a;
+  --color-border-color: #b8c6d4;
+  --color-accent-color: #7f9fc0;
+  --color-error-color: #d9485a;
+  --bg-primary: #e8edf3;
+  --bg-secondary: #dbe4ee;
+  --bg-panel: #ffffff;
+  --bg-hover: #d6e1ee;
+  --bg-selected: #c7d9ec;
+  --text-primary: #0f1724;
+  --text-secondary: #36475a;
+  --border-color: #b8c6d4;
+  --accent-color: #7f9fc0;
+  --error-color: #d9485a;
+  --selection-text-color: #10243d;
+  --folder-color: #d6a034;
+  --folder-name-color: #163b63;
+  --hidden-text-color: rgba(54, 71, 90, 0.72);
+}
+
+:root[data-theme="dark"] {
+  --color-bg-primary: #1a1b1e;
+  --color-bg-secondary: #25262b;
+  --color-bg-panel: #2c2e33;
+  --color-bg-hover: #373a40;
+  --color-bg-selected: #1971c2;
+  --color-text-primary: #f8f9fa;
+  --color-text-secondary: #ced4da;
+  --color-border-color: #373a40;
+  --color-accent-color: #3bc9db;
+  --color-error-color: #fa5252;
+  --bg-primary: #1a1b1e;
+  --bg-secondary: #25262b;
+  --bg-panel: #2c2e33;
+  --bg-hover: #373a40;
+  --bg-selected: #1971c2;
+  --text-primary: #f8f9fa;
+  --text-secondary: #ced4da;
+  --border-color: #373a40;
+  --accent-color: #3bc9db;
+  --error-color: #fa5252;
+  --selection-text-color: #f8f9fa;
+  --folder-color: #8ecff2;
+  --folder-name-color: #cbe8ff;
+  --hidden-text-color: rgba(248, 249, 250, 0.75);
 }
 
 html,
@@ -39,6 +97,9 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden; /* Prevent body scrolling */
   user-select: none; /* Make it feel like a desktop app */
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
 }
 
 /* Scrollbar styling for native feel */
@@ -62,4 +123,20 @@ body {
 
 .font-mono {
   font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+.theme-selection-text {
+  color: var(--selection-text-color);
+}
+
+.theme-folder-icon {
+  color: var(--folder-color);
+}
+
+.theme-folder-name {
+  color: var(--folder-name-color);
+}
+
+.theme-hidden-text {
+  color: var(--hidden-text-color);
 }

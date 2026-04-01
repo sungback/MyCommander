@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { FileEntry, PanelState, PanelTabState } from "../types/file";
+import { ThemePreference } from "../types/theme";
 
 type PanelId = "left" | "right";
 
@@ -9,8 +10,10 @@ interface AppState {
   sizeCache: Record<string, number>;
   activePanel: PanelId;
   showHiddenFiles: boolean;
+  themePreference: ThemePreference;
   setActivePanel: (panel: PanelId) => void;
   setShowHiddenFiles: (show: boolean) => void;
+  setThemePreference: (themePreference: ThemePreference) => void;
   addTab: (panel: PanelId) => void;
   activateTab: (panel: PanelId, tabId: string) => void;
   closeTab: (panel: PanelId, tabId: string) => void;
@@ -31,6 +34,7 @@ interface PersistedPanelState {
   leftPath?: string;
   rightPath?: string;
   showHiddenFiles?: boolean;
+  themePreference?: ThemePreference;
 }
 
 const PANEL_STATE_STORAGE_KEY = "total-commander:panel-state";
@@ -73,6 +77,12 @@ const readPersistedPanelState = (): PersistedPanelState => {
       rightPath: typeof parsed.rightPath === "string" ? parsed.rightPath : undefined,
       showHiddenFiles:
         typeof parsed.showHiddenFiles === "boolean" ? parsed.showHiddenFiles : undefined,
+      themePreference:
+        parsed.themePreference === "auto" ||
+        parsed.themePreference === "light" ||
+        parsed.themePreference === "dark"
+          ? parsed.themePreference
+          : undefined,
     };
   } catch (error) {
     console.error("Failed to restore panel state:", error);
@@ -249,13 +259,15 @@ const persistVisiblePanelState = (
   leftPanel: PanelState,
   rightPanel: PanelState,
   activePanel: PanelId,
-  showHiddenFiles: boolean
+  showHiddenFiles: boolean,
+  themePreference: ThemePreference
 ) => {
   writePersistedPanelState({
     activePanel,
     leftPath: leftPanel.currentPath,
     rightPath: rightPanel.currentPath,
     showHiddenFiles,
+    themePreference,
   });
 };
 
@@ -265,6 +277,7 @@ export const usePanelStore = create<AppState>((set) => ({
   sizeCache: {},
   activePanel: persistedPanelState.activePanel ?? "left",
   showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
+  themePreference: persistedPanelState.themePreference ?? "auto",
 
   setActivePanel: (activePanel) =>
     set((state) => {
@@ -272,7 +285,8 @@ export const usePanelStore = create<AppState>((set) => ({
         state.leftPanel,
         state.rightPanel,
         activePanel,
-        state.showHiddenFiles
+        state.showHiddenFiles,
+        state.themePreference
       );
       return { activePanel };
     }),
@@ -283,9 +297,22 @@ export const usePanelStore = create<AppState>((set) => ({
         state.leftPanel,
         state.rightPanel,
         state.activePanel,
-        showHiddenFiles
+        showHiddenFiles,
+        state.themePreference
       );
       return { showHiddenFiles };
+    }),
+
+  setThemePreference: (themePreference) =>
+    set((state) => {
+      persistVisiblePanelState(
+        state.leftPanel,
+        state.rightPanel,
+        state.activePanel,
+        state.showHiddenFiles,
+        themePreference
+      );
+      return { themePreference };
     }),
 
   addTab: (panel) =>
@@ -308,7 +335,8 @@ export const usePanelStore = create<AppState>((set) => ({
         panel === "left" ? nextPanelState : state.leftPanel,
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
-        state.showHiddenFiles
+        state.showHiddenFiles,
+        state.themePreference
       );
 
       return {
@@ -334,7 +362,8 @@ export const usePanelStore = create<AppState>((set) => ({
         panel === "left" ? nextPanelState : state.leftPanel,
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
-        state.showHiddenFiles
+        state.showHiddenFiles,
+        state.themePreference
       );
 
       return {
@@ -372,7 +401,8 @@ export const usePanelStore = create<AppState>((set) => ({
         panel === "left" ? nextPanelState : state.leftPanel,
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
-        state.showHiddenFiles
+        state.showHiddenFiles,
+        state.themePreference
       );
 
       return {
@@ -394,7 +424,8 @@ export const usePanelStore = create<AppState>((set) => ({
         panel === "left" ? nextPanelState : state.leftPanel,
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
-        state.showHiddenFiles
+        state.showHiddenFiles,
+        state.themePreference
       );
 
       return {

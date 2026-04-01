@@ -9,12 +9,46 @@ import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { isMacPlatform } from "./hooks/useAppCommands";
+import { AppTheme, ThemePreference } from "./types/theme";
+
+const DAY_START_HOUR = 7;
+const NIGHT_START_HOUR = 19;
+
+const getThemeForDate = (date: Date): AppTheme => {
+  const hour = date.getHours();
+  return hour >= DAY_START_HOUR && hour < NIGHT_START_HOUR ? "light" : "dark";
+};
+
+const getNextThemeTransitionDelay = (now: Date) => {
+  const nextTransition = new Date(now);
+
+  if (now.getHours() < DAY_START_HOUR) {
+    nextTransition.setHours(DAY_START_HOUR, 0, 0, 0);
+  } else if (now.getHours() < NIGHT_START_HOUR) {
+    nextTransition.setHours(NIGHT_START_HOUR, 0, 0, 0);
+  } else {
+    nextTransition.setDate(nextTransition.getDate() + 1);
+    nextTransition.setHours(DAY_START_HOUR, 0, 0, 0);
+  }
+
+  return Math.max(nextTransition.getTime() - now.getTime(), 1000);
+};
+
+const resolveTheme = (themePreference: ThemePreference): AppTheme => {
+  if (themePreference === "auto") {
+    return getThemeForDate(new Date());
+  }
+
+  return themePreference;
+};
 
 function App() {
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const setShowHiddenFiles = usePanelStore((s) => s.setShowHiddenFiles);
+  const themePreference = usePanelStore((s) => s.themePreference);
+  const setThemePreference = usePanelStore((s) => s.setThemePreference);
   
   // Initialize global shortcuts
   useKeyboard();
@@ -70,8 +104,88 @@ function App() {
       return;
     }
 
+    let isMounted = true;
+
+    const attachListener = async () => {
+      const unlisten = await listen<ThemePreference>("theme-preference-changed", (event) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (
+          event.payload === "auto" ||
+          event.payload === "light" ||
+          event.payload === "dark"
+        ) {
+          setThemePreference(event.payload);
+        }
+      });
+
+      if (!isMounted) {
+        unlisten();
+      }
+
+      return unlisten;
+    };
+
+    let cleanup: (() => void) | undefined;
+    void attachListener().then((unlisten) => {
+      cleanup = unlisten;
+    });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [setThemePreference]);
+
+  useEffect(() => {
+    if (!isMacPlatform()) {
+      return;
+    }
+
     void invoke("set_show_hidden_menu_checked", { checked: showHiddenFiles });
   }, [showHiddenFiles]);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+
+    const applyTheme = () => {
+      const theme = resolveTheme(themePreference);
+      document.documentElement.dataset.theme = theme;
+
+      if (themePreference === "auto") {
+        timeoutId = window.setTimeout(applyTheme, getNextThemeTransitionDelay(new Date()));
+      }
+    };
+
+    const handleFocus = () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      applyTheme();
+    };
+
+    applyTheme();
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [themePreference]);
+
+  useEffect(() => {
+    if (!isMacPlatform()) {
+      return;
+    }
+
+    void invoke("set_theme_menu_selection", { theme: themePreference });
+  }, [themePreference]);
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">

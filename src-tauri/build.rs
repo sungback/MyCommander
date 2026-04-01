@@ -7,6 +7,8 @@ fn main() {
         "open_in_editor",
         "open_file",
         "quit_app",
+        "set_show_hidden_menu_checked",
+        "set_theme_menu_selection",
         "list_directory",
         "create_directory",
         "create_file",

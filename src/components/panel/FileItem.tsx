@@ -32,6 +32,9 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const isDir = entry.kind === "directory";
   const isHidden = Boolean(entry.isHidden);
   const disclosureOffset = depth * 14;
+  const isSelectionRow = Boolean(isSelected && !isCursor);
+  const rowTextClass = isSelectionRow ? "theme-selection-text" : "text-text-primary";
+  const secondaryTextClass = isSelectionRow ? "theme-selection-text" : "text-text-secondary";
 
   return (
     <div
@@ -40,7 +43,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
       className={clsx(
         "flex items-center h-[28px] border-b border-transparent group select-none font-mono text-sm",
         {
-          "bg-bg-selected text-white": isSelected && !isCursor,
+          "bg-bg-selected theme-selection-text": isSelectionRow,
           "border-dotted border-accent-color": isCursor && isActivePanel,
           "border-dotted border-border-color": isCursor && !isActivePanel,
           "bg-bg-hover": isCursor,
@@ -58,11 +61,11 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onToggleExpand?.();
+          onToggleExpand?.();
           }}
           className={clsx(
             "flex h-4 w-4 shrink-0 items-center justify-center rounded text-text-secondary transition-colors",
-            canExpand ? "hover:bg-white/8" : "pointer-events-none opacity-0"
+            canExpand ? "hover:bg-bg-hover/70" : "pointer-events-none opacity-0"
           )}
           tabIndex={-1}
           aria-label={isExpanded ? "Collapse folder preview" : "Expand folder preview"}
@@ -76,14 +79,14 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
             isExpanded ? (
               <FolderOpen
                 size={15}
-                className={isSelected ? "text-white" : "text-sky-300"}
+                className={isSelectionRow ? "theme-selection-text" : "theme-folder-icon"}
                 fill="currentColor"
                 fillOpacity={0.18}
               />
             ) : (
               <FolderClosed
                 size={15}
-                className={isSelected ? "text-white" : "text-sky-300"}
+                className={isSelectionRow ? "theme-selection-text" : "theme-folder-icon"}
                 fill="currentColor"
                 fillOpacity={0.18}
               />
@@ -93,18 +96,18 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           )}
         </span>
         <span
-          className={clsx("truncate", {
-            "font-bold text-sky-200": isDir && !isSelected,
-            "text-white/75": isHidden && !isSelected,
+          className={clsx("truncate", rowTextClass, {
+            "font-bold theme-folder-name": isDir && !isSelected,
+            "theme-hidden-text": isHidden && !isSelected,
           })}
         >
           {entry.name}
         </span>
       </div>
-      <div className="w-24 px-2 text-right border-r border-border-color/30 text-text-secondary">
+      <div className={clsx("w-24 px-2 text-right border-r border-border-color/30", secondaryTextClass)}>
         {isDir && entry.name !== ".." && (entry.size === undefined || entry.size === null) ? "<DIR>" : formatSize(entry.size)}
       </div>
-      <div className="w-36 px-2 text-text-secondary whitespace-nowrap">
+      <div className={clsx("w-36 px-2 whitespace-nowrap", secondaryTextClass)}>
         {formatDate(entry.lastModified)}
       </div>
     </div>

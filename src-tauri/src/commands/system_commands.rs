@@ -199,6 +199,48 @@ pub fn set_show_hidden_menu_checked(app: tauri::AppHandle, checked: bool) -> Res
     Ok(())
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub fn set_theme_menu_selection(app: tauri::AppHandle, theme: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let menu = app
+            .menu()
+            .ok_or_else(|| "Application menu is not available".to_string())?;
+
+        let view_menu = menu
+            .get("view")
+            .and_then(|item| item.as_submenu().cloned())
+            .ok_or_else(|| "View menu is not available".to_string())?;
+
+        let theme_menu = view_menu
+            .get("theme")
+            .and_then(|item| item.as_submenu().cloned())
+            .ok_or_else(|| "Theme menu is not available".to_string())?;
+
+        for (item_id, is_checked) in [
+            ("theme_auto", theme == "auto"),
+            ("theme_light", theme == "light"),
+            ("theme_dark", theme == "dark"),
+        ] {
+            let item = theme_menu
+                .get(item_id)
+                .and_then(|menu_item| menu_item.as_check_menuitem().cloned())
+                .ok_or_else(|| format!("{item_id} menu item is not available"))?;
+
+            item.set_checked(is_checked)
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        let _ = theme;
+    }
+
+    Ok(())
+}
+
 #[cfg(not(target_os = "windows"))]
 fn build_unix_drive_info(disk: &Disk) -> Option<DriveInfo> {
     let mount_point = disk.mount_point().to_string_lossy().to_string();

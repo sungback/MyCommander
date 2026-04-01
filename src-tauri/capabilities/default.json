@@ -20,6 +20,8 @@
     "allow-open-in-editor",
     "allow-open-file",
     "allow-quit-app",
+    "allow-set-show-hidden-menu-checked",
+    "allow-set-theme-menu-selection",
     "allow-list-directory",
     "allow-create-directory",
     "allow-create-file",
