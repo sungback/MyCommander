@@ -66,9 +66,9 @@ function App() {
   }, [activePanelId, setActivePanel]);
 
   useEffect(() => {
-    if (!isMacPlatform()) {
-      return;
-    }
+//     if (!isMacPlatform()) {
+//       return;
+//     }
 
     let isMounted = true;
 
@@ -100,9 +100,9 @@ function App() {
   }, [setShowHiddenFiles]);
 
   useEffect(() => {
-    if (!isMacPlatform()) {
-      return;
-    }
+//     if (!isMacPlatform()) {
+//       return;
+//     }
 
     let isMounted = true;
 
@@ -140,9 +140,9 @@ function App() {
   }, [setThemePreference]);
 
   useEffect(() => {
-    if (!isMacPlatform()) {
-      return;
-    }
+//     if (!isMacPlatform()) {
+//       return;
+//     }
 
     void invoke("set_show_hidden_menu_checked", { checked: showHiddenFiles });
   }, [showHiddenFiles]);
@@ -180,9 +180,9 @@ function App() {
   }, [themePreference]);
 
   useEffect(() => {
-    if (!isMacPlatform()) {
-      return;
-    }
+//     if (!isMacPlatform()) {
+//       return;
+//     }
 
     void invoke("set_theme_menu_selection", { theme: themePreference });
   }, [themePreference]);
