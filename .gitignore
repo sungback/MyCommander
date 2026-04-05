@@ -1,31 +1,39 @@
-# Logs
-logs
+# === 의존성 ===
+node_modules/
+
+# === 빌드 산출물 ===
+dist/
+dist-ssr/
+coverage/
+src-tauri/target/
+
+# === 로그 ===
+logs/
 *.log
 build_log.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-coverage
-*.tsbuildinfo
-*.local
+# === 환경 변수 ===
 .env
 .env.*
+*.local
 
-# Editor directories and files
+# === TypeScript 빌드 캐시 ===
+*.tsbuildinfo
+
+# === 프로젝트 특화 폴더 ===
+.omc/
+.omx/
+
+# === 에디터 ===
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
+
+# === OS ===
 .DS_Store
 Thumbs.db
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-*.omx
+
+# 참고: src-tauri/Cargo.lock 은 바이너리 앱이므로 커밋 권장 (제외 안 함)

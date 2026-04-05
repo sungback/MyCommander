@@ -1,0 +1,33 @@
+# 의존성 폴더 (가장 중요!)
+node_modules/
+vendor/
+
+# 빌드 및 출력물
+dist/
+.next/
+out/
+src-tauri/target/
+
+# 로그 및 임시 파일
+*.log
+build_log.txt
+tmp/
+.cache/
+
+# 민감한 정보
+.env
+.env.*
+
+# 프로젝트 특화 폴더
+.omc/
+.omx/
+
+# macOS
+.DS_Store
+
+# Git 내부
+.git/
+
+# 락 파일 (용량이 크나 참고용으로 제외)
+package-lock.json
+yarn.lock
