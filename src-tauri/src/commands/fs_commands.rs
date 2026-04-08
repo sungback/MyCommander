@@ -547,3 +547,137 @@ fn normalize_target_path(path: &Path) -> Result<PathBuf, String> {
 
     Ok(resolved)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn collapse_nested_removes_children() {
+        let paths = vec![
+            "/a".to_string(),
+            "/a/b".to_string(),
+            "/a/b/c".to_string(),
+        ];
+        let result = collapse_nested_paths(paths);
+        assert_eq!(result, vec![PathBuf::from("/a")]);
+    }
+
+    #[test]
+    fn collapse_nested_keeps_siblings() {
+        let paths = vec![
+            "/a".to_string(),
+            "/b".to_string(),
+            "/c".to_string(),
+        ];
+        let result = collapse_nested_paths(paths);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn collapse_nested_handles_overlapping_prefixes() {
+        // /app should NOT collapse /a/b because /app does not start with /a/
+        let paths = vec![
+            "/a".to_string(),
+            "/app".to_string(),
+        ];
+        let result = collapse_nested_paths(paths);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn collapse_nested_removes_exact_duplicate() {
+        let paths = vec![
+            "/a/b".to_string(),
+            "/a/b".to_string(),
+        ];
+        let result = collapse_nested_paths(paths);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], PathBuf::from("/a/b"));
+    }
+
+    #[test]
+    fn collapse_nested_empty_vec() {
+        let result = collapse_nested_paths(vec![]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn hidden_entry_dot_prefix() {
+        let dir = std::env::temp_dir();
+        let metadata = fs::metadata(&dir).unwrap();
+        assert!(is_hidden_entry(".hidden", &metadata));
+    }
+
+    #[test]
+    fn hidden_entry_normal_file() {
+        let dir = std::env::temp_dir();
+        let metadata = fs::metadata(&dir).unwrap();
+        assert!(!is_hidden_entry("visible.txt", &metadata));
+    }
+
+    #[test]
+    fn hidden_entry_dot_and_dotdot_are_not_hidden() {
+        let dir = std::env::temp_dir();
+        let metadata = fs::metadata(&dir).unwrap();
+        assert!(!is_hidden_entry(".", &metadata));
+        assert!(!is_hidden_entry("..", &metadata));
+    }
+
+    #[test]
+    fn unique_extraction_dir_base_name() {
+        let tmp = std::env::temp_dir().join("test_extract_unique");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let archive = tmp.join("data.zip");
+        fs::write(&archive, b"").unwrap();
+
+        let result = get_unique_extraction_dir(&archive).unwrap();
+        assert_eq!(result, tmp.join("data"));
+
+        // Clean up
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn unique_extraction_dir_increments_suffix() {
+        let tmp = std::env::temp_dir().join("test_extract_suffix");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let archive = tmp.join("data.zip");
+        fs::write(&archive, b"").unwrap();
+
+        // Create "data" dir so the first name is taken
+        fs::create_dir_all(tmp.join("data")).unwrap();
+
+        let result = get_unique_extraction_dir(&archive).unwrap();
+        assert_eq!(result, tmp.join("data 2"));
+
+        // Clean up
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn compute_path_size_for_single_file() {
+        let tmp = std::env::temp_dir().join("test_size_file");
+        let _ = fs::remove_file(&tmp);
+
+        let content = b"hello world";
+        fs::write(&tmp, content).unwrap();
+
+        let size = compute_path_size(tmp.to_str().unwrap()).unwrap();
+        assert_eq!(size, content.len() as u64);
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn compute_path_size_nonexistent_path() {
+        let result = compute_path_size("/nonexistent/path/that/should/not/exist");
+        assert!(result.is_err());
+    }
+}
+

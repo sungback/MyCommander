@@ -8,7 +8,6 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
 import { ContextMenu } from "./components/layout/ContextMenu";
-import { isMacPlatform } from "./hooks/useAppCommands";
 import { AppTheme, ThemePreference } from "./types/theme";
 
 const DAY_START_HOUR = 7;
