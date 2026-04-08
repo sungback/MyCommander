@@ -9,6 +9,15 @@ import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { AppTheme, ThemePreference } from "./types/theme";
+import { ViewMode } from "./types/file";
+import { useDialogStore } from "./store/dialogStore";
+
+type PanelId = "left" | "right";
+
+interface PanelViewModeChangedPayload {
+  panel: PanelId;
+  viewMode: ViewMode;
+}
 
 const DAY_START_HOUR = 7;
 const NIGHT_START_HOUR = 19;
@@ -48,6 +57,9 @@ function App() {
   const setShowHiddenFiles = usePanelStore((s) => s.setShowHiddenFiles);
   const themePreference = usePanelStore((s) => s.themePreference);
   const setThemePreference = usePanelStore((s) => s.setThemePreference);
+  const panelViewModes = usePanelStore((s) => s.panelViewModes);
+  const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
+  const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   
   // Initialize global shortcuts
   useKeyboard();
@@ -139,6 +151,84 @@ function App() {
   }, [setThemePreference]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const attachListener = async () => {
+      const unlisten = await listen<PanelViewModeChangedPayload>("panel-view-mode-changed", (event) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (
+          (event.payload.panel === "left" || event.payload.panel === "right") &&
+          (event.payload.viewMode === "brief" || event.payload.viewMode === "detailed")
+        ) {
+          setPanelViewMode(event.payload.panel, event.payload.viewMode);
+        }
+      });
+
+      if (!isMounted) {
+        unlisten();
+      }
+
+      return unlisten;
+    };
+
+    let cleanup: (() => void) | undefined;
+    void attachListener().then((unlisten) => {
+      cleanup = unlisten;
+    });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [setPanelViewMode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const attachListener = async () => {
+      const [unlistenNewFolder, unlistenNewFile] = await Promise.all([
+        listen("new-folder-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          setOpenDialog("mkdir");
+        }),
+        listen("new-file-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          setOpenDialog("newfile");
+        }),
+      ]);
+
+      if (!isMounted) {
+        unlistenNewFolder();
+        unlistenNewFile();
+      }
+
+      return () => {
+        unlistenNewFolder();
+        unlistenNewFile();
+      };
+    };
+
+    let cleanup: (() => void) | undefined;
+    void attachListener().then((unlisten) => {
+      cleanup = unlisten;
+    });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [setOpenDialog]);
+
+  useEffect(() => {
 //     if (!isMacPlatform()) {
 //       return;
 //     }
@@ -185,6 +275,13 @@ function App() {
 
     void invoke("set_theme_menu_selection", { theme: themePreference });
   }, [themePreference]);
+
+  useEffect(() => {
+    void invoke("set_view_mode_menu_selection", {
+      leftMode: panelViewModes.left,
+      rightMode: panelViewModes.right,
+    });
+  }, [panelViewModes.left, panelViewModes.right]);
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">

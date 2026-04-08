@@ -163,6 +163,15 @@ pub async fn open_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn run_shell_command(path: String, command: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+
+    tokio::task::spawn_blocking(move || run_shell_command_for_path(&path, &command))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -214,6 +223,53 @@ pub fn set_theme_menu_selection(app: tauri::AppHandle, theme: String) -> Result<
         let item = theme_menu
             .get(item_id)
             .and_then(|menu_item| menu_item.as_check_menuitem().cloned())
+            .ok_or_else(|| format!("{item_id} menu item is not available"))?;
+
+        item.set_checked(is_checked)
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn set_view_mode_menu_selection(
+    app: tauri::AppHandle,
+    left_mode: String,
+    right_mode: String,
+) -> Result<(), String> {
+    let menu = app
+        .menu()
+        .ok_or_else(|| "Application menu is not available".to_string())?;
+
+    let view_menu = menu
+        .get("view")
+        .and_then(|item| item.as_submenu().cloned())
+        .ok_or_else(|| "View menu is not available".to_string())?;
+
+    for (item_id, is_checked) in [
+        ("left_view_mode_brief", left_mode == "brief"),
+        ("left_view_mode_detailed", left_mode == "detailed"),
+        ("right_view_mode_brief", right_mode == "brief"),
+        ("right_view_mode_detailed", right_mode == "detailed"),
+    ] {
+        let item = view_menu
+            .get(item_id)
+            .and_then(|menu_item| menu_item.as_check_menuitem().cloned())
+            .or_else(|| {
+                view_menu
+                    .get("left_panel_view")
+                    .and_then(|item| item.as_submenu().cloned())
+                    .and_then(|submenu| submenu.get(item_id))
+                    .and_then(|item| item.as_check_menuitem().cloned())
+            })
+            .or_else(|| {
+                view_menu
+                    .get("right_panel_view")
+                    .and_then(|item| item.as_submenu().cloned())
+                    .and_then(|submenu| submenu.get(item_id))
+                    .and_then(|item| item.as_check_menuitem().cloned())
+            })
             .ok_or_else(|| format!("{item_id} menu item is not available"))?;
 
         item.set_checked(is_checked)
@@ -480,6 +536,99 @@ fn open_in_terminal_for_path(path: &Path) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn run_shell_command_for_path(path: &Path, command: &str) -> Result<(), String> {
+    let resolved_path = resolve_existing_path(path)?;
+    let working_directory = if resolved_path.is_dir() {
+        resolved_path
+    } else {
+        resolved_path
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| format!("Could not find parent directory for {}", path.display()))?
+    };
+
+    if command.trim().is_empty() {
+        return Err("Command is empty".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let shell_path = shell_escape_single_quotes(&working_directory.to_string_lossy());
+        let shell_command = format!("cd '{}' ; {}", shell_path, command);
+        let script = format!(
+            "tell application \"Terminal\"\nactivate\ndo script \"{}\"\nend tell",
+            escape_applescript_string(&shell_command)
+        );
+
+        Command::new("osascript")
+            .args(["-e", &script])
+            .status()
+            .map_err(|e| e.to_string())
+            .and_then(|status| {
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err(format!("Terminal exited with status {status}"))
+                }
+            })?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let cwd = working_directory.to_string_lossy().replace('"', "\"\"");
+        let cmdline = format!("cd /d \"{}\" && {}", cwd, command);
+
+        Command::new("cmd")
+            .args(["/C", "start", "", "cmd.exe", "/K", &cmdline])
+            .status()
+            .map_err(|e| e.to_string())
+            .and_then(|status| {
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err(format!("Command Prompt exited with status {status}"))
+                }
+            })?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let shell_path = shell_escape_single_quotes(&working_directory.to_string_lossy());
+        let shell_command = format!("cd '{}' ; {} ; exec \"$SHELL\" -l", shell_path, command);
+        let terminal_commands: [(&str, &[&str]); 3] = [
+            ("x-terminal-emulator", &["-e", "sh", "-lc"]),
+            ("gnome-terminal", &["--", "sh", "-lc"]),
+            ("konsole", &["-e", "sh", "-lc"]),
+        ];
+
+        let mut opened = false;
+        for (program, args) in terminal_commands {
+            if let Ok(status) = Command::new(program).args(args).arg(&shell_command).status() {
+                if status.success() {
+                    opened = true;
+                    break;
+                }
+            }
+        }
+
+        if !opened {
+            return Err("Could not open a terminal application".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn shell_escape_single_quotes(value: &str) -> String {
+    value.replace('\'', "'\\''")
+}
+
+#[cfg(target_os = "macos")]
+fn escape_applescript_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn open_in_editor_for_path(path: &Path) -> Result<(), String> {

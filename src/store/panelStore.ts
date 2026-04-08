@@ -5,10 +5,12 @@ import {
   PanelTabState,
   SortDirection,
   SortField,
+  ViewMode,
 } from "../types/file";
 import { ThemePreference } from "../types/theme";
 
 type PanelId = "left" | "right";
+type PanelViewModes = Record<PanelId, ViewMode>;
 
 interface AppState {
   leftPanel: PanelState;
@@ -17,9 +19,11 @@ interface AppState {
   activePanel: PanelId;
   showHiddenFiles: boolean;
   themePreference: ThemePreference;
+  panelViewModes: PanelViewModes;
   setActivePanel: (panel: PanelId) => void;
   setShowHiddenFiles: (show: boolean) => void;
   setThemePreference: (themePreference: ThemePreference) => void;
+  setPanelViewMode: (panel: PanelId, viewMode: ViewMode) => void;
   addTab: (panel: PanelId) => void;
   activateTab: (panel: PanelId, tabId: string) => void;
   closeTab: (panel: PanelId, tabId: string) => void;
@@ -43,6 +47,9 @@ interface PersistedPanelState {
   rightPanel?: PersistedPanelData;
   showHiddenFiles?: boolean;
   themePreference?: ThemePreference;
+  viewMode?: ViewMode;
+  leftViewMode?: ViewMode;
+  rightViewMode?: ViewMode;
 }
 
 interface PersistedPanelData {
@@ -175,6 +182,18 @@ const readPersistedPanelState = (): PersistedPanelState => {
         parsed.themePreference === "light" ||
         parsed.themePreference === "dark"
           ? parsed.themePreference
+          : undefined,
+      viewMode:
+        parsed.viewMode === "brief" || parsed.viewMode === "detailed"
+          ? parsed.viewMode
+          : undefined,
+      leftViewMode:
+        parsed.leftViewMode === "brief" || parsed.leftViewMode === "detailed"
+          ? parsed.leftViewMode
+          : undefined,
+      rightViewMode:
+        parsed.rightViewMode === "brief" || parsed.rightViewMode === "detailed"
+          ? parsed.rightViewMode
           : undefined,
     };
   } catch (error) {
@@ -393,7 +412,8 @@ const persistVisiblePanelState = (
   rightPanel: PanelState,
   activePanel: PanelId,
   showHiddenFiles: boolean,
-  themePreference: ThemePreference
+  themePreference: ThemePreference,
+  panelViewModes: PanelViewModes
 ) => {
   const serializePanel = (panel: PanelState): PersistedPanelData => ({
     activeTabId: panel.activeTabId,
@@ -415,11 +435,17 @@ const persistVisiblePanelState = (
     rightPanel: serializePanel(rightPanel),
     showHiddenFiles,
     themePreference,
+    leftViewMode: panelViewModes.left,
+    rightViewMode: panelViewModes.right,
   });
 };
 
 export const usePanelStore = create<AppState>((set) => {
   const persistedPanelState = readPersistedPanelState();
+  const panelViewModes: PanelViewModes = {
+    left: persistedPanelState.leftViewMode ?? persistedPanelState.viewMode ?? "detailed",
+    right: persistedPanelState.rightViewMode ?? persistedPanelState.viewMode ?? "detailed",
+  };
 
   return {
     leftPanel: restorePersistedPanelState(
@@ -436,6 +462,7 @@ export const usePanelStore = create<AppState>((set) => {
     activePanel: persistedPanelState.activePanel ?? "left",
     showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
     themePreference: persistedPanelState.themePreference ?? "auto",
+    panelViewModes,
 
     setActivePanel: (activePanel) =>
       set((state) => {
@@ -444,7 +471,8 @@ export const usePanelStore = create<AppState>((set) => {
           state.rightPanel,
           activePanel,
           state.showHiddenFiles,
-          state.themePreference
+          state.themePreference,
+          state.panelViewModes
         );
         return { activePanel };
       }),
@@ -456,7 +484,8 @@ export const usePanelStore = create<AppState>((set) => {
           state.rightPanel,
           state.activePanel,
           showHiddenFiles,
-          state.themePreference
+          state.themePreference,
+          state.panelViewModes
         );
         return { showHiddenFiles };
       }),
@@ -468,9 +497,27 @@ export const usePanelStore = create<AppState>((set) => {
           state.rightPanel,
           state.activePanel,
           state.showHiddenFiles,
-          themePreference
+          themePreference,
+          state.panelViewModes
         );
         return { themePreference };
+      }),
+
+    setPanelViewMode: (panel, viewMode) =>
+      set((state) => {
+        const nextPanelViewModes = {
+          ...state.panelViewModes,
+          [panel]: viewMode,
+        };
+        persistVisiblePanelState(
+          state.leftPanel,
+          state.rightPanel,
+          state.activePanel,
+          state.showHiddenFiles,
+          state.themePreference,
+          nextPanelViewModes
+        );
+        return { panelViewModes: nextPanelViewModes };
       }),
 
     addTab: (panel) =>
@@ -494,7 +541,8 @@ export const usePanelStore = create<AppState>((set) => {
           panel === "right" ? nextPanelState : state.rightPanel,
           state.activePanel,
           state.showHiddenFiles,
-          state.themePreference
+          state.themePreference,
+          state.panelViewModes
         );
 
         return {
@@ -521,7 +569,8 @@ export const usePanelStore = create<AppState>((set) => {
           panel === "right" ? nextPanelState : state.rightPanel,
           state.activePanel,
           state.showHiddenFiles,
-          state.themePreference
+          state.themePreference,
+          state.panelViewModes
         );
 
         return {
@@ -560,7 +609,8 @@ export const usePanelStore = create<AppState>((set) => {
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
         state.showHiddenFiles,
-        state.themePreference
+        state.themePreference,
+        state.panelViewModes
       );
 
       return {
@@ -583,7 +633,8 @@ export const usePanelStore = create<AppState>((set) => {
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
         state.showHiddenFiles,
-        state.themePreference
+        state.themePreference,
+        state.panelViewModes
       );
 
       return {
@@ -717,7 +768,8 @@ export const usePanelStore = create<AppState>((set) => {
         panel === "right" ? nextPanelState : state.rightPanel,
         state.activePanel,
         state.showHiddenFiles,
-        state.themePreference
+        state.themePreference,
+        state.panelViewModes
       );
 
       return {

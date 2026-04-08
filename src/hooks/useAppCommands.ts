@@ -52,6 +52,7 @@ export function useAppCommands() {
   const openCopy = () => setOpenDialog("copy");
   const openMove = () => setOpenDialog("move");
   const openMkdir = () => setOpenDialog("mkdir");
+  const openNewFile = () => setOpenDialog("newfile");
   const openDelete = () => setOpenDialog("delete");
   const openSearch = () => setOpenDialog("search");
 
@@ -106,6 +107,26 @@ export function useAppCommands() {
     }
   };
 
+  const runCommandInCurrentPath = async (command: string, panelId?: "left" | "right") => {
+    const trimmedCommand = command.trim();
+    if (!trimmedCommand) {
+      showTransientStatusMessage("Command is empty");
+      return;
+    }
+
+    const state = usePanelStore.getState();
+    const resolvedPanelId = panelId ?? state.activePanel;
+    const panel = resolvedPanelId === "left" ? state.leftPanel : state.rightPanel;
+
+    try {
+      await fs.runShellCommand(panel.currentPath, trimmedCommand);
+      showTransientStatusMessage("Command started");
+    } catch (error) {
+      console.error("Failed to run command:", error);
+      window.alert(getErrorMessage(error, "Failed to run the command."));
+    }
+  };
+
   return {
     openDialog,
     openPreview,
@@ -113,10 +134,12 @@ export function useAppCommands() {
     openCopy,
     openMove,
     openMkdir,
+    openNewFile,
     openDelete,
     openSearch,
     closeApp,
     syncOtherPanelToCurrentPath,
     copyCurrentPath,
+    runCommandInCurrentPath,
   };
 }

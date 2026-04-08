@@ -35,6 +35,8 @@ describe("panelStore persistence", () => {
         activePanel: "right",
         showHiddenFiles: true,
         themePreference: "dark",
+        leftViewMode: "brief",
+        rightViewMode: "detailed",
         leftPanel: {
           activeTabId: "left-b",
           tabs: [
@@ -78,6 +80,8 @@ describe("panelStore persistence", () => {
     expect(state.activePanel).toBe("right");
     expect(state.showHiddenFiles).toBe(true);
     expect(state.themePreference).toBe("dark");
+    expect(state.panelViewModes.left).toBe("brief");
+    expect(state.panelViewModes.right).toBe("detailed");
     expect(state.leftPanel.tabs).toHaveLength(2);
     expect(state.leftPanel.activeTabId).toBe("left-b");
     expect(state.leftPanel.currentPath).toBe("/tmp");
@@ -101,5 +105,22 @@ describe("panelStore persistence", () => {
     expect(state.leftPanel.tabs).toHaveLength(1);
     expect(state.leftPanel.currentPath).toBe("/Users/back");
     expect(state.rightPanel.currentPath).toBe("/tmp");
+    expect(state.panelViewModes.left).toBe("detailed");
+    expect(state.panelViewModes.right).toBe("detailed");
+  });
+
+  it("migrates legacy global viewMode to both panels", async () => {
+    localStorageMock.setItem(
+      PANEL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        viewMode: "brief",
+      })
+    );
+
+    const { usePanelStore } = await import("./panelStore");
+    const state = usePanelStore.getState();
+
+    expect(state.panelViewModes.left).toBe("brief");
+    expect(state.panelViewModes.right).toBe("brief");
   });
 });

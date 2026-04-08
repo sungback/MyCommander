@@ -1,14 +1,60 @@
 mod commands;
 
-use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Runtime};
 
+const FILE_MENU_ID: &str = "file";
+const NEW_FOLDER_MENU_ITEM_ID: &str = "new_folder";
+const NEW_FILE_MENU_ITEM_ID: &str = "new_file";
 const SHOW_HIDDEN_MENU_ITEM_ID: &str = "show_hidden_files";
 const VIEW_MENU_ID: &str = "view";
+const LEFT_PANEL_VIEW_MENU_ID: &str = "left_panel_view";
+const RIGHT_PANEL_VIEW_MENU_ID: &str = "right_panel_view";
+const LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID: &str = "left_view_mode_brief";
+const LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID: &str = "left_view_mode_detailed";
+const RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID: &str = "right_view_mode_brief";
+const RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID: &str = "right_view_mode_detailed";
 const THEME_MENU_ID: &str = "theme";
 const THEME_AUTO_MENU_ITEM_ID: &str = "theme_auto";
 const THEME_LIGHT_MENU_ITEM_ID: &str = "theme_light";
 const THEME_DARK_MENU_ITEM_ID: &str = "theme_dark";
+
+fn get_panel_view_submenu<R: Runtime>(app: &AppHandle<R>, submenu_id: &str) -> Option<Submenu<R>> {
+    let menu = app.menu()?;
+    let view_menu = menu
+        .get(VIEW_MENU_ID)?
+        .as_submenu()
+        .cloned()?;
+
+    view_menu
+        .get(submenu_id)?
+        .as_submenu()
+        .cloned()
+}
+
+fn set_panel_view_menu_checks<R: Runtime>(
+    app: &AppHandle<R>,
+    submenu_id: &str,
+    brief_item_id: &str,
+    detailed_item_id: &str,
+    view_mode: &str,
+) {
+    let Some(submenu) = get_panel_view_submenu(app, submenu_id) else {
+        return;
+    };
+
+    for (item_id, is_checked) in [
+        (brief_item_id, view_mode == "brief"),
+        (detailed_item_id, view_mode == "detailed"),
+    ] {
+        if let Some(item) = submenu
+            .get(item_id)
+            .and_then(|menu_item| menu_item.as_check_menuitem().cloned())
+        {
+            let _ = item.set_checked(is_checked);
+        }
+    }
+}
 
 fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let pkg_info = app.package_info();
@@ -28,6 +74,52 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         false,
         Some("CmdOrCtrl+Shift+Period"),
+    )?;
+    let left_view_mode_brief = CheckMenuItem::with_id(
+        app,
+        LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
+        "Brief",
+        true,
+        false,
+        None::<&str>,
+    )?;
+    let left_view_mode_detailed = CheckMenuItem::with_id(
+        app,
+        LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
+        "Detailed",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let left_panel_view_menu = Submenu::with_id_and_items(
+        app,
+        LEFT_PANEL_VIEW_MENU_ID,
+        "Left Panel",
+        true,
+        &[&left_view_mode_brief, &left_view_mode_detailed],
+    )?;
+    let right_view_mode_brief = CheckMenuItem::with_id(
+        app,
+        RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
+        "Brief",
+        true,
+        false,
+        None::<&str>,
+    )?;
+    let right_view_mode_detailed = CheckMenuItem::with_id(
+        app,
+        RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
+        "Detailed",
+        true,
+        true,
+        None::<&str>,
+    )?;
+    let right_panel_view_menu = Submenu::with_id_and_items(
+        app,
+        RIGHT_PANEL_VIEW_MENU_ID,
+        "Right Panel",
+        true,
+        &[&right_view_mode_brief, &right_view_mode_detailed],
     )?;
 
     let theme_auto = CheckMenuItem::with_id(
@@ -74,6 +166,21 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ],
     )?;
 
+    let new_folder = MenuItem::with_id(
+        app,
+        NEW_FOLDER_MENU_ITEM_ID,
+        "New Folder",
+        true,
+        Some("F7"),
+    )?;
+    let new_file = MenuItem::with_id(
+        app,
+        NEW_FILE_MENU_ITEM_ID,
+        "New File",
+        true,
+        Some("Shift+F4"),
+    )?;
+
 
     Menu::with_items(
         app,
@@ -95,11 +202,15 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                     &PredefinedMenuItem::quit(app, None)?,
                 ],
             )?,
-            &Submenu::with_items(
+            &Submenu::with_id_and_items(
                 app,
+                FILE_MENU_ID,
                 "File",
                 true,
                 &[
+                    &new_folder,
+                    &new_file,
+                    &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::close_window(app, None)?,
                     #[cfg(not(target_os = "macos"))]
                     &PredefinedMenuItem::separator(app)?,
@@ -127,6 +238,9 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 "View",
                 true,
                 &[
+                    &left_panel_view_menu,
+                    &right_panel_view_menu,
+                    &PredefinedMenuItem::separator(app)?,
                     &show_hidden_files,
                     &theme_menu,
                     &PredefinedMenuItem::separator(app)?,
@@ -154,6 +268,16 @@ pub fn run() {
         .on_menu_event(|app, event| {
             let event_id = event.id().as_ref();
 
+            match event_id {
+                NEW_FOLDER_MENU_ITEM_ID => {
+                    let _ = app.emit("new-folder-requested", ());
+                }
+                NEW_FILE_MENU_ITEM_ID => {
+                    let _ = app.emit("new-file-requested", ());
+                }
+                _ => {}
+            }
+
             if event_id == SHOW_HIDDEN_MENU_ITEM_ID {
                 if let Some(menu) = app.menu() {
                     if let Some(view_menu) = menu.get(VIEW_MENU_ID).and_then(|item| item.as_submenu().cloned()) {
@@ -178,6 +302,42 @@ pub fn run() {
             if let Some(theme) = theme {
                 let _ = app.emit("theme-preference-changed", theme);
             }
+
+            let panel_view_mode = match event_id {
+                LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID => Some(("left", "brief")),
+                LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID => Some(("left", "detailed")),
+                RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID => Some(("right", "brief")),
+                RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID => Some(("right", "detailed")),
+                _ => None,
+            };
+
+            if let Some((panel, view_mode)) = panel_view_mode {
+                match panel {
+                    "left" => set_panel_view_menu_checks(
+                        app,
+                        LEFT_PANEL_VIEW_MENU_ID,
+                        LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
+                        LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
+                        view_mode,
+                    ),
+                    "right" => set_panel_view_menu_checks(
+                        app,
+                        RIGHT_PANEL_VIEW_MENU_ID,
+                        RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
+                        RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
+                        view_mode,
+                    ),
+                    _ => {}
+                }
+
+                let _ = app.emit(
+                    "panel-view-mode-changed",
+                    serde_json::json!({
+                        "panel": panel,
+                        "viewMode": view_mode,
+                    }),
+                );
+            }
         })
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -190,9 +350,11 @@ pub fn run() {
             commands::system_commands::open_in_terminal,
             commands::system_commands::open_in_editor,
             commands::system_commands::open_file,
+            commands::system_commands::run_shell_command,
             commands::system_commands::quit_app,
             commands::system_commands::set_show_hidden_menu_checked,
             commands::system_commands::set_theme_menu_selection,
+            commands::system_commands::set_view_mode_menu_selection,
             commands::fs_commands::list_directory,
             commands::fs_commands::create_directory,
             commands::fs_commands::create_file,

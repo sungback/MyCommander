@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FileEntry } from "../../types/file";
+import { FileEntry, ViewMode } from "../../types/file";
 import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
@@ -12,6 +12,7 @@ interface FileListProps {
   cursorIndex: number;
   isActivePanel: boolean;
   panelId: "left" | "right";
+  viewMode: ViewMode;
   onSelect: (path: string, toggle: boolean) => void;
   onEnter: (entry: FileEntry) => void;
   setCursorIndex: (idx: number) => void;
@@ -64,6 +65,7 @@ export const FileList: React.FC<FileListProps> = ({
   cursorIndex,
   isActivePanel,
   panelId,
+  viewMode,
   onSelect,
   onEnter,
   setCursorIndex,
@@ -158,6 +160,29 @@ export const FileList: React.FC<FileListProps> = ({
       .map((entry) => entry.path);
   };
 
+  const moveSelectionToRow = (targetIndex: number) => {
+    if (visibleRows.length === 0) {
+      return;
+    }
+
+    const nextIndex = Math.min(Math.max(targetIndex, 0), visibleRows.length - 1);
+    const nextEntry = visibleRows[nextIndex]?.entry;
+
+    setCursorIndex(nextIndex);
+    selectionAnchorIndexRef.current = nextIndex;
+
+    if (!nextEntry) {
+      return;
+    }
+
+    if (isSelectableEntry(nextEntry)) {
+      selectOnly(panelId, nextEntry.path);
+      return;
+    }
+
+    clearSelection(panelId);
+  };
+
   const handleRowClick = (
     event: React.MouseEvent<HTMLDivElement>,
     rowIndex: number,
@@ -218,10 +243,16 @@ export const FileList: React.FC<FileListProps> = ({
 
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setCursorIndex(Math.min(cursorIndex + 1, visibleRows.length - 1));
+          moveSelectionToRow(cursorIndex + 1);
         } else if (e.key === "ArrowUp") {
           e.preventDefault();
-          setCursorIndex(Math.max(cursorIndex - 1, 0));
+          moveSelectionToRow(cursorIndex - 1);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          moveSelectionToRow(0);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          moveSelectionToRow(visibleRows.length - 1);
         } else if (e.key === "Insert") {
           e.preventDefault();
           if (current) onSelect(current.path, true);
@@ -272,6 +303,7 @@ export const FileList: React.FC<FileListProps> = ({
                 isSelected={selectedItems.has(entry.path)}
                 isCursor={cursorIndex === virtualItem.index}
                 isActivePanel={isActivePanel}
+                viewMode={viewMode}
                 onClick={(event) => {
                   handleRowClick(event, virtualItem.index, entry);
                 }}

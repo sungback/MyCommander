@@ -37,6 +37,12 @@ describe("panelStore — initial state", () => {
     const state = usePanelStore.getState();
     expect(state.showHiddenFiles).toBe(false);
   });
+
+  it("defaults panel view modes to detailed", () => {
+    const state = usePanelStore.getState();
+    expect(state.panelViewModes.left).toBe("detailed");
+    expect(state.panelViewModes.right).toBe("detailed");
+  });
 });
 
 describe("panelStore — setActivePanel", () => {
@@ -47,6 +53,24 @@ describe("panelStore — setActivePanel", () => {
 
     setActivePanel("left");
     expect(usePanelStore.getState().activePanel).toBe("left");
+  });
+});
+
+describe("panelStore — setPanelViewMode", () => {
+  it("switches view mode for only the targeted panel", () => {
+    const { setPanelViewMode } = usePanelStore.getState();
+
+    setPanelViewMode("left", "brief");
+    expect(usePanelStore.getState().panelViewModes.left).toBe("brief");
+    expect(usePanelStore.getState().panelViewModes.right).toBe("detailed");
+
+    setPanelViewMode("right", "brief");
+    expect(usePanelStore.getState().panelViewModes.left).toBe("brief");
+    expect(usePanelStore.getState().panelViewModes.right).toBe("brief");
+
+    setPanelViewMode("left", "detailed");
+    expect(usePanelStore.getState().panelViewModes.left).toBe("detailed");
+    expect(usePanelStore.getState().panelViewModes.right).toBe("brief");
   });
 });
 

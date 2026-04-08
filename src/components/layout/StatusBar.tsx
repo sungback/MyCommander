@@ -4,8 +4,8 @@ import { useUiStore } from "../../store/uiStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
-import { Copy, Eye, FilePenLine, FolderPlus, MoveRight, Power, Search, Trash2 } from "lucide-react";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
+import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
 
 type PanelId = "left" | "right";
 
@@ -105,16 +105,8 @@ export const StatusBar: React.FC = () => {
   const rightPanel = usePanelStore((s) => s.rightPanel);
   const statusMessage = useUiStore((s) => s.statusMessage);
   const { getAvailableSpace } = useFileSystem();
-  const {
-    openPreview,
-    openEditor,
-    openCopy,
-    openMove,
-    openMkdir,
-    openDelete,
-    openSearch,
-    closeApp,
-  } = useAppCommands();
+  const appCommands = useAppCommands();
+  const [commandValue, setCommandValue] = useState("");
   const [availableSpace, setAvailableSpace] = useState<{
     left: number | null | undefined;
     right: number | null | undefined;
@@ -123,26 +115,15 @@ export const StatusBar: React.FC = () => {
     right: undefined,
   });
   const isMac = isMacPlatform();
-  const operations: OperationButtonConfig[] = [
-    { keyLabel: "F3", title: "보기", icon: <Eye size={15} />, onClick: openPreview },
-    { keyLabel: "F4", title: "편집", icon: <FilePenLine size={15} />, onClick: openEditor },
-    { keyLabel: "F5", title: "복사", icon: <Copy size={15} />, onClick: openCopy },
-    { keyLabel: "F6", title: "이동", icon: <MoveRight size={15} />, onClick: openMove },
-    { keyLabel: "F7", title: "새 폴더", icon: <FolderPlus size={15} />, onClick: openMkdir },
-    { keyLabel: "F8", title: "삭제", icon: <Trash2 size={15} />, onClick: openDelete },
-    {
-      keyLabel: isMac ? "Option+F7" : "Alt+F7",
-      title: "검색",
-      icon: <Search size={15} />,
-      onClick: openSearch,
-    },
-    {
-      keyLabel: isMac ? "Cmd+Q" : "Alt+F4",
-      title: "종료",
-      icon: <Power size={15} />,
-      onClick: closeApp,
-    },
-  ];
+  const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
+  const operations: OperationButtonConfig[] = createBottomActionDefinitions(isMac).map(
+    (action: BottomActionDefinition) => ({
+      keyLabel: action.keyLabel,
+      title: action.title,
+      icon: <action.icon size={15} />,
+      onClick: appCommands[action.command],
+    })
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +185,45 @@ export const StatusBar: React.FC = () => {
           isActive={activePanelId === "right"}
           availableSpace={availableSpace.right}
         />
+      </div>
+      <div className="border-t border-border-color/80 px-2 py-2">
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const nextCommand = commandValue.trim();
+            if (!nextCommand) {
+              return;
+            }
+
+            void appCommands.runCommandInCurrentPath(nextCommand, activePanelId);
+            setCommandValue("");
+          }}
+        >
+          <label
+            htmlFor="command-line-input"
+            className="shrink-0 font-mono text-xs uppercase text-text-secondary"
+          >
+            Cmd
+          </label>
+          <div className="min-w-0 shrink-0 rounded-md border border-border-color bg-bg-panel px-2 py-1 font-mono text-[11px] text-text-secondary">
+            {activePanel.currentPath}
+          </div>
+          <input
+            id="command-line-input"
+            type="text"
+            value={commandValue}
+            onChange={(event) => setCommandValue(event.target.value)}
+            placeholder={
+              isMac
+                ? "Run command in Terminal for the current folder"
+                : "Run command in Command Prompt for the current folder"
+            }
+            className="min-w-0 flex-1 rounded-md border border-border-color bg-bg-panel px-3 py-2 font-mono text-sm text-text-primary outline-none transition-colors focus:border-accent-color"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </form>
       </div>
       <div className="border-t border-border-color/80 px-2 py-2">
         <div className="flex flex-wrap items-center gap-2">

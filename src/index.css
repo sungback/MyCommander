@@ -25,8 +25,34 @@
   --accent-color: #3bc9db;
   --error-color: #fa5252;
   --selection-text-color: #f8f9fa;
-  --folder-color: #8ecff2;
-  --folder-name-color: #cbe8ff;
+  --folder-color: #e3b341;
+  --folder-open-color: #f2c14e;
+  --folder-name-color: #f5df9c;
+  --folder-open-name-color: #fff1bf;
+  --folder-hidden-color: #8e7a4b;
+  --folder-hidden-name-color: #c4b07f;
+  --folder-parent-color: #9db4c8;
+  --folder-parent-name-color: #dce8f2;
+  --folder-app-bundle-color: #ffd166;
+  --folder-app-bundle-name-color: #fff0c2;
+  --file-default-color: #c7d1db;
+  --file-default-name-color: #edf2f7;
+  --file-document-color: #7fb3ff;
+  --file-document-name-color: #dbe8ff;
+  --file-image-color: #44c7a1;
+  --file-image-name-color: #caf6ea;
+  --file-archive-color: #f39c4a;
+  --file-archive-name-color: #ffd9b0;
+  --file-code-color: #6ea8ff;
+  --file-code-name-color: #cfe1ff;
+  --file-config-color: #a78bfa;
+  --file-config-name-color: #e3dbff;
+  --file-media-color: #e879c6;
+  --file-media-name-color: #ffd3ef;
+  --file-installer-color: #ff8a3d;
+  --file-installer-name-color: #ffd5bc;
+  --file-app-color: #ffd166;
+  --file-app-name-color: #fff0c2;
   --hidden-text-color: rgba(248, 249, 250, 0.75);
 }
 
@@ -52,8 +78,34 @@
   --accent-color: #7f9fc0;
   --error-color: #d9485a;
   --selection-text-color: #10243d;
-  --folder-color: #d6a034;
-  --folder-name-color: #163b63;
+  --folder-color: #c58a1c;
+  --folder-open-color: #d89a28;
+  --folder-name-color: #5d4108;
+  --folder-open-name-color: #704c0b;
+  --folder-hidden-color: #a48c5c;
+  --folder-hidden-name-color: #6d5d3b;
+  --folder-parent-color: #6e8ead;
+  --folder-parent-name-color: #315377;
+  --folder-app-bundle-color: #a96c00;
+  --folder-app-bundle-name-color: #7a4d00;
+  --file-default-color: #536579;
+  --file-default-name-color: #24384f;
+  --file-document-color: #245fae;
+  --file-document-name-color: #173f77;
+  --file-image-color: #157a5b;
+  --file-image-name-color: #0f5c44;
+  --file-archive-color: #b85c00;
+  --file-archive-name-color: #874000;
+  --file-code-color: #1f62c4;
+  --file-code-name-color: #15478d;
+  --file-config-color: #6c49c8;
+  --file-config-name-color: #4f3496;
+  --file-media-color: #b03e84;
+  --file-media-name-color: #842d63;
+  --file-installer-color: #c65300;
+  --file-installer-name-color: #8f3d00;
+  --file-app-color: #a96c00;
+  --file-app-name-color: #7a4d00;
   --hidden-text-color: rgba(54, 71, 90, 0.72);
 }
 
@@ -79,8 +131,34 @@
   --accent-color: #3bc9db;
   --error-color: #fa5252;
   --selection-text-color: #f8f9fa;
-  --folder-color: #8ecff2;
-  --folder-name-color: #cbe8ff;
+  --folder-color: #e3b341;
+  --folder-open-color: #f2c14e;
+  --folder-name-color: #f5df9c;
+  --folder-open-name-color: #fff1bf;
+  --folder-hidden-color: #8e7a4b;
+  --folder-hidden-name-color: #c4b07f;
+  --folder-parent-color: #9db4c8;
+  --folder-parent-name-color: #dce8f2;
+  --folder-app-bundle-color: #ffd166;
+  --folder-app-bundle-name-color: #fff0c2;
+  --file-default-color: #c7d1db;
+  --file-default-name-color: #edf2f7;
+  --file-document-color: #7fb3ff;
+  --file-document-name-color: #dbe8ff;
+  --file-image-color: #44c7a1;
+  --file-image-name-color: #caf6ea;
+  --file-archive-color: #f39c4a;
+  --file-archive-name-color: #ffd9b0;
+  --file-code-color: #6ea8ff;
+  --file-code-name-color: #cfe1ff;
+  --file-config-color: #a78bfa;
+  --file-config-name-color: #e3dbff;
+  --file-media-color: #e879c6;
+  --file-media-name-color: #ffd3ef;
+  --file-installer-color: #ff8a3d;
+  --file-installer-name-color: #ffd5bc;
+  --file-app-color: #ffd166;
+  --file-app-name-color: #fff0c2;
   --hidden-text-color: rgba(248, 249, 250, 0.75);
 }
 
@@ -129,12 +207,182 @@ body {
   color: var(--selection-text-color);
 }
 
+.theme-folder-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-folder-parent-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--folder-parent-color) 14%, transparent);
+}
+
+.theme-folder-app-bundle-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--folder-app-bundle-color) 12%, transparent);
+}
+
+.theme-file-icon-plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 4px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--border-color) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 42%, transparent);
+}
+
+.theme-file-installer-plate {
+  background: color-mix(in srgb, var(--file-installer-color) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--file-installer-color) 35%, transparent);
+}
+
+.theme-file-app-plate {
+  background: color-mix(in srgb, var(--file-app-color) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--file-app-color) 30%, transparent);
+}
+
+.theme-material-file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.theme-material-file-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
 .theme-folder-icon {
   color: var(--folder-color);
 }
 
+.theme-folder-open-icon {
+  color: var(--folder-open-color);
+}
+
+.theme-folder-hidden-icon {
+  color: var(--folder-hidden-color);
+}
+
+.theme-folder-parent-icon {
+  color: var(--folder-parent-color);
+}
+
+.theme-folder-app-bundle-icon {
+  color: var(--folder-app-bundle-color);
+}
+
 .theme-folder-name {
   color: var(--folder-name-color);
+}
+
+.theme-folder-open-name {
+  color: var(--folder-open-name-color);
+}
+
+.theme-folder-hidden-name {
+  color: var(--folder-hidden-name-color);
+}
+
+.theme-folder-parent-name {
+  color: var(--folder-parent-name-color);
+}
+
+.theme-folder-app-bundle-name {
+  color: var(--folder-app-bundle-name-color);
+}
+
+.theme-file-default-icon {
+  color: var(--file-default-color);
+}
+
+.theme-file-default-name {
+  color: var(--file-default-name-color);
+}
+
+.theme-file-document-icon {
+  color: var(--file-document-color);
+}
+
+.theme-file-document-name {
+  color: var(--file-document-name-color);
+}
+
+.theme-file-image-icon {
+  color: var(--file-image-color);
+}
+
+.theme-file-image-name {
+  color: var(--file-image-name-color);
+}
+
+.theme-file-archive-icon {
+  color: var(--file-archive-color);
+}
+
+.theme-file-archive-name {
+  color: var(--file-archive-name-color);
+}
+
+.theme-file-code-icon {
+  color: var(--file-code-color);
+}
+
+.theme-file-code-name {
+  color: var(--file-code-name-color);
+}
+
+.theme-file-config-icon {
+  color: var(--file-config-color);
+}
+
+.theme-file-config-name {
+  color: var(--file-config-name-color);
+}
+
+.theme-file-media-icon {
+  color: var(--file-media-color);
+}
+
+.theme-file-media-name {
+  color: var(--file-media-name-color);
+}
+
+.theme-file-installer-icon {
+  color: var(--file-installer-color);
+}
+
+.theme-file-installer-name {
+  color: var(--file-installer-name-color);
+}
+
+.theme-file-installer-badge {
+  color: var(--bg-panel);
+  background: var(--file-installer-color);
+  box-shadow: 0 0 0 1px var(--bg-panel);
+}
+
+.theme-file-app-icon {
+  color: var(--file-app-color);
+}
+
+.theme-file-app-name {
+  color: var(--file-app-name-color);
 }
 
 .theme-hidden-text {

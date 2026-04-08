@@ -1,6 +1,12 @@
 import React from "react";
 import { usePanelStore } from "../../store/panelStore";
-import { ArrowRightLeft, ChevronRight, ClipboardCopy, Home, RefreshCw } from "lucide-react";
+import {
+  ArrowRightLeft,
+  ChevronRight,
+  ClipboardCopy,
+  Home,
+  RefreshCw,
+} from "lucide-react";
 import { clsx } from "clsx";
 import { getBreadcrumbParts } from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";

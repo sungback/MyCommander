@@ -1,4 +1,5 @@
 export type FileType = "file" | "directory" | "symlink";
+export type ViewMode = "brief" | "detailed";
 
 export interface FileEntry {
   name: string;

@@ -14,6 +14,7 @@ export function useKeyboard() {
     openCopy,
     openMove,
     openMkdir,
+    openNewFile,
     openDelete,
     openSearch,
     closeApp,
@@ -22,6 +23,7 @@ export function useKeyboard() {
   } = useAppCommands();
   const { getDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
 
   useEffect(() => {
     const isMac = isMacPlatform();
@@ -84,7 +86,11 @@ export function useKeyboard() {
         case "F4":
           if (!e.altKey) {
             e.preventDefault();
-            void openEditor();
+            if (e.shiftKey) {
+              openNewFile();
+            } else {
+              void openEditor();
+            }
           }
           break;
         case "F5":
@@ -119,6 +125,20 @@ export function useKeyboard() {
       if (hasCommandModifier && e.code === "KeyF") {
         e.preventDefault();
         openSearch();
+        return;
+      }
+
+      if (hasCommandModifier && e.key === "F1") {
+        e.preventDefault();
+        const state = usePanelStore.getState();
+        setPanelViewMode(state.activePanel, "brief");
+        return;
+      }
+
+      if (hasCommandModifier && e.key === "F2") {
+        e.preventDefault();
+        const state = usePanelStore.getState();
+        setPanelViewMode(state.activePanel, "detailed");
         return;
       }
 
@@ -170,8 +190,10 @@ export function useKeyboard() {
     openInfoDialog,
     openMkdir,
     openMove,
+    openNewFile,
     openPreview,
     openSearch,
+    setPanelViewMode,
     copyCurrentPath,
     syncOtherPanelToCurrentPath,
     updateEntrySize,

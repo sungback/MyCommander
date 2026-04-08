@@ -49,6 +49,10 @@ const fileSystem = {
     await invoke("open_in_terminal", { path });
   },
 
+  runShellCommand: async (path: string, command: string): Promise<void> => {
+    await invoke("run_shell_command", { path, command });
+  },
+
   openInEditor: async (path: string): Promise<void> => {
     await invoke("open_in_editor", { path });
   },

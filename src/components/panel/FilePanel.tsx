@@ -27,6 +27,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
+  const viewMode = usePanelStore((s) => s.panelViewModes[id]);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const toggleSelection = usePanelStore((s) => s.toggleSelection);
   const setCursor = usePanelStore((s) => s.setCursor);
@@ -282,11 +283,13 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       <DriveList panelId={id} />
       <TabBar panelId={id} />
       <AddressBar panelId={id} />
-      <ColumnHeader
-        sortField={panelState.sortField}
-        sortDirection={panelState.sortDirection}
-        onSort={(field) => usePanelStore.getState().setSort(id, field)}
-      />
+      {viewMode === "detailed" ? (
+        <ColumnHeader
+          sortField={panelState.sortField}
+          sortDirection={panelState.sortDirection}
+          onSort={(field) => usePanelStore.getState().setSort(id, field)}
+        />
+      ) : null}
       <FileList
         currentPath={panelState.currentPath}
         files={panelState.files}
@@ -294,6 +297,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         cursorIndex={panelState.cursorIndex}
         isActivePanel={isActive}
         panelId={id}
+        viewMode={viewMode}
         onSelect={(path, _toggle) => toggleSelection(id, path)}
         onEnter={handleEnter}
         setCursorIndex={(idx) => setCursor(id, idx)}
