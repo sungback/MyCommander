@@ -1,9 +1,10 @@
 import React from "react";
 import { usePanelStore } from "../../store/panelStore";
-import { ChevronRight, Home, RefreshCw } from "lucide-react";
+import { ArrowRightLeft, ChevronRight, ClipboardCopy, Home, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
 import { getBreadcrumbParts } from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 
 interface AddressBarProps {
   panelId: "left" | "right";
@@ -13,12 +14,19 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   const currentPath = usePanelStore((s) =>
     panelId === "left" ? s.leftPanel.currentPath : s.rightPanel.currentPath
   );
+  const otherPanelPath = usePanelStore((s) =>
+    panelId === "left" ? s.rightPanel.currentPath : s.leftPanel.currentPath
+  );
   const setPath = usePanelStore((s) => s.setPath);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const activePanel = usePanelStore((s) => s.activePanel);
   const isActive = activePanel === panelId;
   const { getHomeDir } = useFileSystem();
+  const { syncOtherPanelToCurrentPath, copyCurrentPath } = useAppCommands();
+  const isMac = isMacPlatform();
+  const otherPanelLabel = panelId === "left" ? "right" : "left";
+  const isAlreadySynced = currentPath === otherPanelPath;
 
   const parts = getBreadcrumbParts(currentPath);
 
@@ -69,6 +77,38 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
         title="Refresh"
       >
         <RefreshCw size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setActivePanel(panelId);
+          void copyCurrentPath(panelId);
+        }}
+        className="flex items-center text-text-secondary gap-1 ml-1 px-1 rounded transition-colors cursor-pointer hover:bg-bg-hover hover:text-text-primary"
+        title={`Copy current path (${isMac ? "Cmd" : "Ctrl"}+Shift+C)`}
+      >
+        <ClipboardCopy size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setActivePanel(panelId);
+          syncOtherPanelToCurrentPath(panelId);
+        }}
+        disabled={isAlreadySynced}
+        className={clsx(
+          "flex items-center text-text-secondary gap-1 ml-1 px-1 rounded transition-colors",
+          isAlreadySynced
+            ? "cursor-default opacity-40"
+            : "cursor-pointer hover:bg-bg-hover hover:text-text-primary"
+        )}
+        title={
+          isAlreadySynced
+            ? `The ${otherPanelLabel} panel is already on this folder`
+            : `Open this folder in the ${otherPanelLabel} panel (${isMac ? "Cmd" : "Ctrl"}+Shift+M)`
+        }
+      >
+        <ArrowRightLeft size={14} />
       </button>
     </div>
   );

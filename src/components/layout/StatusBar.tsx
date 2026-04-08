@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
+import { useUiStore } from "../../store/uiStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
@@ -102,6 +103,7 @@ export const StatusBar: React.FC = () => {
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
+  const statusMessage = useUiStore((s) => s.statusMessage);
   const { getAvailableSpace } = useFileSystem();
   const {
     openPreview,
@@ -208,6 +210,11 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
+          {statusMessage ? (
+            <div className="ml-auto rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-secondary">
+              {statusMessage}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

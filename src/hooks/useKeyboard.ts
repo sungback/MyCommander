@@ -17,6 +17,8 @@ export function useKeyboard() {
     openDelete,
     openSearch,
     closeApp,
+    syncOtherPanelToCurrentPath,
+    copyCurrentPath,
   } = useAppCommands();
   const { getDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
@@ -120,6 +122,20 @@ export function useKeyboard() {
         return;
       }
 
+      if (hasCommandModifier && e.shiftKey && e.code === "KeyC") {
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          void copyCurrentPath();
+        }
+        return;
+      }
+
+      if (hasCommandModifier && e.shiftKey && e.code === "KeyM") {
+        e.preventDefault();
+        syncOtherPanelToCurrentPath();
+        return;
+      }
+
       if (hasCommandModifier && e.code === "KeyI") {
         const state = usePanelStore.getState();
         const activeId = state.activePanel;
@@ -156,6 +172,8 @@ export function useKeyboard() {
     openMove,
     openPreview,
     openSearch,
+    copyCurrentPath,
+    syncOtherPanelToCurrentPath,
     updateEntrySize,
   ]);
 }

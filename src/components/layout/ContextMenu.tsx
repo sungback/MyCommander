@@ -13,6 +13,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { writeClipboardText } from "../../utils/clipboard";
 
 const MENU_ITEM_CLASS =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[15px] font-medium text-white/94 transition-colors hover:bg-white/7";
@@ -127,7 +128,7 @@ export const ContextMenu: React.FC = () => {
   const handleCopyPath = async () => {
     const text = targetPath ?? panel.currentPath;
     try {
-      await navigator.clipboard.writeText(text);
+      await writeClipboardText(text);
       setFeedbackLabel("Path copied");
       closeContextMenu();
     } catch (error) {

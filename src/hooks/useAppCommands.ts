@@ -1,5 +1,7 @@
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
+import { useUiStore } from "../store/uiStore";
+import { writeClipboardText } from "../utils/clipboard";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 
 export const isMacPlatform = () => {
@@ -24,6 +26,21 @@ const getPrimaryTargetPath = () => {
   }
 
   return cursorEntry.path;
+};
+
+let clearStatusMessageTimeoutId: number | undefined;
+
+const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
+  const { setStatusMessage } = useUiStore.getState();
+  if (clearStatusMessageTimeoutId !== undefined) {
+    window.clearTimeout(clearStatusMessageTimeoutId);
+  }
+
+  setStatusMessage(message);
+  clearStatusMessageTimeoutId = window.setTimeout(() => {
+    useUiStore.getState().setStatusMessage(null);
+    clearStatusMessageTimeoutId = undefined;
+  }, durationMs);
 };
 
 export function useAppCommands() {
@@ -60,6 +77,35 @@ export function useAppCommands() {
     }
   };
 
+  const syncOtherPanelToCurrentPath = (sourcePanelId?: "left" | "right") => {
+    const state = usePanelStore.getState();
+    const resolvedSourcePanelId = sourcePanelId ?? state.activePanel;
+    const targetPanelId = resolvedSourcePanelId === "left" ? "right" : "left";
+    const sourcePanel =
+      resolvedSourcePanelId === "left" ? state.leftPanel : state.rightPanel;
+    const targetPanel = targetPanelId === "left" ? state.leftPanel : state.rightPanel;
+
+    if (sourcePanel.currentPath === targetPanel.currentPath) {
+      return;
+    }
+
+    state.setPath(targetPanelId, sourcePanel.currentPath);
+  };
+
+  const copyCurrentPath = async (panelId?: "left" | "right") => {
+    const state = usePanelStore.getState();
+    const resolvedPanelId = panelId ?? state.activePanel;
+    const panel = resolvedPanelId === "left" ? state.leftPanel : state.rightPanel;
+
+    try {
+      await writeClipboardText(panel.currentPath);
+      showTransientStatusMessage("Path copied");
+    } catch (error) {
+      console.error("Failed to copy current path:", error);
+      showTransientStatusMessage("Clipboard unavailable");
+    }
+  };
+
   return {
     openDialog,
     openPreview,
@@ -70,5 +116,7 @@ export function useAppCommands() {
     openDelete,
     openSearch,
     closeApp,
+    syncOtherPanelToCurrentPath,
+    copyCurrentPath,
   };
 }
