@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { FileEntry, PanelState, PanelTabState } from "../types/file";
+import {
+  FileEntry,
+  PanelState,
+  PanelTabState,
+  SortDirection,
+  SortField,
+} from "../types/file";
 import { ThemePreference } from "../types/theme";
 
 type PanelId = "left" | "right";
@@ -33,8 +39,24 @@ interface PersistedPanelState {
   activePanel?: PanelId;
   leftPath?: string;
   rightPath?: string;
+  leftPanel?: PersistedPanelData;
+  rightPanel?: PersistedPanelData;
   showHiddenFiles?: boolean;
   themePreference?: ThemePreference;
+}
+
+interface PersistedPanelData {
+  tabs: PersistedTabState[];
+  activeTabId?: string;
+}
+
+interface PersistedTabState {
+  id: string;
+  currentPath: string;
+  history: string[];
+  historyIndex: number;
+  sortField: SortField;
+  sortDirection: SortDirection;
 }
 
 const PANEL_STATE_STORAGE_KEY = "total-commander:panel-state";
@@ -42,6 +64,12 @@ const PANEL_STATE_STORAGE_KEY = "total-commander:panel-state";
 const getPanelKey = (panel: PanelId) => (panel === "left" ? "leftPanel" : "rightPanel");
 
 const createTabId = () => `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isSortField = (value: unknown): value is SortField =>
+  value === "name" || value === "ext" || value === "size" || value === "date";
+
+const isSortDirection = (value: unknown): value is SortDirection =>
+  value === "asc" || value === "desc";
 
 const getDefaultPathForPanel = (id: PanelId) => {
   if (typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC")) {
@@ -68,6 +96,69 @@ const readPersistedPanelState = (): PersistedPanelState => {
 
     const parsed = JSON.parse(rawState) as PersistedPanelState;
 
+    const restoreTab = (tab: unknown): PersistedTabState | null => {
+      if (!tab || typeof tab !== "object") {
+        return null;
+      }
+
+      const currentPath = Reflect.get(tab, "currentPath");
+      if (typeof currentPath !== "string" || currentPath.length === 0) {
+        return null;
+      }
+
+      const historyValue = Reflect.get(tab, "history");
+      const history = Array.isArray(historyValue)
+        ? historyValue.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      const historyIndexValue = Reflect.get(tab, "historyIndex");
+      const clampedHistoryIndex =
+        typeof historyIndexValue === "number" && Number.isFinite(historyIndexValue)
+          ? Math.min(Math.max(Math.trunc(historyIndexValue), -1), history.length - 1)
+          : -1;
+      const sortField = isSortField(Reflect.get(tab, "sortField"))
+        ? (Reflect.get(tab, "sortField") as SortField)
+        : "name";
+      const sortDirection = isSortDirection(Reflect.get(tab, "sortDirection"))
+        ? (Reflect.get(tab, "sortDirection") as SortDirection)
+        : "asc";
+
+      return {
+        id:
+          typeof Reflect.get(tab, "id") === "string" && Reflect.get(tab, "id")
+            ? (Reflect.get(tab, "id") as string)
+            : createTabId(),
+        currentPath,
+        history,
+        historyIndex: clampedHistoryIndex,
+        sortField,
+        sortDirection,
+      };
+    };
+
+    const restorePanel = (panel: unknown): PersistedPanelData | undefined => {
+      if (!panel || typeof panel !== "object") {
+        return undefined;
+      }
+
+      const tabsValue = Reflect.get(panel, "tabs");
+      const tabs = Array.isArray(tabsValue)
+        ? tabsValue
+            .map((tab) => restoreTab(tab))
+            .filter((tab): tab is PersistedTabState => tab !== null)
+        : [];
+
+      if (tabs.length === 0) {
+        return undefined;
+      }
+
+      const activeTabId = Reflect.get(panel, "activeTabId");
+
+      return {
+        tabs,
+        activeTabId: typeof activeTabId === "string" ? activeTabId : undefined,
+      };
+    };
+
     return {
       activePanel:
         parsed.activePanel === "left" || parsed.activePanel === "right"
@@ -75,6 +166,8 @@ const readPersistedPanelState = (): PersistedPanelState => {
           : undefined,
       leftPath: typeof parsed.leftPath === "string" ? parsed.leftPath : undefined,
       rightPath: typeof parsed.rightPath === "string" ? parsed.rightPath : undefined,
+      leftPanel: restorePanel(parsed.leftPanel),
+      rightPanel: restorePanel(parsed.rightPanel),
       showHiddenFiles:
         typeof parsed.showHiddenFiles === "boolean" ? parsed.showHiddenFiles : undefined,
       themePreference:
@@ -101,8 +194,6 @@ const writePersistedPanelState = (state: PersistedPanelState) => {
     console.error("Failed to persist panel state:", error);
   }
 };
-
-const persistedPanelState = readPersistedPanelState();
 
 const sortEntries = (
   entries: FileEntry[],
@@ -201,6 +292,48 @@ const defaultPanelState = (id: PanelId, currentPath?: string): PanelState => {
   });
 };
 
+const restorePersistedPanelState = (
+  id: PanelId,
+  persistedPanel?: PersistedPanelData,
+  fallbackPath?: string
+): PanelState => {
+  if (!persistedPanel || persistedPanel.tabs.length === 0) {
+    return defaultPanelState(id, fallbackPath);
+  }
+
+  const tabs: PanelTabState[] = persistedPanel.tabs.map((tab) => ({
+    id: tab.id,
+    currentPath: tab.currentPath,
+    history: [...tab.history],
+    historyIndex: tab.historyIndex,
+    files: [],
+    selectedItems: new Set<string>(),
+    cursorIndex: 0,
+    sortField: tab.sortField,
+    sortDirection: tab.sortDirection,
+    lastUpdated: Date.now(),
+  }));
+
+  const activeTabId = tabs.some((tab) => tab.id === persistedPanel.activeTabId)
+    ? persistedPanel.activeTabId ?? tabs[0].id
+    : tabs[0].id;
+
+  return syncPanelWithActiveTab({
+    id,
+    tabs,
+    activeTabId,
+    currentPath: tabs[0].currentPath,
+    history: tabs[0].history,
+    historyIndex: tabs[0].historyIndex,
+    files: tabs[0].files,
+    selectedItems: tabs[0].selectedItems,
+    cursorIndex: tabs[0].cursorIndex,
+    sortField: tabs[0].sortField,
+    sortDirection: tabs[0].sortDirection,
+    lastUpdated: tabs[0].lastUpdated,
+  });
+};
+
 const normalizePathKey = (path: string) => path.normalize("NFC");
 
 const applyCachedSizes = (
@@ -262,114 +395,139 @@ const persistVisiblePanelState = (
   showHiddenFiles: boolean,
   themePreference: ThemePreference
 ) => {
+  const serializePanel = (panel: PanelState): PersistedPanelData => ({
+    activeTabId: panel.activeTabId,
+    tabs: panel.tabs.map((tab) => ({
+      id: tab.id,
+      currentPath: tab.currentPath,
+      history: [...tab.history],
+      historyIndex: tab.historyIndex,
+      sortField: tab.sortField,
+      sortDirection: tab.sortDirection,
+    })),
+  });
+
   writePersistedPanelState({
     activePanel,
     leftPath: leftPanel.currentPath,
     rightPath: rightPanel.currentPath,
+    leftPanel: serializePanel(leftPanel),
+    rightPanel: serializePanel(rightPanel),
     showHiddenFiles,
     themePreference,
   });
 };
 
-export const usePanelStore = create<AppState>((set) => ({
-  leftPanel: defaultPanelState("left", persistedPanelState.leftPath),
-  rightPanel: defaultPanelState("right", persistedPanelState.rightPath),
-  sizeCache: {},
-  activePanel: persistedPanelState.activePanel ?? "left",
-  showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
-  themePreference: persistedPanelState.themePreference ?? "auto",
+export const usePanelStore = create<AppState>((set) => {
+  const persistedPanelState = readPersistedPanelState();
 
-  setActivePanel: (activePanel) =>
-    set((state) => {
-      persistVisiblePanelState(
-        state.leftPanel,
-        state.rightPanel,
-        activePanel,
-        state.showHiddenFiles,
-        state.themePreference
-      );
-      return { activePanel };
-    }),
+  return {
+    leftPanel: restorePersistedPanelState(
+      "left",
+      persistedPanelState.leftPanel,
+      persistedPanelState.leftPath
+    ),
+    rightPanel: restorePersistedPanelState(
+      "right",
+      persistedPanelState.rightPanel,
+      persistedPanelState.rightPath
+    ),
+    sizeCache: {},
+    activePanel: persistedPanelState.activePanel ?? "left",
+    showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
+    themePreference: persistedPanelState.themePreference ?? "auto",
 
-  setShowHiddenFiles: (showHiddenFiles) =>
-    set((state) => {
-      persistVisiblePanelState(
-        state.leftPanel,
-        state.rightPanel,
-        state.activePanel,
-        showHiddenFiles,
-        state.themePreference
-      );
-      return { showHiddenFiles };
-    }),
+    setActivePanel: (activePanel) =>
+      set((state) => {
+        persistVisiblePanelState(
+          state.leftPanel,
+          state.rightPanel,
+          activePanel,
+          state.showHiddenFiles,
+          state.themePreference
+        );
+        return { activePanel };
+      }),
 
-  setThemePreference: (themePreference) =>
-    set((state) => {
-      persistVisiblePanelState(
-        state.leftPanel,
-        state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        themePreference
-      );
-      return { themePreference };
-    }),
+    setShowHiddenFiles: (showHiddenFiles) =>
+      set((state) => {
+        persistVisiblePanelState(
+          state.leftPanel,
+          state.rightPanel,
+          state.activePanel,
+          showHiddenFiles,
+          state.themePreference
+        );
+        return { showHiddenFiles };
+      }),
 
-  addTab: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const currentPanel = state[panelKey];
-      const activeTab =
-        currentPanel.tabs.find((tab) => tab.id === currentPanel.activeTabId) ??
-        currentPanel.tabs[0];
-      const nextTab = activeTab
-        ? cloneTabState(activeTab)
-        : defaultTabState(currentPanel.currentPath);
-      const nextPanelState = syncPanelWithActiveTab({
-        ...currentPanel,
-        tabs: [...currentPanel.tabs, nextTab],
-        activeTabId: nextTab.id,
-      });
+    setThemePreference: (themePreference) =>
+      set((state) => {
+        persistVisiblePanelState(
+          state.leftPanel,
+          state.rightPanel,
+          state.activePanel,
+          state.showHiddenFiles,
+          themePreference
+        );
+        return { themePreference };
+      }),
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference
-      );
+    addTab: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const currentPanel = state[panelKey];
+        const activeTab =
+          currentPanel.tabs.find((tab) => tab.id === currentPanel.activeTabId) ??
+          currentPanel.tabs[0];
+        const nextTab = activeTab
+          ? cloneTabState(activeTab)
+          : defaultTabState(currentPanel.currentPath);
+        const nextPanelState = syncPanelWithActiveTab({
+          ...currentPanel,
+          tabs: [...currentPanel.tabs, nextTab],
+          activeTabId: nextTab.id,
+        });
 
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
+        persistVisiblePanelState(
+          panel === "left" ? nextPanelState : state.leftPanel,
+          panel === "right" ? nextPanelState : state.rightPanel,
+          state.activePanel,
+          state.showHiddenFiles,
+          state.themePreference
+        );
 
-  activateTab: (panel, tabId) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const currentPanel = state[panelKey];
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      if (!currentPanel.tabs.some((tab) => tab.id === tabId)) {
-        return {};
-      }
+    activateTab: (panel, tabId) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const currentPanel = state[panelKey];
 
-      const nextPanelState = syncPanelWithActiveTab({
-        ...currentPanel,
-        activeTabId: tabId,
-      });
+        if (!currentPanel.tabs.some((tab) => tab.id === tabId)) {
+          return {};
+        }
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference
-      );
+        const nextPanelState = syncPanelWithActiveTab({
+          ...currentPanel,
+          activeTabId: tabId,
+        });
 
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
+        persistVisiblePanelState(
+          panel === "left" ? nextPanelState : state.leftPanel,
+          panel === "right" ? nextPanelState : state.rightPanel,
+          state.activePanel,
+          state.showHiddenFiles,
+          state.themePreference
+        );
+
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
   closeTab: (panel, tabId) =>
     set((state) => {
@@ -554,6 +712,14 @@ export const usePanelStore = create<AppState>((set) => ({
         };
       });
 
+      persistVisiblePanelState(
+        panel === "left" ? nextPanelState : state.leftPanel,
+        panel === "right" ? nextPanelState : state.rightPanel,
+        state.activePanel,
+        state.showHiddenFiles,
+        state.themePreference
+      );
+
       return {
         [panelKey]: nextPanelState,
       };
@@ -572,4 +738,5 @@ export const usePanelStore = create<AppState>((set) => ({
         rightPanel: updatePanelEntrySize(state.rightPanel, normPath, size),
       };
     }),
-}));
+  };
+});
