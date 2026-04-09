@@ -9,6 +9,7 @@ import {
   FilePlus2,
   FolderPlus,
   Info,
+  Pencil,
   Search,
   Terminal,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const ContextMenuDivider: React.FC = () => (
 export const ContextMenu: React.FC = () => {
   const { isOpen, panelId, targetPath, x, y, closeContextMenu } = useContextMenuStore();
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
+  const openRenameDialog = useDialogStore((s) => s.openRenameDialog);
   const openInfoDialog = useDialogStore((s) => s.openInfoDialog);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
@@ -48,6 +50,7 @@ export const ContextMenu: React.FC = () => {
       ? panel.files.find((entry) => entry.path.normalize("NFC") === targetPath.normalize("NFC")) ?? null
       : null;
   const hasTargetItem = Boolean(targetPath);
+  const canRename = Boolean(targetEntry && targetEntry.name !== "..");
   const targetLabel =
     targetEntry?.name ??
     targetPath?.split(/[\\/]/).filter(Boolean).pop() ??
@@ -111,6 +114,16 @@ export const ContextMenu: React.FC = () => {
 
     setActivePanel(panelId);
     openInfoDialog({ panelId, path: targetPath });
+    closeContextMenu();
+  };
+
+  const handleRename = () => {
+    if (!targetPath || !canRename) {
+      return;
+    }
+
+    setActivePanel(panelId);
+    openRenameDialog({ panelId, path: targetPath });
     closeContextMenu();
   };
 
@@ -194,6 +207,14 @@ export const ContextMenu: React.FC = () => {
             <button className={MENU_ITEM_CLASS} onClick={() => openDialogForPanel("move")}>
               <Search className={MENU_ICON_CLASS} />
               <span>Move</span>
+            </button>
+            <button
+              className={canRename ? MENU_ITEM_CLASS : DISABLED_MENU_ITEM_CLASS}
+              onClick={handleRename}
+              disabled={!canRename}
+            >
+              <Pencil className={MENU_ICON_CLASS} />
+              <span>Rename</span>
             </button>
             <button className={MENU_ITEM_CLASS} onClick={() => openDialogForPanel("delete")}>
               <span className="h-[15px] w-[15px] shrink-0 text-center text-white/70">-</span>

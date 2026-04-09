@@ -6,6 +6,32 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { isAbsolutePath, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
 
+const getPathBaseName = (path: string) => {
+  const normalized = path.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : normalized;
+};
+
+const getPathDirectoryName = (path: string) => {
+  const normalized = path.replace(/[\\/]+$/, "");
+  const slashIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+
+  if (slashIndex < 0) {
+    return "";
+  }
+
+  if (slashIndex === 0) {
+    return normalized.startsWith("\\\\") ? normalized : "/";
+  }
+
+  const parentPath = normalized.slice(0, slashIndex);
+  if (/^[A-Z]:$/i.test(parentPath)) {
+    return `${parentPath}\\`;
+  }
+
+  return parentPath;
+};
+
 // Reusable Radix UI Dialog Wrapper
 const BaseDialog: React.FC<{
   title: string;
@@ -115,10 +141,12 @@ export const DialogContainer: React.FC = () => {
       setInputValue("");
     } else if (openDialog === "newfile") {
       setInputValue("New File.txt");
+    } else if (openDialog === "rename" && dialogTarget) {
+      setInputValue(getPathBaseName(dialogTarget.path));
     } else {
       setInputValue("");
     }
-  }, [openDialog, targetPanel.currentPath]);
+  }, [dialogTarget, openDialog, targetPanel.currentPath]);
 
   useEffect(() => {
     setOperationError(null);
@@ -204,6 +232,29 @@ export const DialogContainer: React.FC = () => {
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to create file."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!dialogTarget || !inputValue.trim()) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setOperationError(null);
+      const sourcePath = dialogTarget.path;
+      const targetName = inputValue.trim();
+      const parentPath = getPathDirectoryName(sourcePath);
+      const fullPath = parentPath ? joinPath(parentPath, targetName) : targetName;
+      await fs.renameFile(sourcePath, fullPath);
+      closeDialog();
+      refreshPanel(dialogTarget.panelId);
+    } catch (e) {
+      console.error(e);
+      setOperationError(getErrorMessage(e, "Failed to rename the selected item."));
     } finally {
       setIsSubmitting(false);
     }
@@ -300,6 +351,32 @@ export const DialogContainer: React.FC = () => {
         errorMessage={operationError}
       >
         <p className="text-xs text-text-secondary mb-2">Create file in: {activePanel.currentPath}</p>
+        <input
+          autoFocus
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            if (operationError) {
+              setOperationError(null);
+            }
+          }}
+          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+        />
+      </BaseDialog>
+
+      <BaseDialog
+        isOpen={openDialog === "rename"}
+        onClose={closeDialog}
+        onSubmit={handleRename}
+        title="Rename"
+        submitLabel={isSubmitting ? "Renaming..." : "Rename"}
+        submitAutoFocus={false}
+        isSubmitting={isSubmitting}
+        errorMessage={operationError}
+      >
+        <p className="text-xs text-text-secondary mb-2">
+          Rename item in: {dialogTarget ? dialogTarget.path : activePanel.currentPath}
+        </p>
         <input
           autoFocus
           value={inputValue}
