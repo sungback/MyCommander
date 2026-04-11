@@ -1,0 +1,52 @@
+name: "Release Tauri App"
+
+on:
+  push:
+    tags:
+      - "v*" # GitHub에 v1.0.0 같은 형태의 태그를 푸시할 때만 실행됩니다.
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 필요하다면 나중에 macos-latest 나 ubuntu-22.04 등 다른 OS도 추가할 수 있습니다.
+          - platform: "windows-latest"
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust 설치
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 캐시 설정 (빌드 속도 향상)
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: 웹 프론트엔드 의존성 설치 (npm)
+        run: npm install
+
+      - name: Tauri 앱 빌드 및 GitHub Release 배포
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # package.json의 version을 읽어서 자동으로 태그/타이틀을 만듭니다.
+          tagName: app-v__VERSION__ 
+          releaseName: "MyCommander v__VERSION__"
+          releaseBody: "자동으로 빌드된 MyCommander 윈도우 설치 파일입니다."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
