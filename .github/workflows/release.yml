@@ -13,7 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 필요하다면 나중에 macos-latest 나 ubuntu-22.04 등 다른 OS도 추가할 수 있습니다.
+          # 윈도우와 맥 동시에 돌아가도록 설정합니다.
+          - platform: "macos-latest"
+            args: ""
           - platform: "windows-latest"
             args: ""
 
