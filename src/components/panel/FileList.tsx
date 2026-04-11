@@ -31,6 +31,7 @@ const getVisibleRows = (
   entries: FileEntry[],
   expandedPaths: Set<string>,
   childEntriesByPath: Record<string, FileEntry[]>,
+  sizeCache: Record<string, number>,
   depth = 0
 ): VisibleEntryRow[] => {
   const rows: VisibleEntryRow[] = [];
@@ -39,8 +40,11 @@ const getVisibleRows = (
     const canExpand = entry.kind === "directory" && entry.name !== "..";
     const isExpanded = canExpand && expandedPaths.has(entry.path);
 
+    const cachedSize = sizeCache[entry.path.normalize("NFC")];
+    const resolvedEntry = cachedSize !== undefined ? { ...entry, size: cachedSize } : entry;
+
     rows.push({
-      entry,
+      entry: resolvedEntry,
       depth,
       canExpand,
       isExpanded,
@@ -52,7 +56,7 @@ const getVisibleRows = (
 
     const children = childEntriesByPath[entry.path] ?? [];
     const filteredChildren = children.filter((child) => child.name !== "..");
-    rows.push(...getVisibleRows(filteredChildren, expandedPaths, childEntriesByPath, depth + 1));
+    rows.push(...getVisibleRows(filteredChildren, expandedPaths, childEntriesByPath, sizeCache, depth + 1));
   }
 
   return rows;
@@ -77,10 +81,11 @@ export const FileList: React.FC<FileListProps> = ({
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const clearSelection = usePanelStore((s) => s.clearSelection);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
+  const sizeCache = usePanelStore((s) => s.sizeCache);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<Record<string, FileEntry[]>>({});
   const selectionAnchorIndexRef = useRef<number | null>(null);
-  const visibleRows = getVisibleRows(files, expandedPaths, childEntriesByPath);
+  const visibleRows = getVisibleRows(files, expandedPaths, childEntriesByPath, sizeCache);
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
@@ -132,14 +137,33 @@ export const FileList: React.FC<FileListProps> = ({
     if (!childEntriesByPath[entry.path]) {
       try {
         const children = await listDirectory(entry.path, showHiddenFiles);
+        const validChildren = children.filter((child) => child.name !== "..");
+        
         setChildEntriesByPath((current) => ({
           ...current,
-          [entry.path]: children.filter((child) => child.name !== ".."),
+          [entry.path]: validChildren,
         }));
+
+        // 새로 불러온 하위 폴더들에 대해서도 자동으로 용량 계산 수행
+        validChildren.forEach((child) => {
+          if (child.kind === "directory" && (child.size === undefined || child.size === null)) {
+            getDirSize(child.path)
+              .then((size) => updateEntrySize(panelId, child.path, size))
+              .catch((err) => console.error("Failed to calculate child dir size:", err));
+          }
+        });
+
       } catch (error) {
         console.error(`Failed to preview child entries for ${entry.path}:`, error);
         return;
       }
+    }
+
+    // 폴더를 확장할 때 폴더 크기를 백그라운드에서 계산하여 업데이트
+    if (entry.size === undefined || entry.size === null) {
+      getDirSize(entry.path)
+        .then((size) => updateEntrySize(panelId, entry.path, size))
+        .catch((err) => console.error("Failed to calculate dir size:", err));
     }
 
     setExpandedPaths((current) => {

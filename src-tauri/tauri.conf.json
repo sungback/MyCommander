@@ -14,7 +14,8 @@
       {
         "title": "MyCommander",
         "width": 1120,
-        "height": 720
+        "height": 720,
+        "visible": false
       }
     ],
     "security": {
