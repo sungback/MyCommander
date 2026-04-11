@@ -12,6 +12,11 @@ import { ThemePreference } from "../types/theme";
 type PanelId = "left" | "right";
 type PanelViewModes = Record<PanelId, ViewMode>;
 
+export interface DragInfo {
+  paths: string[];
+  sourcePanel: PanelId;
+}
+
 interface AppState {
   leftPanel: PanelState;
   rightPanel: PanelState;
@@ -37,6 +42,8 @@ interface AppState {
   refreshPanel: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: string) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  dragInfo: DragInfo | null;
+  setDragInfo: (info: DragInfo | null) => void;
 }
 
 interface PersistedPanelState {
@@ -463,6 +470,9 @@ export const usePanelStore = create<AppState>((set) => {
     showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
     themePreference: persistedPanelState.themePreference ?? "auto",
     panelViewModes,
+    dragInfo: null,
+
+    setDragInfo: (dragInfo) => set({ dragInfo }),
 
     setActivePanel: (activePanel) =>
       set((state) => {

@@ -31,9 +31,11 @@
     "allow-rename-file",
     "allow-copy-files",
     "allow-move-files",
+    "allow-check-copy-conflicts",
     "allow-extract-zip",
     "allow-read-file-content",
     "allow-search-files",
-    "allow-get-dir-size"
+    "allow-get-dir-size",
+    "drag:default"
   ]
 }

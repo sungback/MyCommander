@@ -1,9 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileEntry, ViewMode } from "../../types/file";
 import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
+import { useDialogStore } from "../../store/dialogStore";
+import { clsx } from "clsx";
 
 interface FileListProps {
   currentPath: string;
@@ -25,7 +29,15 @@ interface VisibleEntryRow {
   canExpand: boolean;
 }
 
+const DRAG_THRESHOLD_PX = 6;
+
 const isSelectableEntry = (entry: FileEntry) => entry.name !== "..";
+
+// ─── Module-level shared state for cross-panel drag communication ────────────
+// Both FileList instances (left + right) share this object.
+const sharedDragState = {
+  hoveredPanel: null as "left" | "right" | null,
+};
 
 const getVisibleRows = (
   entries: FileEntry[],
@@ -41,25 +53,49 @@ const getVisibleRows = (
     const isExpanded = canExpand && expandedPaths.has(entry.path);
 
     const cachedSize = sizeCache[entry.path.normalize("NFC")];
-    const resolvedEntry = cachedSize !== undefined ? { ...entry, size: cachedSize } : entry;
+    const resolvedEntry =
+      cachedSize !== undefined ? { ...entry, size: cachedSize } : entry;
 
-    rows.push({
-      entry: resolvedEntry,
-      depth,
-      canExpand,
-      isExpanded,
-    });
+    rows.push({ entry: resolvedEntry, depth, canExpand, isExpanded });
 
-    if (!isExpanded) {
-      continue;
-    }
+    if (!isExpanded) continue;
 
     const children = childEntriesByPath[entry.path] ?? [];
     const filteredChildren = children.filter((child) => child.name !== "..");
-    rows.push(...getVisibleRows(filteredChildren, expandedPaths, childEntriesByPath, sizeCache, depth + 1));
+    rows.push(
+      ...getVisibleRows(
+        filteredChildren,
+        expandedPaths,
+        childEntriesByPath,
+        sizeCache,
+        depth + 1
+      )
+    );
   }
 
   return rows;
+};
+
+/** Small document icon rendered via canvas, cached after first call */
+let _cachedDragIcon: string | null = null;
+const getDragIcon = (): string => {
+  if (_cachedDragIcon) return _cachedDragIcon;
+  const canvas = document.createElement("canvas");
+  canvas.width = 48;
+  canvas.height = 48;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(8, 4, 28, 40, 4);
+  else ctx.rect(8, 4, 28, 40);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(14, 14, 16, 2);
+  ctx.fillRect(14, 20, 16, 2);
+  ctx.fillRect(14, 26, 10, 2);
+  _cachedDragIcon = canvas.toDataURL("image/png");
+  return _cachedDragIcon;
 };
 
 export const FileList: React.FC<FileListProps> = ({
@@ -82,19 +118,40 @@ export const FileList: React.FC<FileListProps> = ({
   const clearSelection = usePanelStore((s) => s.clearSelection);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const sizeCache = usePanelStore((s) => s.sizeCache);
+  const setDragInfo = usePanelStore((s) => s.setDragInfo);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [childEntriesByPath, setChildEntriesByPath] = useState<Record<string, FileEntry[]>>({});
+  const [childEntriesByPath, setChildEntriesByPath] = useState<
+    Record<string, FileEntry[]>
+  >({});
   const selectionAnchorIndexRef = useRef<number | null>(null);
-  const visibleRows = getVisibleRows(files, expandedPaths, childEntriesByPath, sizeCache);
+  const searchStringRef = useRef<string>("");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Counter for HTML5 drag events (for external Finder→App drops)
+  const dragCounterRef = useRef(0);
+
+  // State for mouse-based drag (panel→panel + Finder drag-out)
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    paths: string[];
+    dragging: boolean;       // crossed threshold?
+    nativeDragStarted: boolean; // startDrag() called?
+  } | null>(null);
+
+  const visibleRows = getVisibleRows(
+    files,
+    expandedPaths,
+    childEntriesByPath,
+    sizeCache
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 28, // Height of one FileItem row
+    estimateSize: () => 28,
     overscan: 10,
   });
 
-  // Ensure cursor is always visible
   useEffect(() => {
     if (isActivePanel && cursorIndex >= 0 && cursorIndex < visibleRows.length) {
       rowVirtualizer.scrollToIndex(cursorIndex, { align: "auto" });
@@ -105,23 +162,116 @@ export const FileList: React.FC<FileListProps> = ({
     setExpandedPaths(new Set());
     setChildEntriesByPath({});
     selectionAnchorIndexRef.current = null;
+    searchStringRef.current = "";
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
   }, [currentPath, showHiddenFiles]);
 
   useEffect(() => {
-    if (visibleRows.length === 0) {
-      return;
-    }
-
+    if (visibleRows.length === 0) return;
     if (cursorIndex >= visibleRows.length) {
       setCursorIndex(visibleRows.length - 1);
     }
   }, [cursorIndex, setCursorIndex, visibleRows.length]);
 
-  const toggleExpanded = async (rowIndex: number, entry: FileEntry) => {
-    if (entry.kind !== "directory" || entry.name === "..") {
-      return;
-    }
+  // ─── Document-level mouse listeners ────────────────────────────────────────
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const state = dragStateRef.current;
+      const activeDragInfo = usePanelStore.getState().dragInfo;
 
+      // Update hover state for ANY active drag (from this or other panel)
+      if ((state?.dragging || activeDragInfo) && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const isOverContainer =
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom;
+
+        if (isOverContainer && activeDragInfo?.sourcePanel !== panelId) {
+          sharedDragState.hoveredPanel = panelId;
+        } else if (sharedDragState.hoveredPanel === panelId && !isOverContainer) {
+          sharedDragState.hoveredPanel = null;
+        }
+      }
+
+      if (!state || state.nativeDragStarted) return;
+
+      // Step 1: Detect drag threshold
+      if (!state.dragging) {
+        const dx = e.clientX - state.startX;
+        const dy = e.clientY - state.startY;
+        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+          state.dragging = true;
+          // Signal other panel that a drag is in progress from this panel
+          setDragInfo({ paths: state.paths, sourcePanel: panelId });
+          document.body.style.cursor = "grabbing";
+          document.body.style.userSelect = "none";
+        }
+        return;
+      }
+
+      // Step 2: If mouse has left the app window → hand off to native drag
+      const outsideWindow =
+        e.clientX <= 0 ||
+        e.clientY <= 0 ||
+        e.clientX >= window.innerWidth ||
+        e.clientY >= window.innerHeight;
+
+      if (outsideWindow) {
+        state.nativeDragStarted = true;
+        document.body.style.cursor = "";
+
+        startDrag({ item: state.paths, icon: getDragIcon() })
+          .then(() => {
+            setDragInfo(null);
+            sharedDragState.hoveredPanel = null;
+            dragStateRef.current = null;
+          })
+          .catch(console.error);
+      }
+    };
+
+    const handleMouseUp = () => {
+      const state = dragStateRef.current;
+      if (!state) return;
+
+      // Native drag has taken over — handled by startDrag promise
+      if (state.nativeDragStarted) {
+        dragStateRef.current = null;
+        return;
+      }
+
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+
+      if (state.dragging) {
+        const targetPanel = sharedDragState.hoveredPanel;
+
+        // Internal panel-to-panel drop
+        if (targetPanel && targetPanel !== panelId) {
+          // Make sure selection is correct in source panel
+          usePanelStore.getState().setActivePanel(panelId);
+          useDialogStore.getState().setOpenDialog("copy");
+        }
+      }
+
+      setDragInfo(null);
+      sharedDragState.hoveredPanel = null;
+      dragStateRef.current = null;
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [panelId, setDragInfo]);
+
+  // ─── Tree expand/collapse ─────────────────────────────────────────────────
+  const toggleExpanded = async (rowIndex: number, entry: FileEntry) => {
+    if (entry.kind !== "directory" || entry.name === "..") return;
     setCursorIndex(rowIndex);
     containerRef.current?.focus({ preventScroll: true });
 
@@ -138,28 +288,31 @@ export const FileList: React.FC<FileListProps> = ({
       try {
         const children = await listDirectory(entry.path, showHiddenFiles);
         const validChildren = children.filter((child) => child.name !== "..");
-        
         setChildEntriesByPath((current) => ({
           ...current,
           [entry.path]: validChildren,
         }));
-
-        // 새로 불러온 하위 폴더들에 대해서도 자동으로 용량 계산 수행
         validChildren.forEach((child) => {
-          if (child.kind === "directory" && (child.size === undefined || child.size === null)) {
+          if (
+            child.kind === "directory" &&
+            (child.size === undefined || child.size === null)
+          ) {
             getDirSize(child.path)
               .then((size) => updateEntrySize(panelId, child.path, size))
-              .catch((err) => console.error("Failed to calculate child dir size:", err));
+              .catch((err) =>
+                console.error("Failed to calculate child dir size:", err)
+              );
           }
         });
-
       } catch (error) {
-        console.error(`Failed to preview child entries for ${entry.path}:`, error);
+        console.error(
+          `Failed to preview child entries for ${entry.path}:`,
+          error
+        );
         return;
       }
     }
 
-    // 폴더를 확장할 때 폴더 크기를 백그라운드에서 계산하여 업데이트
     if (entry.size === undefined || entry.size === null) {
       getDirSize(entry.path)
         .then((size) => updateEntrySize(panelId, entry.path, size))
@@ -173,10 +326,10 @@ export const FileList: React.FC<FileListProps> = ({
     });
   };
 
+  // ─── Selection helpers ────────────────────────────────────────────────────
   const getRangePaths = (startIndex: number, endIndex: number) => {
     const start = Math.min(startIndex, endIndex);
     const end = Math.max(startIndex, endIndex);
-
     return visibleRows
       .slice(start, end + 1)
       .map((row) => row.entry)
@@ -185,28 +338,35 @@ export const FileList: React.FC<FileListProps> = ({
   };
 
   const moveSelectionToRow = (targetIndex: number) => {
-    if (visibleRows.length === 0) {
-      return;
-    }
-
-    const nextIndex = Math.min(Math.max(targetIndex, 0), visibleRows.length - 1);
+    if (visibleRows.length === 0) return;
+    const nextIndex = Math.min(
+      Math.max(targetIndex, 0),
+      visibleRows.length - 1
+    );
     const nextEntry = visibleRows[nextIndex]?.entry;
-
     setCursorIndex(nextIndex);
     selectionAnchorIndexRef.current = nextIndex;
-
-    if (!nextEntry) {
-      return;
-    }
-
+    if (!nextEntry) return;
     if (isSelectableEntry(nextEntry)) {
       selectOnly(panelId, nextEntry.path);
       return;
     }
-
     clearSelection(panelId);
   };
 
+  const extendSelectionToRow = (targetIndex: number) => {
+    if (visibleRows.length === 0) return;
+    const nextIndex = Math.min(
+      Math.max(targetIndex, 0),
+      visibleRows.length - 1
+    );
+    const anchorIndex = selectionAnchorIndexRef.current ?? cursorIndex;
+    const rangePaths = getRangePaths(anchorIndex, nextIndex);
+    setCursorIndex(nextIndex);
+    setSelection(panelId, rangePaths);
+  };
+
+  // ─── Click handler ────────────────────────────────────────────────────────
   const handleRowClick = (
     event: React.MouseEvent<HTMLDivElement>,
     rowIndex: number,
@@ -224,9 +384,9 @@ export const FileList: React.FC<FileListProps> = ({
     const additiveSelection = event.metaKey || event.ctrlKey;
 
     if (event.shiftKey) {
-      const anchorIndex = selectionAnchorIndexRef.current ?? cursorIndex ?? rowIndex;
+      const anchorIndex =
+        selectionAnchorIndexRef.current ?? cursorIndex ?? rowIndex;
       const rangePaths = getRangePaths(anchorIndex, rowIndex);
-
       if (additiveSelection) {
         const mergedPaths = new Set(selectedItems);
         rangePaths.forEach((path) => mergedPaths.add(path));
@@ -247,11 +407,106 @@ export const FileList: React.FC<FileListProps> = ({
     selectOnly(panelId, entry.path);
   };
 
+  // ─── Mouse-down: record drag intent ──────────────────────────────────────
+  const handleMouseDown = (e: React.MouseEvent, entry: FileEntry) => {
+    if (entry.name === "..") return;
+    if (e.button !== 0) return;
+
+    // Prevent text selection immediately on mousedown
+    e.preventDefault();
+
+    const pathsToDrag = selectedItems.has(entry.path)
+      ? Array.from(selectedItems)
+      : [entry.path];
+
+    dragStateRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      paths: pathsToDrag,
+      dragging: false,
+      nativeDragStarted: false,
+    };
+  };
+
+  // ─── Container hover during mouse-drag (for visual feedback) ─────────────
+  const handleContainerMouseEnter = () => {
+    const activeDragInfo = usePanelStore.getState().dragInfo;
+    if (activeDragInfo && activeDragInfo.sourcePanel !== panelId) {
+      sharedDragState.hoveredPanel = panelId;
+    }
+  };
+
+  const handleContainerMouseLeave = () => {
+    if (sharedDragState.hoveredPanel === panelId) {
+      sharedDragState.hoveredPanel = null;
+    }
+  };
+
+  // ─── HTML5 drag handlers (for receiving external drops from Finder) ───────
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+
+    const activeDragInfo = usePanelStore.getState().dragInfo;
+
+    // If our app's drag is active, ignore — handled by mouseup
+    if (activeDragInfo) {
+      return;
+    }
+
+    // External drop from Finder/OS → copy files in
+    const externalFiles = Array.from(e.dataTransfer.files);
+    if (externalFiles.length > 0) {
+      const paths = externalFiles
+        .map((f) => (f as any).path as string)
+        .filter(Boolean);
+      if (paths.length > 0) {
+        try {
+          await invoke("copy_files", {
+            source_paths: paths,
+            target_path: currentPath,
+          });
+        } catch (error) {
+          console.error("Failed to copy external files:", error);
+        }
+      }
+    }
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden bg-bg-panel focus:outline-none"
+      className={clsx(
+        "flex-1 overflow-y-auto overflow-x-hidden bg-bg-panel focus:outline-none transition-colors duration-200 select-none"
+      )}
       tabIndex={0}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           clearSelection(panelId);
@@ -267,10 +522,12 @@ export const FileList: React.FC<FileListProps> = ({
 
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          moveSelectionToRow(cursorIndex + 1);
+          if (e.shiftKey) extendSelectionToRow(cursorIndex + 1);
+          else moveSelectionToRow(cursorIndex + 1);
         } else if (e.key === "ArrowUp") {
           e.preventDefault();
-          moveSelectionToRow(cursorIndex - 1);
+          if (e.shiftKey) extendSelectionToRow(cursorIndex - 1);
+          else moveSelectionToRow(cursorIndex - 1);
         } else if (e.key === "ArrowLeft") {
           e.preventDefault();
           moveSelectionToRow(0);
@@ -286,18 +543,42 @@ export const FileList: React.FC<FileListProps> = ({
           if (current) onEnter(current);
         } else if (e.key === "Space") {
           e.preventDefault();
-          e.stopPropagation(); // Prevent space from scrolling the container
+          e.stopPropagation();
           if (current) {
             onSelect(current.path, true);
-            // Calculate dir size if it's a directory
             if (current.kind === "directory" && current.name !== "..") {
-              getDirSize(current.path).then(size => {
-                updateEntrySize(panelId, current.path, size);
-              }).catch(err => {
-                console.error("Failed to calculate dir size:", err);
-              });
+              getDirSize(current.path)
+                .then((size) => updateEntrySize(panelId, current.path, size))
+                .catch((err) =>
+                  console.error("Failed to calculate dir size:", err)
+                );
             }
           }
+        } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyA") {
+          e.preventDefault();
+          const allPaths = visibleRows
+            .map((r) => r.entry)
+            .filter(isSelectableEntry)
+            .map((entry) => entry.path);
+          setSelection(panelId, allPaths);
+        } else if (
+          e.key.length === 1 &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.altKey &&
+          e.key !== " "
+        ) {
+          e.preventDefault();
+          if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+          searchStringRef.current += e.key.toLowerCase();
+          const query = searchStringRef.current;
+          const matchIndex = visibleRows.findIndex((row) =>
+            row.entry.name.toLowerCase().startsWith(query)
+          );
+          if (matchIndex !== -1) moveSelectionToRow(matchIndex);
+          searchTimeoutRef.current = setTimeout(() => {
+            searchStringRef.current = "";
+          }, 800);
         }
       }}
     >
@@ -318,6 +599,7 @@ export const FileList: React.FC<FileListProps> = ({
                 height: `${virtualItem.size}px`,
                 transform: `translateY(${virtualItem.start}px)`,
               }}
+              onMouseDown={(e) => handleMouseDown(e, entry)}
             >
               <FileItem
                 entry={entry}

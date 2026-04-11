@@ -55,7 +55,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       className={clsx(
-        "flex items-center h-[28px] border-b border-transparent group select-none font-mono text-sm",
+        "flex items-center h-[28px] border-b border-transparent group select-none font-mono text-sm cursor-default",
         {
           "bg-bg-selected theme-selection-text": isSelectionRow,
           "border-dotted border-accent-color": isCursor && isActivePanel,

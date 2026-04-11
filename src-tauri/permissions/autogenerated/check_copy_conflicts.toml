@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-copy-conflicts"
+description = "Enables the check_copy_conflicts command without any pre-configured scope."
+commands.allow = ["check_copy_conflicts"]
+
+[[permission]]
+identifier = "deny-check-copy-conflicts"
+description = "Denies the check_copy_conflicts command without any pre-configured scope."
+commands.deny = ["check_copy_conflicts"]

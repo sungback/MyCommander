@@ -271,8 +271,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     <div
       ref={panelRef}
       className={clsx(
-        "flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-opacity bg-bg-panel",
-        !isActive && "opacity-80 grayscale-20"
+        "flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-opacity bg-bg-panel"
       )}
       onClickCapture={() => {
         if (!isActive) {

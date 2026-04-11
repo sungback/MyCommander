@@ -197,6 +197,38 @@ describe("panelStore — tabs", () => {
     usePanelStore.getState().activateTab("left", "non-existent-id");
     expect(usePanelStore.getState().leftPanel.activeTabId).toBe(before);
   });
+
+  it("addTab은 현재 패널 경로를 상속한다", () => {
+    usePanelStore.getState().setPath("left", "/home/user/Documents");
+    usePanelStore.getState().addTab("left");
+    const tabs = usePanelStore.getState().leftPanel.tabs;
+    const newTab = tabs[tabs.length - 1];
+    expect(newTab.currentPath).toBe("/home/user/Documents");
+  });
+
+  it("활성 탭 닫기 → 이웃 탭으로 activeTabId 자동 전환", () => {
+    usePanelStore.getState().addTab("left"); // 탭 2개
+    const tabs = usePanelStore.getState().leftPanel.tabs;
+    const activeId = usePanelStore.getState().leftPanel.activeTabId!;
+    const otherId = tabs.find((t) => t.id !== activeId)!.id;
+
+    usePanelStore.getState().closeTab("left", activeId);
+
+    expect(usePanelStore.getState().leftPanel.activeTabId).toBe(otherId);
+    expect(usePanelStore.getState().leftPanel.tabs).toHaveLength(1);
+  });
+
+  it("비활성 탭 닫기 → activeTabId 변경 없음", () => {
+    usePanelStore.getState().addTab("left");
+    const activeId = usePanelStore.getState().leftPanel.activeTabId!;
+    const tabs = usePanelStore.getState().leftPanel.tabs;
+    const inactiveId = tabs.find((t) => t.id !== activeId)!.id;
+
+    usePanelStore.getState().closeTab("left", inactiveId);
+
+    expect(usePanelStore.getState().leftPanel.activeTabId).toBe(activeId);
+    expect(usePanelStore.getState().leftPanel.tabs).toHaveLength(1);
+  });
 });
 
 describe("panelStore — sorting", () => {
@@ -286,6 +318,27 @@ describe("panelStore — updateEntrySize", () => {
 
     const files = usePanelStore.getState().leftPanel.files;
     expect(files.find((f) => f.name === "dir")?.size).toBe(5000);
+  });
+
+  it("sizeCache에 경로-크기가 직접 저장된다", () => {
+    const { updateEntrySize } = usePanelStore.getState();
+    updateEntrySize("left", "/some/dir", 1234);
+    // sizeCache는 FileList의 getVisibleRows가 직접 읽는 공유 캐시
+    expect(usePanelStore.getState().sizeCache["/some/dir"]).toBe(1234);
+  });
+
+  it("파일 목록에 없는 경로도 sizeCache에 저장된다", () => {
+    const { updateEntrySize } = usePanelStore.getState();
+    // 양쪽 패널에 해당 경로 없음 → 파일 업데이트는 없지만 캐시에는 저장
+    updateEntrySize("left", "/not/in/panel", 777);
+    expect(usePanelStore.getState().sizeCache["/not/in/panel"]).toBe(777);
+  });
+
+  it("동일 경로에 updateEntrySize 두 번 호출 → 최신 값으로 덮어씌워진다", () => {
+    const { updateEntrySize } = usePanelStore.getState();
+    updateEntrySize("left", "/dir", 100);
+    updateEntrySize("left", "/dir", 200);
+    expect(usePanelStore.getState().sizeCache["/dir"]).toBe(200);
   });
 });
 

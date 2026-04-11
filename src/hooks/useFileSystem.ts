@@ -100,6 +100,13 @@ const fileSystem = {
     });
   },
 
+  checkCopyConflicts: async (sourcePaths: string[], targetPath: string): Promise<string[]> => {
+    return await invoke<string[]>("check_copy_conflicts", {
+      source_paths: sourcePaths,
+      target_path: targetPath,
+    });
+  },
+
   extractZip: async (path: string): Promise<string> => {
     return await invoke<string>("extract_zip", { path });
   },

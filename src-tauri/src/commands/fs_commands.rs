@@ -548,6 +548,36 @@ fn normalize_target_path(path: &Path) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub async fn check_copy_conflicts(
+    source_paths: Vec<String>,
+    target_path: String,
+) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        let target = Path::new(&target_path);
+        let mut conflicts = Vec::new();
+
+        for source in &source_paths {
+            let src = Path::new(source);
+            let file_name = src
+                .file_name()
+                .ok_or_else(|| format!("Invalid path: {}", source))?;
+            let destination = if target.is_dir() {
+                target.join(file_name)
+            } else {
+                target.to_path_buf()
+            };
+            if destination.exists() {
+                conflicts.push(file_name.to_string_lossy().to_string());
+            }
+        }
+
+        Ok(conflicts)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -32,6 +32,13 @@ const getPathDirectoryName = (path: string) => {
   return parentPath;
 };
 
+const getSelectedItemsText = (paths: string[]) => {
+  if (paths.length === 0) return "0 files";
+  if (paths.length === 1) return `"${getPathBaseName(paths[0])}"`;
+  if (paths.length <= 3) return paths.map((p) => `"${getPathBaseName(p)}"`).join(", ");
+  return `"${getPathBaseName(paths[0])}", "${getPathBaseName(paths[1])}" and ${paths.length - 2} more file(s)`;
+};
+
 // Reusable Radix UI Dialog Wrapper
 const BaseDialog: React.FC<{
   title: string;
@@ -116,6 +123,12 @@ export const DialogContainer: React.FC = () => {
   const [infoError, setInfoError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
+  const [pendingCopy, setPendingCopy] = useState<{
+    isMove: boolean;
+    allPaths: string[];
+    targetPath: string;
+  } | null>(null);
 
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
@@ -151,6 +164,8 @@ export const DialogContainer: React.FC = () => {
   useEffect(() => {
     setOperationError(null);
     setIsSubmitting(false);
+    setConflictFiles([]);
+    setPendingCopy(null);
   }, [openDialog]);
 
   useEffect(() => {
@@ -287,20 +302,41 @@ export const DialogContainer: React.FC = () => {
       : joinPath(targetPanel.currentPath, trimmedValue);
   };
 
+  const executeCopyMove = async (isMove: boolean, paths: string[], targetPath: string) => {
+    try {
+      if (isMove) {
+        await fs.moveFiles(paths, targetPath);
+      } else {
+        await fs.copyFiles(paths, targetPath);
+      }
+      closeDialog();
+      refreshPanel(activePanelId);
+      refreshPanel(activePanelId === "left" ? "right" : "left");
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
   const handleCopyMove = async (isMove: boolean) => {
     if (!inputValue || selectedPaths.length === 0) return;
     try {
       setIsSubmitting(true);
       setOperationError(null);
       const targetPath = resolveTargetPath();
-      if (isMove) {
-        await fs.moveFiles(selectedPaths, targetPath);
-      } else {
-        await fs.copyFiles(selectedPaths, targetPath);
+
+      // Check for conflicts
+      const conflicts = await fs.checkCopyConflicts(selectedPaths, targetPath);
+      if (conflicts.length > 0) {
+        // Show overwrite confirmation
+        setConflictFiles(conflicts);
+        setPendingCopy({ isMove, allPaths: selectedPaths, targetPath });
+        setIsSubmitting(false);
+        return;
       }
-      closeDialog();
-      refreshPanel(activePanelId);
-      refreshPanel(activePanelId === "left" ? "right" : "left");
+
+      // No conflicts, proceed with copy/move
+      await executeCopyMove(isMove, selectedPaths, targetPath);
     } catch (e) {
       console.error(e);
       setOperationError(
@@ -311,8 +347,59 @@ export const DialogContainer: React.FC = () => {
             : "Failed to copy selected items."
         )
       );
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOverwriteAll = async () => {
+    if (!pendingCopy) return;
+    try {
+      setIsSubmitting(true);
+      await executeCopyMove(pendingCopy.isMove, pendingCopy.allPaths, pendingCopy.targetPath);
+    } catch (e) {
+      console.error(e);
+      setOperationError(
+        getErrorMessage(
+          e,
+          pendingCopy.isMove
+            ? "Failed to move selected items."
+            : "Failed to copy selected items."
+        )
+      );
     } finally {
       setIsSubmitting(false);
+      setConflictFiles([]);
+      setPendingCopy(null);
+    }
+  };
+
+  const handleSkipExisting = async () => {
+    if (!pendingCopy) return;
+    try {
+      setIsSubmitting(true);
+      const nonConflicting = pendingCopy.allPaths.filter((p) => {
+        const baseName = p.split(/[\\/]/).pop() || "";
+        return !conflictFiles.includes(baseName);
+      });
+      if (nonConflicting.length > 0) {
+        await executeCopyMove(pendingCopy.isMove, nonConflicting, pendingCopy.targetPath);
+      } else {
+        closeDialog();
+      }
+    } catch (e) {
+      console.error(e);
+      setOperationError(
+        getErrorMessage(
+          e,
+          pendingCopy.isMove
+            ? "Failed to move selected items."
+            : "Failed to copy selected items."
+        )
+      );
+    } finally {
+      setIsSubmitting(false);
+      setConflictFiles([]);
+      setPendingCopy(null);
     }
   };
 
@@ -400,7 +487,7 @@ export const DialogContainer: React.FC = () => {
         errorMessage={operationError}
       >
         <p className="text-sm">
-          Do you really want to delete {selectedPaths.length} selected file(s) ?
+          Do you really want to delete <span className="font-semibold text-accent-color break-all">{getSelectedItemsText(selectedPaths)}</span>?
         </p>
       </BaseDialog>
 
@@ -408,12 +495,16 @@ export const DialogContainer: React.FC = () => {
         isOpen={openDialog === "copy"}
         onClose={closeDialog}
         onSubmit={() => handleCopyMove(false)}
-        title={`Copy ${selectedPaths.length} file(s)`}
+        title={selectedPaths.length === 1 ? `Copy 1 file` : `Copy ${selectedPaths.length} files`}
         submitLabel={isSubmitting ? "Copying..." : "Copy"}
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
       >
+        <div className="text-sm mb-4">
+          <span className="text-text-secondary">Selected: </span>
+          <span className="font-medium text-accent-color break-all">{getSelectedItemsText(selectedPaths)}</span>
+        </div>
         <p className="text-xs text-text-secondary mb-2">Copy to:</p>
         <input
           autoFocus
@@ -432,12 +523,16 @@ export const DialogContainer: React.FC = () => {
         isOpen={openDialog === "move"}
         onClose={closeDialog}
         onSubmit={() => handleCopyMove(true)}
-        title={`Move/Rename ${selectedPaths.length} file(s)`}
+        title={selectedPaths.length === 1 ? `Move/Rename 1 file` : `Move/Rename ${selectedPaths.length} files`}
         submitLabel={isSubmitting ? "Moving..." : "Move"}
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
       >
+        <div className="text-sm mb-4">
+          <span className="text-text-secondary">Selected: </span>
+          <span className="font-medium text-accent-color break-all">{getSelectedItemsText(selectedPaths)}</span>
+        </div>
         <p className="text-xs text-text-secondary mb-2">Move/Rename to:</p>
         <input
           autoFocus
@@ -505,6 +600,71 @@ export const DialogContainer: React.FC = () => {
                 className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color focus:outline-none focus:ring-1 focus:ring-accent-color transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Overwrite confirmation dialog */}
+      <Dialog.Root
+        open={conflictFiles.length > 0}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConflictFiles([]);
+            setPendingCopy(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[450px] z-50 p-4 text-text-primary">
+            <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-4">
+              Files Already Exist
+            </Dialog.Title>
+            <div className="mb-6 space-y-3">
+              <p className="text-sm">
+                The following {conflictFiles.length} item(s) already exist in the destination:
+              </p>
+              <ul className="max-h-40 overflow-y-auto space-y-1">
+                {conflictFiles.map((name) => (
+                  <li
+                    key={name}
+                    className="text-xs font-mono text-text-secondary truncate px-2 py-0.5 bg-bg-secondary rounded"
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConflictFiles([]);
+                  setPendingCopy(null);
+                }}
+                disabled={isSubmitting}
+                className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color focus:outline-none focus:ring-1 focus:ring-accent-color transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSkipExisting}
+                disabled={isSubmitting}
+                className="px-4 py-1.5 min-w-[100px] text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color focus:outline-none focus:ring-1 focus:ring-accent-color transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Skipping..." : "Skip Existing"}
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={handleOverwriteAll}
+                disabled={isSubmitting}
+                className="px-4 py-1.5 min-w-[100px] text-sm bg-bg-selected hover:opacity-90 rounded border border-transparent focus:outline-none focus:ring-1 focus:ring-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Overwriting..." : "Overwrite All"}
               </button>
             </div>
           </Dialog.Content>

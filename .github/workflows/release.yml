@@ -6,7 +6,25 @@ on:
       - "v*" # GitHub에 v1.0.0 같은 형태의 태그를 푸시할 때만 실행됩니다.
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 의존성 설치
+        run: npm install
+
+      - name: 프론트엔드 테스트 실행
+        run: npm run test
+
   publish-tauri:
+    needs: test
     permissions:
       contents: write
     strategy:

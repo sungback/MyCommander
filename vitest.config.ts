@@ -5,6 +5,20 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      exclude: [
+        'node_modules/**',
+        'src-tauri/**',
+        'dist/**',
+        'src/test/**',
+        '**/*.d.ts',
+        'vite.config.ts',
+        'vitest.config.ts',
+      ],
+    },
   },
 });
