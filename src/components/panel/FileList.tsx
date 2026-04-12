@@ -428,20 +428,6 @@ export const FileList: React.FC<FileListProps> = ({
     };
   };
 
-  // ─── Container hover during mouse-drag (for visual feedback) ─────────────
-  const handleContainerMouseEnter = () => {
-    const activeDragInfo = usePanelStore.getState().dragInfo;
-    if (activeDragInfo && activeDragInfo.sourcePanel !== panelId) {
-      sharedDragState.hoveredPanel = panelId;
-    }
-  };
-
-  const handleContainerMouseLeave = () => {
-    if (sharedDragState.hoveredPanel === panelId) {
-      sharedDragState.hoveredPanel = null;
-    }
-  };
-
   // ─── HTML5 drag handlers (for receiving external drops from Finder) ───────
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
