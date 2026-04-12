@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:coverage": "vitest run --coverage",
-    "test:all": "npm run test && npm run test:rust"
+    "test:all": "npm run test && npm run test:rust",
+    "version": "node version-sync.js && git add src-tauri/tauri.conf.json",
+    "postversion": "git push && git push --tags"
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",
