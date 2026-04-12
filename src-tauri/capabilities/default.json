@@ -30,6 +30,7 @@
     "allow-create-file",
     "allow-delete-files",
     "allow-rename-file",
+    "allow-apply-batch-rename",
     "allow-copy-files",
     "allow-move-files",
     "allow-check-copy-conflicts",

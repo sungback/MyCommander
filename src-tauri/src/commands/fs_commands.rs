@@ -1,7 +1,8 @@
 use std::fs;
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::time::UNIX_EPOCH;
 
 #[cfg(target_os = "macos")]
@@ -19,6 +20,20 @@ pub struct FileEntry {
     last_modified: Option<u64>,
     #[serde(rename = "isHidden")]
     is_hidden: bool,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct BatchRenameOperation {
+    old_path: String,
+    new_path: String,
+}
+
+#[derive(Clone)]
+struct PreparedBatchRenameOperation {
+    old_path: PathBuf,
+    new_path: PathBuf,
+    temp_path: PathBuf,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -159,6 +174,13 @@ pub async fn delete_files(paths: Vec<String>, permanent: bool) -> Result<(), Str
 #[tauri::command(rename_all = "snake_case")]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
     fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn apply_batch_rename(operations: Vec<BatchRenameOperation>) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || apply_batch_rename_operations(operations))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 // Basic copy implementation. A real copy_files would emit progress events
@@ -391,6 +413,127 @@ fn get_unique_archive_path(source_dir: &Path) -> Result<PathBuf, String> {
         "Could not find a unique archive path for {}",
         source_dir.display()
     ))
+}
+
+fn apply_batch_rename_operations(operations: Vec<BatchRenameOperation>) -> Result<(), String> {
+    let filtered_operations: Vec<BatchRenameOperation> = operations
+        .into_iter()
+        .filter(|operation| operation.old_path != operation.new_path)
+        .collect();
+
+    if filtered_operations.is_empty() {
+        return Ok(());
+    }
+
+    let old_paths: HashSet<PathBuf> = filtered_operations
+        .iter()
+        .map(|operation| PathBuf::from(&operation.old_path))
+        .collect();
+    let mut new_paths = HashSet::new();
+
+    for operation in &filtered_operations {
+        let old_path = Path::new(&operation.old_path);
+        let new_path = Path::new(&operation.new_path);
+
+        if !old_path.exists() {
+            return Err(format!("Source path does not exist: {}", old_path.display()));
+        }
+
+        if !new_paths.insert(new_path.to_path_buf()) {
+            return Err(format!(
+                "Multiple items cannot be renamed to the same path: {}",
+                new_path.display()
+            ));
+        }
+
+        if new_path.exists() && !old_paths.contains(new_path) {
+            return Err(format!(
+                "Target path already exists: {}",
+                new_path.display()
+            ));
+        }
+    }
+
+    let prepared_operations = filtered_operations
+        .iter()
+        .enumerate()
+        .map(|(index, operation)| {
+            let old_path = PathBuf::from(&operation.old_path);
+            let new_path = PathBuf::from(&operation.new_path);
+            let temp_path = get_temporary_rename_path(&old_path, index)?;
+
+            Ok(PreparedBatchRenameOperation {
+                old_path,
+                new_path,
+                temp_path,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let mut moved_to_temp = 0usize;
+    for operation in &prepared_operations {
+        if let Err(error) = fs::rename(&operation.old_path, &operation.temp_path) {
+            rollback_temp_renames(&prepared_operations[..moved_to_temp]);
+            return Err(error.to_string());
+        }
+
+        moved_to_temp += 1;
+    }
+
+    let mut moved_to_target = 0usize;
+    for operation in &prepared_operations {
+        if let Err(error) = fs::rename(&operation.temp_path, &operation.new_path) {
+            rollback_target_renames(&prepared_operations[..moved_to_target]);
+            rollback_pending_temp_renames(&prepared_operations[moved_to_target..]);
+            return Err(error.to_string());
+        }
+
+        moved_to_target += 1;
+    }
+
+    Ok(())
+}
+
+fn get_temporary_rename_path(path: &Path, index: usize) -> Result<PathBuf, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Could not find parent directory for {}", path.display()))?;
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+
+    for attempt in 0..1000usize {
+        let candidate = parent.join(format!(
+            ".__mycommander_batch_rename_{seed}_{index}_{attempt}"
+        ));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not create a temporary rename path for {}",
+        path.display()
+    ))
+}
+
+fn rollback_temp_renames(operations: &[PreparedBatchRenameOperation]) {
+    for operation in operations.iter().rev() {
+        let _ = fs::rename(&operation.temp_path, &operation.old_path);
+    }
+}
+
+fn rollback_target_renames(operations: &[PreparedBatchRenameOperation]) {
+    for operation in operations.iter().rev() {
+        let _ = fs::rename(&operation.new_path, &operation.old_path);
+    }
+}
+
+fn rollback_pending_temp_renames(operations: &[PreparedBatchRenameOperation]) {
+    for operation in operations.iter().rev() {
+        let _ = fs::rename(&operation.temp_path, &operation.old_path);
+    }
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -664,6 +807,15 @@ pub async fn check_copy_conflicts(
 mod tests {
     use super::*;
     use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn create_test_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("mycommander_{name}_{suffix}"))
+    }
 
     #[test]
     fn collapse_nested_removes_children() {
@@ -829,5 +981,53 @@ mod tests {
     fn compute_path_size_nonexistent_path() {
         let result = compute_path_size("/nonexistent/path/that/should/not/exist");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn batch_rename_swaps_file_names_safely() {
+        let tmp = create_test_dir("batch_swap");
+        fs::create_dir_all(&tmp).unwrap();
+
+        let a_path = tmp.join("a.txt");
+        let b_path = tmp.join("b.txt");
+        fs::write(&a_path, b"alpha").unwrap();
+        fs::write(&b_path, b"beta").unwrap();
+
+        apply_batch_rename_operations(vec![
+            BatchRenameOperation {
+                old_path: a_path.to_string_lossy().to_string(),
+                new_path: b_path.to_string_lossy().to_string(),
+            },
+            BatchRenameOperation {
+                old_path: b_path.to_string_lossy().to_string(),
+                new_path: a_path.to_string_lossy().to_string(),
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(fs::read(a_path).unwrap(), b"beta");
+        assert_eq!(fs::read(b_path).unwrap(), b"alpha");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn batch_rename_rejects_existing_target_outside_batch() {
+        let tmp = create_test_dir("batch_conflict");
+        fs::create_dir_all(&tmp).unwrap();
+
+        let a_path = tmp.join("a.txt");
+        let c_path = tmp.join("c.txt");
+        fs::write(&a_path, b"alpha").unwrap();
+        fs::write(&c_path, b"charlie").unwrap();
+
+        let result = apply_batch_rename_operations(vec![BatchRenameOperation {
+            old_path: a_path.to_string_lossy().to_string(),
+            new_path: c_path.to_string_lossy().to_string(),
+        }]);
+
+        assert!(result.is_err());
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

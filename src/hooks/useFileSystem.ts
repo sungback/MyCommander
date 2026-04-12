@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { FileEntry } from "../types/file";
 import { SyncItem } from "../types/sync";
+import { BatchRenameOperation } from "../features/multiRename";
 
 export interface DriveInfo {
   mount_point: string;
@@ -120,6 +121,15 @@ const fileSystem = {
     await invoke("rename_file", {
       old_path: oldPath,
       new_path: newPath,
+    });
+  },
+
+  applyBatchRename: async (operations: BatchRenameOperation[]): Promise<void> => {
+    await invoke("apply_batch_rename", {
+      operations: operations.map((operation) => ({
+        old_path: operation.oldPath,
+        new_path: operation.newPath,
+      })),
     });
   },
 

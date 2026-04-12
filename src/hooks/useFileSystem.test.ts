@@ -154,6 +154,22 @@ describe('useFileSystem', () => {
     });
   });
 
+  describe('applyBatchRename', () => {
+    it('invokes apply_batch_rename with mapped operations', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().applyBatchRename([
+        { oldPath: '/home/user/a.txt', newPath: '/home/user/b.txt' },
+        { oldPath: '/home/user/c.txt', newPath: '/home/user/d.txt' },
+      ]);
+      expect(mockInvoke).toHaveBeenCalledWith('apply_batch_rename', {
+        operations: [
+          { old_path: '/home/user/a.txt', new_path: '/home/user/b.txt' },
+          { old_path: '/home/user/c.txt', new_path: '/home/user/d.txt' },
+        ],
+      });
+    });
+  });
+
   // ─── copyFiles ─────────────────────────────────────────────────────────────
   describe('copyFiles', () => {
     it('invokes copy_files with source paths and target', async () => {

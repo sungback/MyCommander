@@ -9,10 +9,12 @@ import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
 import { SyncDialog } from "./components/dialogs/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
+import { MultiRenameDialog } from "./components/dialogs/MultiRenameDialog";
 import { AppTheme, ThemePreference } from "./types/theme";
 import { ViewMode } from "./types/file";
 import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
+import { buildMultiRenameSession } from "./features/multiRename";
 
 type PanelId = "left" | "right";
 
@@ -62,6 +64,7 @@ function App() {
   const panelViewModes = usePanelStore((s) => s.panelViewModes);
   const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
+  const openMultiRenameDialog = useDialogStore((s) => s.openMultiRenameDialog);
   const { syncOtherPanelToCurrentPath } = useAppCommands();
   
   // Initialize global shortcuts
@@ -195,6 +198,7 @@ function App() {
       const [
         unlistenNewFolder,
         unlistenNewFile,
+        unlistenMultiRename,
         unlistenFolderSync,
         unlistenTargetEqualsSource,
         unlistenSwapPanels,
@@ -212,6 +216,16 @@ function App() {
           }
 
           setOpenDialog("newfile");
+        }),
+        listen("multi-rename-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          const state = usePanelStore.getState();
+          const panelId = state.activePanel;
+          const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
+          openMultiRenameDialog(buildMultiRenameSession(panelId, panel));
         }),
         listen("folder-sync-requested", () => {
           if (!isMounted) {
@@ -239,6 +253,7 @@ function App() {
       if (!isMounted) {
         unlistenNewFolder();
         unlistenNewFile();
+        unlistenMultiRename();
         unlistenFolderSync();
         unlistenTargetEqualsSource();
         unlistenSwapPanels();
@@ -247,6 +262,7 @@ function App() {
       return () => {
         unlistenNewFolder();
         unlistenNewFile();
+        unlistenMultiRename();
         unlistenFolderSync();
         unlistenTargetEqualsSource();
         unlistenSwapPanels();
@@ -262,7 +278,7 @@ function App() {
       isMounted = false;
       cleanup?.();
     };
-  }, [setOpenDialog, syncOtherPanelToCurrentPath]);
+  }, [openMultiRenameDialog, setOpenDialog, syncOtherPanelToCurrentPath]);
 
   useEffect(() => {
 //     if (!isMacPlatform()) {
@@ -326,6 +342,7 @@ function App() {
       </div>
       <StatusBar />
       <DialogContainer />
+      <MultiRenameDialog />
       <SearchPreviewDialogs />
       <SyncDialog />
       <ContextMenu />

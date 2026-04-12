@@ -13,6 +13,8 @@ interface FileItemProps {
   isSelected?: boolean;
   isCursor?: boolean;
   isActivePanel?: boolean;
+  isDragSource?: boolean;
+  dropHint?: "copy" | "blocked" | null;
   viewMode?: ViewMode;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
@@ -27,6 +29,8 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   isSelected,
   isCursor,
   isActivePanel,
+  isDragSource = false,
+  dropHint = null,
   viewMode = "detailed",
   onClick,
   onDoubleClick,
@@ -64,6 +68,9 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           "text-text-primary hover:bg-bg-hover/50": !isSelected && !isCursor,
           "text-error-color/80": isSelected && isCursor,
           "opacity-60": isHidden && !isSelected,
+          "opacity-55": isDragSource,
+          "bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/70": dropHint === "copy",
+          "bg-red-500/8 ring-1 ring-inset ring-red-400/70": dropHint === "blocked",
         }
       )}
     >
@@ -118,6 +125,18 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
         >
           {entry.name}
         </span>
+        {dropHint ? (
+          <span
+            className={clsx(
+              "ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
+              dropHint === "copy"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "bg-red-500/20 text-red-300"
+            )}
+          >
+            {dropHint === "copy" ? "복사" : "불가"}
+          </span>
+        ) : null}
       </div>
       {isDetailed ? (
         <>

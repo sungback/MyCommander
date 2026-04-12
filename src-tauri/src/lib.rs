@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter, Runtime};
 const FILE_MENU_ID: &str = "file";
 const NEW_FOLDER_MENU_ITEM_ID: &str = "new_folder";
 const NEW_FILE_MENU_ITEM_ID: &str = "new_file";
+const MULTI_RENAME_MENU_ITEM_ID: &str = "multi_rename";
 const SHOW_HIDDEN_MENU_ITEM_ID: &str = "show_hidden_files";
 const VIEW_MENU_ID: &str = "view";
 const LEFT_PANEL_VIEW_MENU_ID: &str = "left_panel_view";
@@ -184,6 +185,13 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some("Shift+F4"),
     )?;
+    let multi_rename = MenuItem::with_id(
+        app,
+        MULTI_RENAME_MENU_ITEM_ID,
+        "일괄 이름 변경 도구",
+        true,
+        None::<&str>,
+    )?;
     let folder_sync = MenuItem::with_id(
         app,
         FOLDER_SYNC_MENU_ITEM_ID,
@@ -242,6 +250,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 &[
                     &new_folder,
                     &new_file,
+                    &multi_rename,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::close_window(app, None)?,
                     #[cfg(not(target_os = "macos"))]
@@ -307,6 +316,9 @@ pub fn run() {
                 }
                 NEW_FILE_MENU_ITEM_ID => {
                     let _ = app.emit("new-file-requested", ());
+                }
+                MULTI_RENAME_MENU_ITEM_ID => {
+                    let _ = app.emit("multi-rename-requested", ());
                 }
                 FOLDER_SYNC_MENU_ITEM_ID => {
                     let _ = app.emit("folder-sync-requested", ());
@@ -443,6 +455,7 @@ pub fn run() {
             commands::fs_commands::create_file,
             commands::fs_commands::delete_files,
             commands::fs_commands::rename_file,
+            commands::fs_commands::apply_batch_rename,
             commands::fs_commands::copy_files,
             commands::fs_commands::move_files,
             commands::fs_commands::check_copy_conflicts,

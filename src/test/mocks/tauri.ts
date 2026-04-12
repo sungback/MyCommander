@@ -41,6 +41,7 @@ export const createMockInvoke = () =>
       case 'create_file':         return Promise.resolve(undefined);
       case 'delete_files':        return Promise.resolve(undefined);
       case 'rename_file':         return Promise.resolve(undefined);
+      case 'apply_batch_rename':  return Promise.resolve(undefined);
       case 'copy_files':          return Promise.resolve(undefined);
       case 'move_files':          return Promise.resolve(undefined);
       case 'extract_zip':         return Promise.resolve('/home/user/archive');

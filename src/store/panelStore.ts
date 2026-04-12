@@ -14,6 +14,7 @@ type PanelViewModes = Record<PanelId, ViewMode>;
 
 export interface DragInfo {
   paths: string[];
+  directoryPaths: string[];
   sourcePanel: PanelId;
 }
 

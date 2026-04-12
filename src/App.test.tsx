@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { usePanelStore } from './store/panelStore';
+import { useDialogStore } from './store/dialogStore';
 import App from './App';
 
 const mockSyncOtherPanelToCurrentPath = vi.fn();
@@ -29,6 +30,7 @@ vi.mock('./hooks/useAppCommands', () => ({
 vi.mock('./components/panel/DualPanel',          () => ({ DualPanel:          () => null }));
 vi.mock('./components/layout/StatusBar',         () => ({ StatusBar:          () => null }));
 vi.mock('./components/dialogs/DialogContainer',  () => ({ DialogContainer:    () => null }));
+vi.mock('./components/dialogs/MultiRenameDialog', () => ({ MultiRenameDialog: () => null }));
 vi.mock('./components/dialogs/SearchPreviewDialogs', () => ({ SearchPreviewDialogs: () => null }));
 vi.mock('./components/dialogs/SyncDialog',       () => ({ SyncDialog:         () => null }));
 vi.mock('./components/layout/ContextMenu',       () => ({ ContextMenu:        () => null }));
@@ -37,6 +39,7 @@ vi.mock('./components/layout/ContextMenu',       () => ({ ContextMenu:        ()
 describe('App — Tab 키 패널 전환', () => {
   beforeEach(() => {
     usePanelStore.setState(usePanelStore.getInitialState());
+    useDialogStore.setState(useDialogStore.getInitialState());
     listenHandlers.clear();
     mockSyncOtherPanelToCurrentPath.mockReset();
   });
@@ -77,5 +80,42 @@ describe('App — Tab 키 패널 전환', () => {
     handler?.();
 
     expect(mockSyncOtherPanelToCurrentPath).toHaveBeenCalledTimes(1);
+  });
+
+  it('multi-rename-requested 이벤트 → 일괄 이름 변경 다이얼로그 세션 생성', async () => {
+    usePanelStore.setState((state) => ({
+      ...state,
+      leftPanel: {
+        ...state.leftPanel,
+        currentPath: '/home/user',
+        files: [
+          { name: '..', path: '/home', kind: 'directory' },
+          { name: 'alpha.txt', path: '/home/user/alpha.txt', kind: 'file' },
+          { name: 'beta.txt', path: '/home/user/beta.txt', kind: 'file' },
+        ],
+        selectedItems: new Set(['/home/user/beta.txt']),
+        cursorIndex: 1,
+      },
+      activePanel: 'left',
+    }));
+
+    render(<App />);
+
+    await Promise.resolve();
+
+    const handler = listenHandlers.get('multi-rename-requested');
+    expect(handler).toBeTypeOf('function');
+
+    handler?.();
+
+    expect(useDialogStore.getState().openDialog).toBe('multirename');
+    expect(useDialogStore.getState().multiRenameSession?.items).toEqual([
+      {
+        path: '/home/user/beta.txt',
+        name: 'beta.txt',
+        kind: 'file',
+        lastModified: undefined,
+      },
+    ]);
   });
 });

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-apply-batch-rename"
+description = "Enables the apply_batch_rename command without any pre-configured scope."
+commands.allow = ["apply_batch_rename"]
+
+[[permission]]
+identifier = "deny-apply-batch-rename"
+description = "Denies the apply_batch_rename command without any pre-configured scope."
+commands.deny = ["apply_batch_rename"]

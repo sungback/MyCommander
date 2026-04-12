@@ -7,30 +7,64 @@ import type { FileEntry } from '../../types/file';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 // ── useFileSystem mock (vi.hoisted로 호이스팅 — 팩토리 실행 전에 변수 준비) ──
-const { mockGetDirSize, mockListDirectory, mockSetSelection, mockSelectOnly, mockClearSelection } = vi.hoisted(() => ({
+const {
+  mockCopyFiles,
+  mockGetDirSize,
+  mockListDirectory,
+  mockSetSelection,
+  mockSelectOnly,
+  mockClearSelection,
+  mockRefreshPanel,
+  mockSetActivePanel,
+  mockSetDragInfo,
+  mockPanelState,
+} = vi.hoisted(() => ({
+  mockCopyFiles: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockSetSelection: vi.fn(),
   mockSelectOnly: vi.fn(),
   mockClearSelection: vi.fn(),
+  mockRefreshPanel: vi.fn(),
+  mockSetActivePanel: vi.fn(),
+  mockSetDragInfo: vi.fn(),
+  mockPanelState: {
+    dragInfo: null as
+      | {
+          paths: string[];
+          directoryPaths: string[];
+          sourcePanel: 'left' | 'right';
+        }
+      | null,
+  },
 }));
 
 vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
+    copyFiles: mockCopyFiles,
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,
   }),
 }));
 
 vi.mock('../../store/panelStore', () => ({
-  usePanelStore: (selector: (s: Record<string, unknown>) => unknown) =>
+  usePanelStore: Object.assign((selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       updateEntrySize: vi.fn(),
       setSelection: mockSetSelection,
       selectOnly: mockSelectOnly,
       clearSelection: mockClearSelection,
+      refreshPanel: mockRefreshPanel,
+      setActivePanel: mockSetActivePanel,
       showHiddenFiles: false,
       sizeCache: {},
+      dragInfo: mockPanelState.dragInfo,
+      setDragInfo: mockSetDragInfo,
+    }), {
+      getState: () => ({
+        dragInfo: mockPanelState.dragInfo,
+        setActivePanel: mockSetActivePanel,
+      }),
     }),
 }));
 
@@ -77,6 +111,11 @@ const getListEl = () => document.querySelector('[tabindex="0"]') as HTMLElement;
 describe('FileList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPanelState.dragInfo = null;
+    mockSetDragInfo.mockImplementation((dragInfo) => {
+      mockPanelState.dragInfo = dragInfo;
+    });
+    mockCopyFiles.mockResolvedValue(undefined);
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
     mockSetSelection.mockReset();
@@ -408,6 +447,118 @@ describe('FileList', () => {
 
       // listDirectory는 최초 1회만 호출됨
       expect(mockListDirectory).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('같은 패널 드래그 복사', () => {
+    const setContainerRect = () => {
+      const list = getListEl();
+      Object.defineProperty(list, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 400,
+          bottom: 400,
+          width: 400,
+          height: 400,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+    };
+
+    it('같은 패널에서 폴더 위에 드롭하면 즉시 복사한다', async () => {
+      render(
+        <FileList
+          {...makeProps({
+            selectedItems: new Set<string>(['/home/user/notes.txt']),
+          })}
+        />
+      );
+
+      setContainerRect();
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Documents"]'
+      ) as HTMLElement;
+
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: vi.fn(() => targetRow),
+      });
+
+      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 40 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 42, clientY: 42 }));
+      });
+
+      expect(targetRow.textContent).toContain('복사');
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
+      });
+
+      expect(mockCopyFiles).toHaveBeenCalledWith(['/home/user/notes.txt'], '/home/user/Documents');
+      expect(mockRefreshPanel).toHaveBeenCalledWith('left');
+    });
+
+    it('자기 자신 하위 폴더로의 드롭은 차단한다', async () => {
+      const nestedFiles: FileEntry[] = [
+        { name: '..', path: '/home/user', kind: 'directory' },
+        { name: 'Project', path: '/home/user/Project', kind: 'directory', size: null },
+        {
+          name: 'Project Child',
+          path: '/home/user/Project/Child',
+          kind: 'directory',
+          size: null,
+        },
+      ];
+
+      render(
+        <FileList
+          {...makeProps({
+            files: nestedFiles,
+            selectedItems: new Set<string>(['/home/user/Project']),
+          })}
+        />
+      );
+
+      setContainerRect();
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/Project"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Project/Child"]'
+      ) as HTMLElement;
+
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: vi.fn(() => targetRow),
+      });
+
+      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 44, clientY: 44 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 46, clientY: 46 }));
+      });
+
+      expect(targetRow.textContent).toContain('불가');
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 44, clientY: 44 }));
+      });
+
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockRefreshPanel).not.toHaveBeenCalled();
     });
   });
 });

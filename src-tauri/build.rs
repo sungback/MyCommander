@@ -17,6 +17,7 @@ fn main() {
         "create_file",
         "delete_files",
         "rename_file",
+        "apply_batch_rename",
         "copy_files",
         "move_files",
         "extract_zip",

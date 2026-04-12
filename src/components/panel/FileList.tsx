@@ -7,6 +7,7 @@ import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import { useDialogStore } from "../../store/dialogStore";
+import { useUiStore } from "../../store/uiStore";
 import { clsx } from "clsx";
 
 interface FileListProps {
@@ -37,6 +38,37 @@ const isSelectableEntry = (entry: FileEntry) => entry.name !== "..";
 // Both FileList instances (left + right) share this object.
 const sharedDragState = {
   hoveredPanel: null as "left" | "right" | null,
+  dropTargetPath: null as string | null,
+  isDropAllowed: false,
+  blockedReason: null as string | null,
+};
+
+let clearStatusMessageTimeoutId: number | undefined;
+
+const showTransientStatusMessage = (message: string, durationMs: number = 1800) => {
+  const { setStatusMessage } = useUiStore.getState();
+  if (clearStatusMessageTimeoutId !== undefined) {
+    window.clearTimeout(clearStatusMessageTimeoutId);
+  }
+
+  setStatusMessage(message);
+  clearStatusMessageTimeoutId = window.setTimeout(() => {
+    useUiStore.getState().setStatusMessage(null);
+    clearStatusMessageTimeoutId = undefined;
+  }, durationMs);
+};
+
+const normalizePathForComparison = (path: string) =>
+  path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+
+const isSameOrNestedPath = (basePath: string, targetPath: string) => {
+  const normalizedBase = normalizePathForComparison(basePath);
+  const normalizedTarget = normalizePathForComparison(targetPath);
+
+  return (
+    normalizedTarget === normalizedBase ||
+    normalizedTarget.startsWith(`${normalizedBase}/`)
+  );
 };
 
 const getVisibleRows = (
@@ -111,7 +143,7 @@ export const FileList: React.FC<FileListProps> = ({
   setCursorIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { getDirSize, listDirectory } = useFileSystem();
+  const { copyFiles, getDirSize, listDirectory } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const setSelection = usePanelStore((s) => s.setSelection);
   const selectOnly = usePanelStore((s) => s.selectOnly);
@@ -119,10 +151,22 @@ export const FileList: React.FC<FileListProps> = ({
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const sizeCache = usePanelStore((s) => s.sizeCache);
   const setDragInfo = usePanelStore((s) => s.setDragInfo);
+  const refreshPanel = usePanelStore((s) => s.refreshPanel);
+  const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<
     Record<string, FileEntry[]>
   >({});
+  const [dropUiState, setDropUiState] = useState<{
+    isPanelHovered: boolean;
+    dropTargetPath: string | null;
+    isDropAllowed: boolean;
+  }>({
+    isPanelHovered: false,
+    dropTargetPath: null,
+    isDropAllowed: false,
+  });
+  const [isLocalDragActive, setIsLocalDragActive] = useState(false);
   const selectionAnchorIndexRef = useRef<number | null>(null);
   const searchStringRef = useRef<string>("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,6 +188,7 @@ export const FileList: React.FC<FileListProps> = ({
     childEntriesByPath,
     sizeCache
   );
+  const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
@@ -151,6 +196,29 @@ export const FileList: React.FC<FileListProps> = ({
     estimateSize: () => 28,
     overscan: 10,
   });
+
+  const updateDropUiState = (nextState: typeof dropUiState) => {
+    setDropUiState((current) => {
+      if (
+        current.isPanelHovered === nextState.isPanelHovered &&
+        current.dropTargetPath === nextState.dropTargetPath &&
+        current.isDropAllowed === nextState.isDropAllowed
+      ) {
+        return current;
+      }
+
+      return nextState;
+    });
+  };
+
+  const clearDropTargetForPanel = (targetPanel: "left" | "right") => {
+    if (sharedDragState.hoveredPanel === targetPanel) {
+      sharedDragState.hoveredPanel = null;
+      sharedDragState.dropTargetPath = null;
+      sharedDragState.isDropAllowed = false;
+      sharedDragState.blockedReason = null;
+    }
+  };
 
   useEffect(() => {
     if (isActivePanel && cursorIndex >= 0 && cursorIndex < visibleRows.length) {
@@ -190,8 +258,67 @@ export const FileList: React.FC<FileListProps> = ({
 
         if (isOverContainer && activeDragInfo?.sourcePanel !== panelId) {
           sharedDragState.hoveredPanel = panelId;
-        } else if (sharedDragState.hoveredPanel === panelId && !isOverContainer) {
-          sharedDragState.hoveredPanel = null;
+        }
+
+        const rowElement = document
+          .elementFromPoint(e.clientX, e.clientY)
+          ?.closest("[data-entry-path]") as HTMLElement | null;
+        const rowPath =
+          rowElement && containerRef.current.contains(rowElement)
+            ? rowElement.dataset.entryPath ?? null
+            : null;
+        const targetEntry = rowPath
+          ? visibleRows.find((row) => row.entry.path === rowPath)?.entry ?? null
+          : null;
+        const canAcceptDrop =
+          Boolean(targetEntry) &&
+          targetEntry?.kind === "directory" &&
+          targetEntry.name !== ".." &&
+          Boolean(activeDragInfo);
+
+        if (isOverContainer && canAcceptDrop && activeDragInfo) {
+          const blockedReason = activeDragInfo.paths.includes(targetEntry!.path)
+            ? "자기 자신에게는 복사할 수 없습니다."
+            : activeDragInfo.directoryPaths.some((sourceDir) =>
+                isSameOrNestedPath(sourceDir, targetEntry!.path)
+              )
+              ? "폴더를 자기 자신 안이나 하위 폴더로 복사할 수 없습니다."
+              : null;
+          const isDropAllowed = blockedReason === null;
+
+          sharedDragState.dropTargetPath = targetEntry!.path;
+          sharedDragState.isDropAllowed = isDropAllowed;
+          sharedDragState.blockedReason = blockedReason;
+          updateDropUiState({
+            isPanelHovered: true,
+            dropTargetPath: targetEntry!.path,
+            isDropAllowed,
+          });
+        } else {
+          if (activeDragInfo?.sourcePanel === panelId) {
+            sharedDragState.dropTargetPath = null;
+            sharedDragState.isDropAllowed = false;
+            sharedDragState.blockedReason = null;
+          } else if (sharedDragState.hoveredPanel === panelId) {
+            sharedDragState.dropTargetPath = null;
+            sharedDragState.isDropAllowed = false;
+            sharedDragState.blockedReason = null;
+          }
+
+          if (!isOverContainer) {
+            clearDropTargetForPanel(panelId);
+            updateDropUiState({
+              isPanelHovered: false,
+              dropTargetPath: null,
+              isDropAllowed: false,
+            });
+          } else {
+            updateDropUiState({
+              isPanelHovered: true,
+              dropTargetPath: null,
+              isDropAllowed: false,
+            });
+          }
         }
       }
 
@@ -202,9 +329,14 @@ export const FileList: React.FC<FileListProps> = ({
         const dx = e.clientX - state.startX;
         const dy = e.clientY - state.startY;
         if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+          const directoryPaths = state.paths.filter((path) => {
+            const entry = visibleRows.find((row) => row.entry.path === path)?.entry;
+            return entry?.kind === "directory";
+          });
           state.dragging = true;
           // Signal other panel that a drag is in progress from this panel
-          setDragInfo({ paths: state.paths, sourcePanel: panelId });
+          setDragInfo({ paths: state.paths, directoryPaths, sourcePanel: panelId });
+          setIsLocalDragActive(true);
           document.body.style.cursor = "grabbing";
           document.body.style.userSelect = "none";
         }
@@ -226,7 +358,16 @@ export const FileList: React.FC<FileListProps> = ({
           .then(() => {
             setDragInfo(null);
             sharedDragState.hoveredPanel = null;
+            sharedDragState.dropTargetPath = null;
+            sharedDragState.isDropAllowed = false;
+            sharedDragState.blockedReason = null;
             dragStateRef.current = null;
+            setIsLocalDragActive(false);
+            updateDropUiState({
+              isPanelHovered: false,
+              dropTargetPath: null,
+              isDropAllowed: false,
+            });
           })
           .catch(console.error);
       }
@@ -246,19 +387,66 @@ export const FileList: React.FC<FileListProps> = ({
       document.body.style.userSelect = "";
 
       if (state.dragging) {
+        const activeDragInfo = usePanelStore.getState().dragInfo;
         const targetPanel = sharedDragState.hoveredPanel;
+        const samePanelDropTarget =
+          activeDragInfo?.sourcePanel === panelId ? sharedDragState.dropTargetPath : null;
+
+        if (samePanelDropTarget) {
+          const targetPath = samePanelDropTarget;
+          const isDropAllowed = sharedDragState.isDropAllowed;
+          const blockedReason = sharedDragState.blockedReason;
+
+          setDragInfo(null);
+          sharedDragState.hoveredPanel = null;
+          sharedDragState.dropTargetPath = null;
+          sharedDragState.isDropAllowed = false;
+          sharedDragState.blockedReason = null;
+          dragStateRef.current = null;
+          setIsLocalDragActive(false);
+          updateDropUiState({
+            isPanelHovered: false,
+            dropTargetPath: null,
+            isDropAllowed: false,
+          });
+
+          if (!isDropAllowed) {
+            showTransientStatusMessage(blockedReason ?? "여기로는 복사할 수 없습니다.");
+            return;
+          }
+
+          void copyFiles(state.paths, targetPath)
+            .then(() => {
+              refreshPanel(panelId);
+              showTransientStatusMessage("선택한 파일을 폴더에 복사했습니다.");
+            })
+            .catch((error) => {
+              console.error("Failed to copy dragged files:", error);
+              showTransientStatusMessage("파일을 복사하지 못했습니다.");
+            });
+          return;
+        }
 
         // Internal panel-to-panel drop
         if (targetPanel && targetPanel !== panelId) {
           // Make sure selection is correct in source panel
-          usePanelStore.getState().setActivePanel(panelId);
-          useDialogStore.getState().setOpenDialog("copy");
+          setActivePanel(panelId);
+          setOpenDialog("copy");
         }
       }
 
       setDragInfo(null);
       sharedDragState.hoveredPanel = null;
+      sharedDragState.dropTargetPath = null;
+      sharedDragState.isDropAllowed = false;
+      sharedDragState.blockedReason = null;
       dragStateRef.current = null;
+      setIsLocalDragActive(false);
+      updateDropUiState({
+        isPanelHovered: false,
+        dropTargetPath: null,
+        isDropAllowed: false,
+      });
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -267,7 +455,7 @@ export const FileList: React.FC<FileListProps> = ({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [panelId, setDragInfo]);
+  }, [copyFiles, panelId, refreshPanel, setActivePanel, setDragInfo, setOpenDialog, visibleRows]);
 
   // ─── Tree expand/collapse ─────────────────────────────────────────────────
   const toggleExpanded = async (rowIndex: number, entry: FileEntry) => {
@@ -486,7 +674,13 @@ export const FileList: React.FC<FileListProps> = ({
     <div
       ref={containerRef}
       className={clsx(
-        "flex-1 overflow-y-auto overflow-x-hidden bg-bg-panel focus:outline-none transition-colors duration-200 select-none"
+        "flex-1 overflow-y-auto overflow-x-hidden bg-bg-panel focus:outline-none transition-colors duration-200 select-none",
+        {
+          "bg-emerald-500/5 ring-1 ring-inset ring-emerald-400/35":
+            dropUiState.isPanelHovered && dropUiState.dropTargetPath && dropUiState.isDropAllowed,
+          "bg-red-500/5 ring-1 ring-inset ring-red-400/35":
+            dropUiState.isPanelHovered && dropUiState.dropTargetPath && !dropUiState.isDropAllowed,
+        }
       )}
       tabIndex={0}
       onDragOver={handleDragOver}
@@ -595,6 +789,14 @@ export const FileList: React.FC<FileListProps> = ({
                 isSelected={selectedItems.has(entry.path)}
                 isCursor={cursorIndex === virtualItem.index}
                 isActivePanel={isActivePanel}
+                isDragSource={isLocalDragActive && selectedItems.has(entry.path)}
+                dropHint={
+                  dropUiState.dropTargetPath === entry.path
+                    ? dropUiState.isDropAllowed
+                      ? "copy"
+                      : "blocked"
+                    : null
+                }
                 viewMode={viewMode}
                 onClick={(event) => {
                   handleRowClick(event, virtualItem.index, entry);
