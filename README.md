@@ -97,7 +97,7 @@ npm version [새로운_버전]
 ```
 
 **상세 설명:**
-- **`npm version`**: 이 명령을 실행하면 자동으로 `version-sync.js`가 구동되어 `tauri.conf.json`의 버전을 프론트엔드와 일치시킵니다.
+- **`npm version`**: 이 명령을 실행하면 자동으로 `version-sync.cjs`가 구동되어 `tauri.conf.json`의 버전을 프론트엔드와 일치시킵니다.
 - **자동 커밋 및 태그**: 버전 변경 사항이 하나의 커밋으로 자동 생성되고, `v0.9.0`과 같은 Git 태그도 자동으로 붙습니다.
 - **자동 푸시**: `postversion` 훅이 트리거되어 GitHub 원격 저장소와 태그 정보가 즉시 업로드됩니다.
 
