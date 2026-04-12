@@ -21,6 +21,7 @@
     "allow-open-file",
     "allow-run-shell-command",
     "allow-quit-app",
+    "allow-show-context-menu",
     "allow-set-show-hidden-menu-checked",
     "allow-set-theme-menu-selection",
     "allow-set-view-mode-menu-selection",
@@ -33,9 +34,11 @@
     "allow-move-files",
     "allow-check-copy-conflicts",
     "allow-extract-zip",
+    "allow-create-zip",
     "allow-read-file-content",
     "allow-search-files",
     "allow-get-dir-size",
+    "allow-compare-directories",
     "drag:default"
   ]
 }

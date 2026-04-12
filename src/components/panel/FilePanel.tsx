@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -9,6 +10,7 @@ import { TabBar } from "./TabBar";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getParentPath } from "../../utils/path";
 import { useContextMenuStore } from "../../store/contextMenuStore";
+import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
 
 interface FilePanelProps {
   id: "left" | "right";
@@ -33,7 +35,6 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const setCursor = usePanelStore((s) => s.setCursor);
   const setPath = usePanelStore((s) => s.setPath);
   const setFiles = usePanelStore((s) => s.setFiles);
-  const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const openContextMenu = useContextMenuStore((s) => s.openContextMenu);
@@ -214,11 +215,33 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         }
       }
 
+      const targetEntry =
+        entryPath !== null
+          ? panelState.files.find(
+              (entry) => entry.path.normalize("NFC") === entryPath.normalize("NFC")
+            ) ?? null
+          : null;
+
       openContextMenu({
         panelId: id,
         targetPath: entryPath,
         x: event.clientX,
         y: event.clientY,
+      });
+
+      void invoke("show_context_menu", {
+        request: {
+          x: event.clientX,
+          y: event.clientY,
+          has_target_item: entryPath !== null,
+          can_rename: Boolean(targetEntry && targetEntry.name !== ".."),
+          can_create_zip: Boolean(
+            targetEntry && targetEntry.kind === "directory" && targetEntry.name !== ".."
+          ),
+        },
+      }).catch((error) => {
+        console.error("Failed to show context menu:", error);
+        window.alert(getErrorMessage(error, "컨텍스트 메뉴를 열지 못했습니다."));
       });
     };
 
@@ -236,22 +259,24 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         setPath(id, entry.path);
       }
     } else {
-      const isZipArchive =
-        typeof entry.name === "string" && entry.name.toLowerCase().endsWith(".zip");
-      const isDmgFile =
-        typeof entry.name === "string" && entry.name.toLowerCase().endsWith(".dmg");
+      const isZipArchive = isZipArchiveEntry(entry);
 
-      if (!isZipArchive && !isDmgFile) {
+      if (!isArchiveEntry(entry)) {
         console.log("Cannot enter file, need to open:", entry.path);
         return;
       }
 
       try {
-        if (isZipArchive) {
-          await fs.extractZip(entry.path);
-          refreshPanel(id);
-        } else {
-          await fs.openFile(entry.path);
+        const handled = await enterArchiveEntry({
+          entry,
+          fs,
+          panelId: id,
+          setPath,
+        });
+
+        if (!handled) {
+          console.log("Cannot enter file, need to open:", entry.path);
+          return;
         }
       } catch (error) {
         console.error("Failed to open archive file:", error);

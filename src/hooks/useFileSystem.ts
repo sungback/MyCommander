@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { FileEntry } from "../types/file";
+import { SyncItem } from "../types/sync";
 
 export interface DriveInfo {
   mount_point: string;
@@ -111,6 +112,10 @@ const fileSystem = {
     return await invoke<string>("extract_zip", { path });
   },
 
+  createZip: async (path: string): Promise<string> => {
+    return await invoke<string>("create_zip", { path });
+  },
+
   renameFile: async (oldPath: string, newPath: string): Promise<void> => {
     await invoke("rename_file", {
       old_path: oldPath,
@@ -132,6 +137,41 @@ const fileSystem = {
 
   getDirSize: async (path: string): Promise<number> => {
     return await invoke<number>("get_dir_size", { path });
+  },
+
+  compareDirectories: async (leftPath: string, rightPath: string): Promise<SyncItem[]> => {
+    interface RawSyncItem {
+      rel_path: string;
+      left_path: string | null;
+      right_path: string | null;
+      status: string;
+    }
+
+    const autoDirection = (status: string): "toRight" | "toLeft" | "skip" => {
+      switch (status) {
+        case "LeftOnly":
+        case "LeftNewer":
+          return "toRight";
+        case "RightOnly":
+        case "RightNewer":
+          return "toLeft";
+        default:
+          return "skip";
+      }
+    };
+
+    const raw = await invoke<RawSyncItem[]>("compare_directories", {
+      left: leftPath,
+      right: rightPath,
+    });
+
+    return raw.map((item) => ({
+      relPath: item.rel_path,
+      leftPath: item.left_path,
+      rightPath: item.right_path,
+      status: item.status as any,
+      direction: autoDirection(item.status),
+    }));
   },
 };
 

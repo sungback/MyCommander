@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-create-zip"
+description = "Enables the create_zip command without any pre-configured scope."
+commands.allow = ["create_zip"]
+
+[[permission]]
+identifier = "deny-create-zip"
+description = "Denies the create_zip command without any pre-configured scope."
+commands.deny = ["create_zip"]

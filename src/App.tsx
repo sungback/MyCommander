@@ -7,10 +7,12 @@ import { usePanelStore } from "./store/panelStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
+import { SyncDialog } from "./components/dialogs/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { AppTheme, ThemePreference } from "./types/theme";
 import { ViewMode } from "./types/file";
 import { useDialogStore } from "./store/dialogStore";
+import { useAppCommands } from "./hooks/useAppCommands";
 
 type PanelId = "left" | "right";
 
@@ -60,6 +62,7 @@ function App() {
   const panelViewModes = usePanelStore((s) => s.panelViewModes);
   const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
+  const { syncOtherPanelToCurrentPath } = useAppCommands();
   
   // Initialize global shortcuts
   useKeyboard();
@@ -189,7 +192,13 @@ function App() {
     let isMounted = true;
 
     const attachListener = async () => {
-      const [unlistenNewFolder, unlistenNewFile] = await Promise.all([
+      const [
+        unlistenNewFolder,
+        unlistenNewFile,
+        unlistenFolderSync,
+        unlistenTargetEqualsSource,
+        unlistenSwapPanels,
+      ] = await Promise.all([
         listen("new-folder-requested", () => {
           if (!isMounted) {
             return;
@@ -204,16 +213,43 @@ function App() {
 
           setOpenDialog("newfile");
         }),
+        listen("folder-sync-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          setOpenDialog("sync");
+        }),
+        listen("target-equals-source-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          syncOtherPanelToCurrentPath();
+        }),
+        listen("swap-panels-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          usePanelStore.getState().swapPanels();
+        }),
       ]);
 
       if (!isMounted) {
         unlistenNewFolder();
         unlistenNewFile();
+        unlistenFolderSync();
+        unlistenTargetEqualsSource();
+        unlistenSwapPanels();
       }
 
       return () => {
         unlistenNewFolder();
         unlistenNewFile();
+        unlistenFolderSync();
+        unlistenTargetEqualsSource();
+        unlistenSwapPanels();
       };
     };
 
@@ -226,7 +262,7 @@ function App() {
       isMounted = false;
       cleanup?.();
     };
-  }, [setOpenDialog]);
+  }, [setOpenDialog, syncOtherPanelToCurrentPath]);
 
   useEffect(() => {
 //     if (!isMacPlatform()) {
@@ -291,6 +327,7 @@ function App() {
       <StatusBar />
       <DialogContainer />
       <SearchPreviewDialogs />
+      <SyncDialog />
       <ContextMenu />
     </div>
   );

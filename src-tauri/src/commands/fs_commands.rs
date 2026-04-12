@@ -189,6 +189,13 @@ pub async fn extract_zip(path: String) -> Result<String, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn create_zip(path: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || create_zip_archive(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn read_file_content(path: String) -> Result<String, String> {
     use std::io::Read;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
@@ -283,6 +290,53 @@ fn extract_zip_archive(path: &str) -> Result<String, String> {
     Ok(target_dir.to_string_lossy().to_string())
 }
 
+fn create_zip_archive(path: &str) -> Result<String, String> {
+    use std::process::Command;
+
+    let source_dir = Path::new(path);
+    if !source_dir.is_dir() {
+        return Err(format!("{path} is not a directory"));
+    }
+
+    let archive_path = get_unique_archive_path(source_dir)?;
+
+    #[cfg(target_os = "macos")]
+    let status = Command::new("ditto")
+        .args(["-c", "-k", "."])
+        .current_dir(source_dir)
+        .arg(&archive_path)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    let status = Command::new("zip")
+        .args(["-rq"])
+        .arg(&archive_path)
+        .arg(".")
+        .current_dir(source_dir)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "$items = @(Get-ChildItem -LiteralPath $args[0] -Force); if ($items.Count -eq 0) { throw 'Cannot compress an empty directory.' }; Compress-Archive -LiteralPath $items.FullName -DestinationPath $args[1]",
+        ])
+        .arg(source_dir)
+        .arg(&archive_path)
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    if !status.success() {
+        let _ = fs::remove_file(&archive_path);
+        return Err(format!("Failed to create archive at {}", archive_path.display()));
+    }
+
+    Ok(archive_path.to_string_lossy().to_string())
+}
+
 fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
     let parent_dir = archive_path
         .parent()
@@ -308,6 +362,34 @@ fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
     Err(format!(
         "Could not find a unique extraction directory for {}",
         archive_path.display()
+    ))
+}
+
+fn get_unique_archive_path(source_dir: &Path) -> Result<PathBuf, String> {
+    let parent_dir = source_dir
+        .parent()
+        .ok_or_else(|| format!("Could not find parent directory for {}", source_dir.display()))?;
+    let stem = source_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Archive");
+
+    let initial_target = parent_dir.join(format!("{stem}.zip"));
+    if !initial_target.exists() {
+        return Ok(initial_target);
+    }
+
+    for suffix in 2.. {
+        let candidate = parent_dir.join(format!("{stem} {suffix}.zip"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not find a unique archive path for {}",
+        source_dir.display()
     ))
 }
 
@@ -691,6 +773,45 @@ mod tests {
     }
 
     #[test]
+    fn unique_archive_path_base_name() {
+        let tmp = std::env::temp_dir().join("test_archive_unique");
+        let source = tmp.join("data");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&source).unwrap();
+
+        let result = get_unique_archive_path(&source).unwrap();
+        assert_eq!(result, tmp.join("data.zip"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn unique_archive_path_increments_suffix() {
+        let tmp = std::env::temp_dir().join("test_archive_suffix");
+        let source = tmp.join("data");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&source).unwrap();
+        fs::write(tmp.join("data.zip"), b"").unwrap();
+
+        let result = get_unique_archive_path(&source).unwrap();
+        assert_eq!(result, tmp.join("data 2.zip"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn create_zip_archive_rejects_non_directory() {
+        let tmp = std::env::temp_dir().join("test_create_zip_file.txt");
+        let _ = fs::remove_file(&tmp);
+        fs::write(&tmp, b"hello").unwrap();
+
+        let result = create_zip_archive(tmp.to_str().unwrap());
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
     fn compute_path_size_for_single_file() {
         let tmp = std::env::temp_dir().join("test_size_file");
         let _ = fs::remove_file(&tmp);
@@ -710,4 +831,3 @@ mod tests {
         assert!(result.is_err());
     }
 }
-

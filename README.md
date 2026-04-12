@@ -92,8 +92,12 @@ git push origin main --tags
 프로젝트 루트에 설정된 자동화 스크립트를 활용해 명령어 한 줄로 모든 과정을 끝냅니다.
 
 ```bash
-npm version [새로운_버전]
-# 예: npm version 0.9.0
+# 1. 현재 변경사항(코드 수정 등)을 먼저 커밋하여 작업 공간을 깨끗하게 만듭니다.
+git add -A
+git commit -m "Release Version 0.11.0"
+
+# 2. 이제 명령어를 통해 버전을 올립니다. (자동 동기화 및 태그 생성)
+npm version 0.11.0
 ```
 
 **상세 설명:**

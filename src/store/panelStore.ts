@@ -44,6 +44,7 @@ interface AppState {
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   dragInfo: DragInfo | null;
   setDragInfo: (info: DragInfo | null) => void;
+  swapPanels: () => void;
 }
 
 interface PersistedPanelState {
@@ -473,6 +474,45 @@ export const usePanelStore = create<AppState>((set) => {
     dragInfo: null,
 
     setDragInfo: (dragInfo) => set({ dragInfo }),
+
+    swapPanels: () =>
+      set((state) => {
+        const leftPath = state.leftPanel.currentPath;
+        const rightPath = state.rightPanel.currentPath;
+
+        if (leftPath === rightPath) return state;
+
+        const now = Date.now();
+        const newLeft = updateActiveTab(state.leftPanel, (tab) => ({
+          ...tab,
+          currentPath: rightPath,
+          cursorIndex: 0,
+          selectedItems: new Set<string>(),
+          lastUpdated: now,
+        }));
+        const newRight = updateActiveTab(state.rightPanel, (tab) => ({
+          ...tab,
+          currentPath: leftPath,
+          cursorIndex: 0,
+          selectedItems: new Set<string>(),
+          lastUpdated: now + 1,
+        }));
+        const newViewModes: PanelViewModes = {
+          left: state.panelViewModes.right,
+          right: state.panelViewModes.left,
+        };
+
+        persistVisiblePanelState(
+          newLeft,
+          newRight,
+          state.activePanel,
+          state.showHiddenFiles,
+          state.themePreference,
+          newViewModes
+        );
+
+        return { leftPanel: newLeft, rightPanel: newRight, panelViewModes: newViewModes };
+      }),
 
     setActivePanel: (activePanel) =>
       set((state) => {

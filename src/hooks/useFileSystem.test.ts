@@ -188,6 +188,16 @@ describe('useFileSystem', () => {
     });
   });
 
+  // ─── createZip ────────────────────────────────────────────────────────────
+  describe('createZip', () => {
+    it('returns the created zip path', async () => {
+      mockInvoke.mockResolvedValueOnce('/home/user/Documents.zip');
+      const result = await useFileSystem().createZip('/home/user/Documents');
+      expect(mockInvoke).toHaveBeenCalledWith('create_zip', { path: '/home/user/Documents' });
+      expect(result).toBe('/home/user/Documents.zip');
+    });
+  });
+
   // ─── readFileContent ───────────────────────────────────────────────────────
   describe('readFileContent', () => {
     it('returns file text content', async () => {

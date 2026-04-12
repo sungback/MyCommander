@@ -18,6 +18,10 @@ const THEME_MENU_ID: &str = "theme";
 const THEME_AUTO_MENU_ITEM_ID: &str = "theme_auto";
 const THEME_LIGHT_MENU_ITEM_ID: &str = "theme_light";
 const THEME_DARK_MENU_ITEM_ID: &str = "theme_dark";
+const COMMANDS_MENU_ID: &str = "commands";
+const FOLDER_SYNC_MENU_ITEM_ID: &str = "folder_sync";
+const TARGET_EQUALS_SOURCE_MENU_ITEM_ID: &str = "target_equals_source";
+const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
 
 fn get_panel_view_submenu<R: Runtime>(app: &AppHandle<R>, submenu_id: &str) -> Option<Submenu<R>> {
     let menu = app.menu()?;
@@ -70,7 +74,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let show_hidden_files = CheckMenuItem::with_id(
         app,
         SHOW_HIDDEN_MENU_ITEM_ID,
-        "Show Hidden Files",
+        "숨김 파일 표시",
         true,
         false,
         Some("CmdOrCtrl+Shift+Period"),
@@ -78,7 +82,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let left_view_mode_brief = CheckMenuItem::with_id(
         app,
         LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
-        "Brief",
+        "간단히",
         true,
         false,
         None::<&str>,
@@ -86,7 +90,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let left_view_mode_detailed = CheckMenuItem::with_id(
         app,
         LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
-        "Detailed",
+        "자세히",
         true,
         true,
         None::<&str>,
@@ -94,14 +98,14 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let left_panel_view_menu = Submenu::with_id_and_items(
         app,
         LEFT_PANEL_VIEW_MENU_ID,
-        "Left Panel",
+        "왼쪽 패널",
         true,
         &[&left_view_mode_brief, &left_view_mode_detailed],
     )?;
     let right_view_mode_brief = CheckMenuItem::with_id(
         app,
         RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
-        "Brief",
+        "간단히",
         true,
         false,
         None::<&str>,
@@ -109,7 +113,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let right_view_mode_detailed = CheckMenuItem::with_id(
         app,
         RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
-        "Detailed",
+        "자세히",
         true,
         true,
         None::<&str>,
@@ -117,7 +121,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let right_panel_view_menu = Submenu::with_id_and_items(
         app,
         RIGHT_PANEL_VIEW_MENU_ID,
-        "Right Panel",
+        "오른쪽 패널",
         true,
         &[&right_view_mode_brief, &right_view_mode_detailed],
     )?;
@@ -125,7 +129,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let theme_auto = CheckMenuItem::with_id(
         app,
         THEME_AUTO_MENU_ITEM_ID,
-        "Auto",
+        "자동",
         true,
         true,
         None::<&str>,
@@ -133,7 +137,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let theme_light = CheckMenuItem::with_id(
         app,
         THEME_LIGHT_MENU_ITEM_ID,
-        "Light",
+        "라이트",
         true,
         false,
         None::<&str>,
@@ -141,7 +145,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let theme_dark = CheckMenuItem::with_id(
         app,
         THEME_DARK_MENU_ITEM_ID,
-        "Dark",
+        "다크",
         true,
         false,
         None::<&str>,
@@ -149,14 +153,14 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let theme_menu = Submenu::with_id_and_items(
         app,
         THEME_MENU_ID,
-        "Theme",
+        "테마",
         true,
         &[&theme_auto, &theme_light, &theme_dark],
     )?;
 
     let window_menu = Submenu::with_items(
         app,
-        "Window",
+        "창",
         true,
         &[
             &PredefinedMenuItem::minimize(app, None)?,
@@ -169,16 +173,44 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let new_folder = MenuItem::with_id(
         app,
         NEW_FOLDER_MENU_ITEM_ID,
-        "New Folder",
+        "새 폴더",
         true,
         Some("F7"),
     )?;
     let new_file = MenuItem::with_id(
         app,
         NEW_FILE_MENU_ITEM_ID,
-        "New File",
+        "새 파일",
         true,
         Some("Shift+F4"),
+    )?;
+    let folder_sync = MenuItem::with_id(
+        app,
+        FOLDER_SYNC_MENU_ITEM_ID,
+        "폴더 동기화",
+        true,
+        Some("F11"),
+    )?;
+    let target_equals_source = MenuItem::with_id(
+        app,
+        TARGET_EQUALS_SOURCE_MENU_ITEM_ID,
+        "대상=원본",
+        true,
+        Some("CmdOrCtrl+Shift+M"),
+    )?;
+    let swap_panels = MenuItem::with_id(
+        app,
+        SWAP_PANELS_MENU_ITEM_ID,
+        "패널 교환",
+        true,
+        Some("CmdOrCtrl+U"),
+    )?;
+    let commands_menu = Submenu::with_id_and_items(
+        app,
+        COMMANDS_MENU_ID,
+        "명령",
+        true,
+        &[&folder_sync, &target_equals_source, &swap_panels],
     )?;
 
 
@@ -205,7 +237,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &Submenu::with_id_and_items(
                 app,
                 FILE_MENU_ID,
-                "File",
+                "파일",
                 true,
                 &[
                     &new_folder,
@@ -220,7 +252,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             )?,
             &Submenu::with_items(
                 app,
-                "Edit",
+                "편집",
                 true,
                 &[
                     &PredefinedMenuItem::undo(app, None)?,
@@ -235,7 +267,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &Submenu::with_id_and_items(
                 app,
                 VIEW_MENU_ID,
-                "View",
+                "보기",
                 true,
                 &[
                     &left_panel_view_menu,
@@ -247,10 +279,11 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                     &PredefinedMenuItem::fullscreen(app, None)?,
                 ],
             )?,
+            &commands_menu,
             &window_menu,
             &Submenu::with_items(
                 app,
-                "Help",
+                "도움말",
                 true,
                 &[
                     #[cfg(not(target_os = "macos"))]
@@ -274,6 +307,54 @@ pub fn run() {
                 }
                 NEW_FILE_MENU_ITEM_ID => {
                     let _ = app.emit("new-file-requested", ());
+                }
+                FOLDER_SYNC_MENU_ITEM_ID => {
+                    let _ = app.emit("folder-sync-requested", ());
+                }
+                TARGET_EQUALS_SOURCE_MENU_ITEM_ID => {
+                    let _ = app.emit("target-equals-source-requested", ());
+                }
+                SWAP_PANELS_MENU_ITEM_ID => {
+                    let _ = app.emit("swap-panels-requested", ());
+                }
+                commands::system_commands::CONTEXT_INFO_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "info");
+                }
+                commands::system_commands::CONTEXT_REVEAL_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "reveal");
+                }
+                commands::system_commands::CONTEXT_TERMINAL_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "terminal");
+                }
+                commands::system_commands::CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "create-zip");
+                }
+                commands::system_commands::CONTEXT_COPY_PATH_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "copy-path");
+                }
+                commands::system_commands::CONTEXT_COPY_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "copy");
+                }
+                commands::system_commands::CONTEXT_MOVE_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "move");
+                }
+                commands::system_commands::CONTEXT_RENAME_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "rename");
+                }
+                commands::system_commands::CONTEXT_DELETE_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "delete");
+                }
+                commands::system_commands::CONTEXT_REFRESH_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "refresh");
+                }
+                commands::system_commands::CONTEXT_NEW_FOLDER_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "mkdir");
+                }
+                commands::system_commands::CONTEXT_NEW_FILE_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "newfile");
+                }
+                commands::system_commands::CONTEXT_SEARCH_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "search");
                 }
                 _ => {}
             }
@@ -353,6 +434,7 @@ pub fn run() {
             commands::system_commands::open_file,
             commands::system_commands::run_shell_command,
             commands::system_commands::quit_app,
+            commands::system_commands::show_context_menu,
             commands::system_commands::set_show_hidden_menu_checked,
             commands::system_commands::set_theme_menu_selection,
             commands::system_commands::set_view_mode_menu_selection,
@@ -365,10 +447,12 @@ pub fn run() {
             commands::fs_commands::move_files,
             commands::fs_commands::check_copy_conflicts,
             commands::fs_commands::extract_zip,
+            commands::fs_commands::create_zip,
             commands::fs_commands::read_file_content,
             commands::search_commands::search_files,
             commands::fs_commands::get_dir_size,
             commands::drag_commands::start_native_drag,
+            commands::sync_commands::compare_directories,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

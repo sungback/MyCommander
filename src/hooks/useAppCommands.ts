@@ -55,6 +55,8 @@ export function useAppCommands() {
   const openNewFile = () => setOpenDialog("newfile");
   const openDelete = () => setOpenDialog("delete");
   const openSearch = () => setOpenDialog("search");
+  const openSync = () => setOpenDialog("sync");
+  const swapPanels = () => usePanelStore.getState().swapPanels();
 
   const openEditor = async () => {
     const path = getPrimaryTargetPath();
@@ -137,6 +139,8 @@ export function useAppCommands() {
     openNewFile,
     openDelete,
     openSearch,
+    openSync,
+    swapPanels,
     closeApp,
     syncOtherPanelToCurrentPath,
     copyCurrentPath,

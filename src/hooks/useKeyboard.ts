@@ -17,6 +17,8 @@ export function useKeyboard() {
     openNewFile,
     openDelete,
     openSearch,
+    openSync,
+    swapPanels,
     closeApp,
     syncOtherPanelToCurrentPath,
     copyCurrentPath,
@@ -118,6 +120,10 @@ export function useKeyboard() {
             openMkdir();
           }
           break;
+        case "F11":
+          e.preventDefault();
+          openSync();
+          break;
         default:
           break;
       }
@@ -153,6 +159,12 @@ export function useKeyboard() {
       if (hasCommandModifier && e.shiftKey && e.code === "KeyM") {
         e.preventDefault();
         syncOtherPanelToCurrentPath();
+        return;
+      }
+
+      if (hasCommandModifier && !e.shiftKey && e.code === "KeyU") {
+        e.preventDefault();
+        swapPanels();
         return;
       }
 
@@ -193,6 +205,8 @@ export function useKeyboard() {
     openNewFile,
     openPreview,
     openSearch,
+    openSync,
+    swapPanels,
     setPanelViewMode,
     copyCurrentPath,
     syncOtherPanelToCurrentPath,

@@ -10,6 +10,7 @@ export type DialogType =
   | "search"
   | "preview"
   | "info"
+  | "sync"
   | null;
 
 export interface DialogTarget {
