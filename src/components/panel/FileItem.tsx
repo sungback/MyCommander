@@ -1,9 +1,42 @@
-import React from "react";
+import React, { useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { FileEntry, ViewMode } from "../../types/file";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { formatDate, formatSize } from "../../utils/format";
 import { resolveEntryVisual } from "./fileVisuals";
+
+const THUMBNAIL_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "avif",
+]);
+
+const getExt = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+
+interface ThumbnailImgProps {
+  path: string;
+  fallback: React.ReactNode;
+  size: number;
+}
+
+const ThumbnailImg: React.FC<ThumbnailImgProps> = React.memo(({ path, fallback, size }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) return <>{fallback}</>;
+
+  return (
+    <img
+      src={convertFileSrc(path)}
+      alt=""
+      width={size}
+      height={size}
+      className="object-cover rounded-sm shrink-0"
+      style={{ width: size, height: size }}
+      onError={() => setFailed(true)}
+      loading="lazy"
+      draggable={false}
+    />
+  );
+});
 
 interface FileItemProps {
   entry: FileEntry;
@@ -41,6 +74,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const disclosureOffset = depth * 14;
   const isSelectionRow = Boolean(isSelected && !isCursor);
   const visual = resolveEntryVisual(entry, { isExpanded });
+  const showThumbnail = !isDir && THUMBNAIL_EXTENSIONS.has(getExt(entry.name));
   const Icon = visual.icon;
   const BadgeIcon = visual.badgeIcon;
   const isDetailed = viewMode === "detailed";
@@ -99,7 +133,27 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           ) : null}
         </button>
         <span className={clsx("relative shrink-0", iconWrapperClassName)}>
-          {visual.svgMarkup ? (
+          {showThumbnail ? (
+            <ThumbnailImg
+              path={entry.path}
+              size={visual.iconSize ?? 16}
+              fallback={
+                visual.svgMarkup ? (
+                  <span
+                    className={clsx("block", visual.svgClassName)}
+                    dangerouslySetInnerHTML={{ __html: visual.svgMarkup }}
+                  />
+                ) : (
+                  <Icon
+                    size={visual.iconSize}
+                    className={iconClassName}
+                    fill={visual.iconFillOpacity ? "currentColor" : undefined}
+                    fillOpacity={visual.iconFillOpacity}
+                  />
+                )
+              }
+            />
+          ) : visual.svgMarkup ? (
             <span
               className={clsx("block", visual.svgClassName)}
               dangerouslySetInnerHTML={{ __html: visual.svgMarkup }}

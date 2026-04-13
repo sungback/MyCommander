@@ -275,6 +275,19 @@ pub async fn create_zip(path: String) -> Result<String, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn create_zip_from_paths(
+    paths: Vec<String>,
+    target_dir: String,
+    archive_name: String,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        create_zip_archive_from_paths(&paths, &target_dir, &archive_name)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn read_file_content(path: String) -> Result<String, String> {
     use std::io::Read;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
@@ -470,6 +483,90 @@ fn get_unique_archive_path(source_dir: &Path) -> Result<PathBuf, String> {
         "Could not find a unique archive path for {}",
         source_dir.display()
     ))
+}
+
+fn get_unique_archive_path_named(target_dir: &Path, stem: &str) -> Result<PathBuf, String> {
+    let initial = target_dir.join(format!("{stem}.zip"));
+    if !initial.exists() {
+        return Ok(initial);
+    }
+    for suffix in 2.. {
+        let candidate = target_dir.join(format!("{stem} {suffix}.zip"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err(format!("Could not find a unique archive path for {stem}"))
+}
+
+fn create_zip_archive_from_paths(
+    paths: &[String],
+    target_dir: &str,
+    archive_name: &str,
+) -> Result<String, String> {
+    use std::process::Command;
+
+    if paths.is_empty() {
+        return Err("No paths provided".to_string());
+    }
+
+    let target_dir_path = Path::new(target_dir);
+    let stem = if archive_name.is_empty() { "Archive" } else { archive_name };
+    let archive_path = get_unique_archive_path_named(target_dir_path, stem)?;
+
+    // Collect only the file/folder names (relative to target_dir) that exist
+    let item_names: Vec<String> = paths
+        .iter()
+        .filter_map(|p| {
+            let path = Path::new(p);
+            if path.exists() {
+                path.file_name()?.to_str().map(|s| s.to_owned())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if item_names.is_empty() {
+        return Err("No valid paths to compress".to_string());
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let status = {
+        let mut cmd = Command::new("zip");
+        cmd.arg("-r").arg(&archive_path);
+        for name in &item_names {
+            cmd.arg(name);
+        }
+        cmd.current_dir(target_dir_path)
+            .status()
+            .map_err(|e| e.to_string())?
+    };
+
+    #[cfg(target_os = "windows")]
+    let status = {
+        let paths_ps = item_names
+            .iter()
+            .map(|n| format!("'{}'", target_dir_path.join(n).to_string_lossy().replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(",");
+        let dest = archive_path.to_string_lossy();
+        let script = format!(
+            "Compress-Archive -LiteralPath {} -DestinationPath '{}'",
+            paths_ps, dest
+        );
+        Command::new("powershell")
+            .args(["-NoProfile", "-Command", &script])
+            .status()
+            .map_err(|e| e.to_string())?
+    };
+
+    if !status.success() {
+        let _ = fs::remove_file(&archive_path);
+        return Err(format!("Failed to create archive at {}", archive_path.display()));
+    }
+
+    Ok(archive_path.to_string_lossy().to_string())
 }
 
 fn apply_batch_rename_operations(operations: Vec<BatchRenameOperation>) -> Result<(), String> {

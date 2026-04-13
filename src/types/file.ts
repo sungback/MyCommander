@@ -23,6 +23,7 @@ export interface PanelViewState {
   sortField: SortField;
   sortDirection: SortDirection;
   lastUpdated: number;
+  pendingCursorName: string | null; // folder name to focus after navigating up
 }
 
 export interface PanelTabState extends PanelViewState {

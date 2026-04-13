@@ -1,6 +1,8 @@
 import React from "react";
 import { usePanelStore } from "../../store/panelStore";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowRightLeft,
   ChevronRight,
   ClipboardCopy,
@@ -24,6 +26,16 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
     panelId === "left" ? s.rightPanel.currentPath : s.leftPanel.currentPath
   );
   const setPath = usePanelStore((s) => s.setPath);
+  const goBack = usePanelStore((s) => s.goBack);
+  const goForward = usePanelStore((s) => s.goForward);
+  const historyIndex = usePanelStore((s) =>
+    panelId === "left" ? s.leftPanel.historyIndex : s.rightPanel.historyIndex
+  );
+  const historyLength = usePanelStore((s) =>
+    panelId === "left" ? s.leftPanel.history.length : s.rightPanel.history.length
+  );
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < historyLength - 1;
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const activePanel = usePanelStore((s) => s.activePanel);
@@ -51,6 +63,34 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
       "flex h-8 items-center px-2 border-b text-sm transition-colors",
       isActive ? "bg-bg-panel border-accent-color/50" : "bg-bg-secondary border-border-color"
     )}>
+      <button
+        type="button"
+        onClick={() => { setActivePanel(panelId); goBack(panelId); }}
+        disabled={!canGoBack}
+        className={clsx(
+          "flex items-center px-1 rounded transition-colors",
+          canGoBack
+            ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover cursor-pointer"
+            : "text-text-secondary opacity-30 cursor-default"
+        )}
+        title="뒤로 (Alt+←)"
+      >
+        <ArrowLeft size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => { setActivePanel(panelId); goForward(panelId); }}
+        disabled={!canGoForward}
+        className={clsx(
+          "flex items-center px-1 rounded transition-colors mr-1",
+          canGoForward
+            ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover cursor-pointer"
+            : "text-text-secondary opacity-30 cursor-default"
+        )}
+        title="앞으로 (Alt+→)"
+      >
+        <ArrowRight size={14} />
+      </button>
       <button
         type="button"
         onClick={() => void handleGoHome()}

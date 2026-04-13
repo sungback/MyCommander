@@ -25,6 +25,7 @@ describe("multiRename", () => {
       sortField: "name",
       sortDirection: "asc",
       lastUpdated: 0,
+      pendingCursorName: null,
     });
 
     expect(session.items.map((item) => item.name)).toEqual(["b.txt", "a.txt"]);

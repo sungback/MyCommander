@@ -117,6 +117,18 @@ const fileSystem = {
     return await invoke<string>("create_zip", { path });
   },
 
+  createZipFromPaths: async (
+    paths: string[],
+    targetDir: string,
+    archiveName: string
+  ): Promise<string> => {
+    return await invoke<string>("create_zip_from_paths", {
+      paths,
+      target_dir: targetDir,
+      archive_name: archiveName,
+    });
+  },
+
   renameFile: async (oldPath: string, newPath: string): Promise<void> => {
     await invoke("rename_file", {
       old_path: oldPath,

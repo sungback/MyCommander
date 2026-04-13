@@ -5,6 +5,7 @@ import { usePanelStore } from "../../store/panelStore";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { isAbsolutePath, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
+import { QuickPreviewDialog } from "./QuickPreviewDialog";
 
 const getPathBaseName = (path: string) => {
   const normalized = path.replace(/[\\/]+$/, "");
@@ -673,6 +674,8 @@ export const DialogContainer: React.FC = () => {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      <QuickPreviewDialog />
     </>
   );
 };

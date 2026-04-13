@@ -30,6 +30,7 @@ pub const CONTEXT_INFO_MENU_ITEM_ID: &str = "context_info";
 pub const CONTEXT_REVEAL_MENU_ITEM_ID: &str = "context_reveal";
 pub const CONTEXT_TERMINAL_MENU_ITEM_ID: &str = "context_terminal";
 pub const CONTEXT_CREATE_ZIP_MENU_ITEM_ID: &str = "context_create_zip";
+pub const CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID: &str = "context_extract_zip";
 pub const CONTEXT_PASTE_MENU_ITEM_ID: &str = "context_paste";
 pub const CONTEXT_COPY_PATH_MENU_ITEM_ID: &str = "context_copy_path";
 pub const CONTEXT_COPY_MENU_ITEM_ID: &str = "context_copy";
@@ -41,6 +42,7 @@ pub const CONTEXT_NEW_FOLDER_MENU_ITEM_ID: &str = "context_new_folder";
 pub const CONTEXT_NEW_FILE_MENU_ITEM_ID: &str = "context_new_file";
 pub const CONTEXT_SEARCH_MENU_ITEM_ID: &str = "context_search";
 const CONTEXT_CREATE_ZIP_MENU_LABEL: &str = "압축";
+const CONTEXT_EXTRACT_ZIP_MENU_LABEL: &str = "압축 해제";
 
 #[derive(Deserialize)]
 pub struct ShowContextMenuRequest {
@@ -49,6 +51,7 @@ pub struct ShowContextMenuRequest {
     pub has_target_item: bool,
     pub can_rename: bool,
     pub can_create_zip: bool,
+    pub can_extract_zip: bool,
 }
 
 #[cfg(target_os = "macos")]
@@ -211,7 +214,7 @@ pub fn show_context_menu(
     request: ShowContextMenuRequest,
 ) -> Result<(), String> {
     let menu = if request.has_target_item {
-        build_target_context_menu(&window, request.can_rename, request.can_create_zip)?
+        build_target_context_menu(&window, request.can_rename, request.can_create_zip, request.can_extract_zip)?
     } else {
         build_background_context_menu(&window)?
     };
@@ -228,6 +231,7 @@ fn build_target_context_menu(
     window: &Window,
     can_rename: bool,
     can_create_zip: bool,
+    can_extract_zip: bool,
 ) -> Result<Menu<tauri::Wry>, String> {
     let info = MenuItem::with_id(window, CONTEXT_INFO_MENU_ITEM_ID, "속성", true, None::<&str>)
         .map_err(|error| error.to_string())?;
@@ -252,6 +256,14 @@ fn build_target_context_menu(
         CONTEXT_CREATE_ZIP_MENU_ITEM_ID,
         CONTEXT_CREATE_ZIP_MENU_LABEL,
         can_create_zip,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    let extract_zip = MenuItem::with_id(
+        window,
+        CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID,
+        CONTEXT_EXTRACT_ZIP_MENU_LABEL,
+        can_extract_zip,
         None::<&str>,
     )
     .map_err(|error| error.to_string())?;
@@ -309,6 +321,7 @@ fn build_target_context_menu(
             &reveal,
             &terminal,
             &create_zip,
+            &extract_zip,
             &paste,
             &copy_path,
             &first_separator,

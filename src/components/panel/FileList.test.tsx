@@ -17,6 +17,7 @@ const {
   mockRefreshPanel,
   mockSetActivePanel,
   mockSetDragInfo,
+  mockOpenPreviewDialog,
   mockPanelState,
 } = vi.hoisted(() => ({
   mockCopyFiles: vi.fn(),
@@ -28,6 +29,7 @@ const {
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSetDragInfo: vi.fn(),
+  mockOpenPreviewDialog: vi.fn(),
   mockPanelState: {
     dragInfo: null as
       | {
@@ -45,6 +47,16 @@ vi.mock('../../hooks/useFileSystem', () => ({
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,
   }),
+}));
+
+vi.mock('../../store/dialogStore', () => ({
+  useDialogStore: Object.assign((selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      setOpenDialog: vi.fn(),
+      openPreviewDialog: mockOpenPreviewDialog,
+    }), {
+      getState: () => ({}),
+    }),
 }));
 
 vi.mock('../../store/panelStore', () => ({
@@ -250,7 +262,7 @@ describe('FileList', () => {
   });
 
   // ── 키보드: Enter / Space ────────────────────────────────────────────────────
-  // 컴포넌트는 e.key === "Space" (대문자 문자열)로 체크하므로 key: 'Space' 사용
+  // 컴포넌트는 e.code === "Space"로 체크하므로 code: 'Space' 사용
   describe('Enter / Space', () => {
     it('Enter → 현재 커서 항목에 대해 onEnter 호출', () => {
       const onEnter = vi.fn();
@@ -268,15 +280,19 @@ describe('FileList', () => {
       expect(setCursorIndex).toHaveBeenCalledWith(2);
     });
 
-    it('Space → 파일에 대해 getDirSize를 호출하지 않는다', () => {
+    it('Space → 파일에 대해 미리보기 다이얼로그를 연다', () => {
       render(<FileList {...makeProps({ cursorIndex: 3 })} />); // notes.txt (file)
-      fireEvent.keyDown(getListEl(), { key: 'Space', code: 'Space' });
+      fireEvent.keyDown(getListEl(), { key: ' ', code: 'Space' });
+      expect(mockOpenPreviewDialog).toHaveBeenCalledWith({
+        panelId: 'left',
+        path: '/home/user/notes.txt',
+      });
       expect(mockGetDirSize).not.toHaveBeenCalled();
     });
 
     it('Space → 디렉토리에 대해 getDirSize 호출', () => {
       render(<FileList {...makeProps({ cursorIndex: 1 })} />); // Documents (dir)
-      fireEvent.keyDown(getListEl(), { key: 'Space', code: 'Space' });
+      fireEvent.keyDown(getListEl(), { key: ' ', code: 'Space' });
       expect(mockGetDirSize).toHaveBeenCalledWith('/home/user/Documents');
     });
 
@@ -284,7 +300,7 @@ describe('FileList', () => {
       mockGetDirSize.mockRejectedValueOnce(new Error('disk error'));
       render(<FileList {...makeProps({ cursorIndex: 1 })} />);
       await act(async () => {
-        fireEvent.keyDown(getListEl(), { key: 'Space', code: 'Space' });
+        fireEvent.keyDown(getListEl(), { key: ' ', code: 'Space' });
       });
       // 에러가 throw되지 않고 console.error로 처리됨
       expect(mockGetDirSize).toHaveBeenCalledWith('/home/user/Documents');

@@ -189,6 +189,7 @@ export const FileList: React.FC<FileListProps> = ({
     sizeCache
   );
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
+  const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
@@ -682,6 +683,7 @@ export const FileList: React.FC<FileListProps> = ({
             dropUiState.isPanelHovered && dropUiState.dropTargetPath && !dropUiState.isDropAllowed,
         }
       )}
+      data-panel-id={panelId}
       tabIndex={0}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
@@ -721,17 +723,23 @@ export const FileList: React.FC<FileListProps> = ({
         } else if (e.key === "Enter") {
           e.preventDefault();
           if (current) onEnter(current);
-        } else if (e.key === "Space") {
+        } else if (e.code === "Space") {
           e.preventDefault();
           e.stopPropagation();
           if (current) {
-            onSelect(current.path, true);
-            if (current.kind === "directory" && current.name !== "..") {
-              getDirSize(current.path)
-                .then((size) => updateEntrySize(panelId, current.path, size))
-                .catch((err) =>
-                  console.error("Failed to calculate dir size:", err)
-                );
+            if (current.kind === "file") {
+              // Open Quick Preview for files
+              openPreviewDialog({ panelId, path: current.path });
+            } else {
+              // Toggle selection + calculate size for directories
+              onSelect(current.path, true);
+              if (current.kind === "directory" && current.name !== "..") {
+                getDirSize(current.path)
+                  .then((size) => updateEntrySize(panelId, current.path, size))
+                  .catch((err) =>
+                    console.error("Failed to calculate dir size:", err)
+                  );
+              }
             }
           }
         } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyA") {

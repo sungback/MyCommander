@@ -95,17 +95,32 @@ export const ContextMenu: React.FC = () => {
               await fs.openInTerminal(targetPath ?? panel.currentPath);
               closeContextMenu();
               return;
-            case "create-zip":
-              if (
-                !targetPath ||
-                !targetEntry ||
-                targetEntry.kind !== "directory" ||
-                targetEntry.name === ".."
-              ) {
+            case "create-zip": {
+              if (!targetPath || !targetEntry || targetEntry.name === "..") {
                 return;
               }
               setActivePanel(panelId);
-              await fs.createZip(targetPath);
+              const selectedPaths = [...panel.selectedItems];
+              if (selectedPaths.length > 1) {
+                // 다중 선택: 선택된 항목 모두 압축
+                const archiveName =
+                  panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
+                  "Archive";
+                await fs.createZipFromPaths(selectedPaths, panel.currentPath, archiveName);
+              } else {
+                if (targetEntry.kind !== "directory") return;
+                await fs.createZip(targetPath);
+              }
+              refreshPanel(panelId);
+              closeContextMenu();
+              return;
+            }
+            case "extract-zip":
+              if (!targetPath || !targetEntry || targetEntry.kind !== "file") {
+                return;
+              }
+              setActivePanel(panelId);
+              await fs.extractZip(targetPath);
               refreshPanel(panelId);
               closeContextMenu();
               return;
@@ -151,7 +166,8 @@ export const ContextMenu: React.FC = () => {
               showTransientStatusMessage("클립보드를 사용할 수 없습니다.");
               break;
             case "create-zip":
-              showTransientStatusMessage("압축하지 못했습니다.");
+            case "extract-zip":
+              showTransientStatusMessage("압축 작업을 완료하지 못했습니다.");
               break;
             default:
               showTransientStatusMessage("작업을 완료하지 못했습니다.");

@@ -29,6 +29,7 @@ interface DialogState {
   openRenameDialog: (target: DialogTarget) => void;
   openInfoDialog: (target: DialogTarget) => void;
   openMultiRenameDialog: (session: MultiRenameSession) => void;
+  openPreviewDialog: (target: DialogTarget) => void;
   closeDialog: () => void;
 }
 
@@ -39,6 +40,7 @@ export const useDialogStore = create<DialogState>((set) => ({
   setOpenDialog: (dialog) => set({ openDialog: dialog }),
   openRenameDialog: (dialogTarget) => set({ openDialog: "rename", dialogTarget }),
   openInfoDialog: (dialogTarget) => set({ openDialog: "info", dialogTarget }),
+  openPreviewDialog: (dialogTarget) => set({ openDialog: "preview", dialogTarget }),
   openMultiRenameDialog: (multiRenameSession) =>
     set({ openDialog: "multirename", multiRenameSession }),
   closeDialog: () => set({ openDialog: null, dialogTarget: null, multiRenameSession: null }),

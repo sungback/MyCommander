@@ -16,6 +16,7 @@ import { ViewMode } from "./types/file";
 import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { buildMultiRenameSession } from "./features/multiRename";
+import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
 
 type PanelId = "left" | "right";
 
@@ -338,8 +339,11 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <DualPanel />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <FavoritesPanel />
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <DualPanel />
+        </div>
       </div>
       <StatusBar />
       <DialogContainer />

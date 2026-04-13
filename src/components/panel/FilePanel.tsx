@@ -229,15 +229,25 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         y: event.clientY,
       });
 
+      const selectedCount = panelState.selectedItems.size;
+      const canCreateZip = Boolean(
+        targetEntry && targetEntry.name !== ".." &&
+        (targetEntry.kind === "directory" || selectedCount > 1)
+      );
+      const canExtractZip = Boolean(
+        targetEntry &&
+        targetEntry.kind === "file" &&
+        targetEntry.name.toLowerCase().endsWith(".zip")
+      );
+
       void invoke("show_context_menu", {
         request: {
           x: event.clientX,
           y: event.clientY,
           has_target_item: entryPath !== null,
           can_rename: Boolean(targetEntry && targetEntry.name !== ".."),
-          can_create_zip: Boolean(
-            targetEntry && targetEntry.kind === "directory" && targetEntry.name !== ".."
-          ),
+          can_create_zip: canCreateZip,
+          can_extract_zip: canExtractZip,
         },
       }).catch((error) => {
         console.error("Failed to show context menu:", error);
@@ -254,7 +264,12 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const handleEnter = async (entry: any) => {
     if (entry.kind === "directory") {
       if (entry.name === "..") {
-        setPath(id, getParentPath(panelState.currentPath));
+        const currentName = panelState.currentPath
+          .replace(/[\\/]+$/, "")
+          .replace(/\\/g, "/")
+          .split("/")
+          .pop();
+        setPath(id, getParentPath(panelState.currentPath), currentName);
       } else {
         setPath(id, entry.path);
       }

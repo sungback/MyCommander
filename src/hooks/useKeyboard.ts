@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
+import { useFavoriteStore } from "../store/favoriteStore";
 import { useFileSystem } from "./useFileSystem";
 import { PanelState } from "../types/file";
 import { isMacPlatform, useAppCommands } from "./useAppCommands";
@@ -26,6 +27,8 @@ export function useKeyboard() {
   const { getDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
+  const goBack = usePanelStore((s) => s.goBack);
+  const goForward = usePanelStore((s) => s.goForward);
 
   useEffect(() => {
     const isMac = isMacPlatform();
@@ -168,6 +171,29 @@ export function useKeyboard() {
         return;
       }
 
+      if (e.altKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        goBack(usePanelStore.getState().activePanel);
+        return;
+      }
+
+      if (e.altKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        goForward(usePanelStore.getState().activePanel);
+        return;
+      }
+
+      if (hasCommandModifier && !e.shiftKey && e.code === "KeyD") {
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          const state = usePanelStore.getState();
+          const panel =
+            state.activePanel === "left" ? state.leftPanel : state.rightPanel;
+          useFavoriteStore.getState().addFavorite(panel.currentPath);
+        }
+        return;
+      }
+
       if (hasCommandModifier && e.code === "KeyI") {
         const state = usePanelStore.getState();
         const activeId = state.activePanel;
@@ -195,6 +221,8 @@ export function useKeyboard() {
   }, [
     closeApp,
     getDirSize,
+    goBack,
+    goForward,
     openCopy,
     openDelete,
     openDialog,

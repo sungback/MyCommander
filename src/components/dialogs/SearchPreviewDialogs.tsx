@@ -34,18 +34,7 @@ export const SearchPreviewDialogs: React.FC = () => {
       ? activePanel.files[activePanel.cursorIndex]?.path 
       : null);
 
-  useEffect(() => {
-    if (openDialog === "preview" && selectedFile) {
-      fs.readFileContent(selectedFile).then(content => {
-        setPreviewContent(content);
-      }).catch(err => {
-        setPreviewContent("Error reading file or file too large.");
-        console.error(err);
-      });
-    } else if (openDialog !== "preview") {
-      setPreviewContent("");
-    }
-  }, [openDialog, selectedFile]);
+
 
   useEffect(() => {
     if (openDialog !== "search") {
@@ -399,32 +388,6 @@ export const SearchPreviewDialogs: React.FC = () => {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Preview Dialog */}
-      <Dialog.Root open={openDialog === "preview"} onOpenChange={(open) => !open && closeDialog()}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/70 z-40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-2xl w-[80vw] h-[80vh] z-50 p-4 flex flex-col focus:outline-none text-text-primary">
-            <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-2 truncate">
-              Preview: {selectedFile || "No file selected"}
-            </Dialog.Title>
-            
-            <div className="flex-1 overflow-auto bg-bg-primary border border-border-color rounded relative">
-               <pre className="p-4 text-xs font-mono text-text-secondary leading-relaxed whitespace-pre-wrap select-text">
-                 {previewContent || "Loading preview..."}
-               </pre>
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={closeDialog}
-                className="px-4 py-1.5 text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color"
-              >
-                Close (ESC)
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
     </>
   );
 };

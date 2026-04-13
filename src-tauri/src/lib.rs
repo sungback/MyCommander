@@ -341,6 +341,9 @@ pub fn run() {
                 commands::system_commands::CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "create-zip");
                 }
+                commands::system_commands::CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID => {
+                    let _ = app.emit("context-menu-action", "extract-zip");
+                }
                 commands::system_commands::CONTEXT_COPY_PATH_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "copy-path");
                 }
@@ -432,6 +435,16 @@ pub fn run() {
                 );
             }
         })
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .setup(|app| {
+            use tauri::Manager;
+            use tauri_plugin_window_state::{StateFlags, WindowExt};
+            if let Some(window) = app.get_webview_window("main") {
+                let flags = StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED;
+                let _ = window.restore_state(flags);
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -461,6 +474,7 @@ pub fn run() {
             commands::fs_commands::check_copy_conflicts,
             commands::fs_commands::extract_zip,
             commands::fs_commands::create_zip,
+            commands::fs_commands::create_zip_from_paths,
             commands::fs_commands::read_file_content,
             commands::search_commands::search_files,
             commands::fs_commands::get_dir_size,
