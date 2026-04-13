@@ -27,13 +27,6 @@ export const SearchPreviewDialogs: React.FC = () => {
   const [isApplyingSearchOperation, setIsApplyingSearchOperation] = useState(false);
   const [searchOperationError, setSearchOperationError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [previewContent, setPreviewContent] = useState("");
-
-  const selectedFile = Array.from(activePanel.selectedItems)[0] || 
-    (activePanel.files[activePanel.cursorIndex]?.name !== ".." 
-      ? activePanel.files[activePanel.cursorIndex]?.path 
-      : null);
-
 
 
   useEffect(() => {
