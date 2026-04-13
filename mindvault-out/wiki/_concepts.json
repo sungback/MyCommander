@@ -1,0 +1,1585 @@
+{
+  "__unresolved__::ref::and_then": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::any": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::as_millis": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::as_nanos": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::as_os_str": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::as_ref": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::canonicalize": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::collect": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::collect___result_vec_____string__": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::components": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::contains": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::copy_directory_recursive": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::copy_file_to_destination": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::copy_path_into_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::copy_path_to_destination": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::copy_single_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::count": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::dirs__home_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::duration_since": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::emit": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::ends_with": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::enumerate": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::eq_ignore_ascii_case": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::err": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::exists": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::extension": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::file_name": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::file_stem": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::file_type": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::filter": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::filter_map": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__copy": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__create_dir_all": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__metadata": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__read_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__rename": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::fs__symlink_metadata": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::get_dir_size_with_du": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::get_dir_size_with_walkdir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::get_last_modified_millis": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::get_temporary_rename_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::get_unique_extraction_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::hashmap__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::hashset__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::insert": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::into_iter": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::into_owned": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_empty": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_file": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_hidden_entry": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_match": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_some_and": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::is_symlink": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::iter": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::join": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::len": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::map": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::matches": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::metadata": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::modified": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::name": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::normalize_target_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::ok": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::ok_or_else": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::parent": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::path__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::pattern__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::push": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::regex__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::rev": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::rollback_pending_temp_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::rollback_target_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::rollback_temp_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::split": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::std__collections__hashset": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::std__ffi__osstring": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::std__os__macos__fs__metadataext": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::std__time__systemtime__now": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::strip_prefix": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::tauri__emitter": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::to_os_string": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::to_path_buf": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::to_str": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::to_string_lossy": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::unwrap_or": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::unwrap_or_default": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::unwrap_or_else": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::vec__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::walkdir__new": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "batchrenameoperation": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "fileentry": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "preparedbatchrenameoperation": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "progresspayload": [
+    "fscommands-unresolvedrefok.md",
+    "app-unresolvedrefreact.md"
+  ],
+  "apply_batch_rename_operations": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "check_copy_conflicts": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "collapse_nested_paths": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "compute_path_size": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_directory_recursive": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_file_to_destination": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_files": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_path_into_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_path_to_destination": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "copy_single_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "extract_zip_archive": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_dir_size_with_walkdir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_temporary_rename_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_unique_archive_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_unique_extraction_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "list_directory": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "move_files": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "normalize_target_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "rename_file": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "rollback_pending_temp_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "rollback_target_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "rollback_temp_renames": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "fs_commands": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "search_files": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_last_modified_millis": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "scan_directory": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "drive_name_for_mount": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "get_home_dir": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "open_file_with_default_app": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "open_in_terminal_for_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "resolve_existing_path": [
+    "fscommands-unresolvedrefok.md"
+  ],
+  "__unresolved__::ref::__crabnebula_tauri_plugin_drag_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__radix_ui_react_dialog_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__tanstack_react_virtual_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__tauri_apps_api_core_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__tauri_apps_api_event_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__tauri_apps_api_window_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__tauri_apps_plugin_opener_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::__testing_library_react_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_addressbar_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_app_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_archiveenter_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_bottomactions_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_clsx_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_columnheader_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_dialogs_dialogcontainer_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_dialogs_multirenamedialog_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_dialogs_progressdialog_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_dialogs_searchpreviewdialogs_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_dialogs_syncdialog_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_layout_contextmenu_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_layout_statusbar_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_components_panel_dualpanel_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_contextmenu_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_contextmenustore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_dialogstore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_drivelist_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_features_multirename_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_fileitem_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_filelist_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_filepanel_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_filevisuals_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_format_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_hooks_useappcommands_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_hooks_usefilesystem_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_hooks_usekeyboard_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_lucide_react_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_material_file_icons_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_multirename_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_panelstore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_path_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_react_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_react_dom_client_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_react_resizable_panels_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_store_contextmenustore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_store_dialogstore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_store_panelstore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_store_uistore_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_tabbar_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_test_mocks_tauri_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_types_file_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_types_sync_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_useappcommands_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_usefilesystem_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_usekeyboard_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_utils_clipboard_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_utils_format_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_utils_path_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::_vitest_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::css_": [
+    "app-unresolvedrefreact.md"
+  ],
+  "app.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "panelviewmodechangedpayload": [
+    "app-unresolvedrefreact.md"
+  ],
+  "app": [
+    "app-unresolvedrefreact.md",
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "dialogcontainer": [
+    "app-unresolvedrefreact.md"
+  ],
+  "multirenamedialog": [
+    "app-unresolvedrefreact.md"
+  ],
+  "progressdialog": [
+    "app-unresolvedrefreact.md"
+  ],
+  "searchpreviewdialogs": [
+    "app-unresolvedrefreact.md"
+  ],
+  "syncdialog": [
+    "app-unresolvedrefreact.md"
+  ],
+  "bottomactions.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "bottomactions": [
+    "app-unresolvedrefreact.md"
+  ],
+  "contextmenu.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "contextmenu": [
+    "app-unresolvedrefreact.md"
+  ],
+  "operationbuttonconfig": [
+    "app-unresolvedrefreact.md"
+  ],
+  "panelstatusprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "statusbar": [
+    "app-unresolvedrefreact.md"
+  ],
+  "toolbar": [
+    "app-unresolvedrefreact.md"
+  ],
+  "addressbarprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "addressbar": [
+    "app-unresolvedrefreact.md"
+  ],
+  "archiveenter.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "archivefs": [
+    "app-unresolvedrefreact.md"
+  ],
+  "enterarchiveentryoptions": [
+    "app-unresolvedrefreact.md"
+  ],
+  "archiveenter": [
+    "app-unresolvedrefreact.md"
+  ],
+  "columnheaderprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "columnheader": [
+    "app-unresolvedrefreact.md"
+  ],
+  "drivelistprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "drivelist": [
+    "app-unresolvedrefreact.md"
+  ],
+  "dualpanel": [
+    "app-unresolvedrefreact.md"
+  ],
+  "fileitemprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "fileitem": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filelist.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filelistprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "visibleentryrow": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filelist": [
+    "app-unresolvedrefreact.md"
+  ],
+  "backgroundsizescheduler": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filepanelprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filepanel": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filevisuals.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "resolveentryvisualoptions": [
+    "app-unresolvedrefreact.md"
+  ],
+  "filevisuals": [
+    "app-unresolvedrefreact.md"
+  ],
+  "tabbarprops": [
+    "app-unresolvedrefreact.md"
+  ],
+  "tabbar": [
+    "app-unresolvedrefreact.md"
+  ],
+  "multirename.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "multirename": [
+    "app-unresolvedrefreact.md"
+  ],
+  "useappcommands.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "useappcommands": [
+    "app-unresolvedrefreact.md"
+  ],
+  "usefilesystem.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "usefilesystem": [
+    "app-unresolvedrefreact.md"
+  ],
+  "usekeyboard.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "usekeyboard": [
+    "app-unresolvedrefreact.md"
+  ],
+  "main": [
+    "app-unresolvedrefreact.md",
+    "run-setviewmodemenuselection.md",
+    "main-unresolvedrefmycommanderlibrun.md"
+  ],
+  "contextmenustore.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "dialogstore.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "dialogstate": [
+    "app-unresolvedrefreact.md"
+  ],
+  "dialogstore": [
+    "app-unresolvedrefreact.md"
+  ],
+  "panelstore.persistence.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "panelstore.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "tauri": [
+    "app-unresolvedrefreact.md"
+  ],
+  "format.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "path.test": [
+    "app-unresolvedrefreact.md"
+  ],
+  "__unresolved__::ref::apply_batch_rename_operations": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::build_background_context_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::build_target_context_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::checkmenuitem__with_id": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::collapse_nested_paths": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::compute_path_size": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::config": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::create_zip_archive": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::default__default": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::extract_zip_archive": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::fs__file__create": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::fs__file__open": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::fs__remove_dir_all": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::fs__remove_file": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::get_available_space_for_path": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::logicalposition__new": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::map_err": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::menu__with_items": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::menuitem__with_id": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::move_to_trash": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::open_file_with_default_app": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::open_in_editor_for_path": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::open_in_terminal_for_path": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::package_info": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::pathbuf__from": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::popup_menu_at": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::position__logical": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__about": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__close_window": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__copy": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__cut": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__fullscreen": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__hide": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__hide_others": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__maximize": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__minimize": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__paste": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__quit": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__redo": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__select_all": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__separator": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__services": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__show_all": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::predefinedmenuitem__undo": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::read_to_string": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::run_shell_command_for_path": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::string__new": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::submenu__with_id_and_items": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::submenu__with_items": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::take": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::to_string": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::tokio__task__spawn_blocking": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "apply_batch_rename": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "create_directory": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "create_file": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "create_zip": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "delete_files": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "extract_zip": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "get_dir_size": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "read_file_content": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "build_background_context_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "build_target_context_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "get_available_space": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "open_file": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "open_in_editor": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "open_in_terminal": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "run_shell_command": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "show_context_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "build_app_menu": [
+    "unresolvedreftostring-unresolvedrefmaperr.md"
+  ],
+  "__unresolved__::ref::arg": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::args": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::available_space": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::build_unix_drive_info": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::command__new": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::current_dir": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::disks__new_with_refreshed_list": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::drive_name_for_mount": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::exit": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::file_system": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::get_available_space_for_windows_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::get_unique_archive_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::getlogicaldrives": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::is_network_file_system": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::is_read_only": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::is_removable": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::list": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::max_by_key": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::mount_point": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::next": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::output": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::parse___u64_": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::replace": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::resolve_existing_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::shell_escape_single_quotes": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::sort_drives": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::spawn": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::split_whitespace": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::st_flags": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::starts_with": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::status": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::std__os__windows__ffi__osstrext": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::std__process__command": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::string__from_utf8_lossy": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::success": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::trim": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::windows__core__pcwstr": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "create_zip_archive": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "get_dir_size_with_du": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "is_hidden_entry": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "driveinfo": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "showcontextmenurequest": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "build_unix_drive_info": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "drive_sort_rank": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "escape_applescript_string": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "get_available_space_for_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "get_drives": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "is_network_file_system": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "open_in_editor_for_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "quit_app": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "run_shell_command_for_path": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "shell_escape_single_quotes": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "system_commands": [
+    "systemcommands-runshellcommandforpath.md"
+  ],
+  "__unresolved__::ref::addeventlistener": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::all": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::applytheme": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::attachlistener": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::await_listen": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::boolean": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::buildmultirenamesession": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::cleanup": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::cleartimeout": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::getnextthemetransitiondelay": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::getstate": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::invoke": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::listen": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::openmultirenamedialog": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::preventdefault": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::removeeventlistener": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::resolvetheme": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::setactivepanel": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::setopendialog": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::setpanelviewmode": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::setshowhiddenfiles": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::setthemepreference": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::settimeout": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::swappanels": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::syncotherpaneltocurrentpath": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::then": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlisten": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistenfoldersync": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistenmultirename": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistennewfile": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistennewfolder": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistenswappanels": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::unlistentargetequalssource": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::useappcommands": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::usedialogstore": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::useeffect": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::usekeyboard": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::usepanelstore": [
+    "app-unresolvedrefaddeventlistener.md"
+  ],
+  "__unresolved__::ref::app_manifest": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::as_check_menuitem": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::as_submenu": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::build_app_menu": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::cloned": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::commands": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::expect": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::get": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::get_panel_view_submenu": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::id": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::invoke_handler": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::is_checked": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::menu": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::on_menu_event": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::or_else": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::plugin": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::run": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::set_checked": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::set_panel_view_menu_checks": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri__builder__default": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_build__appmanifest__new": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_build__attributes__new": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_build__try_build": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_plugin_dialog__init": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_plugin_drag__init": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_plugin_fs__init": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_plugin_opener__init": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::tauri_plugin_shell__init": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "build": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "set_show_hidden_menu_checked": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "set_theme_menu_selection": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "set_view_mode_menu_selection": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "get_panel_view_submenu": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "run": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "set_panel_view_menu_checks": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "lib": [
+    "run-setviewmodemenuselection.md"
+  ],
+  "__unresolved__::ref::clone": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::cmp": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::drive_sort_rank": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::glob__pattern": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::regex__regex": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::scan_directory": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::serde__serialize": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::sort_by": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::std__collections__hashmap": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::std__collections__hashset__new": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::std__fs": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::std__path__path": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::std__time__unix_epoch": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::then_with": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::to_lowercase": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::walkdir__walkdir": [
+    "comparedirectories-synccommands.md"
+  ],
+  "searchresult": [
+    "comparedirectories-synccommands.md"
+  ],
+  "search_commands": [
+    "comparedirectories-synccommands.md"
+  ],
+  "fileinfo": [
+    "comparedirectories-synccommands.md"
+  ],
+  "syncitem": [
+    "comparedirectories-synccommands.md"
+  ],
+  "compare_directories": [
+    "comparedirectories-synccommands.md"
+  ],
+  "sync_commands": [
+    "comparedirectories-synccommands.md"
+  ],
+  "sort_drives": [
+    "comparedirectories-synccommands.md"
+  ],
+  "__unresolved__::ref::as_ptr": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::chain": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::collect___vec____": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::encode_wide": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::getdiskfreespaceexw": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::init_str": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::nsarray__arraywithobjects": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::nspasteboard__generalpasteboard": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::nspasteboard__pasteboardwithname": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::nsstring__alloc": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::nsurl__fileurlwithpath_": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::pcwstr": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::some": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::std__iter__once": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::tauri__runtime": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "start_native_drag": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "drag_commands": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "get_available_space_for_windows_path": [
+    "startnativedrag-getavailablespaceforwindowspath.md"
+  ],
+  "__unresolved__::ref::_types_theme_": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "__unresolved__::ref::_zustand_": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "contextmenustate": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "contextmenustore": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "appstate": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "persistedpaneldata": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "persistedpanelstate": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "persistedtabstate": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "panelstore": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "uistate": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "uistore": [
+    "panelstore-unresolvedrefzustand.md"
+  ],
+  "bash": [
+    "bash-mycommander.md",
+    "mycommander-claudemd-bash.md"
+  ],
+  "⌨️ 명령어 요약 (commands)": [
+    "bash-mycommander.md"
+  ],
+  "🤝 코드 기여 워크플로우 (git)": [
+    "bash-mycommander.md"
+  ],
+  "mycommander 🚀": [
+    "bash-mycommander.md"
+  ],
+  "📦 빠른 시작 (quick start)": [
+    "bash-mycommander.md"
+  ],
+  "🔖 버전 업데이트 (release)": [
+    "bash-mycommander.md"
+  ],
+  "🚑 문제 해결 (troubleshooting)": [
+    "bash-mycommander.md"
+  ],
+  "__unresolved__::ref::__tailwindcss_vite_": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "__unresolved__::ref::__vitejs_plugin_react_": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "__unresolved__::ref::_vite_": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "__unresolved__::ref::_vitest_config_": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "vite.config": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "vitest.config": [
+    "viteconfig-unresolvedrefvitejspluginreact.md"
+  ],
+  "__unresolved__::ref::delete": [
+    "movetotrash-unresolvedrefdelete.md"
+  ],
+  "__unresolved__::ref::set_delete_method": [
+    "movetotrash-unresolvedrefdelete.md"
+  ],
+  "__unresolved__::ref::trash__delete": [
+    "movetotrash-unresolvedrefdelete.md"
+  ],
+  "__unresolved__::ref::trash__trashcontext__new": [
+    "movetotrash-unresolvedrefdelete.md"
+  ],
+  "move_to_trash": [
+    "movetotrash-unresolvedrefdelete.md"
+  ],
+  "backend (rust / tauri)": [
+    "mycommander-claudemd-bash.md"
+  ],
+  "frontend (typescript / react)": [
+    "mycommander-claudemd-bash.md"
+  ],
+  "mycommander — claude.md": [
+    "mycommander-claudemd-bash.md"
+  ],
+  "__unresolved__::ref::my_commander_lib__run": [
+    "main-unresolvedrefmycommanderlibrun.md"
+  ],
+  "__unresolved__::ref::_date_fns_": [
+    "format-unresolvedrefdatefns.md"
+  ],
+  "formatsizeoptions": [
+    "format-unresolvedrefdatefns.md"
+  ],
+  "format": [
+    "format-unresolvedrefdatefns.md"
+  ],
+  "__unresolved__::ref::__testing_library_jest_dom_": [
+    "unresolvedreftestinglibraryjestdom-setup.md"
+  ],
+  "setup": [
+    "unresolvedreftestinglibraryjestdom-setup.md"
+  ],
+  "mod": [
+    "mod.md"
+  ],
+  "vite-env.d": [
+    "vite-envd.md"
+  ],
+  "file": [
+    "file.md"
+  ],
+  "theme": [
+    "theme.md"
+  ],
+  "sync": [
+    "sync.md"
+  ],
+  "path": [
+    "path.md"
+  ],
+  "clipboard": [
+    "clipboard.md"
+  ]
+}

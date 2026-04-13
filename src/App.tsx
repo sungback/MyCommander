@@ -6,6 +6,7 @@ import { DualPanel } from "./components/panel/DualPanel";
 import { usePanelStore } from "./store/panelStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { DialogContainer } from "./components/dialogs/DialogContainer";
+import { ProgressDialog } from "./components/dialogs/ProgressDialog";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
 import { SyncDialog } from "./components/dialogs/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
@@ -342,6 +343,7 @@ function App() {
       </div>
       <StatusBar />
       <DialogContainer />
+      <ProgressDialog />
       <MultiRenameDialog />
       <SearchPreviewDialogs />
       <SyncDialog />

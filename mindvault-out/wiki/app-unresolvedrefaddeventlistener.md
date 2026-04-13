@@ -1,0 +1,168 @@
+# App & __unresolved__::ref::addeventlistener
+Cohesion: 0.05 | Nodes: 39
+
+## Key Nodes
+- **App** (/Users/sungback/Documents/MyCommander/src/App.tsx) -- 39 connections
+  - -> calls -> [[unresolvedrefusepanelstore]]
+  - -> calls -> [[unresolvedrefusedialogstore]]
+  - -> calls -> [[unresolvedrefuseappcommands]]
+  - -> calls -> [[unresolvedrefusekeyboard]]
+  - -> calls -> [[unresolvedrefuseeffect]]
+  - -> calls -> [[unresolvedrefpreventdefault]]
+  - -> calls -> [[unresolvedrefsetactivepanel]]
+  - -> calls -> [[unresolvedrefaddeventlistener]]
+  - -> calls -> [[unresolvedrefremoveeventlistener]]
+  - -> calls -> [[unresolvedrefawaitlisten]]
+  - -> calls -> [[unresolvedrefsetshowhiddenfiles]]
+  - -> calls -> [[unresolvedrefboolean]]
+  - -> calls -> [[unresolvedrefunlisten]]
+  - -> calls -> [[unresolvedrefthen]]
+  - -> calls -> [[unresolvedrefattachlistener]]
+  - -> calls -> [[unresolvedrefcleanup]]
+  - -> calls -> [[unresolvedrefsetthemepreference]]
+  - -> calls -> [[unresolvedrefsetpanelviewmode]]
+  - -> calls -> [[unresolvedrefall]]
+  - -> calls -> [[unresolvedreflisten]]
+  - -> calls -> [[unresolvedrefsetopendialog]]
+  - -> calls -> [[unresolvedrefgetstate]]
+  - -> calls -> [[unresolvedrefopenmultirenamedialog]]
+  - -> calls -> [[unresolvedrefbuildmultirenamesession]]
+  - -> calls -> [[unresolvedrefsyncotherpaneltocurrentpath]]
+  - -> calls -> [[unresolvedrefswappanels]]
+  - -> calls -> [[unresolvedrefunlistennewfolder]]
+  - -> calls -> [[unresolvedrefunlistennewfile]]
+  - -> calls -> [[unresolvedrefunlistenmultirename]]
+  - -> calls -> [[unresolvedrefunlistenfoldersync]]
+  - -> calls -> [[unresolvedrefunlistentargetequalssource]]
+  - -> calls -> [[unresolvedrefunlistenswappanels]]
+  - -> calls -> [[unresolvedrefinvoke]]
+  - -> calls -> [[unresolvedrefresolvetheme]]
+  - -> calls -> [[unresolvedrefsettimeout]]
+  - -> calls -> [[unresolvedrefgetnextthemetransitiondelay]]
+  - -> calls -> [[unresolvedrefcleartimeout]]
+  - -> calls -> [[unresolvedrefapplytheme]]
+  - <- contains <- [[app]]
+- **__unresolved__::ref::addeventlistener** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::all** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::applytheme** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::attachlistener** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::await_listen** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::boolean** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::buildmultirenamesession** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::cleanup** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::cleartimeout** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::getnextthemetransitiondelay** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::getstate** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::invoke** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::listen** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::openmultirenamedialog** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::preventdefault** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::removeeventlistener** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::resolvetheme** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::setactivepanel** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::setopendialog** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::setpanelviewmode** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::setshowhiddenfiles** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::setthemepreference** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::settimeout** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::swappanels** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::syncotherpaneltocurrentpath** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::then** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlisten** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistenfoldersync** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistenmultirename** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistennewfile** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistennewfolder** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistenswappanels** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::unlistentargetequalssource** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::useappcommands** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::usedialogstore** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::useeffect** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::usekeyboard** () -- 1 connections
+  - <- calls <- [[app]]
+- **__unresolved__::ref::usepanelstore** () -- 1 connections
+  - <- calls <- [[app]]
+
+## Internal Relationships
+- App -> calls -> __unresolved__::ref::usepanelstore [EXTRACTED]
+- App -> calls -> __unresolved__::ref::usedialogstore [EXTRACTED]
+- App -> calls -> __unresolved__::ref::useappcommands [EXTRACTED]
+- App -> calls -> __unresolved__::ref::usekeyboard [EXTRACTED]
+- App -> calls -> __unresolved__::ref::useeffect [EXTRACTED]
+- App -> calls -> __unresolved__::ref::preventdefault [EXTRACTED]
+- App -> calls -> __unresolved__::ref::setactivepanel [EXTRACTED]
+- App -> calls -> __unresolved__::ref::addeventlistener [EXTRACTED]
+- App -> calls -> __unresolved__::ref::removeeventlistener [EXTRACTED]
+- App -> calls -> __unresolved__::ref::await_listen [EXTRACTED]
+- App -> calls -> __unresolved__::ref::setshowhiddenfiles [EXTRACTED]
+- App -> calls -> __unresolved__::ref::boolean [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlisten [EXTRACTED]
+- App -> calls -> __unresolved__::ref::then [EXTRACTED]
+- App -> calls -> __unresolved__::ref::attachlistener [EXTRACTED]
+- App -> calls -> __unresolved__::ref::cleanup [EXTRACTED]
+- App -> calls -> __unresolved__::ref::setthemepreference [EXTRACTED]
+- App -> calls -> __unresolved__::ref::setpanelviewmode [EXTRACTED]
+- App -> calls -> __unresolved__::ref::all [EXTRACTED]
+- App -> calls -> __unresolved__::ref::listen [EXTRACTED]
+- App -> calls -> __unresolved__::ref::setopendialog [EXTRACTED]
+- App -> calls -> __unresolved__::ref::getstate [EXTRACTED]
+- App -> calls -> __unresolved__::ref::openmultirenamedialog [EXTRACTED]
+- App -> calls -> __unresolved__::ref::buildmultirenamesession [EXTRACTED]
+- App -> calls -> __unresolved__::ref::syncotherpaneltocurrentpath [EXTRACTED]
+- App -> calls -> __unresolved__::ref::swappanels [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistennewfolder [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistennewfile [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistenmultirename [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistenfoldersync [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistentargetequalssource [EXTRACTED]
+- App -> calls -> __unresolved__::ref::unlistenswappanels [EXTRACTED]
+- App -> calls -> __unresolved__::ref::invoke [EXTRACTED]
+- App -> calls -> __unresolved__::ref::resolvetheme [EXTRACTED]
+- App -> calls -> __unresolved__::ref::settimeout [EXTRACTED]
+- App -> calls -> __unresolved__::ref::getnextthemetransitiondelay [EXTRACTED]
+- App -> calls -> __unresolved__::ref::cleartimeout [EXTRACTED]
+- App -> calls -> __unresolved__::ref::applytheme [EXTRACTED]
+
+## Cross-Community Connections
+
+## Context
+이 커뮤니티는 App, __unresolved__::ref::addeventlistener, __unresolved__::ref::all를 중심으로 calls 관계로 연결되어 있다. 주요 소스 파일은 App.tsx이다.
+
+### Key Facts
+- import { useEffect } from "react"; import { invoke } from "@tauri-apps/api/core"; import { listen } from "@tauri-apps/api/event"; import { StatusBar } from "./components/layout/StatusBar"; import { DualPanel } from "./components/panel/DualPanel"; import { usePanelStore } from "./store/panelStore";…

@@ -4,6 +4,16 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use std::time::UNIX_EPOCH;
+use tauri::Emitter;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressPayload {
+    pub operation: String,
+    pub current: usize,
+    pub total: usize,
+    pub current_file: String,
+}
 
 #[cfg(target_os = "macos")]
 use std::os::macos::fs::MetadataExt;
@@ -183,19 +193,66 @@ pub async fn apply_batch_rename(operations: Vec<BatchRenameOperation>) -> Result
         .map_err(|e| e.to_string())?
 }
 
-// Basic copy implementation. A real copy_files would emit progress events
 #[tauri::command(rename_all = "snake_case")]
-pub async fn copy_files(source_paths: Vec<String>, target_path: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || copy_selected_paths(&source_paths, &target_path))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn copy_files(app: tauri::AppHandle, source_paths: Vec<String>, target_path: String) -> Result<(), String> {
+    let total = source_paths.len();
+    tokio::task::spawn_blocking(move || {
+        if source_paths.is_empty() {
+            return Ok(());
+        }
+
+        if source_paths.len() == 1 {
+            let file_name = Path::new(&source_paths[0])
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| source_paths[0].clone());
+            let _ = app.emit("fs-progress", ProgressPayload {
+                operation: "copy".to_string(),
+                current: 1,
+                total,
+                current_file: file_name,
+            });
+            return copy_single_path(Path::new(&source_paths[0]), &target_path);
+        }
+
+        let target_root = Path::new(&target_path);
+        fs::create_dir_all(target_root).map_err(|e| e.to_string())?;
+        if !target_root.is_dir() {
+            return Err(format!("{target_path} is not a directory"));
+        }
+
+        for (i, source) in source_paths.iter().enumerate() {
+            let file_name = Path::new(source)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| source.clone());
+            let _ = app.emit("fs-progress", ProgressPayload {
+                operation: "copy".to_string(),
+                current: i + 1,
+                total,
+                current_file: file_name,
+            });
+            copy_path_into_dir(Path::new(source), target_root)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn move_files(source_paths: Vec<String>, target_dir: String) -> Result<(), String> {
-    for path in source_paths {
-        let src = Path::new(&path);
+pub async fn move_files(app: tauri::AppHandle, source_paths: Vec<String>, target_dir: String) -> Result<(), String> {
+    let total = source_paths.len();
+    for (i, path) in source_paths.iter().enumerate() {
+        let src = Path::new(path);
         if let Some(file_name) = src.file_name() {
+            let file_name_str = file_name.to_string_lossy().to_string();
+            let _ = app.emit("fs-progress", ProgressPayload {
+                operation: "move".to_string(),
+                current: i + 1,
+                total,
+                current_file: file_name_str,
+            });
             let dest = Path::new(&target_dir).join(file_name);
             fs::rename(src, dest).map_err(|e| e.to_string())?;
         }
@@ -612,30 +669,6 @@ fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     {
         trash::delete(path)
     }
-}
-
-fn copy_selected_paths(source_paths: &[String], target_path: &str) -> Result<(), String> {
-    if source_paths.is_empty() {
-        return Ok(());
-    }
-
-    if source_paths.len() == 1 {
-        copy_single_path(Path::new(&source_paths[0]), target_path)?;
-        return Ok(());
-    }
-
-    let target_root = Path::new(target_path);
-    fs::create_dir_all(target_root).map_err(|e| e.to_string())?;
-
-    if !target_root.is_dir() {
-        return Err(format!("{target_path} is not a directory"));
-    }
-
-    for source in source_paths {
-        copy_path_into_dir(Path::new(source), target_root)?;
-    }
-
-    Ok(())
 }
 
 fn copy_single_path(source: &Path, target_path: &str) -> Result<(), String> {

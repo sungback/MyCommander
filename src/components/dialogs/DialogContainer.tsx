@@ -107,7 +107,7 @@ const BaseDialog: React.FC<{
 };
 
 export const DialogContainer: React.FC = () => {
-  const { openDialog, dialogTarget, closeDialog } = useDialogStore();
+  const { openDialog, dialogTarget, closeDialog, setOpenDialog } = useDialogStore();
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const activePanelId = usePanelStore((s) => s.activePanel);
@@ -303,6 +303,7 @@ export const DialogContainer: React.FC = () => {
   };
 
   const executeCopyMove = async (isMove: boolean, paths: string[], targetPath: string) => {
+    setOpenDialog("progress");
     try {
       if (isMove) {
         await fs.moveFiles(paths, targetPath);
@@ -314,6 +315,8 @@ export const DialogContainer: React.FC = () => {
       refreshPanel(activePanelId === "left" ? "right" : "left");
     } catch (e) {
       console.error(e);
+      // Switch back to the form dialog so the error message can be displayed
+      setOpenDialog(isMove ? "move" : "copy");
       throw e;
     }
   };

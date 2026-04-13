@@ -31,15 +31,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 윈도우, 맥, 리눅스(우분투)에서 동시에 돌아가도록 설정합니다.
+          # macOS는 Apple Silicon / Intel을 각각 빌드합니다.
           - platform: "macos-latest"
-            args: ""
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
           - platform: "windows-latest"
             args: ""
           - platform: "ubuntu-22.04"
             args: ""
 
     runs-on: ${{ matrix.platform }}
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
@@ -51,6 +60,8 @@ jobs:
 
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.args, '--target') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust 캐시 설정 (빌드 속도 향상)
         uses: swatinem/rust-cache@v2
@@ -66,10 +77,53 @@ jobs:
       - name: 웹 프론트엔드 의존성 설치 (npm)
         run: npm install
 
+      - name: macOS 배포 서명 설정 확인
+        if: matrix.platform == 'macos-latest'
+        run: |
+          missing=0
+          for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "macOS release builds require Apple signing and notarization secrets."
+            exit 1
+          fi
+
+      - name: Apple Developer 인증서 가져오기 (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -n 1 || true)
+          if [ -z "$CERT_INFO" ]; then
+            echo "Developer ID Application certificate not found in keychain."
+            security find-identity -v -p codesigning build.keychain
+            exit 1
+          fi
+
+          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+
       - name: Tauri 앱 빌드 및 GitHub Release 배포
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ env.APPLE_ID }}
+          APPLE_PASSWORD: ${{ env.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         with:
           # package.json의 version을 읽어서 자동으로 태그/타이틀을 만듭니다.
           tagName: app-v__VERSION__ 

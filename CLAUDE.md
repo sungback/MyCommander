@@ -1,6 +1,7 @@
 # MyCommander — CLAUDE.md
 
 이 파일은 Claude가 이 프로젝트를 이해하고 작업할 때 참고하는 컨텍스트 문서입니다.
+작업 절차와 검증 규칙은 [`AGENTS.md`](/Users/sungback/Documents/MyCommander/AGENTS.md)를 우선 따릅니다.
 
 ---
 
@@ -81,29 +82,25 @@ npm run tauri build
 
 ---
 
-## 코드 작성 규칙
+## 구현 관례
+
+이 섹션은 "어떻게 작업할지"보다 "코드가 어떻게 구성돼 있는지"를 설명합니다.
 
 ### Frontend (TypeScript / React)
 
-- 컴포넌트는 `src/components/` 아래에 기능별로 분리
-- 전역 상태는 Zustand (`src/store/`) 사용
-- 타입 정의는 `src/types/`에 모음
-- 유틸 함수는 `src/utils/`에 모음
-- 스타일은 Tailwind CSS v4 사용 (인라인 클래스 방식)
-- 아이콘은 `lucide-react` 사용
-- 긴 목록은 `@tanstack/react-virtual`로 가상화
+- UI 컴포넌트는 보통 `src/components/` 아래에 기능별로 분리합니다.
+- 전역 상태는 Zustand 기반으로 `src/store/`에서 관리합니다.
+- 공용 타입은 `src/types/`에, 유틸 함수는 `src/utils/`에 두는 편입니다.
+- 스타일링은 Tailwind CSS v4 유틸리티 클래스를 중심으로 구성합니다.
+- 아이콘은 `lucide-react`를 사용합니다.
+- 긴 목록 UI는 `@tanstack/react-virtual` 사용 가능성을 먼저 고려합니다.
 
 ### Backend (Rust / Tauri)
 
-- Tauri 커스텀 커맨드는 `src-tauri/src/commands/`에 추가
-- 커맨드 추가 후 `lib.rs`의 `invoke_handler`에 등록 필요
-- 권한은 `src-tauri/permissions/`에서 관리
-- `tauri.conf.json`에서 앱 설정 및 번들 타겟 관리
-
-### 공통
-
-- 커밋 메시지는 영어로 작성 (예: `Fix file delete error on Windows`)
-- 빌드 산출물(`dist/`, `src-tauri/target/`)은 커밋하지 않음
+- Tauri 커스텀 커맨드는 주로 `src-tauri/src/commands/`에 위치합니다.
+- 새 커맨드를 추가하면 `src-tauri/src/lib.rs`의 `invoke_handler` 등록 여부를 함께 확인해야 합니다.
+- 권한과 capability 관련 설정은 `src-tauri/permissions/`와 Tauri 설정 파일에서 함께 관리됩니다.
+- 앱 설정 및 번들 관련 값은 `src-tauri/tauri.conf.json`에 있습니다.
 
 ---
 
@@ -131,3 +128,8 @@ npm run tauri build -- --bundles deb,appimage
 ```
 
 산출물 경로: `src-tauri/target/release/bundle/`
+
+## 운영 메모
+
+- 작업 절차, 검증 명령, 커밋/빌드 위생 규칙은 `AGENTS.md`를 기준으로 합니다.
+- 이 문서는 프로젝트 컨텍스트 보존이 목적이므로, 에이전트 행동 규칙은 여기보다 `AGENTS.md`에 추가하는 편이 좋습니다.

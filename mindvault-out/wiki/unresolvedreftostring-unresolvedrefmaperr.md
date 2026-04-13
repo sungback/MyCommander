@@ -1,0 +1,481 @@
+# __unresolved__::ref::to_string & __unresolved__::ref::map_err
+Cohesion: 0.04 | Nodes: 69
+
+## Key Nodes
+- **__unresolved__::ref::to_string** () -- 45 connections
+  - <- calls <- [[buildappmenu]]
+  - <- calls <- [[listdirectory]]
+  - <- calls <- [[createdirectory]]
+  - <- calls <- [[createfile]]
+  - <- calls <- [[deletefiles]]
+  - <- calls <- [[renamefile]]
+  - <- calls <- [[applybatchrename]]
+  - <- calls <- [[copyfiles]]
+  - <- calls <- [[movefiles]]
+  - <- calls <- [[extractzip]]
+  - <- calls <- [[createzip]]
+  - <- calls <- [[readfilecontent]]
+  - <- calls <- [[getdirsize]]
+  - <- calls <- [[computepathsize]]
+  - <- calls <- [[extractziparchive]]
+  - <- calls <- [[createziparchive]]
+  - <- calls <- [[applybatchrenameoperations]]
+  - <- calls <- [[gettemporaryrenamepath]]
+  - <- calls <- [[getdirsizewithdu]]
+  - <- calls <- [[copysinglepath]]
+  - <- calls <- [[copypathtodestination]]
+  - <- calls <- [[copydirectoryrecursive]]
+  - <- calls <- [[copyfiletodestination]]
+  - <- calls <- [[normalizetargetpath]]
+  - <- calls <- [[checkcopyconflicts]]
+  - <- calls <- [[scandirectory]]
+  - <- calls <- [[getdrives]]
+  - <- calls <- [[gethomedir]]
+  - <- calls <- [[getavailablespace]]
+  - <- calls <- [[openinterminal]]
+  - <- calls <- [[openineditor]]
+  - <- calls <- [[openfile]]
+  - <- calls <- [[runshellcommand]]
+  - <- calls <- [[showcontextmenu]]
+  - <- calls <- [[buildtargetcontextmenu]]
+  - <- calls <- [[buildbackgroundcontextmenu]]
+  - <- calls <- [[setshowhiddenmenuchecked]]
+  - <- calls <- [[setthememenuselection]]
+  - <- calls <- [[setviewmodemenuselection]]
+  - <- calls <- [[buildunixdriveinfo]]
+  - <- calls <- [[drivenameformount]]
+  - <- calls <- [[openfilewithdefaultapp]]
+  - <- calls <- [[openinterminalforpath]]
+  - <- calls <- [[runshellcommandforpath]]
+  - <- calls <- [[openineditorforpath]]
+- **__unresolved__::ref::map_err** () -- 39 connections
+  - <- calls <- [[listdirectory]]
+  - <- calls <- [[createdirectory]]
+  - <- calls <- [[createfile]]
+  - <- calls <- [[deletefiles]]
+  - <- calls <- [[renamefile]]
+  - <- calls <- [[applybatchrename]]
+  - <- calls <- [[copyfiles]]
+  - <- calls <- [[movefiles]]
+  - <- calls <- [[extractzip]]
+  - <- calls <- [[createzip]]
+  - <- calls <- [[readfilecontent]]
+  - <- calls <- [[getdirsize]]
+  - <- calls <- [[computepathsize]]
+  - <- calls <- [[extractziparchive]]
+  - <- calls <- [[createziparchive]]
+  - <- calls <- [[gettemporaryrenamepath]]
+  - <- calls <- [[getdirsizewithdu]]
+  - <- calls <- [[copysinglepath]]
+  - <- calls <- [[copypathtodestination]]
+  - <- calls <- [[copydirectoryrecursive]]
+  - <- calls <- [[copyfiletodestination]]
+  - <- calls <- [[normalizetargetpath]]
+  - <- calls <- [[checkcopyconflicts]]
+  - <- calls <- [[getavailablespace]]
+  - <- calls <- [[getavailablespaceforwindowspath]]
+  - <- calls <- [[openinterminal]]
+  - <- calls <- [[openineditor]]
+  - <- calls <- [[openfile]]
+  - <- calls <- [[runshellcommand]]
+  - <- calls <- [[showcontextmenu]]
+  - <- calls <- [[buildtargetcontextmenu]]
+  - <- calls <- [[buildbackgroundcontextmenu]]
+  - <- calls <- [[setshowhiddenmenuchecked]]
+  - <- calls <- [[setthememenuselection]]
+  - <- calls <- [[setviewmodemenuselection]]
+  - <- calls <- [[openfilewithdefaultapp]]
+  - <- calls <- [[openinterminalforpath]]
+  - <- calls <- [[runshellcommandforpath]]
+  - <- calls <- [[openineditorforpath]]
+- **build_app_menu** (/Users/sungback/Documents/MyCommander/src-tauri/src/lib.rs) -- 30 connections
+  - -> calls -> [[unresolvedrefpackageinfo]]
+  - -> calls -> [[unresolvedrefconfig]]
+  - -> calls -> [[unresolvedrefsome]]
+  - -> calls -> [[unresolvedrefclone]]
+  - -> calls -> [[unresolvedreftostring]]
+  - -> calls -> [[unresolvedrefmap]]
+  - -> calls -> [[unresolvedrefdefaultdefault]]
+  - -> calls -> [[unresolvedrefcheckmenuitemwithid]]
+  - -> calls -> [[unresolvedrefsubmenuwithidanditems]]
+  - -> calls -> [[unresolvedrefsubmenuwithitems]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemminimize]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemmaximize]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemseparator]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemclosewindow]]
+  - -> calls -> [[unresolvedrefmenuitemwithid]]
+  - -> calls -> [[unresolvedrefmenuwithitems]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemabout]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemservices]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemhide]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemhideothers]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemshowall]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemquit]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemundo]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemredo]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemcut]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemcopy]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitempaste]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemselectall]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemfullscreen]]
+  - <- contains <- [[lib]]
+- **__unresolved__::ref::tokio__task__spawn_blocking** () -- 11 connections
+  - <- calls <- [[applybatchrename]]
+  - <- calls <- [[copyfiles]]
+  - <- calls <- [[extractzip]]
+  - <- calls <- [[createzip]]
+  - <- calls <- [[getdirsize]]
+  - <- calls <- [[checkcopyconflicts]]
+  - <- calls <- [[getavailablespace]]
+  - <- calls <- [[openinterminal]]
+  - <- calls <- [[openineditor]]
+  - <- calls <- [[openfile]]
+  - <- calls <- [[runshellcommand]]
+- **delete_files** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 10 connections
+  - -> calls -> [[unresolvedrefcollapsenestedpaths]]
+  - -> calls -> [[unresolvedrefpathnew]]
+  - -> calls -> [[unresolvedrefisdir]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreffsremovedirall]]
+  - -> calls -> [[unresolvedreftostring]]
+  - -> calls -> [[unresolvedreffsremovefile]]
+  - -> calls -> [[unresolvedrefmovetotrash]]
+  - -> calls -> [[unresolvedrefok]]
+  - <- contains <- [[fscommands]]
+- **read_file_content** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 8 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreffsfileopen]]
+  - -> calls -> [[unresolvedreftostring]]
+  - -> calls -> [[unresolvedrefstringnew]]
+  - -> calls -> [[unresolvedrefreadtostring]]
+  - -> calls -> [[unresolvedreftake]]
+  - -> calls -> [[unresolvedrefok]]
+  - <- contains <- [[fscommands]]
+- **show_context_menu** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 8 connections
+  - -> calls -> [[unresolvedrefbuildtargetcontextmenu]]
+  - -> calls -> [[unresolvedrefbuildbackgroundcontextmenu]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedrefpopupmenuat]]
+  - -> calls -> [[unresolvedrefpositionlogical]]
+  - -> calls -> [[unresolvedreflogicalpositionnew]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **__unresolved__::ref::pathbuf__from** () -- 6 connections
+  - <- calls <- [[applybatchrenameoperations]]
+  - <- calls <- [[getavailablespace]]
+  - <- calls <- [[openinterminal]]
+  - <- calls <- [[openineditor]]
+  - <- calls <- [[openfile]]
+  - <- calls <- [[runshellcommand]]
+- **build_background_context_menu** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedrefmenuitemwithid]]
+  - -> calls -> [[unresolvedreftostring]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemseparator]]
+  - -> calls -> [[unresolvedrefmenuwithitems]]
+  - <- contains <- [[systemcommands]]
+- **build_target_context_menu** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedrefmenuitemwithid]]
+  - -> calls -> [[unresolvedreftostring]]
+  - -> calls -> [[unresolvedrefpredefinedmenuitemseparator]]
+  - -> calls -> [[unresolvedrefmenuwithitems]]
+  - <- contains <- [[systemcommands]]
+- **get_available_space** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefpathbuffrom]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefgetavailablespaceforpath]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **open_file** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefpathbuffrom]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefopenfilewithdefaultapp]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **open_in_editor** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefpathbuffrom]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefopenineditorforpath]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **open_in_terminal** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefpathbuffrom]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefopeninterminalforpath]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **run_shell_command** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/system_commands.rs) -- 6 connections
+  - -> calls -> [[unresolvedrefpathbuffrom]]
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefrunshellcommandforpath]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[systemcommands]]
+- **apply_batch_rename** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 5 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefapplybatchrenameoperations]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **create_file** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 5 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedrefmap]]
+  - -> calls -> [[unresolvedreffsfilecreate]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **create_zip** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 5 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefcreateziparchive]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **extract_zip** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 5 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefextractziparchive]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **get_dir_size** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 5 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreftokiotaskspawnblocking]]
+  - -> calls -> [[unresolvedrefcomputepathsize]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **create_directory** (/Users/sungback/Documents/MyCommander/src-tauri/src/commands/fs_commands.rs) -- 4 connections
+  - -> calls -> [[unresolvedrefmaperr]]
+  - -> calls -> [[unresolvedreffscreatedirall]]
+  - -> calls -> [[unresolvedreftostring]]
+  - <- contains <- [[fscommands]]
+- **__unresolved__::ref::menu__with_items** () -- 3 connections
+  - <- calls <- [[buildappmenu]]
+  - <- calls <- [[buildtargetcontextmenu]]
+  - <- calls <- [[buildbackgroundcontextmenu]]
+- **__unresolved__::ref::menuitem__with_id** () -- 3 connections
+  - <- calls <- [[buildappmenu]]
+  - <- calls <- [[buildtargetcontextmenu]]
+  - <- calls <- [[buildbackgroundcontextmenu]]
+- **__unresolved__::ref::predefinedmenuitem__separator** () -- 3 connections
+  - <- calls <- [[buildappmenu]]
+  - <- calls <- [[buildtargetcontextmenu]]
+  - <- calls <- [[buildbackgroundcontextmenu]]
+- **__unresolved__::ref::fs__remove_dir_all** () -- 2 connections
+  - <- calls <- [[deletefiles]]
+  - <- calls <- [[extractziparchive]]
+- **__unresolved__::ref::fs__remove_file** () -- 2 connections
+  - <- calls <- [[deletefiles]]
+  - <- calls <- [[createziparchive]]
+- **__unresolved__::ref::apply_batch_rename_operations** () -- 1 connections
+  - <- calls <- [[applybatchrename]]
+- **__unresolved__::ref::build_background_context_menu** () -- 1 connections
+  - <- calls <- [[showcontextmenu]]
+- **__unresolved__::ref::build_target_context_menu** () -- 1 connections
+  - <- calls <- [[showcontextmenu]]
+- **__unresolved__::ref::checkmenuitem__with_id** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::collapse_nested_paths** () -- 1 connections
+  - <- calls <- [[deletefiles]]
+- **__unresolved__::ref::compute_path_size** () -- 1 connections
+  - <- calls <- [[getdirsize]]
+- **__unresolved__::ref::config** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::create_zip_archive** () -- 1 connections
+  - <- calls <- [[createzip]]
+- **__unresolved__::ref::default__default** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::extract_zip_archive** () -- 1 connections
+  - <- calls <- [[extractzip]]
+- **__unresolved__::ref::fs__file__create** () -- 1 connections
+  - <- calls <- [[createfile]]
+- **__unresolved__::ref::fs__file__open** () -- 1 connections
+  - <- calls <- [[readfilecontent]]
+- **__unresolved__::ref::get_available_space_for_path** () -- 1 connections
+  - <- calls <- [[getavailablespace]]
+- **__unresolved__::ref::logicalposition__new** () -- 1 connections
+  - <- calls <- [[showcontextmenu]]
+- **__unresolved__::ref::move_to_trash** () -- 1 connections
+  - <- calls <- [[deletefiles]]
+- **__unresolved__::ref::open_file_with_default_app** () -- 1 connections
+  - <- calls <- [[openfile]]
+- **__unresolved__::ref::open_in_editor_for_path** () -- 1 connections
+  - <- calls <- [[openineditor]]
+- **__unresolved__::ref::open_in_terminal_for_path** () -- 1 connections
+  - <- calls <- [[openinterminal]]
+- **__unresolved__::ref::package_info** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::popup_menu_at** () -- 1 connections
+  - <- calls <- [[showcontextmenu]]
+- **__unresolved__::ref::position__logical** () -- 1 connections
+  - <- calls <- [[showcontextmenu]]
+- **__unresolved__::ref::predefinedmenuitem__about** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__close_window** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__copy** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__cut** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__fullscreen** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__hide** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__hide_others** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__maximize** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__minimize** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__paste** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__quit** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__redo** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__select_all** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__services** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__show_all** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::predefinedmenuitem__undo** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::read_to_string** () -- 1 connections
+  - <- calls <- [[readfilecontent]]
+- **__unresolved__::ref::run_shell_command_for_path** () -- 1 connections
+  - <- calls <- [[runshellcommand]]
+- **__unresolved__::ref::string__new** () -- 1 connections
+  - <- calls <- [[readfilecontent]]
+- **__unresolved__::ref::submenu__with_id_and_items** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::submenu__with_items** () -- 1 connections
+  - <- calls <- [[buildappmenu]]
+- **__unresolved__::ref::take** () -- 1 connections
+  - <- calls <- [[readfilecontent]]
+
+## Internal Relationships
+- apply_batch_rename -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- apply_batch_rename -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- apply_batch_rename -> calls -> __unresolved__::ref::apply_batch_rename_operations [EXTRACTED]
+- apply_batch_rename -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- create_directory -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- create_directory -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- create_file -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- create_file -> calls -> __unresolved__::ref::fs__file__create [EXTRACTED]
+- create_file -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- create_zip -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- create_zip -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- create_zip -> calls -> __unresolved__::ref::create_zip_archive [EXTRACTED]
+- create_zip -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::collapse_nested_paths [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::fs__remove_dir_all [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::fs__remove_file [EXTRACTED]
+- delete_files -> calls -> __unresolved__::ref::move_to_trash [EXTRACTED]
+- extract_zip -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- extract_zip -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- extract_zip -> calls -> __unresolved__::ref::extract_zip_archive [EXTRACTED]
+- extract_zip -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- get_dir_size -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- get_dir_size -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- get_dir_size -> calls -> __unresolved__::ref::compute_path_size [EXTRACTED]
+- get_dir_size -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::fs__file__open [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::string__new [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::read_to_string [EXTRACTED]
+- read_file_content -> calls -> __unresolved__::ref::take [EXTRACTED]
+- build_background_context_menu -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- build_background_context_menu -> calls -> __unresolved__::ref::menuitem__with_id [EXTRACTED]
+- build_background_context_menu -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- build_background_context_menu -> calls -> __unresolved__::ref::predefinedmenuitem__separator [EXTRACTED]
+- build_background_context_menu -> calls -> __unresolved__::ref::menu__with_items [EXTRACTED]
+- build_target_context_menu -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- build_target_context_menu -> calls -> __unresolved__::ref::menuitem__with_id [EXTRACTED]
+- build_target_context_menu -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- build_target_context_menu -> calls -> __unresolved__::ref::predefinedmenuitem__separator [EXTRACTED]
+- build_target_context_menu -> calls -> __unresolved__::ref::menu__with_items [EXTRACTED]
+- get_available_space -> calls -> __unresolved__::ref::pathbuf__from [EXTRACTED]
+- get_available_space -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- get_available_space -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- get_available_space -> calls -> __unresolved__::ref::get_available_space_for_path [EXTRACTED]
+- get_available_space -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- open_file -> calls -> __unresolved__::ref::pathbuf__from [EXTRACTED]
+- open_file -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- open_file -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- open_file -> calls -> __unresolved__::ref::open_file_with_default_app [EXTRACTED]
+- open_file -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- open_in_editor -> calls -> __unresolved__::ref::pathbuf__from [EXTRACTED]
+- open_in_editor -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- open_in_editor -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- open_in_editor -> calls -> __unresolved__::ref::open_in_editor_for_path [EXTRACTED]
+- open_in_editor -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- open_in_terminal -> calls -> __unresolved__::ref::pathbuf__from [EXTRACTED]
+- open_in_terminal -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- open_in_terminal -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- open_in_terminal -> calls -> __unresolved__::ref::open_in_terminal_for_path [EXTRACTED]
+- open_in_terminal -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- run_shell_command -> calls -> __unresolved__::ref::pathbuf__from [EXTRACTED]
+- run_shell_command -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- run_shell_command -> calls -> __unresolved__::ref::tokio__task__spawn_blocking [EXTRACTED]
+- run_shell_command -> calls -> __unresolved__::ref::run_shell_command_for_path [EXTRACTED]
+- run_shell_command -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::build_target_context_menu [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::build_background_context_menu [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::map_err [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::popup_menu_at [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::position__logical [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::logicalposition__new [EXTRACTED]
+- show_context_menu -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::package_info [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::config [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::to_string [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::default__default [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::checkmenuitem__with_id [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::submenu__with_id_and_items [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::submenu__with_items [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__minimize [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__maximize [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__separator [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__close_window [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::menuitem__with_id [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::menu__with_items [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__about [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__services [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__hide [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__hide_others [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__show_all [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__quit [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__undo [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__redo [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__cut [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__copy [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__paste [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__select_all [EXTRACTED]
+- build_app_menu -> calls -> __unresolved__::ref::predefinedmenuitem__fullscreen [EXTRACTED]
+
+## Cross-Community Connections
+- create_directory -> calls -> __unresolved__::ref::fs__create_dir_all (-> [[fscommands-unresolvedrefok]])
+- create_file -> calls -> __unresolved__::ref::map (-> [[fscommands-unresolvedrefok]])
+- delete_files -> calls -> __unresolved__::ref::path__new (-> [[fscommands-unresolvedrefok]])
+- delete_files -> calls -> __unresolved__::ref::is_dir (-> [[fscommands-unresolvedrefok]])
+- delete_files -> calls -> __unresolved__::ref::ok (-> [[fscommands-unresolvedrefok]])
+- read_file_content -> calls -> __unresolved__::ref::ok (-> [[fscommands-unresolvedrefok]])
+- build_app_menu -> calls -> __unresolved__::ref::some (-> [[startnativedrag-getavailablespaceforwindowspath]])
+- build_app_menu -> calls -> __unresolved__::ref::clone (-> [[comparedirectories-synccommands]])
+- build_app_menu -> calls -> __unresolved__::ref::map (-> [[fscommands-unresolvedrefok]])
+
+## Context
+이 커뮤니티는 __unresolved__::ref::to_string, __unresolved__::ref::map_err, build_app_menu를 중심으로 calls 관계로 연결되어 있다. 주요 소스 파일은 fs_commands.rs, lib.rs, system_commands.rs이다.
+
+### Key Facts
+- fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> { let pkg_info = app.package_info(); let config = app.config(); let about_metadata = AboutMetadata { name: Some(pkg_info.name.clone()), version: Some(pkg_info.version.to_string()), copyright:…
+- [tauri::command(rename_all = "snake_case")] pub async fn delete_files(paths: Vec<String>, permanent: bool) -> Result<(), String> { let paths = collapse_nested_paths(paths);
+- [tauri::command(rename_all = "snake_case")] pub async fn read_file_content(path: String) -> Result<String, String> { use std::io::Read; let file = fs::File::open(&path).map_err(|e| e.to_string())?; // Read only first 100KB to prevent UI lag on huge files let mut buffer = String::new();…
+- [tauri::command(rename_all = "snake_case")] pub fn show_context_menu( window: Window, request: ShowContextMenuRequest, ) -> Result<(), String> { let menu = if request.has_target_item { build_target_context_menu(&window, request.can_rename, request.can_create_zip)? } else {…
+- [tauri::command(rename_all = "snake_case")] pub fn show_context_menu( window: Window, request: ShowContextMenuRequest, ) -> Result<(), String> { let menu = if request.has_target_item { build_target_context_menu(&window, request.can_rename, request.can_create_zip)? } else {…
