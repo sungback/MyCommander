@@ -4,7 +4,10 @@ import { FileList } from './FileList';
 import type { FileEntry } from '../../types/file';
 
 // ── Tauri IPC mock ──────────────────────────────────────────────────────────
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+  convertFileSrc: (path: string) => `asset://${path}`,
+}));
 
 // ── useFileSystem mock (vi.hoisted로 호이스팅 — 팩토리 실행 전에 변수 준비) ──
 const {

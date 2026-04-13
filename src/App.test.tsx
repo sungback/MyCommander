@@ -8,7 +8,10 @@ const mockSyncOtherPanelToCurrentPath = vi.fn();
 const listenHandlers = new Map<string, () => void>();
 
 // ── Tauri IPC / event mocks ───────────────────────────────────────────────────
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn().mockResolvedValue(undefined),
+  convertFileSrc: (path: string) => `asset://${path}`,
+}));
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockImplementation(async (eventName: string, handler: () => void) => {
     listenHandlers.set(eventName, handler);

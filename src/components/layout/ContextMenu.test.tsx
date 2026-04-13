@@ -39,6 +39,7 @@ const mockContextState = {
 const mockPanelState = {
   leftPanel: {
     currentPath: "/home/user",
+    selectedItems: new Set<string>(),
     files: [
       {
         name: "Documents",
@@ -60,6 +61,7 @@ const mockPanelState = {
   },
   rightPanel: {
     currentPath: "/home/other",
+    selectedItems: new Set<string>(),
     files: [],
   },
   refreshPanel: mockRefreshPanel,
