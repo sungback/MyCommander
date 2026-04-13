@@ -37,3 +37,6 @@ yarn-error.log*
 Thumbs.db
 
 # 참고: src-tauri/Cargo.lock 은 바이너리 앱이므로 커밋 권장 (제외 안 함)
+
+# MindVault build outputs
+mindvault-out/
