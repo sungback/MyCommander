@@ -34,11 +34,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS는 Apple Silicon / Intel을 각각 빌드합니다.
+          # macOS는 universal로 빌드 (Apple Silicon / Intel 모두 지원)
           - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
+            args: "--target universal-apple-darwin"
           - platform: "windows-latest"
             args: ""
           - platform: "ubuntu-22.04"
