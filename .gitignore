@@ -26,6 +26,7 @@ yarn-error.log*
 # === 프로젝트 특화 폴더 ===
 .omc/
 .omx/
+.claude/
 
 # === 에디터 ===
 .vscode/*
