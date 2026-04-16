@@ -1,14 +1,67 @@
 # MyCommander — CLAUDE.md
 
-이 파일은 Claude가 이 프로젝트를 이해하고 작업할 때 참고하는 컨텍스트 문서입니다.
-작업 절차와 검증 규칙은 [`AGENTS.md`](/Users/sungback/Documents/MyCommander/AGENTS.md)를 우선 따릅니다.
+이 파일은 MyCommander 프로젝트의 현재 구현 상태를 빠르게 파악하기 위한 컨텍스트 문서입니다.
+작업 절차, 검증 규칙, 커밋/빌드 위생은 [`AGENTS.md`](/Users/sungback/Documents/MyCommander/AGENTS.md)를 우선 따릅니다.
 
 ---
 
 ## 프로젝트 개요
 
-**MyCommander**는 Tauri v2 + React 19 + TypeScript로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
-듀얼 패널 방식의 파일 탐색 UI를 목표로 개발 중입니다.
+**MyCommander**는 **Tauri v2 + React 19 + TypeScript** 기반의 크로스플랫폼 데스크톱 파일 매니저입니다.
+현재 구현은 단순 파일 브라우저를 넘어, **듀얼 패널 탐색**, **탭과 히스토리**, **즐겨찾기**, **검색**, **빠른 미리보기**, **일괄 이름 변경**, **ZIP 작업**, **폴더 비교/동기화 보조 기능**까지 포함합니다.
+
+앱의 기본 화면은 다음 요소들로 구성됩니다.
+
+- 좌측 즐겨찾기 패널
+- 좌/우 듀얼 파일 패널
+- 상태바 및 하단 액션 바
+- 다이얼로그 기반 파일 작업 UI
+
+---
+
+## 현재 구현된 주요 기능
+
+### 파일 탐색 / 패널
+
+- 좌/우 **듀얼 패널** 구조
+- 패널별 **탭** 추가/전환/닫기
+- 패널별 **경로 히스토리**와 뒤로/앞으로 이동
+- 활성 패널 전환 (`Tab`)
+- 상세 / 간단 보기 모드 전환
+- 숨김 파일 표시 토글
+- 이름 / 크기 / 날짜 기준 정렬
+- 경로 breadcrumb 이동
+- 드라이브 목록 표시
+
+### 파일 작업
+
+- 새 폴더 생성
+- 새 파일 생성
+- 이름 변경
+- 삭제
+- 복사 / 이동
+- 복사 충돌 확인
+- ZIP 생성 / ZIP 압축 해제
+- 파일 열기, 에디터로 열기, 터미널에서 열기
+- 현재 폴더 기준 셸 명령 실행
+
+### 생산성 기능
+
+- 빠른 미리보기 (`F3`)
+- 검색 다이얼로그 및 검색 결과 일괄 작업
+- 다중 파일 일괄 이름 변경
+- 폴더 비교 기반 동기화 다이얼로그
+- 선택 항목 / 용량 / 여유 공간 상태 표시
+- 즐겨찾기 추가 / 이름 변경 / 재정렬 / 접기
+
+### 데스크톱 통합
+
+- Tauri 앱 메뉴
+- 컨텍스트 메뉴
+- 테마 선택 (`auto`, `light`, `dark`)
+- 패널별 보기 모드 메뉴 연동
+- 메뉴 이벤트와 프런트엔드 상태 동기화
+- 네이티브 드래그 연동 및 패널 간 드롭 처리
 
 ---
 
@@ -16,49 +69,143 @@
 
 | 영역 | 기술 |
 |---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
+| Frontend | React 19, TypeScript, Vite |
+| Styling | Tailwind CSS v4 |
+| State | Zustand |
 | Desktop Shell | Tauri v2 |
-| Backend (Rust) | Tauri 커스텀 커맨드, Tauri 플러그인 |
-| 상태 관리 | Zustand |
-| UI 컴포넌트 | Radix UI (Dialog), Lucide React (아이콘) |
-| 가상 스크롤 | @tanstack/react-virtual |
-| 날짜 | date-fns |
+| Backend | Rust, Tauri custom commands |
+| UI | Radix UI Dialog, Lucide React |
+| Virtualized List | `@tanstack/react-virtual` |
+| Preview Helpers | `highlight.js`, `marked`, `xlsx`, `jszip` |
+| Utilities | `date-fns`, `clsx`, `tailwind-merge` |
+| Testing | Vitest, Testing Library |
 
 ---
 
-## 디렉토리 구조
+## 디렉터리 구조
 
-```
+```text
 MyCommander/
-├── src/                      # React 프런트엔드
-│   ├── components/           # UI 컴포넌트
-│   ├── hooks/                # 커스텀 훅
-│   ├── store/                # Zustand 스토어
-│   ├── types/                # TypeScript 타입 정의
-│   ├── utils/                # 유틸리티 함수
-│   ├── App.tsx               # 최상위 컴포넌트
-│   └── main.tsx              # 진입점
-├── src-tauri/                # Rust 백엔드 (Tauri)
+├── src/
+│   ├── components/
+│   │   ├── dialogs/         # 복사/이동/검색/미리보기/동기화/일괄이름변경 UI
+│   │   ├── favorites/       # 즐겨찾기 사이드 패널
+│   │   ├── layout/          # 상태바, 컨텍스트 메뉴, 하단 액션 정의
+│   │   └── panel/           # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록
+│   ├── features/            # 기능 단위 로직 (예: multiRename)
+│   ├── hooks/               # Tauri 명령 래퍼 및 키보드 훅
+│   ├── store/               # Zustand 스토어
+│   ├── test/                # 테스트 유틸 / mock
+│   ├── types/               # 파일/테마/동기화 타입 정의
+│   ├── utils/               # 포맷팅, 경로, 클립보드 유틸
+│   ├── App.tsx              # 앱 루트 구성과 전역 이벤트 연결
+│   └── main.tsx             # React 진입점
+├── src-tauri/
 │   ├── src/
-│   │   ├── commands/         # Tauri 커스텀 커맨드
-│   │   ├── lib.rs            # 앱 빌더 및 커맨드 등록
-│   │   └── main.rs           # 진입점
-│   ├── permissions/          # Tauri 권한 설정
-│   ├── Cargo.toml
-│   └── tauri.conf.json       # Tauri 앱 설정
-├── public/                   # 정적 파일
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
+│   │   ├── commands/
+│   │   │   ├── system_commands.rs
+│   │   │   ├── fs_commands.rs
+│   │   │   ├── search_commands.rs
+│   │   │   ├── sync_commands.rs
+│   │   │   └── drag_commands.rs
+│   │   ├── lib.rs           # Tauri 앱 빌더, 메뉴, invoke_handler 등록
+│   │   └── main.rs          # Tauri 진입점
+│   ├── capabilities/        # Capability 정의
+│   ├── permissions/         # Tauri 명령 권한 설정
+│   ├── tauri.conf.json      # 앱 설정, 번들 설정, dev/build 연결
+│   └── Cargo.toml
+├── public/
+├── README.md
+├── AGENTS.md
+├── package.json
+└── version-sync.cjs
 ```
+
+---
+
+## 프런트엔드 구조 메모
+
+### 앱 구성
+
+- `src/App.tsx`는 앱 뼈대를 조립합니다.
+  - `FavoritesPanel`
+  - `DualPanel`
+  - `StatusBar`
+  - `DialogContainer`
+  - `MultiRenameDialog`
+  - `SearchPreviewDialogs`
+  - `SyncDialog`
+  - `ContextMenu`
+
+### 상태 관리
+
+- `panelStore`
+  - 좌/우 패널 상태
+  - 패널별 탭, 경로, 히스토리, 선택, 커서, 정렬, 보기 모드
+  - 숨김 파일 표시 여부
+  - 테마 선호도
+  - 드래그 상태
+- `dialogStore`
+  - 현재 열린 다이얼로그
+  - 다이얼로그 대상 파일/폴더
+  - 일괄 이름 변경 세션
+- `uiStore`
+  - 상태 메시지
+  - 즐겨찾기 패널 열림/닫힘
+- `favoriteStore`
+  - 즐겨찾기 목록, 순서, 이름 변경
+
+### UI/상호작용
+
+- `FileList.tsx`는 가상 스크롤과 키보드/드래그 상호작용의 핵심입니다.
+- `AddressBar.tsx`는 breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화를 담당합니다.
+- `StatusBar.tsx`는 패널 요약, 여유 공간, 현재 경로 명령 실행 입력창, 하단 액션 버튼을 제공합니다.
+- 일부 UI 상태는 `localStorage`에 저장됩니다.
+  - 패널 상태
+  - 즐겨찾기
+
+---
+
+## 백엔드 구조 메모
+
+### Tauri 명령 모듈
+
+- `system_commands.rs`
+  - 드라이브 조회
+  - 홈 디렉터리 조회
+  - 여유 공간 조회
+  - 파일/에디터/터미널 열기
+  - 셸 명령 실행
+  - 앱 종료
+  - 메뉴 상태 반영
+  - 컨텍스트 메뉴 표시
+- `fs_commands.rs`
+  - 디렉터리 목록 조회
+  - 파일/폴더 생성
+  - 삭제 / 이름 변경 / 복사 / 이동
+  - ZIP 생성 / 압축 해제
+  - 파일 내용 읽기
+  - 폴더 용량 계산
+  - 복사 충돌 점검
+- `search_commands.rs`
+  - 파일 검색
+- `sync_commands.rs`
+  - 디렉터리 비교
+- `drag_commands.rs`
+  - 네이티브 드래그 시작
+
+### 메뉴 / 권한
+
+- `src-tauri/src/lib.rs`에서 앱 메뉴와 `invoke_handler`를 함께 구성합니다.
+- 메뉴는 파일 / 보기 / 테마 / 명령 관련 액션을 포함합니다.
+- Tauri capability/permission은 `src-tauri/capabilities/` 및 `src-tauri/permissions/`에서 관리합니다.
 
 ---
 
 ## 주요 개발 명령어
 
 ```bash
-# Tauri 데스크톱 앱 실행 (개발)
+# 앱 개발 실행
 npm run tauri dev
 
 # 프런트엔드만 실행
@@ -70,66 +217,23 @@ npm run build
 # TypeScript 타입 체크
 ./node_modules/.bin/tsc --noEmit
 
+# 프런트엔드 테스트
+npm run test
+
+# Rust 테스트
+npm run test:rust
+
 # Rust 체크
 cargo check --manifest-path src-tauri/Cargo.toml
-
-# 배포 빌드 (설치 파일 생성)
-npm run tauri build
 ```
 
-개발 서버: `http://127.0.0.1:1420`  
-포트 충돌 시: `lsof -ti tcp:1420 | xargs kill`
+개발 서버 URL은 일반적으로 `http://127.0.0.1:1420` 입니다.
 
 ---
 
-## 구현 관례
+## 참고 메모
 
-이 섹션은 "어떻게 작업할지"보다 "코드가 어떻게 구성돼 있는지"를 설명합니다.
-
-### Frontend (TypeScript / React)
-
-- UI 컴포넌트는 보통 `src/components/` 아래에 기능별로 분리합니다.
-- 전역 상태는 Zustand 기반으로 `src/store/`에서 관리합니다.
-- 공용 타입은 `src/types/`에, 유틸 함수는 `src/utils/`에 두는 편입니다.
-- 스타일링은 Tailwind CSS v4 유틸리티 클래스를 중심으로 구성합니다.
-- 아이콘은 `lucide-react`를 사용합니다.
-- 긴 목록 UI는 `@tanstack/react-virtual` 사용 가능성을 먼저 고려합니다.
-
-### Backend (Rust / Tauri)
-
-- Tauri 커스텀 커맨드는 주로 `src-tauri/src/commands/`에 위치합니다.
-- 새 커맨드를 추가하면 `src-tauri/src/lib.rs`의 `invoke_handler` 등록 여부를 함께 확인해야 합니다.
-- 권한과 capability 관련 설정은 `src-tauri/permissions/`와 Tauri 설정 파일에서 함께 관리됩니다.
-- 앱 설정 및 번들 관련 값은 `src-tauri/tauri.conf.json`에 있습니다.
-
----
-
-## 주의 사항
-
-- **`src-tauri/target/`** 는 수 GB까지 커질 수 있음. 용량 정리 시 `cargo clean --manifest-path src-tauri/Cargo.toml` 사용
-- **Tauri v2** 기준으로 작성됨. v1과 API가 다를 수 있으니 공식 문서 확인 필요
-- **권한 오류** 발생 시 `src-tauri/permissions/` 설정과 `tauri.conf.json`의 `security.capabilities` 확인
-- 빌드 오류 시 `build_log.txt` 참고 (루트에 위치)
-- `.omc/`, `.omx/` 는 앱 내부 설정/캐시 폴더로 직접 편집 불필요
-
----
-
-## 플랫폼별 배포 빌드
-
-```bash
-# macOS (.dmg / .app)
-npm run tauri build -- --bundles dmg
-
-# Windows (.exe NSIS)
-npm run tauri build -- --bundles nsis
-
-# Linux (.deb / .AppImage)
-npm run tauri build -- --bundles deb,appimage
-```
-
-산출물 경로: `src-tauri/target/release/bundle/`
-
-## 운영 메모
-
-- 작업 절차, 검증 명령, 커밋/빌드 위생 규칙은 `AGENTS.md`를 기준으로 합니다.
-- 이 문서는 프로젝트 컨텍스트 보존이 목적이므로, 에이전트 행동 규칙은 여기보다 `AGENTS.md`에 추가하는 편이 좋습니다.
+- 이 문서는 현재 프로젝트 구조와 기능을 설명하기 위한 컨텍스트 문서입니다.
+- 작업 방식, 검증 규칙, 커밋 메시지 규칙은 `AGENTS.md` 기준으로 유지합니다.
+- 온보딩/실행/사용자 관점 설명은 `README.md`에서 다룹니다.
+- Tauri v2 기준으로만 해석해야 합니다.

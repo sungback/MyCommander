@@ -1,128 +1,185 @@
-# MyCommander 🚀
+# MyCommander
 
-MyCommander는 Tauri + React + TypeScript로 만들어진 초고속 데스크톱 파일 매니저입니다.
+MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
+현재 구현은 듀얼 패널 탐색을 중심으로, 검색, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능까지 포함합니다.
 
-## 🛠 기술 스택
+## 주요 기능
+
+- 좌/우 **듀얼 패널** 파일 탐색
+- 패널별 **탭**, 뒤로/앞으로 이동, breadcrumb 경로 이동
+- **즐겨찾기 패널** 추가 / 이름 변경 / 재정렬 / 접기
+- 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
+- **빠른 미리보기**와 텍스트/문서 계열 렌더링
+- **파일 검색**과 검색 결과 복사/이동/삭제
+- **일괄 이름 변경**
+- **ZIP 생성 / ZIP 압축 해제**
+- **폴더 비교** 기반 동기화 보조 다이얼로그
+- 현재 폴더 기준 **터미널 명령 실행**
+- 앱 메뉴 / 컨텍스트 메뉴 / 단축키 연동
+
+## 미리보기 지원 예시
+
+현재 코드 기준으로 다음 계열의 파일을 미리보기에 대응합니다.
+
+- 이미지
+- 비디오
+- PDF
+- 일반 텍스트 / 소스 코드 하이라이팅
+- Markdown 렌더링
+- HTML 렌더링
+- Excel (`.xlsx`, `.xls`)
+- Jupyter Notebook (`.ipynb`)
+- PowerPoint (`.pptx`)
+- HWPX
+
+지원하지 않는 형식은 미리보기에서 unsupported 상태로 표시됩니다.
+
+## 기술 스택
 
 - **Frontend**: React 19, TypeScript, Vite, Zustand
+- **Styling**: Tailwind CSS v4
 - **Desktop Shell**: Tauri v2
 - **Backend**: Rust
+- **UI**: Radix UI, Lucide React
+- **Virtualized List**: `@tanstack/react-virtual`
+- **Tests**: Vitest, Testing Library
 
-## ⚙️ 요구 환경
+## 요구 환경
 
-- Node.js 20+ 및 npm
-- Rust Stable Toolchain
-- **OS별 빌드 도구**: macOS(Xcode CLI Tool), Windows(Visual Studio C++ Build Tools), Linux(WebKitGTK 등)
+- Node.js 20+
+- npm
+- Rust stable toolchain
+- 운영체제별 Tauri 빌드 도구
+  - macOS: Xcode Command Line Tools
+  - Windows: Visual Studio C++ Build Tools
+  - Linux: WebKitGTK 등 Tauri 의존성
 
-## 📦 빠른 시작 (Quick Start)
+## 빠른 시작
 
-**1. 패키지 설치 및 Rust 빌드 점검**
+### 1. 의존성 설치
 
 ```bash
 npm install
-cd src-tauri && cargo check && cd ..
 ```
 
-**2. 앱 실행**
+### 2. Rust 체크
 
 ```bash
-# 개발 모드 (UI + 프론트엔드 변경사항 실시간 반영)
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+### 3. 앱 실행
+
+```bash
 npm run tauri dev
 ```
 
-## ⌨️ 명령어 요약 (Commands)
-
-| 용도 | 명령어 | 비고 |
-|---|---|---|
-| 앱 전체 개발 모드 | `npm run tauri dev` | 프론트엔드(포트 `1420`)와 백엔드를 동시 시작 |
-| 프론트엔드만 실행 | `npm run dev` | UI 디자인 껍데기만 수정하고 싶을 때 유용함 |
-| 타입스크립트 검사 | `npm run typecheck` | (또는 `./node_modules/.bin/tsc --noEmit`) |
-| 백엔드 문법 검사 | `cargo check` | 반드시 `src-tauri` 폴더 안에 들어가서 실행 필요 |
-| 설치 파일 패키징 | `npm run tauri build` | 윈도우, 맥, 리눅스에 맞는 앱 최종 배포 파일 생성 |
-
-## 🏗 설치 파일 생성 (빌드)
-
-`src-tauri/tauri.conf.json`의 번들 타겟이 `"all"`로 설정되어 있어 아래 명령어 한 줄이면 설치 파일이 생성됩니다.
+개발 중 프런트엔드만 빠르게 확인하고 싶다면:
 
 ```bash
-npm run tauri build
+npm run dev
 ```
 
-운영체제별 주요 최종 산출물 경로는 다음과 같습니다 (`src-tauri/target/release/bundle/`의 내부 폴더):
+개발 서버 URL은 보통 `http://127.0.0.1:1420` 입니다.
 
-- **macOS**: `dmg/*.dmg`, `macos/*.app`
-- **Windows**: `nsis/*.exe`, `msi/*.msi`
-- **Linux**: `deb/*.deb`, `appimage/*.AppImage`
+## 주요 명령어
 
-> **Tip:** 특정 파일 포맷 하나만 뽑고 싶다면, `-- --bundles dmg`, `-- --bundles appimage` 등 뒤에 옵션 태그를 붙이시면 됩니다.
+| 용도 | 명령어 |
+|---|---|
+| 앱 전체 개발 모드 | `npm run tauri dev` |
+| 프런트엔드만 실행 | `npm run dev` |
+| 프런트엔드 빌드 | `npm run build` |
+| TypeScript 타입 체크 | `./node_modules/.bin/tsc --noEmit` |
+| 프런트엔드 테스트 | `npm run test` |
+| Rust 테스트 | `npm run test:rust` |
+| 전체 테스트 | `npm run test:all` |
+| 테스트 커버리지 | `npm run test:coverage` |
+| Rust 체크 | `cargo check --manifest-path src-tauri/Cargo.toml` |
+| 배포 빌드 | `npm run tauri build` |
 
-## 🤝 코드 기여 워크플로우 (Git)
+## 단축키 / 주요 액션
 
-협업이나 로컬 코드 관리를 위한 가장 기본적이고 안전한 작업 순서 요약입니다.
+현재 코드 기준으로 대표 단축키는 다음과 같습니다.
 
-```bash
-git pull                   # 1. 작업 전 저장소 최신 변경사항 동기화
-git add -A                 # 2. 이번에 내가 수정한 파일 모두 담기
-git commit -m "수정 내용"   # 3. 무엇을 바꿨는지 작업 일지(메세지) 남기기
-git push                   # 4. 깃허브 원격 저장소에 최종 제출하기
+- `Tab`: 활성 패널 전환
+- `F3`: 보기
+- `F4`: 편집
+- `Shift+F4`: 새 파일
+- `F5`: 복사
+- `F6`: 이동
+- `F7`: 새 폴더
+- `Alt+F7` / `Option+F7`: 검색
+- `F8`: 삭제
+- `Cmd+Q` / `Alt+F4`: 앱 종료
+- `CmdOrCtrl+Shift+.`: 숨김 파일 표시 토글
+- `CmdOrCtrl+Shift+M`: 반대 패널을 현재 경로로 동기화
+- `CmdOrCtrl+U`: 패널 교환
+
+## 프로젝트 구조
+
+```text
+src/
+  components/
+    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경
+    favorites/     # 즐겨찾기 사이드바
+    layout/        # 상태바, 컨텍스트 메뉴, 하단 액션
+    panel/         # 듀얼 패널, 파일 목록, 주소창, 탭, 드라이브 목록
+  features/        # 기능 단위 로직
+  hooks/           # 키보드 및 Tauri command wrapper
+  store/           # Zustand 스토어
+  test/            # 테스트 설정 / mock
+  types/           # 타입 정의
+  utils/           # 포맷/경로/클립보드 유틸
+
+src-tauri/
+  src/commands/    # Rust Tauri commands
+  capabilities/    # Tauri capability 정의
+  permissions/     # 명령 권한 설정
+  tauri.conf.json  # Tauri 앱 설정
 ```
 
-*(기본적으로 `node_modules`, `dist`, `src-tauri/target` 등의 덩치가 큰 빌드 부산물은 Git에 제출되지 않도록 자동 보호(`.gitignore`)되어 있습니다.)*
+## 버전 업데이트
 
-## 🔖 버전 업데이트 (Release)
+프로젝트 루트의 [`version-sync.cjs`](/Users/sungback/Documents/MyCommander/version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다.
 
-Tauri 프로젝트라면 아래 순서로 진행하는 것이 가장 안전하고 확실합니다.
-
-### ✅ 해결된 추천 명령어
-
-**방법 A: 수동으로 수정 후 한 번에 올리기 (가장 권장)**
-
-1. `package.json`과 `src-tauri/tauri.conf.json`의 `version`을 모두 `0.9.0`으로 직접 수정합니다.
-2. 이후 아래 명령을 실행합니다.
+일반적인 릴리스 흐름:
 
 ```bash
 git add -A
-git commit -m "Release v0.9.0"
-git tag v0.9.0
-git push origin main --tags
+git commit -m "release: prepare next version"
+npm version 1.1.4
 ```
 
-**방법 B: 자동 수정 (고급 권장 방식)**
+`npm version` 실행 시:
 
-프로젝트 루트에 설정된 자동화 스크립트를 활용해 명령어 한 줄로 모든 과정을 끝냅니다.
+- `package.json` 버전이 변경됩니다.
+- `version-sync.cjs`가 `src-tauri/tauri.conf.json` 버전을 함께 맞춥니다.
+- Git 태그가 생성됩니다.
+- `postversion` 스크립트가 `git push`와 `git push --tags`를 실행합니다.
+
+## 문제 해결
+
+### 포트 1420 충돌
 
 ```bash
-# 1. 현재 변경사항(코드 수정 등)을 먼저 커밋하여 작업 공간을 깨끗하게 만듭니다.
-git add -A
-git commit -m "Release Version 0.11.0"
-
-# 2. 이제 명령어를 통해 버전을 올립니다. (자동 동기화 및 태그 생성)
-npm version 0.11.0
+lsof -ti tcp:1420 | xargs kill
 ```
 
-**상세 설명:**
-- **`npm version`**: 이 명령을 실행하면 자동으로 `version-sync.cjs`가 구동되어 `tauri.conf.json`의 버전을 프론트엔드와 일치시킵니다.
-- **자동 커밋 및 태그**: 버전 변경 사항이 하나의 커밋으로 자동 생성되고, `v0.9.0`과 같은 Git 태그도 자동으로 붙습니다.
-- **자동 푸시**: `postversion` 훅이 트리거되어 GitHub 원격 저장소와 태그 정보가 즉시 업로드됩니다.
-
-**공통 상세 설명:**
-- **코드 수정**: Tauri 앱은 프론트엔드(`package.json`)와 백엔드 설정(`tauri.conf.json`)의 버전이 일치해야 문제없이 배포됩니다.
-- **`git tag`**: 특정 시점에 이름을 붙여 보관하는 기능입니다. GitHub Action이 이 태그를 감지해 자동으로 릴리스 빌드를 시작하게 됩니다.
-- **`--tags`**: 로컬에서 만든 태그를 원격 저장소(`origin`)로 함께 전송합니다.
-
-## 🚑 문제 해결 (Troubleshooting)
-
-### 하드디스크 빌드 용량 폭발 방지 (추천)
-
-Tauri 개발을 오래 진행하다보면 `src-tauri/target/` 폴더 내 백엔드 컴파일 캐시 파일들이 **수십 GB** 넘게 엄청나게 쌓일 수 있습니다. 저장 공간 확보를 위해 가끔씩 쓰레기 파일들을 싹 지워주세요.
+### 빌드 산출물 용량이 너무 커질 때
 
 ```bash
-cd src-tauri && cargo clean
+cargo clean --manifest-path src-tauri/Cargo.toml
 ```
 
-*(※ 비워내고 난 후, 다음 번에 처음 다시 `npm run tauri dev` 명령어를 입력할 때는 기초 설정들을 다시 받느라 5~10분 가량 오래 걸릴 수 있습니다.)*
+`src-tauri/target/`은 매우 커질 수 있습니다.
 
-### 기타 런타임 오류
+### 빌드/권한 이슈가 있을 때
 
-- **포트 1420 충돌 오류 (Port 1420 is already in use)**: `lsof -ti tcp:1420 | xargs kill` 명령어로 앱을 억지로 쥐고 있는 뒷면의 유령 프로세스를 강제 종료 후 재실행.
-- **esbuild 플랫폼 충돌 에러**: 터미널에 `npm rebuild esbuild`를 입력하여 해결. 정 안 될 시, `node_modules` 폴더 삭제 후 다시 처음부터 `npm install`.
+- 루트의 `build_log.txt` 확인
+- `src-tauri/permissions/`와 `src-tauri/capabilities/` 확인
+- `src-tauri/tauri.conf.json` 확인
+
+## 참고
+
+- 프로젝트 컨텍스트 문서는 [CLAUDE.md](/Users/sungback/Documents/MyCommander/CLAUDE.md)
+- 작업 규칙과 검증 규칙은 [AGENTS.md](/Users/sungback/Documents/MyCommander/AGENTS.md)
