@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import { FileList } from './FileList';
 import type { FileEntry } from '../../types/file';
@@ -121,6 +121,56 @@ const makeProps = (overrides: Partial<React.ComponentProps<typeof FileList>> = {
 });
 
 const getListEl = () => document.querySelector('[tabindex="0"]') as HTMLElement;
+const setContainerRect = () => {
+  const list = getListEl();
+  Object.defineProperty(list, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 400,
+      width: 400,
+      height: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  });
+};
+
+const mockElementFromPoint = (element: HTMLElement) => {
+  Object.defineProperty(document, 'elementFromPoint', {
+    configurable: true,
+    value: vi.fn(() => element),
+  });
+};
+
+const performInternalDrag = async (
+  sourceRow: HTMLElement,
+  targetRow: HTMLElement,
+  startPoint = { x: 20, y: 20 },
+  movePoint = { x: 40, y: 40 }
+) => {
+  mockElementFromPoint(targetRow);
+  fireEvent.mouseDown(sourceRow, {
+    button: 0,
+    clientX: startPoint.x,
+    clientY: startPoint.y,
+  });
+
+  await act(async () => {
+    document.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: movePoint.x, clientY: movePoint.y })
+    );
+    document.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: movePoint.x + 2,
+        clientY: movePoint.y + 2,
+      })
+    );
+  });
+};
 
 // ── 테스트 ────────────────────────────────────────────────────────────────────
 describe('FileList', () => {
@@ -136,6 +186,12 @@ describe('FileList', () => {
     mockSetSelection.mockReset();
     mockSelectOnly.mockReset();
     mockClearSelection.mockReset();
+  });
+
+  afterEach(() => {
+    if ('elementFromPoint' in document) {
+      Reflect.deleteProperty(document as unknown as Record<string, unknown>, 'elementFromPoint');
+    }
   });
 
   // ── 렌더링 ──────────────────────────────────────────────────────────────────
@@ -470,24 +526,6 @@ describe('FileList', () => {
   });
 
   describe('같은 패널 드래그 복사', () => {
-    const setContainerRect = () => {
-      const list = getListEl();
-      Object.defineProperty(list, 'getBoundingClientRect', {
-        configurable: true,
-        value: () => ({
-          left: 0,
-          top: 0,
-          right: 400,
-          bottom: 400,
-          width: 400,
-          height: 400,
-          x: 0,
-          y: 0,
-          toJSON: () => ({}),
-        }),
-      });
-    };
-
     it('같은 패널에서 폴더 위에 드롭하면 즉시 복사한다', async () => {
       render(
         <FileList
@@ -506,17 +544,7 @@ describe('FileList', () => {
         '[data-entry-path="/home/user/Documents"]'
       ) as HTMLElement;
 
-      Object.defineProperty(document, 'elementFromPoint', {
-        configurable: true,
-        value: vi.fn(() => targetRow),
-      });
-
-      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
-
-      await act(async () => {
-        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 40 }));
-        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 42, clientY: 42 }));
-      });
+      await performInternalDrag(sourceRow, targetRow);
 
       expect(targetRow.textContent).toContain('복사');
 
@@ -558,17 +586,7 @@ describe('FileList', () => {
         '[data-entry-path="/home/user/Project/Child"]'
       ) as HTMLElement;
 
-      Object.defineProperty(document, 'elementFromPoint', {
-        configurable: true,
-        value: vi.fn(() => targetRow),
-      });
-
-      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
-
-      await act(async () => {
-        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 44, clientY: 44 }));
-        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 46, clientY: 46 }));
-      });
+      await performInternalDrag(sourceRow, targetRow, { x: 20, y: 20 }, { x: 44, y: 44 });
 
       expect(targetRow.textContent).toContain('불가');
 

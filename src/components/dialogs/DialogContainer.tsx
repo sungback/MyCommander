@@ -421,6 +421,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">Create directory in: {activePanel.currentPath}</p>
         <input
           autoFocus
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
@@ -444,6 +447,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">Create file in: {activePanel.currentPath}</p>
         <input
           autoFocus
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
@@ -470,6 +476,9 @@ export const DialogContainer: React.FC = () => {
         </p>
         <input
           autoFocus
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
@@ -512,6 +521,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">Copy to:</p>
         <input
           autoFocus
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
@@ -540,6 +552,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">Move/Rename to:</p>
         <input
           autoFocus
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);

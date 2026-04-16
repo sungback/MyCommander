@@ -44,10 +44,7 @@ fn scan_directory(dir_path: &str) -> Result<HashMap<String, FileInfo>, String> {
         return Err(format!("{} is not a directory", dir_path));
     }
 
-    for entry in WalkDir::new(dir_path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         let abs_path_str = path.to_string_lossy().to_string();
 

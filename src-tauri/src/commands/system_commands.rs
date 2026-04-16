@@ -134,7 +134,7 @@ fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-    let disks = Disks::new_with_refreshed_list();
+        let disks = Disks::new_with_refreshed_list();
 
         disks
             .list()
@@ -142,7 +142,12 @@ fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
             .filter(|disk| resolved_path.starts_with(disk.mount_point()))
             .max_by_key(|disk| disk.mount_point().to_string_lossy().len())
             .map(|disk| disk.available_space())
-            .ok_or_else(|| format!("Could not find a mounted volume for {}", resolved_path.display()))
+            .ok_or_else(|| {
+                format!(
+                    "Could not find a mounted volume for {}",
+                    resolved_path.display()
+                )
+            })
     }
 }
 
@@ -209,12 +214,14 @@ pub async fn run_shell_command(path: String, command: String) -> Result<(), Stri
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn show_context_menu(
-    window: Window,
-    request: ShowContextMenuRequest,
-) -> Result<(), String> {
+pub fn show_context_menu(window: Window, request: ShowContextMenuRequest) -> Result<(), String> {
     let menu = if request.has_target_item {
-        build_target_context_menu(&window, request.can_rename, request.can_create_zip, request.can_extract_zip)?
+        build_target_context_menu(
+            &window,
+            request.can_rename,
+            request.can_create_zip,
+            request.can_extract_zip,
+        )?
     } else {
         build_background_context_menu(&window)?
     };
@@ -233,8 +240,14 @@ fn build_target_context_menu(
     can_create_zip: bool,
     can_extract_zip: bool,
 ) -> Result<Menu<tauri::Wry>, String> {
-    let info = MenuItem::with_id(window, CONTEXT_INFO_MENU_ITEM_ID, "속성", true, None::<&str>)
-        .map_err(|error| error.to_string())?;
+    let info = MenuItem::with_id(
+        window,
+        CONTEXT_INFO_MENU_ITEM_ID,
+        "속성",
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
     let reveal = MenuItem::with_id(
         window,
         CONTEXT_REVEAL_MENU_ITEM_ID,
@@ -283,11 +296,22 @@ fn build_target_context_menu(
         None::<&str>,
     )
     .map_err(|error| error.to_string())?;
-    let copy = MenuItem::with_id(window, CONTEXT_COPY_MENU_ITEM_ID, "복사", true, None::<&str>)
-        .map_err(|error| error.to_string())?;
-    let move_item =
-        MenuItem::with_id(window, CONTEXT_MOVE_MENU_ITEM_ID, "이동", true, None::<&str>)
-            .map_err(|error| error.to_string())?;
+    let copy = MenuItem::with_id(
+        window,
+        CONTEXT_COPY_MENU_ITEM_ID,
+        "복사",
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    let move_item = MenuItem::with_id(
+        window,
+        CONTEXT_MOVE_MENU_ITEM_ID,
+        "이동",
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
     let rename = MenuItem::with_id(
         window,
         CONTEXT_RENAME_MENU_ITEM_ID,
@@ -530,7 +554,8 @@ fn build_unix_drive_info(disk: &Disk) -> Option<DriveInfo> {
 
     let name = drive_name_for_mount(&mount_point, disk);
     let is_network = is_network_file_system(&file_system);
-    let is_disk_image = cfg!(target_os = "macos") && disk.is_read_only() && mount_point.starts_with("/Volumes/");
+    let is_disk_image =
+        cfg!(target_os = "macos") && disk.is_read_only() && mount_point.starts_with("/Volumes/");
 
     let (device_type, icon, is_ejectable) = if mount_point == "/" {
         ("system", "mac", false)
@@ -541,7 +566,11 @@ fn build_unix_drive_info(disk: &Disk) -> Option<DriveInfo> {
     } else if disk.is_removable() {
         ("external", "usb", true)
     } else {
-        ("volume", "drive", cfg!(target_os = "macos") && mount_point.starts_with("/Volumes/"))
+        (
+            "volume",
+            "drive",
+            cfg!(target_os = "macos") && mount_point.starts_with("/Volumes/"),
+        )
     };
 
     Some(DriveInfo {
@@ -610,7 +639,10 @@ fn resolve_existing_path(path: &Path) -> Result<PathBuf, String> {
         }
 
         candidate = candidate.parent().ok_or_else(|| {
-            format!("Could not resolve an existing volume path for {}", path.display())
+            format!(
+                "Could not resolve an existing volume path for {}",
+                path.display()
+            )
         })?;
     }
 }
@@ -756,7 +788,11 @@ fn open_in_terminal_for_path(path: &Path) -> Result<(), String> {
 
         let mut opened = false;
         for (program, args) in terminal_commands {
-            if let Ok(status) = Command::new(program).args(args).arg(&terminal_path).status() {
+            if let Ok(status) = Command::new(program)
+                .args(args)
+                .arg(&terminal_path)
+                .status()
+            {
                 if status.success() {
                     opened = true;
                     break;
@@ -839,7 +875,11 @@ fn run_shell_command_for_path(path: &Path, command: &str) -> Result<(), String> 
 
         let mut opened = false;
         for (program, args) in terminal_commands {
-            if let Ok(status) = Command::new(program).args(args).arg(&shell_command).status() {
+            if let Ok(status) = Command::new(program)
+                .args(args)
+                .arg(&shell_command)
+                .status()
+            {
                 if status.success() {
                     opened = true;
                     break;

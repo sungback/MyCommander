@@ -11,7 +11,7 @@ pub async fn start_native_drag<R: Runtime>(
     {
         use cocoa::appkit::NSPasteboard;
         use cocoa::base::nil;
-        use cocoa::foundation::{NSArray, NSURL, NSString};
+        use cocoa::foundation::{NSArray, NSString, NSURL};
         use objc::{msg_send, sel, sel_impl};
 
         unsafe {
@@ -20,13 +20,17 @@ pub async fn start_native_drag<R: Runtime>(
                 .filter_map(|p| {
                     let path_str = NSString::alloc(nil).init_str(p);
                     let url = NSURL::fileURLWithPath_(nil, path_str);
-                    if url == nil { None } else { Some(url) }
+                    if url == nil {
+                        None
+                    } else {
+                        Some(url)
+                    }
                 })
                 .collect::<Vec<_>>();
 
             if !urls.is_empty() {
                 let nspaths = NSArray::arrayWithObjects(nil, &urls);
-                
+
                 // 1. General Pasteboard
                 let gen_pb = NSPasteboard::generalPasteboard(nil);
                 if gen_pb != nil {

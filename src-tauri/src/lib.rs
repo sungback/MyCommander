@@ -26,15 +26,9 @@ const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
 
 fn get_panel_view_submenu<R: Runtime>(app: &AppHandle<R>, submenu_id: &str) -> Option<Submenu<R>> {
     let menu = app.menu()?;
-    let view_menu = menu
-        .get(VIEW_MENU_ID)?
-        .as_submenu()
-        .cloned()?;
+    let view_menu = menu.get(VIEW_MENU_ID)?.as_submenu().cloned()?;
 
-    view_menu
-        .get(submenu_id)?
-        .as_submenu()
-        .cloned()
+    view_menu.get(submenu_id)?.as_submenu().cloned()
 }
 
 fn set_panel_view_menu_checks<R: Runtime>(
@@ -68,7 +62,11 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         name: Some(pkg_info.name.clone()),
         version: Some(pkg_info.version.to_string()),
         copyright: config.bundle.copyright.clone(),
-        authors: config.bundle.publisher.clone().map(|publisher| vec![publisher]),
+        authors: config
+            .bundle
+            .publisher
+            .clone()
+            .map(|publisher| vec![publisher]),
         ..Default::default()
     };
 
@@ -171,13 +169,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ],
     )?;
 
-    let new_folder = MenuItem::with_id(
-        app,
-        NEW_FOLDER_MENU_ITEM_ID,
-        "새 폴더",
-        true,
-        Some("F7"),
-    )?;
+    let new_folder = MenuItem::with_id(app, NEW_FOLDER_MENU_ITEM_ID, "새 폴더", true, Some("F7"))?;
     let new_file = MenuItem::with_id(
         app,
         NEW_FILE_MENU_ITEM_ID,
@@ -220,7 +212,6 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[&folder_sync, &target_equals_source, &swap_panels],
     )?;
-
 
     Menu::with_items(
         app,
@@ -376,7 +367,10 @@ pub fn run() {
 
             if event_id == SHOW_HIDDEN_MENU_ITEM_ID {
                 if let Some(menu) = app.menu() {
-                    if let Some(view_menu) = menu.get(VIEW_MENU_ID).and_then(|item| item.as_submenu().cloned()) {
+                    if let Some(view_menu) = menu
+                        .get(VIEW_MENU_ID)
+                        .and_then(|item| item.as_submenu().cloned())
+                    {
                         if let Some(checked) = view_menu
                             .get(SHOW_HIDDEN_MENU_ITEM_ID)
                             .and_then(|item| item.as_check_menuitem().cloned())

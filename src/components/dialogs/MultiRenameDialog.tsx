@@ -101,6 +101,9 @@ export const MultiRenameDialog: React.FC = () => {
                 <span className="mb-1 block text-xs text-text-secondary">이름 마스크</span>
                 <input
                   autoFocus
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={nameMask}
                   onChange={(event) => {
                     setNameMask(event.target.value);
@@ -115,6 +118,9 @@ export const MultiRenameDialog: React.FC = () => {
               <label className="block text-sm">
                 <span className="mb-1 block text-xs text-text-secondary">확장자 마스크</span>
                 <input
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={extensionMask}
                   onChange={(event) => {
                     setExtensionMask(event.target.value);
@@ -130,6 +136,9 @@ export const MultiRenameDialog: React.FC = () => {
                 <label className="block text-sm">
                   <span className="mb-1 block text-xs text-text-secondary">찾을 문자열</span>
                   <input
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
@@ -138,6 +147,9 @@ export const MultiRenameDialog: React.FC = () => {
                 <label className="block text-sm">
                   <span className="mb-1 block text-xs text-text-secondary">바꿀 문자열</span>
                   <input
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={replaceText}
                     onChange={(event) => setReplaceText(event.target.value)}
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"

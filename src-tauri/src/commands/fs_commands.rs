@@ -1,8 +1,8 @@
-use std::fs;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use std::time::UNIX_EPOCH;
 use tauri::Emitter;
 
@@ -89,8 +89,12 @@ pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
                     "file".to_string()
                 };
 
-                let size = if meta.is_dir() { None } else { Some(meta.len()) };
-                
+                let size = if meta.is_dir() {
+                    None
+                } else {
+                    Some(meta.len())
+                };
+
                 let last_modified = meta
                     .modified()
                     .ok()
@@ -159,7 +163,9 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_file(path: String) -> Result<(), String> {
-    fs::File::create(&path).map(|_| ()).map_err(|e| e.to_string())
+    fs::File::create(&path)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -194,7 +200,11 @@ pub async fn apply_batch_rename(operations: Vec<BatchRenameOperation>) -> Result
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn copy_files(app: tauri::AppHandle, source_paths: Vec<String>, target_path: String) -> Result<(), String> {
+pub async fn copy_files(
+    app: tauri::AppHandle,
+    source_paths: Vec<String>,
+    target_path: String,
+) -> Result<(), String> {
     let total = source_paths.len();
     tokio::task::spawn_blocking(move || {
         if source_paths.is_empty() {
@@ -206,12 +216,15 @@ pub async fn copy_files(app: tauri::AppHandle, source_paths: Vec<String>, target
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source_paths[0].clone());
-            let _ = app.emit("fs-progress", ProgressPayload {
-                operation: "copy".to_string(),
-                current: 1,
-                total,
-                current_file: file_name,
-            });
+            let _ = app.emit(
+                "fs-progress",
+                ProgressPayload {
+                    operation: "copy".to_string(),
+                    current: 1,
+                    total,
+                    current_file: file_name,
+                },
+            );
             return copy_single_path(Path::new(&source_paths[0]), &target_path);
         }
 
@@ -226,12 +239,15 @@ pub async fn copy_files(app: tauri::AppHandle, source_paths: Vec<String>, target
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source.clone());
-            let _ = app.emit("fs-progress", ProgressPayload {
-                operation: "copy".to_string(),
-                current: i + 1,
-                total,
-                current_file: file_name,
-            });
+            let _ = app.emit(
+                "fs-progress",
+                ProgressPayload {
+                    operation: "copy".to_string(),
+                    current: i + 1,
+                    total,
+                    current_file: file_name,
+                },
+            );
             copy_path_into_dir(Path::new(source), target_root)?;
         }
         Ok(())
@@ -241,18 +257,25 @@ pub async fn copy_files(app: tauri::AppHandle, source_paths: Vec<String>, target
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn move_files(app: tauri::AppHandle, source_paths: Vec<String>, target_dir: String) -> Result<(), String> {
+pub async fn move_files(
+    app: tauri::AppHandle,
+    source_paths: Vec<String>,
+    target_dir: String,
+) -> Result<(), String> {
     let total = source_paths.len();
     for (i, path) in source_paths.iter().enumerate() {
         let src = Path::new(path);
         if let Some(file_name) = src.file_name() {
             let file_name_str = file_name.to_string_lossy().to_string();
-            let _ = app.emit("fs-progress", ProgressPayload {
-                operation: "move".to_string(),
-                current: i + 1,
-                total,
-                current_file: file_name_str,
-            });
+            let _ = app.emit(
+                "fs-progress",
+                ProgressPayload {
+                    operation: "move".to_string(),
+                    current: i + 1,
+                    total,
+                    current_file: file_name_str,
+                },
+            );
             let dest = Path::new(&target_dir).join(file_name);
             fs::rename(src, dest).map_err(|e| e.to_string())?;
         }
@@ -291,11 +314,13 @@ pub async fn create_zip_from_paths(
 pub async fn read_file_content(path: String) -> Result<String, String> {
     use std::io::Read;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
-    
+
     // Read only first 100KB to prevent UI lag on huge files
     let mut buffer = String::new();
-    file.take(100 * 1024).read_to_string(&mut buffer).map_err(|e| e.to_string())?;
-    
+    file.take(100 * 1024)
+        .read_to_string(&mut buffer)
+        .map_err(|e| e.to_string())?;
+
     Ok(buffer)
 }
 
@@ -377,7 +402,10 @@ fn extract_zip_archive(path: &str) -> Result<String, String> {
 
     if !status.success() {
         let _ = fs::remove_dir_all(&target_dir);
-        return Err(format!("Failed to extract archive into {}", target_dir.display()));
+        return Err(format!(
+            "Failed to extract archive into {}",
+            target_dir.display()
+        ));
     }
     Ok(target_dir.to_string_lossy().to_string())
 }
@@ -423,16 +451,22 @@ fn create_zip_archive(path: &str) -> Result<String, String> {
 
     if !status.success() {
         let _ = fs::remove_file(&archive_path);
-        return Err(format!("Failed to create archive at {}", archive_path.display()));
+        return Err(format!(
+            "Failed to create archive at {}",
+            archive_path.display()
+        ));
     }
 
     Ok(archive_path.to_string_lossy().to_string())
 }
 
 fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
-    let parent_dir = archive_path
-        .parent()
-        .ok_or_else(|| format!("Could not find parent directory for {}", archive_path.display()))?;
+    let parent_dir = archive_path.parent().ok_or_else(|| {
+        format!(
+            "Could not find parent directory for {}",
+            archive_path.display()
+        )
+    })?;
     let stem = archive_path
         .file_stem()
         .and_then(|name| name.to_str())
@@ -458,9 +492,12 @@ fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
 }
 
 fn get_unique_archive_path(source_dir: &Path) -> Result<PathBuf, String> {
-    let parent_dir = source_dir
-        .parent()
-        .ok_or_else(|| format!("Could not find parent directory for {}", source_dir.display()))?;
+    let parent_dir = source_dir.parent().ok_or_else(|| {
+        format!(
+            "Could not find parent directory for {}",
+            source_dir.display()
+        )
+    })?;
     let stem = source_dir
         .file_name()
         .and_then(|name| name.to_str())
@@ -511,7 +548,11 @@ fn create_zip_archive_from_paths(
     }
 
     let target_dir_path = Path::new(target_dir);
-    let stem = if archive_name.is_empty() { "Archive" } else { archive_name };
+    let stem = if archive_name.is_empty() {
+        "Archive"
+    } else {
+        archive_name
+    };
     let archive_path = get_unique_archive_path_named(target_dir_path, stem)?;
 
     // Collect only the file/folder names (relative to target_dir) that exist
@@ -547,7 +588,15 @@ fn create_zip_archive_from_paths(
     let status = {
         let paths_ps = item_names
             .iter()
-            .map(|n| format!("'{}'", target_dir_path.join(n).to_string_lossy().replace('\'', "''")))
+            .map(|n| {
+                format!(
+                    "'{}'",
+                    target_dir_path
+                        .join(n)
+                        .to_string_lossy()
+                        .replace('\'', "''")
+                )
+            })
             .collect::<Vec<_>>()
             .join(",");
         let dest = archive_path.to_string_lossy();
@@ -563,7 +612,10 @@ fn create_zip_archive_from_paths(
 
     if !status.success() {
         let _ = fs::remove_file(&archive_path);
-        return Err(format!("Failed to create archive at {}", archive_path.display()));
+        return Err(format!(
+            "Failed to create archive at {}",
+            archive_path.display()
+        ));
     }
 
     Ok(archive_path.to_string_lossy().to_string())
@@ -590,7 +642,10 @@ fn apply_batch_rename_operations(operations: Vec<BatchRenameOperation>) -> Resul
         let new_path = Path::new(&operation.new_path);
 
         if !old_path.exists() {
-            return Err(format!("Source path does not exist: {}", old_path.display()));
+            return Err(format!(
+                "Source path does not exist: {}",
+                old_path.display()
+            ));
         }
 
         if !new_paths.insert(new_path.to_path_buf()) {
@@ -742,7 +797,10 @@ fn collapse_nested_paths(paths: Vec<String>) -> Vec<PathBuf> {
     });
 
     for candidate in candidates {
-        if collapsed.iter().any(|existing| candidate == *existing || candidate.starts_with(existing)) {
+        if collapsed
+            .iter()
+            .any(|existing| candidate == *existing || candidate.starts_with(existing))
+        {
             continue;
         }
 
@@ -775,7 +833,10 @@ fn copy_single_path(source: &Path, target_path: &str) -> Result<(), String> {
         return copy_path_into_dir(source, target);
     }
 
-    if target_path.ends_with(std::path::MAIN_SEPARATOR) || target_path.ends_with('/') || target_path.ends_with('\\') {
+    if target_path.ends_with(std::path::MAIN_SEPARATOR)
+        || target_path.ends_with('/')
+        || target_path.ends_with('\\')
+    {
         fs::create_dir_all(target).map_err(|e| e.to_string())?;
         return copy_path_into_dir(source, target);
     }
@@ -838,9 +899,7 @@ fn copy_directory_recursive(source: &Path, destination: &Path) -> Result<(), Str
     for entry in WalkDir::new(source) {
         let entry = entry.map_err(|e| e.to_string())?;
         let entry_path = entry.path();
-        let relative_path = entry_path
-            .strip_prefix(source)
-            .map_err(|e| e.to_string())?;
+        let relative_path = entry_path.strip_prefix(source).map_err(|e| e.to_string())?;
 
         if relative_path.as_os_str().is_empty() {
             continue;
@@ -887,9 +946,9 @@ fn normalize_target_path(path: &Path) -> Result<PathBuf, String> {
             .file_name()
             .ok_or_else(|| format!("Could not resolve destination path {}", path.display()))?;
         suffix.push(name.to_os_string());
-        existing_ancestor = existing_ancestor.parent().ok_or_else(|| {
-            format!("Could not resolve destination path {}", path.display())
-        })?;
+        existing_ancestor = existing_ancestor
+            .parent()
+            .ok_or_else(|| format!("Could not resolve destination path {}", path.display()))?;
     }
 
     let mut resolved = existing_ancestor
@@ -949,22 +1008,14 @@ mod tests {
 
     #[test]
     fn collapse_nested_removes_children() {
-        let paths = vec![
-            "/a".to_string(),
-            "/a/b".to_string(),
-            "/a/b/c".to_string(),
-        ];
+        let paths = vec!["/a".to_string(), "/a/b".to_string(), "/a/b/c".to_string()];
         let result = collapse_nested_paths(paths);
         assert_eq!(result, vec![PathBuf::from("/a")]);
     }
 
     #[test]
     fn collapse_nested_keeps_siblings() {
-        let paths = vec![
-            "/a".to_string(),
-            "/b".to_string(),
-            "/c".to_string(),
-        ];
+        let paths = vec!["/a".to_string(), "/b".to_string(), "/c".to_string()];
         let result = collapse_nested_paths(paths);
         assert_eq!(result.len(), 3);
     }
@@ -972,20 +1023,14 @@ mod tests {
     #[test]
     fn collapse_nested_handles_overlapping_prefixes() {
         // /app should NOT collapse /a/b because /app does not start with /a/
-        let paths = vec![
-            "/a".to_string(),
-            "/app".to_string(),
-        ];
+        let paths = vec!["/a".to_string(), "/app".to_string()];
         let result = collapse_nested_paths(paths);
         assert_eq!(result.len(), 2);
     }
 
     #[test]
     fn collapse_nested_removes_exact_duplicate() {
-        let paths = vec![
-            "/a/b".to_string(),
-            "/a/b".to_string(),
-        ];
+        let paths = vec!["/a/b".to_string(), "/a/b".to_string()];
         let result = collapse_nested_paths(paths);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], PathBuf::from("/a/b"));

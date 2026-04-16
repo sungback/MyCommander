@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Resizable } from "re-resizable";
 import { useDialogStore } from "../../store/dialogStore";
 import { getErrorMessage, SearchResult, useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import { isAbsolutePath, joinPath } from "../../utils/path";
 import { File, Folder } from "lucide-react";
+
+const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
+const DEFAULT_DIALOG_SIZE = { width: 700, height: 560 };
 
 export const SearchPreviewDialogs: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -21,12 +25,20 @@ export const SearchPreviewDialogs: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedSearchPaths, setSelectedSearchPaths] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState("");
   const [isDeletingSearchResults, setIsDeletingSearchResults] = useState(false);
   const [searchOperation, setSearchOperation] = useState<"copy" | "move" | null>(null);
   const [searchOperationTarget, setSearchOperationTarget] = useState("");
   const [isApplyingSearchOperation, setIsApplyingSearchOperation] = useState(false);
   const [searchOperationError, setSearchOperationError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [dialogSize, setDialogSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem(SEARCH_DIALOG_SIZE_KEY);
+      if (saved) return JSON.parse(saved) as { width: number; height: number };
+    } catch { /* ignore */ }
+    return DEFAULT_DIALOG_SIZE;
+  });
 
 
   useEffect(() => {
@@ -37,6 +49,7 @@ export const SearchPreviewDialogs: React.FC = () => {
       setSearchOperation(null);
       setSearchOperationTarget("");
       setSearchOperationError(null);
+      setSearchProgress("");
     }
   }, [openDialog]);
 
@@ -46,14 +59,27 @@ export const SearchPreviewDialogs: React.FC = () => {
     setSearchResults([]);
     setSelectedSearchPaths(new Set());
     setSearchError(null);
+    setSearchProgress("");
     try {
-      const results = await fs.searchFiles(activePanel.currentPath, searchQuery, false);
-      setSearchResults(results);
+      await fs.searchFiles(activePanel.currentPath, searchQuery, false, (event) => {
+        if (event.type === "ResultBatch") {
+          setSearchResults((current) => [...current, ...event.payload]);
+        } else if (event.type === "Progress") {
+          setSearchProgress(event.payload.current_dir);
+        } else if (event.type === "Finished") {
+          setIsSearching(false);
+          setSearchProgress("");
+        } else if (event.type === "Error") {
+          setSearchError(event.payload);
+          setIsSearching(false);
+          setSearchProgress("");
+        }
+      });
     } catch (e) {
       console.error(e);
       setSearchError(getErrorMessage(e, "Search failed."));
-    } finally {
       setIsSearching(false);
+      setSearchProgress("");
     }
   };
 
@@ -212,12 +238,43 @@ export const SearchPreviewDialogs: React.FC = () => {
       <Dialog.Root open={openDialog === "search"} onOpenChange={(open) => !open && closeDialog()}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[600px] h-[400px] z-50 p-4 flex flex-col focus:outline-none text-text-primary">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 focus:outline-none">
+            <Resizable
+              size={dialogSize}
+              minWidth={480}
+              minHeight={380}
+              maxWidth={Math.round(window.innerWidth * 0.95)}
+              maxHeight={Math.round(window.innerHeight * 0.92)}
+              enable={{ right: true, bottom: true, bottomRight: true, left: false, top: false, topLeft: false, topRight: false, bottomLeft: false }}
+              onResizeStop={(_e, _dir, _ref, d) => {
+                const newSize = {
+                  width: dialogSize.width + d.width,
+                  height: dialogSize.height + d.height,
+                };
+                setDialogSize(newSize);
+                try { localStorage.setItem(SEARCH_DIALOG_SIZE_KEY, JSON.stringify(newSize)); } catch { /* ignore */ }
+              }}
+              handleComponent={{
+                bottomRight: (
+                  <div className="absolute bottom-1 right-1 w-3 h-3 opacity-40 hover:opacity-90 transition-opacity">
+                    <svg viewBox="0 0 8 8" fill="currentColor" className="text-text-secondary w-full h-full">
+                      <circle cx="6" cy="6" r="1"/><circle cx="3" cy="6" r="1"/><circle cx="6" cy="3" r="1"/>
+                    </svg>
+                  </div>
+                ),
+              }}
+              className="bg-bg-panel border border-border-color rounded shadow-xl text-text-primary overflow-hidden"
+              style={{ display: "flex", flexDirection: "column" }}
+            >
+            <div className="p-4 flex flex-col h-full overflow-hidden">
             <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-2">
               Search in {activePanel.currentPath}
             </Dialog.Title>
             <div className="flex gap-2 mb-4">
               <input
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -233,6 +290,11 @@ export const SearchPreviewDialogs: React.FC = () => {
                 {isSearching ? "Searching..." : "Search"}
               </button>
             </div>
+            {isSearching && searchProgress && (
+              <div className="text-[11px] text-text-secondary truncate mb-2 px-1">
+                Scanning: {searchProgress}
+              </div>
+            )}
 
             <div className="mb-2 flex items-center justify-between text-xs text-text-secondary">
               <span>{selectedSearchPaths.size} selected</span>
@@ -314,6 +376,8 @@ export const SearchPreviewDialogs: React.FC = () => {
                 Close
               </button>
             </div>
+            </div>
+            </Resizable>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -340,6 +404,9 @@ export const SearchPreviewDialogs: React.FC = () => {
                 </p>
                 <input
                   autoFocus
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={searchOperationTarget}
                   onChange={(event) => {
                     setSearchOperationTarget(event.target.value);

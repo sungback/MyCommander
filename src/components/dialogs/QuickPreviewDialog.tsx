@@ -206,6 +206,9 @@ const escapeHtml = (s: string): string =>
 const ansiToHtml = (s: string): string =>
   escapeHtml(s).replace(/\x1b\[[0-9;]*m/g, "");
 
+const MAX_NOTEBOOK_CELLS = 100;
+const MAX_OUTPUT_BYTES = 50 * 1024; // 50KB per cell output
+
 const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
   const isDark = getAppTheme() === "dark";
   const bg = isDark ? "#0d1117" : "#ffffff";
@@ -228,8 +231,12 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
   const lang = nb.metadata?.kernelspec?.language ?? "python";
   const hljsLang = EXT_TO_LANG[lang] ?? lang;
 
+  const totalCells = nb.cells.length;
+  const truncatedCells = nb.cells.slice(0, MAX_NOTEBOOK_CELLS);
+  const isTruncated = totalCells > MAX_NOTEBOOK_CELLS;
+
   const cellsHtml = await Promise.all(
-    nb.cells.map(async (cell) => {
+    truncatedCells.map(async (cell) => {
       const src = joinSource(cell.source);
 
       if (cell.cell_type === "markdown") {
@@ -247,7 +254,10 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
         const outputsHtml = (cell.outputs ?? []).map((out) => {
           if (out.output_type === "stream") {
             const text = joinSource(out.text ?? "");
-            return `<div class="output output-stream">${ansiToHtml(text)}</div>`;
+            const trimmed = text.length > MAX_OUTPUT_BYTES
+              ? text.slice(0, MAX_OUTPUT_BYTES) + "\n… (출력이 너무 커서 잘렸습니다)"
+              : text;
+            return `<div class="output output-stream">${ansiToHtml(trimmed)}</div>`;
           }
           if (out.output_type === "error") {
             const tb = (out.traceback ?? []).map(ansiToHtml).join("\n");
@@ -350,7 +360,7 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
   ${codeTheme}
 </style>
 </head>
-<body>${cellsHtml.join("\n")}</body>
+<body>${cellsHtml.join("\n")}${isTruncated ? `<div style="padding:10px 16px;font-size:12px;color:${isDark ? "#6e7681" : "#9ca3af"};border-top:1px solid ${isDark ? "#21262d" : "#e1e4e8"};margin-top:8px">처음 ${MAX_NOTEBOOK_CELLS}개 셀만 표시됩니다 (전체 ${totalCells}개)</div>` : ""}</body>
 </html>`;
 };
 
@@ -701,7 +711,18 @@ export const QuickPreviewDialog: React.FC = () => {
       }
 
       if (NOTEBOOK_EXTENSIONS.has(ext)) {
-        const content = await invoke<string>("read_file_content", { path });
+        const url = convertFileSrc(path);
+        const res = await fetch(url);
+        const contentLength = res.headers.get("content-length");
+        if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
+          setPreview({ type: "error", error: "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다." });
+          return;
+        }
+        const content = await res.text();
+        if (content.length > 5 * 1024 * 1024) {
+          setPreview({ type: "error", error: "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다." });
+          return;
+        }
         const renderedHtml = await buildNotebookHtml(content);
         setPreview({ type: "rendered", content, renderedHtml, renderExt: "ipynb" });
         return;

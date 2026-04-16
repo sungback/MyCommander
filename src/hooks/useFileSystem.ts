@@ -19,6 +19,12 @@ export interface SearchResult {
   is_dir: boolean;
 }
 
+export type SearchEvent =
+  | { type: "ResultBatch"; payload: SearchResult[] }
+  | { type: "Progress"; payload: { current_dir: string } }
+  | { type: "Finished"; payload: { total_matches: number } }
+  | { type: "Error"; payload: string };
+
 const fileSystem = {
   getDrives: async (): Promise<DriveInfo[]> => {
     try {
@@ -145,11 +151,23 @@ const fileSystem = {
     });
   },
 
-  searchFiles: async (startPath: string, query: string, useRegex: boolean = false): Promise<SearchResult[]> => {
-    return await invoke<SearchResult[]>("search_files", {
+
+
+  searchFiles: async (
+    startPath: string, 
+    query: string, 
+    useRegex: boolean,
+    onEvent: (event: SearchEvent) => void
+  ): Promise<void> => {
+    const { Channel } = await import("@tauri-apps/api/core");
+    const channel = new Channel<SearchEvent>();
+    channel.onmessage = onEvent;
+    
+    await invoke("search_files", {
       start_path: startPath,
       query,
       use_regex: useRegex,
+      on_event: channel,
     });
   },
 

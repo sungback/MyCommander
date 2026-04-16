@@ -178,6 +178,9 @@ export const SyncDialog: React.FC = () => {
                   <label className="text-xs text-text-secondary block mb-2">Left Directory</label>
                   <input
                     type="text"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={leftPath}
                     onChange={(e) => setLeftPath(e.target.value)}
                     className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color"
@@ -187,6 +190,9 @@ export const SyncDialog: React.FC = () => {
                   <label className="text-xs text-text-secondary block mb-2">Right Directory</label>
                   <input
                     type="text"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={rightPath}
                     onChange={(e) => setRightPath(e.target.value)}
                     className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color"

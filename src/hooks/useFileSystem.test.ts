@@ -1,12 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('@tauri-apps/api/core', () => ({
+  Channel: class MockChannel<T> {
+    onmessage?: (message: T) => void;
+  },
   invoke: vi.fn(),
 }));
 
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystem, getErrorMessage } from './useFileSystem';
-import { mockFiles, mockDrives, mockSearchResults } from '../test/mocks/tauri';
+import { mockFiles, mockDrives } from '../test/mocks/tauri';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -290,24 +293,50 @@ describe('useFileSystem', () => {
 
   // ─── searchFiles ───────────────────────────────────────────────────────────
   describe('searchFiles', () => {
-    it('returns search results for a query', async () => {
-      mockInvoke.mockResolvedValueOnce(mockSearchResults);
-      const result = await useFileSystem().searchFiles('/home/user', 'notes');
+    it('invokes search_files with snake_case args and a channel', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      const onEvent = vi.fn();
+
+      await useFileSystem().searchFiles('/home/user', 'notes', false, onEvent);
+
       expect(mockInvoke).toHaveBeenCalledWith('search_files', {
         start_path: '/home/user',
         query: 'notes',
         use_regex: false,
+        on_event: expect.objectContaining({ onmessage: onEvent }),
       });
-      expect(result).toEqual(mockSearchResults);
+    });
+
+    it('wires the channel message handler to the provided callback', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      const onEvent = vi.fn();
+
+      await useFileSystem().searchFiles('/home/user', 'notes', false, onEvent);
+
+      const [, args] = mockInvoke.mock.calls[0];
+      const event = {
+        type: 'Finished' as const,
+        payload: { total_matches: 1 },
+      };
+
+      (
+        args as { on_event: { onmessage?: (message: typeof event) => void } }
+      ).on_event.onmessage?.(event);
+
+      expect(onEvent).toHaveBeenCalledWith(event);
     });
 
     it('passes use_regex=true when specified', async () => {
-      mockInvoke.mockResolvedValueOnce([]);
-      await useFileSystem().searchFiles('/home/user', '.*\\.txt', true);
+      mockInvoke.mockResolvedValueOnce(undefined);
+      const onEvent = vi.fn();
+
+      await useFileSystem().searchFiles('/home/user', '.*\\.txt', true, onEvent);
+
       expect(mockInvoke).toHaveBeenCalledWith('search_files', {
         start_path: '/home/user',
         query: '.*\\.txt',
         use_regex: true,
+        on_event: expect.objectContaining({ onmessage: onEvent }),
       });
     });
   });
