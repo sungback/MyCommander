@@ -75,12 +75,17 @@ vi.mock('../../store/panelStore', () => ({
       sizeCache: {},
       dragInfo: mockPanelState.dragInfo,
       setDragInfo: mockSetDragInfo,
+      leftPanel: { tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab1' },
+      rightPanel: { tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab2' },
     }), {
       getState: () => ({
         dragInfo: mockPanelState.dragInfo,
         setActivePanel: mockSetActivePanel,
+        leftPanel: { tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab1' },
+        rightPanel: { tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab2' },
       }),
     }),
+  sortEntries: (entries: any[]) => entries,
 }));
 
 // ── react-virtual mock (예측 가능한 렌더링) ──────────────────────────────────
