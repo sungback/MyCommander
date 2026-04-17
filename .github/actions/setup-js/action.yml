@@ -4,9 +4,6 @@ description: Checkout the repository and install JavaScript dependencies.
 runs:
   using: composite
   steps:
-    - name: 저장소 체크아웃
-      uses: actions/checkout@v4
-
     - name: Node.js 설치
       uses: actions/setup-node@v4
       with:

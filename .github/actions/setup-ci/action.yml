@@ -14,8 +14,15 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: 공통 JS 환경 준비
-      uses: ./.github/actions/setup-js
+    - name: Node.js 설치
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: "npm"
+
+    - name: 의존성 설치
+      shell: bash
+      run: npm ci
 
     - name: Rust 설치
       if: ${{ inputs.install_rust == 'true' }}
