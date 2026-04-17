@@ -19,7 +19,6 @@ pub enum SearchEvent {
     ResultBatch(Vec<SearchResult>),
     Progress { current_dir: String },
     Finished { total_matches: usize },
-    Error(String),
 }
 
 fn matches_query(

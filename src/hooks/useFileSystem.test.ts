@@ -176,12 +176,24 @@ describe('useFileSystem', () => {
   // ─── copyFiles ─────────────────────────────────────────────────────────────
   describe('copyFiles', () => {
     it('invokes copy_files with source paths and target', async () => {
-      mockInvoke.mockResolvedValueOnce(undefined);
+      mockInvoke.mockResolvedValueOnce([]);
       await useFileSystem().copyFiles(['/home/user/a.txt', '/home/user/b.txt'], '/home/user/dest');
       expect(mockInvoke).toHaveBeenCalledWith('copy_files', {
         source_paths: ['/home/user/a.txt', '/home/user/b.txt'],
         target_path: '/home/user/dest',
+        keep_both: false,
       });
+    });
+
+    it('invokes copy_files with keep_both=true when specified', async () => {
+      mockInvoke.mockResolvedValueOnce(['a copy.txt']);
+      const result = await useFileSystem().copyFiles(['/home/user/a.txt'], '/home/user/dest', true);
+      expect(mockInvoke).toHaveBeenCalledWith('copy_files', {
+        source_paths: ['/home/user/a.txt'],
+        target_path: '/home/user/dest',
+        keep_both: true,
+      });
+      expect(result).toEqual(['a copy.txt']);
     });
   });
 
@@ -337,6 +349,19 @@ describe('useFileSystem', () => {
         query: '.*\\.txt',
         use_regex: true,
         on_event: expect.objectContaining({ onmessage: onEvent }),
+      });
+    });
+  });
+
+  // ─── syncWatchedDirectories ────────────────────────────────────────────────
+  describe('syncWatchedDirectories', () => {
+    it('invokes sync_watched_directories with path list', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await useFileSystem().syncWatchedDirectories(['/Users/back/Documents', '/Users/back/Desktop']);
+
+      expect(mockInvoke).toHaveBeenCalledWith('sync_watched_directories', {
+        paths: ['/Users/back/Documents', '/Users/back/Desktop'],
       });
     });
   });

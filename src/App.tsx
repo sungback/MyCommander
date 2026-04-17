@@ -17,6 +17,7 @@ import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { buildMultiRenameSession } from "./features/multiRename";
 import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
+import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
 
 type PanelId = "left" | "right";
 
@@ -71,6 +72,7 @@ function App() {
   
   // Initialize global shortcuts
   useKeyboard();
+  useDirectoryWatch();
 
   // Global Keyboard listener for Tab
   useEffect(() => {

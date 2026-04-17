@@ -32,6 +32,74 @@ export function isAbsolutePath(path: string): boolean {
   return /^([A-Z]:[\\/]|\/|\\\\)/i.test(path);
 }
 
+export function getPathDirectoryName(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "") || path;
+
+  if (normalized === "/") {
+    return "/";
+  }
+
+  if (/^[A-Z]:$/i.test(normalized)) {
+    return `${normalized}\\`;
+  }
+
+  const slashIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+
+  if (slashIndex < 0) {
+    return "";
+  }
+
+  if (slashIndex === 0) {
+    return normalized.startsWith("\\\\") ? normalized : "/";
+  }
+
+  const parentPath = normalized.slice(0, slashIndex);
+  if (/^[A-Z]:$/i.test(parentPath)) {
+    return `${parentPath}\\`;
+  }
+
+  return parentPath;
+}
+
+export function normalizePathForComparison(path: string): string {
+  const normalized = path.normalize("NFC").replace(/\\/g, "/");
+  const driveRootMatch = normalized.match(/^([A-Z]:)\/?$/i);
+
+  if (driveRootMatch) {
+    return `${driveRootMatch[1].toLowerCase()}/`;
+  }
+
+  if (normalized === "/") {
+    return "/";
+  }
+
+  const withoutTrailingSeparators =
+    normalized.length > 1 ? normalized.replace(/\/+$/, "") : normalized;
+
+  if (/^[A-Z]:\//i.test(withoutTrailingSeparators) || withoutTrailingSeparators.startsWith("//")) {
+    return withoutTrailingSeparators.toLowerCase();
+  }
+
+  return withoutTrailingSeparators;
+}
+
+export function arePathsEquivalent(left: string, right: string): boolean {
+  return normalizePathForComparison(left) === normalizePathForComparison(right);
+}
+
+export function isSameOrNestedPath(basePath: string, targetPath: string): boolean {
+  const normalizedBase = normalizePathForComparison(basePath);
+  const normalizedTarget = normalizePathForComparison(targetPath);
+  const nestedPrefix = normalizedBase.endsWith("/")
+    ? normalizedBase
+    : `${normalizedBase}/`;
+
+  return (
+    normalizedTarget === normalizedBase ||
+    normalizedTarget.startsWith(nestedPrefix)
+  );
+}
+
 export interface BreadcrumbPart {
   label: string;
   path: string;

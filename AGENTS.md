@@ -12,15 +12,14 @@ This file applies to the entire repository.
 
 ## Required First Steps
 
-- Read [`CLAUDE.md`](/Users/sungback/Documents/MyCommander/CLAUDE.md) before making project-level assumptions.
-- Before answering codebase questions or making architectural assumptions, run:
-  - `mindvault query "<question>" --global`
-- Use raw file reads only when MindVault returns no useful context.
+- Read [`CLAUDE.md`](./CLAUDE.md) before making project-level assumptions.
+- Before answering codebase questions or making architectural assumptions, inspect the relevant repository files directly.
 
 ## Working Style
 
 - Keep changes focused and local to the feature or bug being addressed.
 - Prefer matching the existing code style and file placement instead of introducing new patterns.
+- Keep `README.md` user-facing, `CLAUDE.md` implementation-facing, and `AGENTS.md` workflow-facing.
 - Use Tailwind utility classes for styling in the frontend.
 - Use Zustand for shared frontend state.
 - Add new Tauri commands under `src-tauri/src/commands/` and register them in `src-tauri/src/lib.rs`.

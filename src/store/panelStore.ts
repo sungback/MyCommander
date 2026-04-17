@@ -18,6 +18,12 @@ export interface DragInfo {
   sourcePanel: PanelId;
 }
 
+export interface ClipboardState {
+  paths: string[];
+  operation: "copy" | "cut";
+  sourcePanel: PanelId;
+}
+
 interface AppState {
   leftPanel: PanelState;
   rightPanel: PanelState;
@@ -47,6 +53,9 @@ interface AppState {
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   dragInfo: DragInfo | null;
   setDragInfo: (info: DragInfo | null) => void;
+  clipboard: ClipboardState | null;
+  setClipboard: (state: ClipboardState) => void;
+  clearClipboard: () => void;
   swapPanels: () => void;
 }
 
@@ -479,8 +488,11 @@ export const usePanelStore = create<AppState>((set) => {
     themePreference: persistedPanelState.themePreference ?? "auto",
     panelViewModes,
     dragInfo: null,
+    clipboard: null,
 
     setDragInfo: (dragInfo) => set({ dragInfo }),
+    setClipboard: (clipboard) => set({ clipboard }),
+    clearClipboard: () => set({ clipboard: null }),
 
     swapPanels: () =>
       set((state) => {

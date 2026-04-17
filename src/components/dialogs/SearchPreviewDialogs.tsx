@@ -4,7 +4,15 @@ import { Resizable } from "re-resizable";
 import { useDialogStore } from "../../store/dialogStore";
 import { getErrorMessage, SearchResult, useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
-import { isAbsolutePath, joinPath } from "../../utils/path";
+import {
+  getPathDirectoryName,
+  isAbsolutePath,
+  joinPath,
+} from "../../utils/path";
+import {
+  refreshPanelsForDirectories,
+  refreshPanelsForEntryPaths,
+} from "../../store/panelRefresh";
 import { File, Folder } from "lucide-react";
 
 const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
@@ -17,7 +25,6 @@ export const SearchPreviewDialogs: React.FC = () => {
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
-  const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
 
@@ -67,10 +74,6 @@ export const SearchPreviewDialogs: React.FC = () => {
         } else if (event.type === "Progress") {
           setSearchProgress(event.payload.current_dir);
         } else if (event.type === "Finished") {
-          setIsSearching(false);
-          setSearchProgress("");
-        } else if (event.type === "Error") {
-          setSearchError(event.payload);
           setIsSearching(false);
           setSearchProgress("");
         }
@@ -172,7 +175,7 @@ export const SearchPreviewDialogs: React.FC = () => {
 
       removeResultsFromList(selectedResults);
       setSelectedSearchPaths(new Set());
-      refreshPanel(activePanelId);
+      refreshPanelsForEntryPaths(selectedResults.map((result) => result.path));
     } catch (error) {
       console.error(error);
       setSearchError(getErrorMessage(error, "Failed to delete selected search results."));
@@ -214,8 +217,10 @@ export const SearchPreviewDialogs: React.FC = () => {
         setSelectedSearchPaths(new Set());
       }
 
-      refreshPanel(activePanelId);
-      refreshPanel(activePanelId === "left" ? "right" : "left");
+      refreshPanelsForDirectories([
+        resolvedTarget,
+        ...selectedResults.map((result) => getPathDirectoryName(result.path)),
+      ]);
       closeSearchOperationDialog();
     } catch (error) {
       console.error(error);

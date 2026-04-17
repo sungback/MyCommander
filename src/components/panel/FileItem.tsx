@@ -47,6 +47,7 @@ interface FileItemProps {
   isCursor?: boolean;
   isActivePanel?: boolean;
   isDragSource?: boolean;
+  isCut?: boolean;
   dropHint?: "copy" | "blocked" | null;
   viewMode?: ViewMode;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -63,6 +64,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   isCursor,
   isActivePanel,
   isDragSource = false,
+  isCut = false,
   dropHint = null,
   viewMode = "detailed",
   onClick,
@@ -103,6 +105,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           "text-error-color/80": isSelected && isCursor,
           "opacity-60": isHidden && !isSelected,
           "opacity-55": isDragSource,
+          "opacity-40": isCut,
           "bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/70": dropHint === "copy",
           "bg-red-500/8 ring-1 ring-inset ring-red-400/70": dropHint === "blocked",
         }

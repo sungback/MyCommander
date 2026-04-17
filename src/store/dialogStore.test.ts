@@ -10,6 +10,7 @@ describe("dialogStore — initial state", () => {
     const state = useDialogStore.getState();
     expect(state.openDialog).toBeNull();
     expect(state.dialogTarget).toBeNull();
+    expect(state.dragCopyRequest).toBeNull();
   });
 });
 
@@ -61,5 +62,40 @@ describe("dialogStore — closeDialog", () => {
     const state = useDialogStore.getState();
     expect(state.openDialog).toBeNull();
     expect(state.dialogTarget).toBeNull();
+  });
+});
+
+describe("dialogStore — openDragCopyDialog", () => {
+  it("opens copy dialog with drag payload", () => {
+    useDialogStore.getState().openDragCopyDialog({
+      sourcePanelId: "left",
+      targetPanelId: "right",
+      sourcePaths: ["/left/file.txt"],
+      targetPath: "/right",
+    });
+
+    const state = useDialogStore.getState();
+    expect(state.openDialog).toBe("copy");
+    expect(state.dragCopyRequest).toEqual({
+      sourcePanelId: "left",
+      targetPanelId: "right",
+      sourcePaths: ["/left/file.txt"],
+      targetPath: "/right",
+    });
+    expect(state.isPasteMode).toBe(false);
+  });
+
+  it("clears drag payload when dialog closes", () => {
+    const { openDragCopyDialog, closeDialog } = useDialogStore.getState();
+
+    openDragCopyDialog({
+      sourcePanelId: "left",
+      targetPanelId: "right",
+      sourcePaths: ["/left/file.txt"],
+      targetPath: "/right",
+    });
+    closeDialog();
+
+    expect(useDialogStore.getState().dragCopyRequest).toBeNull();
   });
 });

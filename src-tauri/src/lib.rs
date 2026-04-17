@@ -297,6 +297,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(commands::file_watch_commands::FileWatcherState::default())
         .menu(|app| build_app_menu(app))
         .on_menu_event(|app, event| {
             let event_id = event.id().as_ref();
@@ -473,7 +474,9 @@ pub fn run() {
             commands::search_commands::search_files,
             commands::fs_commands::get_dir_size,
             commands::drag_commands::start_native_drag,
+            commands::drag_commands::write_files_to_pasteboard,
             commands::sync_commands::compare_directories,
+            commands::file_watch_commands::sync_watched_directories,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

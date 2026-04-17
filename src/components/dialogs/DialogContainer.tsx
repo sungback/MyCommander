@@ -2,35 +2,17 @@ import React, { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
+import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
-import { isAbsolutePath, joinPath } from "../../utils/path";
+import { getPathDirectoryName, isAbsolutePath, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
+import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 
 const getPathBaseName = (path: string) => {
   const normalized = path.replace(/[\\/]+$/, "");
   const parts = normalized.split(/[\\/]/).filter(Boolean);
   return parts.length > 0 ? parts[parts.length - 1] : normalized;
-};
-
-const getPathDirectoryName = (path: string) => {
-  const normalized = path.replace(/[\\/]+$/, "");
-  const slashIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-
-  if (slashIndex < 0) {
-    return "";
-  }
-
-  if (slashIndex === 0) {
-    return normalized.startsWith("\\\\") ? normalized : "/";
-  }
-
-  const parentPath = normalized.slice(0, slashIndex);
-  if (/^[A-Z]:$/i.test(parentPath)) {
-    return `${parentPath}\\`;
-  }
-
-  return parentPath;
 };
 
 const getSelectedItemsText = (paths: string[]) => {
@@ -108,13 +90,21 @@ const BaseDialog: React.FC<{
 };
 
 export const DialogContainer: React.FC = () => {
-  const { openDialog, dialogTarget, closeDialog, setOpenDialog } = useDialogStore();
-  const refreshPanel = usePanelStore((s) => s.refreshPanel);
+  const {
+    openDialog,
+    dialogTarget,
+    dragCopyRequest,
+    closeDialog,
+    setOpenDialog,
+    isPasteMode,
+  } = useDialogStore();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
-  
+  const clipboard = usePanelStore((s) => s.clipboard);
+  const clearClipboard = usePanelStore((s) => s.clearClipboard);
+
   const fs = useFileSystem();
 
   // Dialog-specific state
@@ -133,24 +123,36 @@ export const DialogContainer: React.FC = () => {
 
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
+  const dragSourcePanel =
+    dragCopyRequest?.sourcePanelId === "left" ? leftPanel : rightPanel;
   const infoPanel = dialogTarget?.panelId === "left" ? leftPanel : rightPanel;
   const infoEntry = dialogTarget
     ? infoPanel.files.find((entry) => entry.path.normalize("NFC") === dialogTarget.path.normalize("NFC")) ?? null
     : null;
 
-  // Determine items to process
-  const selectedPaths = Array.from(activePanel.selectedItems);
-  if (selectedPaths.length === 0 && activePanel.files[activePanel.cursorIndex]) {
-    const cursorFile = activePanel.files[activePanel.cursorIndex];
-    if (cursorFile.name !== "..") {
-      selectedPaths.push(cursorFile.path);
-    }
-  }
+  // Paste 모드: 클립보드 경로 사용 / 일반 모드: 현재 선택 또는 커서 사용
+  const selectedPaths: string[] =
+    openDialog === "copy" && dragCopyRequest
+      ? [...dragCopyRequest.sourcePaths]
+      : isPasteMode && clipboard
+        ? [...clipboard.paths]
+        : (() => {
+            const paths = Array.from(activePanel.selectedItems);
+            if (paths.length === 0 && activePanel.files[activePanel.cursorIndex]) {
+              const cursorFile = activePanel.files[activePanel.cursorIndex];
+              if (cursorFile.name !== "..") paths.push(cursorFile.path);
+            }
+            return paths;
+          })();
 
   // Effect to set default input values when dialog opens
   useEffect(() => {
-    if (openDialog === "copy" || openDialog === "move") {
-      setInputValue(targetPanel.currentPath);
+    if (openDialog === "copy" && dragCopyRequest) {
+      setInputValue(dragCopyRequest.targetPath);
+    } else if (openDialog === "copy" || openDialog === "move") {
+      // paste 모드: 목적지는 현재 활성 패널(붙여넣기 위치)
+      // 일반 모드: 목적지는 반대 패널
+      setInputValue(isPasteMode ? activePanel.currentPath : targetPanel.currentPath);
     } else if (openDialog === "mkdir") {
       setInputValue("");
     } else if (openDialog === "newfile") {
@@ -160,7 +162,14 @@ export const DialogContainer: React.FC = () => {
     } else {
       setInputValue("");
     }
-  }, [dialogTarget, openDialog, targetPanel.currentPath]);
+  }, [
+    activePanel.currentPath,
+    dialogTarget,
+    dragCopyRequest,
+    isPasteMode,
+    openDialog,
+    targetPanel.currentPath,
+  ]);
 
   useEffect(() => {
     setOperationError(null);
@@ -227,7 +236,7 @@ export const DialogContainer: React.FC = () => {
       const fullPath = joinPath(activePanel.currentPath, inputValue);
       await fs.createDirectory(fullPath);
       closeDialog();
-      refreshPanel(activePanelId);
+      refreshPanelsForDirectories([activePanel.currentPath]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to create directory."));
@@ -244,7 +253,7 @@ export const DialogContainer: React.FC = () => {
       const fullPath = joinPath(activePanel.currentPath, inputValue);
       await fs.createFile(fullPath);
       closeDialog();
-      refreshPanel(activePanelId);
+      refreshPanelsForDirectories([activePanel.currentPath]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to create file."));
@@ -267,7 +276,7 @@ export const DialogContainer: React.FC = () => {
       const fullPath = parentPath ? joinPath(parentPath, targetName) : targetName;
       await fs.renameFile(sourcePath, fullPath);
       closeDialog();
-      refreshPanel(dialogTarget.panelId);
+      refreshPanelsForDirectories([parentPath]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to rename the selected item."));
@@ -283,7 +292,7 @@ export const DialogContainer: React.FC = () => {
       setOperationError(null);
       await fs.deleteFiles(selectedPaths, false);
       closeDialog();
-      refreshPanel(activePanelId);
+      refreshPanelsForDirectories([activePanel.currentPath]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to delete selected items."));
@@ -298,22 +307,54 @@ export const DialogContainer: React.FC = () => {
       return "";
     }
 
+    const basePath =
+      openDialog === "copy" && dragCopyRequest
+        ? dragCopyRequest.targetPath
+        : (isPasteMode ? activePanel : targetPanel).currentPath;
     return isAbsolutePath(trimmedValue)
       ? trimmedValue
-      : joinPath(targetPanel.currentPath, trimmedValue);
+      : joinPath(basePath, trimmedValue);
   };
 
-  const executeCopyMove = async (isMove: boolean, paths: string[], targetPath: string) => {
+  const executeCopyMove = async (
+    isMove: boolean,
+    paths: string[],
+    targetPath: string,
+    keepBoth: boolean = false
+  ) => {
     setOpenDialog("progress");
     try {
       if (isMove) {
         await fs.moveFiles(paths, targetPath);
       } else {
-        await fs.copyFiles(paths, targetPath);
+        const savedNames = await fs.copyFiles(paths, targetPath, keepBoth);
+
+        // keep_both 모드에서 이름이 바뀐 파일이 있으면 안내
+        if (keepBoth && savedNames.length > 0) {
+          const origNames = paths.map((p) => p.split(/[\\/]/).pop() ?? "");
+          const renamed = savedNames.filter((saved, i) => saved !== origNames[i]);
+          if (renamed.length > 0) {
+            const preview =
+              renamed.length === 1
+                ? `'${renamed[0]}'`
+                : `'${renamed[0]}' 외 ${renamed.length - 1}개`;
+            showTransientStatusMessage(
+              `${renamed.length}개 파일이 이미 존재하여 ${preview}(으)로 저장됨`,
+              3000
+            );
+          }
+        }
+      }
+      // cut 작업이 완료되면 클립보드 초기화
+      if (isPasteMode && clipboard?.operation === "cut") {
+        clearClipboard();
+        if (!keepBoth) showTransientStatusMessage(`${paths.length}개 항목 이동됨`);
       }
       closeDialog();
-      refreshPanel(activePanelId);
-      refreshPanel(activePanelId === "left" ? "right" : "left");
+      refreshPanelsForDirectories([
+        (openDialog === "copy" && dragCopyRequest ? dragSourcePanel : activePanel).currentPath,
+        targetPath,
+      ]);
     } catch (e) {
       console.error(e);
       // Switch back to the form dialog so the error message can be displayed
@@ -332,7 +373,12 @@ export const DialogContainer: React.FC = () => {
       // Check for conflicts
       const conflicts = await fs.checkCopyConflicts(selectedPaths, targetPath);
       if (conflicts.length > 0) {
-        // Show overwrite confirmation
+        // paste 모드(Cmd+V): 덮어쓰기 다이얼로그 없이 자동으로 "copy" 이름으로 저장
+        if (isPasteMode && !isMove) {
+          await executeCopyMove(false, selectedPaths, targetPath, true);
+          return;
+        }
+        // 일반 모드(F5/F6): 기존 덮어쓰기 확인 다이얼로그 표시
         setConflictFiles(conflicts);
         setPendingCopy({ isMove, allPaths: selectedPaths, targetPath });
         setIsSubmitting(false);

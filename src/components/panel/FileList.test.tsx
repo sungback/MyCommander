@@ -12,6 +12,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 // ── useFileSystem mock (vi.hoisted로 호이스팅 — 팩토리 실행 전에 변수 준비) ──
 const {
   mockCopyFiles,
+  mockCheckCopyConflicts,
   mockGetDirSize,
   mockListDirectory,
   mockSetSelection,
@@ -20,10 +21,12 @@ const {
   mockRefreshPanel,
   mockSetActivePanel,
   mockSetDragInfo,
+  mockOpenDragCopyDialog,
   mockOpenPreviewDialog,
   mockPanelState,
 } = vi.hoisted(() => ({
   mockCopyFiles: vi.fn(),
+  mockCheckCopyConflicts: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockSetSelection: vi.fn(),
@@ -32,8 +35,17 @@ const {
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSetDragInfo: vi.fn(),
+  mockOpenDragCopyDialog: vi.fn(),
   mockOpenPreviewDialog: vi.fn(),
   mockPanelState: {
+    leftPanel: {
+      currentPath: '/home/user',
+      lastUpdated: 0,
+    },
+    rightPanel: {
+      currentPath: '/target',
+      lastUpdated: 0,
+    },
     dragInfo: null as
       | {
           paths: string[];
@@ -46,6 +58,7 @@ const {
 
 vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
+    checkCopyConflicts: mockCheckCopyConflicts,
     copyFiles: mockCopyFiles,
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,
@@ -55,7 +68,7 @@ vi.mock('../../hooks/useFileSystem', () => ({
 vi.mock('../../store/dialogStore', () => ({
   useDialogStore: Object.assign((selector: (s: Record<string, unknown>) => unknown) =>
     selector({
-      setOpenDialog: vi.fn(),
+      openDragCopyDialog: mockOpenDragCopyDialog,
       openPreviewDialog: mockOpenPreviewDialog,
     }), {
       getState: () => ({}),
@@ -73,12 +86,18 @@ vi.mock('../../store/panelStore', () => ({
       setActivePanel: mockSetActivePanel,
       showHiddenFiles: false,
       sizeCache: {},
+      leftPanel: mockPanelState.leftPanel,
+      rightPanel: mockPanelState.rightPanel,
       dragInfo: mockPanelState.dragInfo,
       setDragInfo: mockSetDragInfo,
     }), {
       getState: () => ({
+        leftPanel: mockPanelState.leftPanel,
+        rightPanel: mockPanelState.rightPanel,
         dragInfo: mockPanelState.dragInfo,
+        refreshPanel: mockRefreshPanel,
         setActivePanel: mockSetActivePanel,
+        setDragInfo: mockSetDragInfo,
       }),
     }),
 }));
@@ -176,11 +195,16 @@ const performInternalDrag = async (
 describe('FileList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPanelState.leftPanel.currentPath = '/home/user';
+    mockPanelState.leftPanel.lastUpdated = 0;
+    mockPanelState.rightPanel.currentPath = '/target';
+    mockPanelState.rightPanel.lastUpdated = 0;
     mockPanelState.dragInfo = null;
     mockSetDragInfo.mockImplementation((dragInfo) => {
       mockPanelState.dragInfo = dragInfo;
     });
     mockCopyFiles.mockResolvedValue(undefined);
+    mockCheckCopyConflicts.mockResolvedValue([]);
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
     mockSetSelection.mockReset();
@@ -552,8 +576,13 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
       });
 
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/home/user/notes.txt'],
+        '/home/user/Documents'
+      );
       expect(mockCopyFiles).toHaveBeenCalledWith(['/home/user/notes.txt'], '/home/user/Documents');
       expect(mockRefreshPanel).toHaveBeenCalledWith('left');
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
     it('자기 자신 하위 폴더로의 드롭은 차단한다', async () => {
@@ -596,6 +625,224 @@ describe('FileList', () => {
 
       expect(mockCopyFiles).not.toHaveBeenCalled();
       expect(mockRefreshPanel).not.toHaveBeenCalled();
+    });
+
+    it('같은 패널 드롭에서 충돌이 있으면 copy 다이얼로그를 연다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+
+      render(
+        <FileList
+          {...makeProps({
+            selectedItems: new Set<string>(['/home/user/notes.txt']),
+          })}
+        />
+      );
+
+      setContainerRect();
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Documents"]'
+      ) as HTMLElement;
+
+      await performInternalDrag(sourceRow, targetRow);
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
+      });
+
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
+        sourcePanelId: 'left',
+        targetPanelId: 'left',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/home/user/Documents',
+      });
+    });
+  });
+
+  describe('패널 간 드래그 복사', () => {
+    it('충돌이 없으면 copy 다이얼로그 없이 즉시 복사한다', async () => {
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              selectedItems: new Set<string>(['/home/user/notes.txt']),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/target',
+              files: [
+                { name: '..', path: '/', kind: 'directory' },
+                { name: 'Inbox', path: '/target/Inbox', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const sourceList = lists[0] as HTMLElement;
+      const targetList = lists[1] as HTMLElement;
+
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 360, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 364, clientY: 44 })
+        );
+      });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 364, clientY: 44 }));
+      });
+
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/home/user/notes.txt'],
+        '/target'
+      );
+      expect(mockCopyFiles).toHaveBeenCalledWith(['/home/user/notes.txt'], '/target');
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+      expect(mockRefreshPanel).toHaveBeenCalledWith('left');
+      expect(mockRefreshPanel).toHaveBeenCalledWith('right');
+    });
+
+    it('충돌이 있으면 드래그 복사 다이얼로그를 연다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              selectedItems: new Set<string>(['/home/user/notes.txt']),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/target',
+              files: [
+                { name: '..', path: '/', kind: 'directory' },
+                { name: 'Inbox', path: '/target/Inbox', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const sourceList = lists[0] as HTMLElement;
+      const targetList = lists[1] as HTMLElement;
+
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 360, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 364, clientY: 44 })
+        );
+      });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 364, clientY: 44 }));
+      });
+
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
+        sourcePanelId: 'left',
+        targetPanelId: 'right',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/target',
+      });
     });
   });
 });

@@ -22,8 +22,7 @@ export interface SearchResult {
 export type SearchEvent =
   | { type: "ResultBatch"; payload: SearchResult[] }
   | { type: "Progress"; payload: { current_dir: string } }
-  | { type: "Finished"; payload: { total_matches: number } }
-  | { type: "Error"; payload: string };
+  | { type: "Finished"; payload: { total_matches: number } };
 
 const fileSystem = {
   getDrives: async (): Promise<DriveInfo[]> => {
@@ -73,6 +72,13 @@ const fileSystem = {
     await invoke("quit_app");
   },
 
+  writeFilesToPasteboard: async (
+    paths: string[],
+    operation: "copy" | "cut"
+  ): Promise<void> => {
+    await invoke("write_files_to_pasteboard", { paths, operation });
+  },
+
   listDirectory: async (path: string, showHidden: boolean = false): Promise<FileEntry[]> => {
     try {
       return await invoke<FileEntry[]>("list_directory", { path, show_hidden: showHidden });
@@ -94,10 +100,15 @@ const fileSystem = {
     await invoke("delete_files", { paths, permanent });
   },
 
-  copyFiles: async (sourcePaths: string[], targetPath: string): Promise<void> => {
-    await invoke("copy_files", {
+  copyFiles: async (
+    sourcePaths: string[],
+    targetPath: string,
+    keepBoth?: boolean
+  ): Promise<string[]> => {
+    return await invoke<string[]>("copy_files", {
       source_paths: sourcePaths,
       target_path: targetPath,
+      keep_both: keepBoth ?? false,
     });
   },
 
@@ -212,6 +223,10 @@ const fileSystem = {
       status: item.status as any,
       direction: autoDirection(item.status),
     }));
+  },
+
+  syncWatchedDirectories: async (paths: string[]): Promise<void> => {
+    await invoke("sync_watched_directories", { paths });
   },
 };
 

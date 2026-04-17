@@ -204,11 +204,13 @@ pub async fn copy_files(
     app: tauri::AppHandle,
     source_paths: Vec<String>,
     target_path: String,
-) -> Result<(), String> {
+    keep_both: Option<bool>,
+) -> Result<Vec<String>, String> {
+    let keep_both = keep_both.unwrap_or(false);
     let total = source_paths.len();
     tokio::task::spawn_blocking(move || {
         if source_paths.is_empty() {
-            return Ok(());
+            return Ok(vec![]);
         }
 
         if source_paths.len() == 1 {
@@ -225,7 +227,8 @@ pub async fn copy_files(
                     current_file: file_name,
                 },
             );
-            return copy_single_path(Path::new(&source_paths[0]), &target_path);
+            let saved = copy_single_path(Path::new(&source_paths[0]), &target_path, keep_both)?;
+            return Ok(vec![saved]);
         }
 
         let target_root = Path::new(&target_path);
@@ -234,6 +237,7 @@ pub async fn copy_files(
             return Err(format!("{target_path} is not a directory"));
         }
 
+        let mut saved_names = Vec::with_capacity(source_paths.len());
         for (i, source) in source_paths.iter().enumerate() {
             let file_name = Path::new(source)
                 .file_name()
@@ -248,9 +252,10 @@ pub async fn copy_files(
                     current_file: file_name,
                 },
             );
-            copy_path_into_dir(Path::new(source), target_root)?;
+            let saved = copy_path_into_dir(Path::new(source), target_root, keep_both)?;
+            saved_names.push(saved);
         }
-        Ok(())
+        Ok(saved_names)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -267,6 +272,25 @@ pub async fn move_files(
         let src = Path::new(path);
         if let Some(file_name) = src.file_name() {
             let file_name_str = file_name.to_string_lossy().to_string();
+            let dest = Path::new(&target_dir).join(file_name);
+
+            // 같은 경로로 이동하는 경우 에러 반환
+            if src == dest {
+                return Err(format!(
+                    "이미 같은 위치에 있습니다: {}",
+                    file_name_str
+                ));
+            }
+            // canonical path 비교 (심볼릭 링크 등 고려)
+            if let (Ok(src_c), Ok(dest_c)) = (src.canonicalize(), dest.canonicalize()) {
+                if src_c == dest_c {
+                    return Err(format!(
+                        "이미 같은 위치에 있습니다: {}",
+                        file_name_str
+                    ));
+                }
+            }
+
             let _ = app.emit(
                 "fs-progress",
                 ProgressPayload {
@@ -276,8 +300,7 @@ pub async fn move_files(
                     current_file: file_name_str,
                 },
             );
-            let dest = Path::new(&target_dir).join(file_name);
-            fs::rename(src, dest).map_err(|e| e.to_string())?;
+            fs::rename(src, &dest).map_err(|e| e.to_string())?;
         }
     }
     Ok(())
@@ -826,11 +849,11 @@ fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     }
 }
 
-fn copy_single_path(source: &Path, target_path: &str) -> Result<(), String> {
+fn copy_single_path(source: &Path, target_path: &str, keep_both: bool) -> Result<String, String> {
     let target = Path::new(target_path);
 
     if target.exists() && target.is_dir() {
-        return copy_path_into_dir(source, target);
+        return copy_path_into_dir(source, target, keep_both);
     }
 
     if target_path.ends_with(std::path::MAIN_SEPARATOR)
@@ -838,19 +861,90 @@ fn copy_single_path(source: &Path, target_path: &str) -> Result<(), String> {
         || target_path.ends_with('\\')
     {
         fs::create_dir_all(target).map_err(|e| e.to_string())?;
-        return copy_path_into_dir(source, target);
+        return copy_path_into_dir(source, target, keep_both);
     }
 
-    copy_path_to_destination(source, target)
+    // 명시적 목적지 경로인 경우 keep_both라도 그대로 사용 (단일 파일 이름 변경 복사)
+    copy_path_to_destination(source, target)?;
+    Ok(target
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default())
 }
 
-fn copy_path_into_dir(source: &Path, target_dir: &Path) -> Result<(), String> {
+fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
+    let file_name = source
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    // 확장자 분리 (폴더는 확장자 없음)
+    let (stem, ext_with_dot) = if source.is_dir() {
+        (file_name.as_str().to_string(), String::new())
+    } else {
+        match source.extension() {
+            Some(ext) => {
+                let ext_str = ext.to_string_lossy().to_string();
+                let stem_str = source
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                (stem_str, format!(".{ext_str}"))
+            }
+            None => (file_name.clone(), String::new()),
+        }
+    };
+
+    // 기존 " copy" / " copy N" 접미사 제거하여 base stem 추출
+    let base_stem = {
+        let copy_n_re = regex::Regex::new(r"^(.*) copy(?: (\d+))?$").unwrap();
+        if let Some(caps) = copy_n_re.captures(&stem) {
+            caps.get(1).map(|m| m.as_str().to_string()).unwrap_or(stem.clone())
+        } else {
+            stem.clone()
+        }
+    };
+
+    // 충돌 없는 이름 탐색
+    let first_candidate = target_dir.join(format!("{base_stem} copy{ext_with_dot}"));
+    if !first_candidate.exists() {
+        return first_candidate;
+    }
+    let mut n = 2u32;
+    loop {
+        let candidate = target_dir.join(format!("{base_stem} copy {n}{ext_with_dot}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
+/// 파일을 디렉터리에 복사하고 실제로 저장된 파일명을 반환합니다.
+/// keep_both = true 이면 목적지에 같은 이름이 있을 때 자동으로 "copy" 이름을 생성합니다.
+fn copy_path_into_dir(source: &Path, target_dir: &Path, keep_both: bool) -> Result<String, String> {
     let file_name = source
         .file_name()
         .ok_or_else(|| format!("Could not determine file name for {}", source.display()))?;
-    let destination = target_dir.join(file_name);
 
-    copy_path_to_destination(source, &destination)
+    let same_folder = source.parent().map(|p| p == target_dir).unwrap_or(false);
+
+    let destination = if same_folder || (keep_both && target_dir.join(file_name).exists()) {
+        // 같은 폴더이거나, keep_both 모드에서 이미 파일이 존재하면 자동 이름 생성
+        make_copy_name(source, target_dir)
+    } else {
+        target_dir.join(file_name)
+    };
+
+    let saved_name = destination
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    copy_path_to_destination(source, &destination)?;
+    Ok(saved_name)
 }
 
 fn copy_path_to_destination(source: &Path, destination: &Path) -> Result<(), String> {

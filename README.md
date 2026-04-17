@@ -1,7 +1,7 @@
 # MyCommander
 
 MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
-현재 구현은 듀얼 패널 탐색을 중심으로, 검색, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능까지 포함합니다.
+현재 구현은 듀얼 패널 탐색을 중심으로, 검색, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX까지 포함합니다.
 
 ## 주요 기능
 
@@ -9,6 +9,8 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 패널별 **탭**, 뒤로/앞으로 이동, breadcrumb 경로 이동
 - **즐겨찾기 패널** 추가 / 이름 변경 / 재정렬 / 접기
 - 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
+- 패널 간 **드래그 드롭 복사**
+- 같은 폴더를 보는 양쪽 패널의 **자동 동기 갱신**
 - **빠른 미리보기**와 텍스트/문서 계열 렌더링
 - **파일 검색**과 검색 결과 복사/이동/삭제
 - **일괄 이름 변경**
@@ -115,6 +117,14 @@ npm run dev
 - `CmdOrCtrl+Shift+M`: 반대 패널을 현재 경로로 동기화
 - `CmdOrCtrl+U`: 패널 교환
 
+## 드래그 드롭 동작
+
+- 같은 패널 안에서 폴더 위로 드롭하면 바로 복사합니다.
+- 왼쪽 패널에서 오른쪽 패널, 또는 반대로 드롭하면 대상 패널 현재 폴더로 복사합니다.
+- 이름 충돌이 없으면 즉시 복사합니다.
+- 이름 충돌이 있으면 복사 확인 다이얼로그를 열어 후속 동작을 선택합니다.
+- 파일 생성, 삭제, 이름 변경, 복사, 이동 후 양쪽 패널이 같은 폴더를 보고 있으면 함께 갱신됩니다.
+
 ## 프로젝트 구조
 
 ```text
@@ -140,7 +150,7 @@ src-tauri/
 
 ## 버전 업데이트
 
-프로젝트 루트의 [`version-sync.cjs`](/Users/sungback/Documents/MyCommander/version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다.
+프로젝트 루트의 [`version-sync.cjs`](./version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다.
 
 일반적인 릴리스 흐름:
 
@@ -165,6 +175,13 @@ npm version 1.1.4
 lsof -ti tcp:1420 | xargs kill
 ```
 
+### Vite 관련 파일 누락/설치 손상
+
+```bash
+rm -rf node_modules
+npm install
+```
+
 ### 빌드 산출물 용량이 너무 커질 때
 
 ```bash
@@ -181,5 +198,5 @@ cargo clean --manifest-path src-tauri/Cargo.toml
 
 ## 참고
 
-- 프로젝트 컨텍스트 문서는 [CLAUDE.md](/Users/sungback/Documents/MyCommander/CLAUDE.md)
-- 작업 규칙과 검증 규칙은 [AGENTS.md](/Users/sungback/Documents/MyCommander/AGENTS.md)
+- 프로젝트 컨텍스트 문서는 [CLAUDE.md](./CLAUDE.md)
+- 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)

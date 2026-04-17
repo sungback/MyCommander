@@ -6,6 +6,7 @@ import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
+import { Clipboard, Scissors } from "lucide-react";
 
 type PanelId = "left" | "right";
 
@@ -104,6 +105,8 @@ export const StatusBar: React.FC = () => {
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
   const statusMessage = useUiStore((s) => s.statusMessage);
+  const clipboard = usePanelStore((s) => s.clipboard);
+  const clearClipboard = usePanelStore((s) => s.clearClipboard);
   const { getAvailableSpace } = useFileSystem();
   const appCommands = useAppCommands();
   const [commandValue, setCommandValue] = useState("");
@@ -230,7 +233,26 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
-          {statusMessage ? (
+          {clipboard && (
+            <div className="ml-auto flex items-center gap-1.5 rounded-md border border-border-color bg-bg-panel px-3 py-1.5 text-xs text-text-secondary">
+              {clipboard.operation === "copy"
+                ? <Clipboard size={12} />
+                : <Scissors size={12} />
+              }
+              <span>
+                {clipboard.paths.length}개 항목{" "}
+                {clipboard.operation === "copy" ? "복사됨" : "잘라내기됨"}
+              </span>
+              <button
+                className="ml-1 opacity-60 hover:opacity-100 transition-opacity"
+                title="클립보드 초기화 (Escape)"
+                onClick={clearClipboard}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {statusMessage && !clipboard ? (
             <div className="ml-auto rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-secondary">
               {statusMessage}
             </div>

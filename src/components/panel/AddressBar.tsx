@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { getBreadcrumbParts } from "../../utils/path";
+import { arePathsEquivalent, getBreadcrumbParts } from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 
@@ -44,7 +44,7 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   const { syncOtherPanelToCurrentPath, copyCurrentPath } = useAppCommands();
   const isMac = isMacPlatform();
   const otherPanelLabel = panelId === "left" ? "right" : "left";
-  const isAlreadySynced = currentPath === otherPanelPath;
+  const isAlreadySynced = arePathsEquivalent(currentPath, otherPanelPath);
 
   const parts = getBreadcrumbParts(currentPath);
 

@@ -4,7 +4,7 @@ import { usePanelStore } from "../store/panelStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { useFileSystem } from "./useFileSystem";
 import { PanelState } from "../types/file";
-import { isMacPlatform, useAppCommands } from "./useAppCommands";
+import { isMacPlatform, showTransientStatusMessage, useAppCommands } from "./useAppCommands";
 
 export function useKeyboard() {
   const openInfoDialog = useDialogStore((s) => s.openInfoDialog);
@@ -23,6 +23,9 @@ export function useKeyboard() {
     closeApp,
     syncOtherPanelToCurrentPath,
     copyCurrentPath,
+    copyToClipboard,
+    cutToClipboard,
+    pasteFromClipboard,
   } = useAppCommands();
   const { getDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
@@ -79,6 +82,17 @@ export function useKeyboard() {
         if (e.key === "Escape") {
           e.preventDefault();
           useDialogStore.getState().closeDialog();
+        }
+        return;
+      }
+
+      // Escape: 클립보드 초기화
+      if (e.key === "Escape") {
+        const clipState = usePanelStore.getState().clipboard;
+        if (clipState) {
+          e.preventDefault();
+          usePanelStore.getState().clearClipboard();
+          showTransientStatusMessage("클립보드 초기화됨");
         }
         return;
       }
@@ -148,6 +162,33 @@ export function useKeyboard() {
         e.preventDefault();
         const state = usePanelStore.getState();
         setPanelViewMode(state.activePanel, "detailed");
+        return;
+      }
+
+      // Cmd+C: 복사 (INPUT 포커스 시 제외)
+      if (hasCommandModifier && !e.shiftKey && e.code === "KeyC") {
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          void copyToClipboard();
+        }
+        return;
+      }
+
+      // Cmd+X: 잘라내기 (INPUT 포커스 시 제외)
+      if (hasCommandModifier && !e.shiftKey && e.code === "KeyX") {
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          void cutToClipboard();
+        }
+        return;
+      }
+
+      // Cmd+V: 붙여넣기 (INPUT 포커스 시 제외)
+      if (hasCommandModifier && !e.shiftKey && e.code === "KeyV") {
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          pasteFromClipboard();
+        }
         return;
       }
 
@@ -239,5 +280,8 @@ export function useKeyboard() {
     copyCurrentPath,
     syncOtherPanelToCurrentPath,
     updateEntrySize,
+    copyToClipboard,
+    cutToClipboard,
+    pasteFromClipboard,
   ]);
 }

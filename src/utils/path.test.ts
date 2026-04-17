@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
+  arePathsEquivalent,
+  getPathDirectoryName,
   joinPath,
   getParentPath,
   isWindowsPath,
   isAbsolutePath,
   getBreadcrumbParts,
+  isSameOrNestedPath,
+  normalizePathForComparison,
 } from "./path";
 
 describe("joinPath", () => {
@@ -81,6 +85,62 @@ describe("isAbsolutePath", () => {
   it("returns false for relative paths", () => {
     expect(isAbsolutePath("relative/path")).toBe(false);
     expect(isAbsolutePath("file.txt")).toBe(false);
+  });
+});
+
+describe("getPathDirectoryName", () => {
+  it("returns parent directory for Unix file paths", () => {
+    expect(getPathDirectoryName("/usr/local/file.txt")).toBe("/usr/local");
+  });
+
+  it("returns root for Unix top-level file paths", () => {
+    expect(getPathDirectoryName("/file.txt")).toBe("/");
+  });
+
+  it("returns parent directory for Windows file paths", () => {
+    expect(getPathDirectoryName("C:\\Users\\test\\file.txt")).toBe("C:\\Users\\test");
+  });
+
+  it("returns drive root for Windows top-level file paths", () => {
+    expect(getPathDirectoryName("C:\\file.txt")).toBe("C:\\");
+  });
+});
+
+describe("normalizePathForComparison", () => {
+  it("normalizes Windows separators and casing", () => {
+    expect(normalizePathForComparison("C:\\Users\\Back\\")).toBe("c:/users/back");
+  });
+
+  it("preserves Unix casing while trimming trailing separators", () => {
+    expect(normalizePathForComparison("/Users/back/")).toBe("/Users/back");
+  });
+});
+
+describe("arePathsEquivalent", () => {
+  it("treats Windows paths with different case and separators as equal", () => {
+    expect(arePathsEquivalent("C:\\Users\\Back", "c:/users/back/")).toBe(true);
+  });
+
+  it("treats Unix paths with trailing separators as equal", () => {
+    expect(arePathsEquivalent("/tmp/work", "/tmp/work/")).toBe(true);
+  });
+
+  it("keeps Unix case-sensitive comparisons distinct", () => {
+    expect(arePathsEquivalent("/Users/Back", "/users/back")).toBe(false);
+  });
+});
+
+describe("isSameOrNestedPath", () => {
+  it("detects nested Unix paths", () => {
+    expect(isSameOrNestedPath("/tmp/work", "/tmp/work/sub")).toBe(true);
+  });
+
+  it("detects nested Windows paths", () => {
+    expect(isSameOrNestedPath("C:\\Work", "c:/work/sub")).toBe(true);
+  });
+
+  it("rejects sibling paths", () => {
+    expect(isSameOrNestedPath("/tmp/work", "/tmp/other")).toBe(false);
   });
 });
 

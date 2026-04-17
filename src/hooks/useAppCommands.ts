@@ -2,7 +2,9 @@ import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
 import { useUiStore } from "../store/uiStore";
 import { writeClipboardText } from "../utils/clipboard";
+import { arePathsEquivalent } from "../utils/path";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
+import { ClipboardState } from "../store/panelStore";
 
 export const isMacPlatform = () => {
   if (typeof window === "undefined") {
@@ -30,7 +32,7 @@ const getPrimaryTargetPath = () => {
 
 let clearStatusMessageTimeoutId: number | undefined;
 
-const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
+export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   const { setStatusMessage } = useUiStore.getState();
   if (clearStatusMessageTimeoutId !== undefined) {
     window.clearTimeout(clearStatusMessageTimeoutId);
@@ -45,6 +47,7 @@ const showTransientStatusMessage = (message: string, durationMs: number = 1400) 
 
 export function useAppCommands() {
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
+  const openPasteDialog = useDialogStore((s) => s.openPasteDialog);
   const openDialog = useDialogStore((s) => s.openDialog);
   const fs = useFileSystem();
 
@@ -88,7 +91,7 @@ export function useAppCommands() {
       resolvedSourcePanelId === "left" ? state.leftPanel : state.rightPanel;
     const targetPanel = targetPanelId === "left" ? state.leftPanel : state.rightPanel;
 
-    if (sourcePanel.currentPath === targetPanel.currentPath) {
+    if (arePathsEquivalent(sourcePanel.currentPath, targetPanel.currentPath)) {
       return;
     }
 
@@ -106,6 +109,87 @@ export function useAppCommands() {
     } catch (error) {
       console.error("Failed to copy current path:", error);
       showTransientStatusMessage("Clipboard unavailable");
+    }
+  };
+
+  const getActiveSelectedPaths = (): string[] => {
+    const state = usePanelStore.getState();
+    const panelId = state.activePanel;
+    const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
+    const selected = Array.from(panel.selectedItems);
+    if (selected.length > 0) return selected;
+    const cursor = panel.files[panel.cursorIndex];
+    if (cursor && cursor.name !== "..") return [cursor.path];
+    return [];
+  };
+
+  const copyToClipboard = async () => {
+    const paths = getActiveSelectedPaths();
+    if (paths.length === 0) return;
+
+    const state = usePanelStore.getState();
+    const clipState: ClipboardState = {
+      paths,
+      operation: "copy",
+      sourcePanel: state.activePanel,
+    };
+    state.setClipboard(clipState);
+
+    try {
+      await fs.writeFilesToPasteboard(paths, "copy");
+    } catch (e) {
+      console.error("Failed to write to pasteboard:", e);
+    }
+
+    showTransientStatusMessage(`${paths.length}개 항목 복사됨`);
+  };
+
+  const cutToClipboard = async () => {
+    const paths = getActiveSelectedPaths();
+    if (paths.length === 0) return;
+
+    const state = usePanelStore.getState();
+    const clipState: ClipboardState = {
+      paths,
+      operation: "cut",
+      sourcePanel: state.activePanel,
+    };
+    state.setClipboard(clipState);
+
+    try {
+      await fs.writeFilesToPasteboard(paths, "cut");
+    } catch (e) {
+      console.error("Failed to write to pasteboard:", e);
+    }
+
+    showTransientStatusMessage(`${paths.length}개 항목 잘라내기됨`);
+  };
+
+  const pasteFromClipboard = () => {
+    const state = usePanelStore.getState();
+    const clipboard = state.clipboard;
+    if (!clipboard) return;
+
+    const activePanel = state.activePanel;
+    const panel = activePanel === "left" ? state.leftPanel : state.rightPanel;
+
+    // 같은 폴더로 cut 이동은 의미 없음
+    if (clipboard.operation === "cut") {
+      const sourcePaths = clipboard.paths;
+      const sameFolder = sourcePaths.every((p) => {
+        const parent = p.substring(0, p.lastIndexOf("/")) || p.substring(0, p.lastIndexOf("\\"));
+        return parent === panel.currentPath;
+      });
+      if (sameFolder) {
+        showTransientStatusMessage("이미 같은 위치에 있습니다");
+        return;
+      }
+    }
+
+    if (clipboard.operation === "copy") {
+      openPasteDialog("copy");
+    } else {
+      openPasteDialog("move");
     }
   };
 
@@ -145,5 +229,8 @@ export function useAppCommands() {
     syncOtherPanelToCurrentPath,
     copyCurrentPath,
     runCommandInCurrentPath,
+    copyToClipboard,
+    cutToClipboard,
+    pasteFromClipboard,
   };
 }
