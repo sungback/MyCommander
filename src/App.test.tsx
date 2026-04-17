@@ -121,4 +121,17 @@ describe('App — Tab 키 패널 전환', () => {
       },
     ]);
   });
+
+  it('settings-requested 이벤트 → 설정 다이얼로그 오픈', async () => {
+    render(<App />);
+
+    await Promise.resolve();
+
+    const handler = listenHandlers.get('settings-requested');
+    expect(handler).toBeTypeOf('function');
+
+    handler?.();
+
+    expect(useDialogStore.getState().openDialog).toBe('settings');
+  });
 });

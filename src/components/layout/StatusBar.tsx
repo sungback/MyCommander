@@ -7,7 +7,7 @@ import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
-import { Clipboard, Scissors } from "lucide-react";
+import { Settings } from "lucide-react";
 
 type PanelId = "left" | "right";
 
@@ -105,8 +105,7 @@ export const StatusBar: React.FC = () => {
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
   const statusMessage = useUiStore((s) => s.statusMessage);
-  const clipboard = usePanelStore((s) => s.clipboard);
-  const clearClipboard = usePanelStore((s) => s.clearClipboard);
+  const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const { getAvailableSpace } = useFileSystem();
   const appCommands = useAppCommands();
   const [commandValue, setCommandValue] = useState("");
@@ -233,6 +232,16 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
+          <button
+            type="button"
+            onClick={() => setOpenDialog("settings")}
+            className="flex items-center gap-2 rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-hover"
+            title="설정"
+            aria-label="설정"
+          >
+            <Settings size={15} className="text-accent-color" />
+            <span>설정</span>
+          </button>
           {statusMessage ? (
             <div className="ml-auto rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-secondary">
               {statusMessage}

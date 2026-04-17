@@ -19,6 +19,7 @@ import { buildMultiRenameSession } from "./features/multiRename";
 import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
 import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
 import { useSettingsStore } from "./store/settingsStore";
+import { buildFontFamilyStack } from "./constants/fontOptions";
 
 type PanelId = "left" | "right";
 
@@ -207,6 +208,7 @@ function App() {
         unlistenFolderSync,
         unlistenTargetEqualsSource,
         unlistenSwapPanels,
+        unlistenSettings,
       ] = await Promise.all([
         listen("new-folder-requested", () => {
           if (!isMounted) {
@@ -253,6 +255,13 @@ function App() {
 
           usePanelStore.getState().swapPanels();
         }),
+        listen("settings-requested", () => {
+          if (!isMounted) {
+            return;
+          }
+
+          setOpenDialog("settings");
+        }),
       ]);
 
       if (!isMounted) {
@@ -262,6 +271,7 @@ function App() {
         unlistenFolderSync();
         unlistenTargetEqualsSource();
         unlistenSwapPanels();
+        unlistenSettings();
       }
 
       return () => {
@@ -271,6 +281,7 @@ function App() {
         unlistenFolderSync();
         unlistenTargetEqualsSource();
         unlistenSwapPanels();
+        unlistenSettings();
       };
     };
 
@@ -346,9 +357,11 @@ function App() {
     <div
       className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden"
       style={{
+        "--app-font-family": buildFontFamilyStack(settings.fontFamily),
         "--app-font-size": `${settings.fontSize}px`,
         "--app-row-height": `${Math.max(24, settings.fontSize * 2)}px`,
-        fontSize: "var(--app-font-size)"
+        fontSize: "var(--app-font-size)",
+        fontFamily: "var(--app-font-family)",
       } as React.CSSProperties}
     >
       <div className="flex flex-1 min-h-0 overflow-hidden">

@@ -7,6 +7,7 @@ const FILE_MENU_ID: &str = "file";
 const NEW_FOLDER_MENU_ITEM_ID: &str = "new_folder";
 const NEW_FILE_MENU_ITEM_ID: &str = "new_file";
 const MULTI_RENAME_MENU_ITEM_ID: &str = "multi_rename";
+const SETTINGS_MENU_ITEM_ID: &str = "settings";
 const SHOW_HIDDEN_MENU_ITEM_ID: &str = "show_hidden_files";
 const VIEW_MENU_ID: &str = "view";
 const LEFT_PANEL_VIEW_MENU_ID: &str = "left_panel_view";
@@ -184,6 +185,13 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         None::<&str>,
     )?;
+    let settings = MenuItem::with_id(
+        app,
+        SETTINGS_MENU_ITEM_ID,
+        "설정",
+        true,
+        Some("CmdOrCtrl+,"),
+    )?;
     let folder_sync = MenuItem::with_id(
         app,
         FOLDER_SYNC_MENU_ITEM_ID,
@@ -242,6 +250,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                     &new_folder,
                     &new_file,
                     &multi_rename,
+                    &settings,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::close_window(app, None)?,
                     #[cfg(not(target_os = "macos"))]
@@ -311,6 +320,9 @@ pub fn run() {
                 }
                 MULTI_RENAME_MENU_ITEM_ID => {
                     let _ = app.emit("multi-rename-requested", ());
+                }
+                SETTINGS_MENU_ITEM_ID => {
+                    let _ = app.emit("settings-requested", ());
                 }
                 FOLDER_SYNC_MENU_ITEM_ID => {
                     let _ = app.emit("folder-sync-requested", ());

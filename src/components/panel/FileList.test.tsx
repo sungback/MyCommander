@@ -41,10 +41,14 @@ const {
     leftPanel: {
       currentPath: '/home/user',
       lastUpdated: 0,
+      tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }],
+      activeTabId: 'tab1',
     },
     rightPanel: {
       currentPath: '/target',
       lastUpdated: 0,
+      tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }],
+      activeTabId: 'tab2',
     },
     dragInfo: null as
       | {
@@ -90,8 +94,6 @@ vi.mock('../../store/panelStore', () => ({
       rightPanel: mockPanelState.rightPanel,
       dragInfo: mockPanelState.dragInfo,
       setDragInfo: mockSetDragInfo,
-      leftPanel: { tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab1' },
-      rightPanel: { tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab2' },
     }), {
     getState: () => ({
       leftPanel: mockPanelState.leftPanel,
