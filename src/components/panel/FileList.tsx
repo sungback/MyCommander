@@ -5,9 +5,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileEntry, ViewMode } from "../../types/file";
 import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
-import { usePanelStore } from "../../store/panelStore";
+import { usePanelStore, sortEntries } from "../../store/panelStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useUiStore } from "../../store/uiStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
 import { isSameOrNestedPath } from "../../utils/path";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
@@ -65,6 +66,8 @@ const getVisibleRows = (
   expandedPaths: Set<string>,
   childEntriesByPath: Record<string, FileEntry[]>,
   sizeCache: Record<string, number>,
+  sortField: string,
+  sortDirection: "asc" | "desc",
   depth = 0
 ): VisibleEntryRow[] => {
   const rows: VisibleEntryRow[] = [];
@@ -82,13 +85,24 @@ const getVisibleRows = (
     if (!isExpanded) continue;
 
     const children = childEntriesByPath[entry.path] ?? [];
-    const filteredChildren = children.filter((child) => child.name !== "..");
+    // Apply sizeCache to children before sorting so that dynamically updated sizes sort properly
+    const resolvedChildren = children.map(child => {
+      const cSize = sizeCache[child.path.normalize("NFC")];
+      return cSize !== undefined ? { ...child, size: cSize } : child;
+    });
+
+    // Sort children
+    const filteredChildren = resolvedChildren.filter((child) => child.name !== "..");
+    const sortedChildren = sortEntries(filteredChildren, sortField, sortDirection);
+
     rows.push(
       ...getVisibleRows(
-        filteredChildren,
+        sortedChildren,
         expandedPaths,
         childEntriesByPath,
         sizeCache,
+        sortField,
+        sortDirection,
         depth + 1
       )
     );
@@ -145,6 +159,12 @@ export const FileList: React.FC<FileListProps> = ({
     ? new Set(clipboard.paths)
     : null;
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
+  const activeTab = usePanelStore((s) => {
+    const key = panelId === "left" ? "leftPanel" : "rightPanel";
+    return s[key].tabs.find((t) => t.id === s[key].activeTabId);
+  });
+  const sortField = activeTab?.sortField ?? "name";
+  const sortDirection = activeTab?.sortDirection ?? "asc";
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<
     Record<string, FileEntry[]>
@@ -178,39 +198,17 @@ export const FileList: React.FC<FileListProps> = ({
     files,
     expandedPaths,
     childEntriesByPath,
-    sizeCache
+    sizeCache,
+    sortField as string,
+    sortDirection as "asc" | "desc"
   );
   const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
 
-  const handleDraggedCopy = async (
-    paths: string[],
-    targetPath: string,
-    targetPanelId: "left" | "right"
-  ) => {
-    const conflicts = await checkCopyConflicts(paths, targetPath);
-
-    if (conflicts.length > 0) {
-      setActivePanel(panelId);
-      openDragCopyDialog({
-        sourcePanelId: panelId,
-        targetPanelId,
-        sourcePaths: paths,
-        targetPath,
-      });
-      return false;
-    }
-
-    await copyFiles(paths, targetPath);
-    refreshPanelsForDirectories([currentPath, targetPath]);
-    showTransientStatusMessage("선택한 파일을 복사했습니다.");
-    return true;
-  };
-
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => rowHeight,
     overscan: 10,
   });
 
@@ -297,8 +295,8 @@ export const FileList: React.FC<FileListProps> = ({
           const blockedReason = activeDragInfo.paths.includes(targetEntry!.path)
             ? "자기 자신에게는 복사할 수 없습니다."
             : activeDragInfo.directoryPaths.some((sourceDir) =>
-                isSameOrNestedPath(sourceDir, targetEntry!.path)
-              )
+              isSameOrNestedPath(sourceDir, targetEntry!.path)
+            )
               ? "폴더를 자기 자신 안이나 하위 폴더로 복사할 수 없습니다."
               : null;
           const isDropAllowed = blockedReason === null;

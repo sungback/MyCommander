@@ -17,7 +17,6 @@ import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { buildMultiRenameSession } from "./features/multiRename";
 import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
-import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
 
 type PanelId = "left" | "right";
 
@@ -69,7 +68,7 @@ function App() {
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openMultiRenameDialog = useDialogStore((s) => s.openMultiRenameDialog);
   const { syncOtherPanelToCurrentPath } = useAppCommands();
-  
+
   // Initialize global shortcuts
   useKeyboard();
   useDirectoryWatch();
@@ -87,9 +86,9 @@ function App() {
   }, [activePanelId, setActivePanel]);
 
   useEffect(() => {
-//     if (!isMacPlatform()) {
-//       return;
-//     }
+    //     if (!isMacPlatform()) {
+    //       return;
+    //     }
 
     let isMounted = true;
 
@@ -121,9 +120,9 @@ function App() {
   }, [setShowHiddenFiles]);
 
   useEffect(() => {
-//     if (!isMacPlatform()) {
-//       return;
-//     }
+    //     if (!isMacPlatform()) {
+    //       return;
+    //     }
 
     let isMounted = true;
 
@@ -285,9 +284,9 @@ function App() {
   }, [openMultiRenameDialog, setOpenDialog, syncOtherPanelToCurrentPath]);
 
   useEffect(() => {
-//     if (!isMacPlatform()) {
-//       return;
-//     }
+    //     if (!isMacPlatform()) {
+    //       return;
+    //     }
 
     void invoke("set_show_hidden_menu_checked", { checked: showHiddenFiles });
   }, [showHiddenFiles]);
@@ -325,9 +324,9 @@ function App() {
   }, [themePreference]);
 
   useEffect(() => {
-//     if (!isMacPlatform()) {
-//       return;
-//     }
+    //     if (!isMacPlatform()) {
+    //       return;
+    //     }
 
     void invoke("set_theme_menu_selection", { theme: themePreference });
   }, [themePreference]);
@@ -339,8 +338,17 @@ function App() {
     });
   }, [panelViewModes.left, panelViewModes.right]);
 
+  const settings = useSettingsStore();
+
   return (
-    <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">
+    <div
+      className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden"
+      style={{
+        "--app-font-size": `${settings.fontSize}px`,
+        "--app-row-height": `${Math.max(24, settings.fontSize * 2)}px`,
+        fontSize: "var(--app-font-size)"
+      } as React.CSSProperties}
+    >
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <FavoritesPanel />
         <div className="relative flex-1 min-h-0 overflow-hidden">

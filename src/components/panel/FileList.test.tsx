@@ -48,10 +48,10 @@ const {
     },
     dragInfo: null as
       | {
-          paths: string[];
-          directoryPaths: string[];
-          sourcePanel: 'left' | 'right';
-        }
+        paths: string[];
+        directoryPaths: string[];
+        sourcePanel: 'left' | 'right';
+      }
       | null,
   },
 }));
@@ -71,8 +71,8 @@ vi.mock('../../store/dialogStore', () => ({
       openDragCopyDialog: mockOpenDragCopyDialog,
       openPreviewDialog: mockOpenPreviewDialog,
     }), {
-      getState: () => ({}),
-    }),
+    getState: () => ({}),
+  }),
 }));
 
 vi.mock('../../store/panelStore', () => ({
@@ -90,16 +90,18 @@ vi.mock('../../store/panelStore', () => ({
       rightPanel: mockPanelState.rightPanel,
       dragInfo: mockPanelState.dragInfo,
       setDragInfo: mockSetDragInfo,
+      leftPanel: { tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab1' },
+      rightPanel: { tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }], activeTabId: 'tab2' },
     }), {
-      getState: () => ({
-        leftPanel: mockPanelState.leftPanel,
-        rightPanel: mockPanelState.rightPanel,
-        dragInfo: mockPanelState.dragInfo,
-        refreshPanel: mockRefreshPanel,
-        setActivePanel: mockSetActivePanel,
-        setDragInfo: mockSetDragInfo,
-      }),
+    getState: () => ({
+      leftPanel: mockPanelState.leftPanel,
+      rightPanel: mockPanelState.rightPanel,
+      dragInfo: mockPanelState.dragInfo,
+      refreshPanel: mockRefreshPanel,
+      setActivePanel: mockSetActivePanel,
     }),
+  }),
+  sortEntries: (entries: any[]) => entries,
 }));
 
 // ── react-virtual mock (예측 가능한 렌더링) ──────────────────────────────────

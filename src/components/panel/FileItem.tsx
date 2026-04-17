@@ -95,7 +95,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       className={clsx(
-        "flex items-center h-[28px] border-b border-transparent group select-none font-mono text-sm cursor-default",
+        "flex items-center border-b border-transparent group select-none font-mono cursor-default",
         {
           "bg-bg-selected theme-selection-text": isSelectionRow,
           "border-dotted border-accent-color": isCursor && isActivePanel,
@@ -110,6 +110,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           "bg-red-500/8 ring-1 ring-inset ring-red-400/70": dropHint === "blocked",
         }
       )}
+      style={{ height: "var(--app-row-height)", fontSize: "var(--app-font-size)" }}
     >
       <div
         className={clsx(

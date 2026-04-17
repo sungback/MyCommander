@@ -56,3 +56,6 @@ Run the smallest relevant checks for the files you touched, then mention what yo
 - If Tauri permission issues occur, inspect both `src-tauri/permissions/` and `src-tauri/tauri.conf.json`.
 - If builds fail unexpectedly, check `build_log.txt` in the repo root.
 - `.omc/` and `.omx/` are tool/config directories and should not be edited unless the task explicitly requires it.
+- **ESM/Vite Compatibility:** Avoid using inline `require()` in frontend source. Use standard ESM `import` or dynamic `import()` to prevent missing `@types/node` TypeScript errors.
+- **Third-Party API Drift:** Always check the exact exported typings when handling UI libraries like `react-resizable-panels` (e.g., `PanelImperativeHandle` instead of `ImperativePanelHandle`, returning maps rather than arrays for layouts).
+- **Zustand Mock Maintenance:** If test files throw "Cannot read properties of undefined", a missing mock data structure in `vi.mock` (like newly added store boundaries, arrays, or mock utility exports) is the most likely cause. Sync test mocks tightly with production store definitions.

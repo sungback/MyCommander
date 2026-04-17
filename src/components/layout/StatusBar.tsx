@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { useUiStore } from "../../store/uiStore";
+import { useDialogStore } from "../../store/dialogStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
@@ -63,9 +64,8 @@ const PanelStatus: React.FC<PanelStatusProps> = ({
   availableSpace,
 }) => (
   <div
-    className={`flex-1 min-w-0 px-4 ${
-      isActive ? "text-text-primary" : "text-text-secondary"
-    }`}
+    className={`flex-1 min-w-0 px-4 ${isActive ? "text-text-primary" : "text-text-secondary"
+      }`}
   >
     <span className="mr-2 uppercase">{panelId}</span>
     <span>
@@ -233,26 +233,7 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
-          {clipboard && (
-            <div className="ml-auto flex items-center gap-1.5 rounded-md border border-border-color bg-bg-panel px-3 py-1.5 text-xs text-text-secondary">
-              {clipboard.operation === "copy"
-                ? <Clipboard size={12} />
-                : <Scissors size={12} />
-              }
-              <span>
-                {clipboard.paths.length}개 항목{" "}
-                {clipboard.operation === "copy" ? "복사됨" : "잘라내기됨"}
-              </span>
-              <button
-                className="ml-1 opacity-60 hover:opacity-100 transition-opacity"
-                title="클립보드 초기화 (Escape)"
-                onClick={clearClipboard}
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {statusMessage && !clipboard ? (
+          {statusMessage ? (
             <div className="ml-auto rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-secondary">
               {statusMessage}
             </div>
