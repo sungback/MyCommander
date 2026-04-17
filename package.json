@@ -13,8 +13,9 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:coverage": "vitest run --coverage",
     "test:all": "npm run test && npm run test:rust",
+    "release:push": "git push origin main && git push origin --tags",
     "version": "node version-sync.cjs && git add src-tauri/tauri.conf.json",
-    "postversion": "git push && git push --tags"
+    "postversion": "echo \"Version updated locally. Push branch and tags explicitly when ready.\""
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",

@@ -1,0 +1,22 @@
+name: "Lint GitHub Actions"
+
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+  workflow_dispatch:
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: actionlint 실행
+        uses: raven-actions/actionlint@v2

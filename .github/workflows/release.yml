@@ -4,30 +4,51 @@ on:
   push:
     tags:
       - "v*" # GitHub에 v1.0.0 같은 형태의 태그를 푸시할 때만 실행됩니다.
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+
+      - name: TypeScript 타입 체크
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Rust 체크
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-
-      - name: Node.js 설치
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: 의존성 설치
-        run: npm install
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
 
       - name: 프론트엔드 테스트 실행
         run: npm run test
 
+      - name: Rust 테스트 실행
+        run: npm run test:rust
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [check, test]
+    steps:
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+        with:
+          install_rust: "false"
+          install_linux_tauri_deps: "false"
+
+      - name: 프런트엔드 빌드
+        run: npm run build
+
   publish-tauri:
-    needs: test
+    needs: [check, test, build]
     permissions:
       contents: write
     strategy:
@@ -51,13 +72,8 @@ jobs:
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-
-      - name: Node.js 설치
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
 
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@stable
@@ -74,9 +90,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: 웹 프론트엔드 의존성 설치 (npm)
-        run: npm install
 
       - name: macOS 배포 서명 설정 확인
         if: matrix.platform == 'macos-latest'
@@ -126,8 +139,8 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         with:
-          # package.json의 version을 읽어서 자동으로 태그/타이틀을 만듭니다.
-          tagName: app-v__VERSION__ 
+          # package.json version과 동일한 v* 태그 규칙을 유지합니다.
+          tagName: v__VERSION__
           releaseName: "MyCommander v__VERSION__"
           releaseBody: "자동으로 빌드된 MyCommander 설치 파일(윈도우, 맥, 리눅스)입니다."
           releaseDraft: false

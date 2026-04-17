@@ -157,15 +157,36 @@ src-tauri/
 ```bash
 git add -A
 git commit -m "release: prepare next version"
-npm version 1.1.4
+npm version 1.1.10
+git push origin main
+git push origin v1.1.10
 ```
 
 `npm version` 실행 시:
 
 - `package.json` 버전이 변경됩니다.
 - `version-sync.cjs`가 `src-tauri/tauri.conf.json` 버전을 함께 맞춥니다.
-- Git 태그가 생성됩니다.
-- `postversion` 스크립트가 `git push`와 `git push --tags`를 실행합니다.
+- Git 태그가 로컬에 생성됩니다.
+- 원격 브랜치와 태그 push는 자동으로 하지 않습니다.
+
+필요하면 명시적으로 다음 스크립트로 브랜치와 태그를 함께 push할 수 있습니다.
+
+```bash
+npm run release:push
+```
+
+릴리스 GitHub Actions는 `v*` 형식의 태그 push 또는 수동 실행(`workflow_dispatch`)으로 시작됩니다.
+
+과거 릴리스 과정에서 생성된 `app-v*` 태그는 legacy 호환용으로 유지합니다. 새 릴리스에서는 `v*` 태그만 사용하며, 더 이상 `app-v*` 태그를 새로 만들지 않습니다.
+
+현재 릴리스 하네스는 다음 순서로 동작합니다.
+
+- `check`: TypeScript 타입 체크와 Rust 체크
+- `test`: 프런트엔드 테스트와 Rust 테스트
+- `build`: 프런트엔드 프로덕션 빌드
+- `publish-tauri`: 위 단계를 모두 통과한 뒤 플랫폼별 Tauri 배포 빌드
+
+GitHub Actions 워크플로 또는 로컬 composite action을 수정할 때는 별도 `actionlint` 워크플로가 먼저 YAML과 액션 구성을 검증합니다.
 
 ## 문제 해결
 

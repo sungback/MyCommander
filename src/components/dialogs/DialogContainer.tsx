@@ -157,7 +157,7 @@ export const DialogContainer: React.FC = () => {
     } else if (openDialog === "mkdir") {
       setInputValue("");
     } else if (openDialog === "newfile") {
-      setInputValue("New File.txt");
+      setInputValue("");
     } else if (openDialog === "rename" && dialogTarget) {
       setInputValue(getPathBaseName(dialogTarget.path));
     } else {
