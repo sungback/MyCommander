@@ -74,7 +74,7 @@
 | State | Zustand |
 | Desktop Shell | Tauri v2 |
 | Backend | Rust, Tauri custom commands |
-| UI | Radix UI Dialog, Lucide React |
+| UI | Radix UI Dialog, Lucide React, `react-resizable-panels` |
 | Virtualized List | `@tanstack/react-virtual` |
 | Preview Helpers | `highlight.js`, `marked`, `xlsx`, `jszip` |
 | Utilities | `date-fns`, `clsx`, `tailwind-merge` |
@@ -158,6 +158,7 @@ MyCommander/
 ### UI/상호작용
 
 - `FileList.tsx`는 가상 스크롤과 키보드/드래그 상호작용의 핵심입니다.
+- `DualPanel.tsx`는 `react-resizable-panels`을 사용하여 패널 ID 맵을 기반으로 너비 비율과 스플릿 상태를 관리합니다.
 - `AddressBar.tsx`는 breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화를 담당합니다.
 - `StatusBar.tsx`는 패널 요약, 여유 공간, 현재 경로 명령 실행 입력창, 하단 액션 버튼을 제공합니다.
 - 일부 UI 상태는 `localStorage`에 저장됩니다.
