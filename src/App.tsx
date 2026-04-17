@@ -17,6 +17,8 @@ import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { buildMultiRenameSession } from "./features/multiRename";
 import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
+import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
+import { useSettingsStore } from "./store/settingsStore";
 
 type PanelId = "left" | "right";
 

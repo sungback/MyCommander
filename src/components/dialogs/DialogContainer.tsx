@@ -7,6 +7,8 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getPathDirectoryName, isAbsolutePath, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
+import { showTransientStatusMessage } from "../../hooks/useAppCommands";
+import { SettingsDialog } from "./SettingsDialog";
 
 const getPathBaseName = (path: string) => {
   const normalized = path.replace(/[\\/]+$/, "");

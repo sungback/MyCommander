@@ -204,6 +204,32 @@ export const FileList: React.FC<FileListProps> = ({
   );
   const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
+  const settingsFontSize = useSettingsStore((s) => s.fontSize);
+  const rowHeight = Math.max(24, settingsFontSize * 2);
+
+  const handleDraggedCopy = async (
+    paths: string[],
+    targetPath: string,
+    targetPanelId: "left" | "right"
+  ) => {
+    const conflicts = await checkCopyConflicts(paths, targetPath);
+
+    if (conflicts.length > 0) {
+      setActivePanel(panelId);
+      openDragCopyDialog({
+        sourcePanelId: panelId,
+        targetPanelId,
+        sourcePaths: paths,
+        targetPath,
+      });
+      return false;
+    }
+
+    await copyFiles(paths, targetPath);
+    refreshPanelsForDirectories([currentPath, targetPath]);
+    showTransientStatusMessage("선택한 파일을 복사했습니다.");
+    return true;
+  };
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
