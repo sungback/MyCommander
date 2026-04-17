@@ -1,6 +1,7 @@
 import React from "react";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { createBottomActionDefinitions } from "./bottomActions";
+import { useDialogStore } from "../../store/dialogStore";
 
 export const Toolbar: React.FC = () => {
   const isMac = isMacPlatform();
@@ -24,7 +25,6 @@ export const Toolbar: React.FC = () => {
       <div className="flex items-center">
         <button
           onClick={() => {
-            const { useDialogStore } = require("../../store/dialogStore");
             useDialogStore.getState().setOpenDialog("settings");
           }}
           className="flex items-center gap-2 px-2 py-1.5 text-sm rounded bg-transparent hover:bg-bg-hover active:opacity-80 transition-colors text-text-secondary hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-color"

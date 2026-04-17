@@ -5,7 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileEntry, ViewMode } from "../../types/file";
 import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
-import { usePanelStore } from "../../store/panelStore";
+import { usePanelStore, sortEntries } from "../../store/panelStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useUiStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -77,6 +77,8 @@ const getVisibleRows = (
   expandedPaths: Set<string>,
   childEntriesByPath: Record<string, FileEntry[]>,
   sizeCache: Record<string, number>,
+  sortField: string,
+  sortDirection: "asc" | "desc",
   depth = 0
 ): VisibleEntryRow[] => {
   const rows: VisibleEntryRow[] = [];
@@ -94,13 +96,24 @@ const getVisibleRows = (
     if (!isExpanded) continue;
 
     const children = childEntriesByPath[entry.path] ?? [];
-    const filteredChildren = children.filter((child) => child.name !== "..");
+    // Apply sizeCache to children before sorting so that dynamically updated sizes sort properly
+    const resolvedChildren = children.map(child => {
+      const cSize = sizeCache[child.path.normalize("NFC")];
+      return cSize !== undefined ? { ...child, size: cSize } : child;
+    });
+    
+    // Sort children
+    const filteredChildren = resolvedChildren.filter((child) => child.name !== "..");
+    const sortedChildren = sortEntries(filteredChildren, sortField, sortDirection);
+    
     rows.push(
       ...getVisibleRows(
-        filteredChildren,
+        sortedChildren,
         expandedPaths,
         childEntriesByPath,
         sizeCache,
+        sortField,
+        sortDirection,
         depth + 1
       )
     );
@@ -154,6 +167,12 @@ export const FileList: React.FC<FileListProps> = ({
   const setDragInfo = usePanelStore((s) => s.setDragInfo);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
+  const activeTab = usePanelStore((s) => {
+    const key = panelId === "left" ? "leftPanel" : "rightPanel";
+    return s[key].tabs.find((t) => t.id === s[key].activeTabId);
+  });
+  const sortField = activeTab?.sortField ?? "name";
+  const sortDirection = activeTab?.sortDirection ?? "asc";
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<
     Record<string, FileEntry[]>
@@ -187,7 +206,9 @@ export const FileList: React.FC<FileListProps> = ({
     files,
     expandedPaths,
     childEntriesByPath,
-    sizeCache
+    sizeCache,
+    sortField as string,
+    sortDirection as "asc" | "desc"
   );
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);

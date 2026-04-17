@@ -225,7 +225,7 @@ const writePersistedPanelState = (state: PersistedPanelState) => {
   }
 };
 
-const sortEntries = (
+export const sortEntries = (
   entries: FileEntry[],
   field: string,
   direction: "asc" | "desc"
@@ -416,7 +416,9 @@ const updatePanelEntrySize = (
       return entry;
     });
 
-    return tabChanged ? { ...tab, files } : tab;
+    return tabChanged
+      ? { ...tab, files: sortEntries(files, tab.sortField, tab.sortDirection) }
+      : tab;
   });
 
   return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;

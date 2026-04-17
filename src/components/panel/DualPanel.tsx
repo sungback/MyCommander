@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, ImperativePanelHandle } from "react-resizable-panels";
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, PanelImperativeHandle } from "react-resizable-panels";
 import { FilePanel } from "./FilePanel";
 import { useSettingsStore } from "../../store/settingsStore";
 
@@ -7,7 +7,7 @@ export const DualPanel: React.FC = () => {
   const panelLeftRatio = useSettingsStore(s => s.panelLeftRatio);
   const setPanelLeftRatio = useSettingsStore(s => s.setPanelLeftRatio);
   
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const leftPanelRef = useRef<PanelImperativeHandle>(null);
 
   useEffect(() => {
     if (leftPanelRef.current) {
@@ -22,14 +22,13 @@ export const DualPanel: React.FC = () => {
     <PanelGroup 
       orientation="horizontal" 
       className="flex-1 w-full h-full flex min-h-0 overflow-hidden"
-      autoSaveId="dual-panel-sizes"
-      onLayout={(sizes) => {
+      onLayoutChanged={(sizes: number[]) => {
         if (sizes.length === 2 && Math.abs(sizes[0] - panelLeftRatio) > 0.5) {
           setPanelLeftRatio(sizes[0]);
         }
       }}
     >
-      <Panel ref={leftPanelRef} defaultSize={panelLeftRatio} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Panel panelRef={leftPanelRef} defaultSize={panelLeftRatio} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
         <FilePanel id="left" />
       </Panel>
 
