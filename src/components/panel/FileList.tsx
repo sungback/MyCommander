@@ -8,6 +8,7 @@ import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useUiStore } from "../../store/uiStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
 
 interface FileListProps {
@@ -191,10 +192,13 @@ export const FileList: React.FC<FileListProps> = ({
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
 
+  const fontSize = useSettingsStore((s) => s.fontSize);
+  const rowHeight = Math.max(24, fontSize * 2);
+
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => rowHeight,
     overscan: 10,
   });
 

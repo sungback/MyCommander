@@ -14,6 +14,7 @@ export type DialogType =
   | "sync"
   | "multirename"
   | "progress"
+  | "settings"
   | null;
 
 export interface DialogTarget {

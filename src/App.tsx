@@ -17,6 +17,7 @@ import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { buildMultiRenameSession } from "./features/multiRename";
 import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
+import { useSettingsStore } from "./store/settingsStore";
 
 type PanelId = "left" | "right";
 
@@ -337,8 +338,17 @@ function App() {
     });
   }, [panelViewModes.left, panelViewModes.right]);
 
+  const settings = useSettingsStore();
+
   return (
-    <div className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden">
+    <div 
+      className="flex flex-col h-screen bg-bg-primary text-text-primary font-sans overflow-hidden"
+      style={{
+        "--app-font-size": `${settings.fontSize}px`,
+        "--app-row-height": `${Math.max(24, settings.fontSize * 2)}px`,
+        fontSize: "var(--app-font-size)"
+      } as React.CSSProperties}
+    >
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <FavoritesPanel />
         <div className="relative flex-1 min-h-0 overflow-hidden">
