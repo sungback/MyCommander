@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 공통 CI 환경 준비
         uses: ./.github/actions/setup-ci
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 공통 CI 환경 준비
         uses: ./.github/actions/setup-ci
@@ -45,7 +45,7 @@ jobs:
     needs: [check, test]
     steps:
       - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 공통 CI 환경 준비
         uses: ./.github/actions/setup-ci
@@ -82,7 +82,7 @@ jobs:
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 공통 JS 환경 준비
         uses: ./.github/actions/setup-js
