@@ -224,7 +224,7 @@ cargo clean --manifest-path src-tauri/Cargo.toml
 - `src-tauri/permissions/`와 `src-tauri/capabilities/` 확인
 - `src-tauri/tauri.conf.json` 확인
 
-## 참고
+## 참고1
 
 - 프로젝트 컨텍스트 문서는 [CLAUDE.md](./CLAUDE.md)
 - 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)
