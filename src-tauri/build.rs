@@ -23,6 +23,8 @@ fn main() {
         "move_files",
         "extract_zip",
         "create_zip",
+        "create_zip_from_paths",
+        "cancel_zip_operation",
         "read_file_content",
         "search_files",
         "get_dir_size",

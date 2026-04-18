@@ -2,21 +2,27 @@ import React, { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { useDialogStore } from "../../store/dialogStore";
+import { formatSize } from "../../utils/format";
+import { useFileSystem } from "../../hooks/useFileSystem";
 
 interface ProgressPayload {
-  operation: "copy" | "move";
+  operation: "copy" | "move" | "zip";
   current: number;
   total: number;
   currentFile: string;
+  unit: "items" | "bytes";
 }
 
 export const ProgressDialog: React.FC = () => {
   const { openDialog } = useDialogStore();
+  const { cancelZipOperation } = useFileSystem();
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (openDialog !== "progress") {
       setProgress(null);
+      setIsCancelling(false);
       return;
     }
 
@@ -45,7 +51,18 @@ export const ProgressDialog: React.FC = () => {
   const percent = progress && progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0;
-  const operationLabel = progress?.operation === "move" ? "Moving" : "Copying";
+  const operationLabel =
+    progress?.operation === "move"
+      ? "Moving"
+      : progress?.operation === "zip"
+        ? "Compressing"
+        : "Copying";
+  const canCancel = progress?.operation === "zip";
+  const progressText = progress
+    ? progress.unit === "bytes"
+      ? `${formatSize(progress.current)} / ${formatSize(progress.total)}`
+      : `${progress.current} / ${progress.total}`
+    : "";
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={() => {}}>
@@ -70,7 +87,7 @@ export const ProgressDialog: React.FC = () => {
                 )}
               </span>
               <span className="shrink-0 ml-2">
-                {progress ? `${progress.current} / ${progress.total}` : ""}
+                {progressText}
               </span>
             </div>
 
@@ -82,6 +99,29 @@ export const ProgressDialog: React.FC = () => {
             </div>
 
             <p className="text-xs text-text-secondary text-right">{percent}%</p>
+
+            {canCancel ? (
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCancelling) {
+                      return;
+                    }
+
+                    setIsCancelling(true);
+                    void cancelZipOperation().catch((error) => {
+                      console.error("Failed to cancel archive creation:", error);
+                      setIsCancelling(false);
+                    });
+                  }}
+                  disabled={isCancelling}
+                  className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isCancelling ? "Cancelling..." : "Cancel"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

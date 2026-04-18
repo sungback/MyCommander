@@ -7,6 +7,7 @@ const {
   mockSetOpenDialog,
   mockOpenRenameDialog,
   mockOpenInfoDialog,
+  mockCloseDialog,
   mockRefreshPanel,
   mockSetActivePanel,
   mockCreateZip,
@@ -20,6 +21,7 @@ const {
   mockSetOpenDialog: vi.fn(),
   mockOpenRenameDialog: vi.fn(),
   mockOpenInfoDialog: vi.fn(),
+  mockCloseDialog: vi.fn(),
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockCreateZip: vi.fn(),
@@ -110,6 +112,7 @@ vi.mock("../../store/dialogStore", () => ({
             setOpenDialog: mockSetOpenDialog,
             openRenameDialog: mockOpenRenameDialog,
             openInfoDialog: mockOpenInfoDialog,
+            closeDialog: mockCloseDialog,
           })
         : null,
     {
@@ -117,6 +120,7 @@ vi.mock("../../store/dialogStore", () => ({
         setOpenDialog: mockSetOpenDialog,
         openRenameDialog: mockOpenRenameDialog,
         openInfoDialog: mockOpenInfoDialog,
+        closeDialog: mockCloseDialog,
       }),
     }
   ),

@@ -65,7 +65,8 @@ export const ContextMenu: React.FC = () => {
         }
 
         const { panelId, panel, targetPath, targetEntry } = context;
-        const { setOpenDialog, openRenameDialog, openInfoDialog } = useDialogStore.getState();
+        const { setOpenDialog, openRenameDialog, openInfoDialog, closeDialog } =
+          useDialogStore.getState();
         const { setActivePanel, refreshPanel } = usePanelStore.getState();
         const { closeContextMenu } = useContextMenuStore.getState();
 
@@ -100,16 +101,24 @@ export const ContextMenu: React.FC = () => {
                 return;
               }
               setActivePanel(panelId);
+              setOpenDialog("progress");
               const selectedPaths = [...panel.selectedItems];
-              if (selectedPaths.length > 1) {
-                // 다중 선택: 선택된 항목 모두 압축
-                const archiveName =
-                  panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
-                  "Archive";
-                await fs.createZipFromPaths(selectedPaths, panel.currentPath, archiveName);
-              } else {
-                if (targetEntry.kind !== "directory") return;
-                await fs.createZip(targetPath);
+              try {
+                if (selectedPaths.length > 1) {
+                  // 다중 선택: 선택된 항목 모두 압축
+                  const archiveName =
+                    panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
+                    "Archive";
+                  await fs.createZipFromPaths(selectedPaths, panel.currentPath, archiveName);
+                } else {
+                  if (targetEntry.kind !== "directory") {
+                    closeDialog();
+                    return;
+                  }
+                  await fs.createZip(targetPath);
+                }
+              } finally {
+                closeDialog();
               }
               refreshPanel(panelId);
               closeContextMenu();
@@ -154,6 +163,12 @@ export const ContextMenu: React.FC = () => {
           }
         } catch (error) {
           console.error("Failed to handle native context menu action:", error);
+          const message =
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : "";
 
           switch (event.payload) {
             case "reveal":
@@ -166,6 +181,12 @@ export const ContextMenu: React.FC = () => {
               showTransientStatusMessage("클립보드를 사용할 수 없습니다.");
               break;
             case "create-zip":
+              if (message.toLowerCase().includes("canceled")) {
+                showTransientStatusMessage("압축을 취소했습니다.");
+                break;
+              }
+              showTransientStatusMessage("압축 작업을 완료하지 못했습니다.");
+              break;
             case "extract-zip":
               showTransientStatusMessage("압축 작업을 완료하지 못했습니다.");
               break;

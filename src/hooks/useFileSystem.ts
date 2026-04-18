@@ -150,6 +150,10 @@ const fileSystem = {
     });
   },
 
+  cancelZipOperation: async (): Promise<void> => {
+    await invoke("cancel_zip_operation");
+  },
+
   renameFile: async (oldPath: string, newPath: string): Promise<void> => {
     await invoke("rename_file", {
       old_path: oldPath,

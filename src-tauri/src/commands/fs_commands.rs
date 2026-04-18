@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::UNIX_EPOCH;
 use tauri::Emitter;
 
@@ -10,9 +13,10 @@ use tauri::Emitter;
 #[serde(rename_all = "camelCase")]
 pub struct ProgressPayload {
     pub operation: String,
-    pub current: usize,
-    pub total: usize,
+    pub current: u64,
+    pub total: u64,
     pub current_file: String,
+    pub unit: String,
 }
 
 #[cfg(target_os = "macos")]
@@ -44,6 +48,37 @@ struct PreparedBatchRenameOperation {
     old_path: PathBuf,
     new_path: PathBuf,
     temp_path: PathBuf,
+}
+
+static ZIP_OPERATION_STATE: OnceLock<Mutex<Option<Arc<AtomicBool>>>> = OnceLock::new();
+
+fn zip_operation_state() -> &'static Mutex<Option<Arc<AtomicBool>>> {
+    ZIP_OPERATION_STATE.get_or_init(|| Mutex::new(None))
+}
+
+fn begin_zip_operation() -> Result<Arc<AtomicBool>, String> {
+    let mut state = zip_operation_state()
+        .lock()
+        .map_err(|_| "Failed to lock zip operation state".to_string())?;
+
+    if state.is_some() {
+        return Err("Another archive operation is already in progress.".to_string());
+    }
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    *state = Some(cancel_flag.clone());
+    Ok(cancel_flag)
+}
+
+fn end_zip_operation(cancel_flag: &Arc<AtomicBool>) {
+    if let Ok(mut state) = zip_operation_state().lock() {
+        if state
+            .as_ref()
+            .is_some_and(|active_flag| Arc::ptr_eq(active_flag, cancel_flag))
+        {
+            *state = None;
+        }
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -207,7 +242,7 @@ pub async fn copy_files(
     keep_both: Option<bool>,
 ) -> Result<Vec<String>, String> {
     let keep_both = keep_both.unwrap_or(false);
-    let total = source_paths.len();
+    let total = source_paths.len() as u64;
     tokio::task::spawn_blocking(move || {
         if source_paths.is_empty() {
             return Ok(vec![]);
@@ -225,6 +260,7 @@ pub async fn copy_files(
                     current: 1,
                     total,
                     current_file: file_name,
+                    unit: "items".to_string(),
                 },
             );
             let saved = copy_single_path(Path::new(&source_paths[0]), &target_path, keep_both)?;
@@ -247,9 +283,10 @@ pub async fn copy_files(
                 "fs-progress",
                 ProgressPayload {
                     operation: "copy".to_string(),
-                    current: i + 1,
+                    current: (i + 1) as u64,
                     total,
                     current_file: file_name,
+                    unit: "items".to_string(),
                 },
             );
             let saved = copy_path_into_dir(Path::new(source), target_root, keep_both)?;
@@ -267,7 +304,7 @@ pub async fn move_files(
     source_paths: Vec<String>,
     target_dir: String,
 ) -> Result<(), String> {
-    let total = source_paths.len();
+    let total = source_paths.len() as u64;
     for (i, path) in source_paths.iter().enumerate() {
         let src = Path::new(path);
         if let Some(file_name) = src.file_name() {
@@ -276,18 +313,12 @@ pub async fn move_files(
 
             // 같은 경로로 이동하는 경우 에러 반환
             if src == dest {
-                return Err(format!(
-                    "이미 같은 위치에 있습니다: {}",
-                    file_name_str
-                ));
+                return Err(format!("이미 같은 위치에 있습니다: {}", file_name_str));
             }
             // canonical path 비교 (심볼릭 링크 등 고려)
             if let (Ok(src_c), Ok(dest_c)) = (src.canonicalize(), dest.canonicalize()) {
                 if src_c == dest_c {
-                    return Err(format!(
-                        "이미 같은 위치에 있습니다: {}",
-                        file_name_str
-                    ));
+                    return Err(format!("이미 같은 위치에 있습니다: {}", file_name_str));
                 }
             }
 
@@ -295,9 +326,10 @@ pub async fn move_files(
                 "fs-progress",
                 ProgressPayload {
                     operation: "move".to_string(),
-                    current: i + 1,
+                    current: (i + 1) as u64,
                     total,
                     current_file: file_name_str,
+                    unit: "items".to_string(),
                 },
             );
             fs::rename(src, &dest).map_err(|e| e.to_string())?;
@@ -314,23 +346,46 @@ pub async fn extract_zip(path: String) -> Result<String, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn create_zip(path: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || create_zip_archive(&path))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn create_zip(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let cancel_flag = begin_zip_operation()?;
+    tokio::task::spawn_blocking(move || {
+        let result = create_zip_archive(&app, &path, &cancel_flag);
+        end_zip_operation(&cancel_flag);
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_zip_from_paths(
+    app: tauri::AppHandle,
     paths: Vec<String>,
     target_dir: String,
     archive_name: String,
 ) -> Result<String, String> {
+    let cancel_flag = begin_zip_operation()?;
     tokio::task::spawn_blocking(move || {
-        create_zip_archive_from_paths(&paths, &target_dir, &archive_name)
+        let result =
+            create_zip_archive_from_paths(&app, &paths, &target_dir, &archive_name, &cancel_flag);
+        end_zip_operation(&cancel_flag);
+        result
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn cancel_zip_operation() -> Result<(), String> {
+    let state = zip_operation_state()
+        .lock()
+        .map_err(|_| "Failed to lock zip operation state".to_string())?;
+
+    if let Some(cancel_flag) = state.as_ref() {
+        cancel_flag.store(true, Ordering::SeqCst);
+    }
+
+    Ok(())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -395,92 +450,204 @@ fn extract_zip_archive(path: &str) -> Result<String, String> {
     fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "macos")]
-    let status = Command::new("ditto")
-        .args(["-x", "-k"])
-        .arg(archive_path)
-        .arg(&target_dir)
-        .status()
-        .map_err(|e| e.to_string())?;
+    {
+        let ditto_output = Command::new("ditto")
+            .args(["-x", "-k"])
+            .arg(archive_path)
+            .arg(&target_dir)
+            .output()
+            .map_err(|e| {
+                format!(
+                    "Failed to run ditto while extracting archive into {}: {e}",
+                    target_dir.display()
+                )
+            })?;
+
+        if !ditto_output.status.success() {
+            let ditto_error = format_command_failure("ditto", &ditto_output);
+
+            let _ = fs::remove_dir_all(&target_dir);
+            fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+
+            let unzip_output = Command::new("unzip")
+                .args(["-q"])
+                .arg(archive_path)
+                .args(["-d"])
+                .arg(&target_dir)
+                .output()
+                .map_err(|e| {
+                    format!(
+                        "Failed to run unzip fallback while extracting archive into {} after {ditto_error}: {e}",
+                        target_dir.display()
+                    )
+                })?;
+
+            if !unzip_output.status.success() {
+                let _ = fs::remove_dir_all(&target_dir);
+                let problem = describe_invalid_zip_problem([&ditto_output, &unzip_output]);
+                return Err(format!(
+                    "Failed to extract archive into {}. {} {ditto_error}; fallback {}",
+                    target_dir.display(),
+                    problem,
+                    format_command_failure("unzip", &unzip_output)
+                ));
+            }
+        }
+    }
 
     #[cfg(target_os = "linux")]
-    let status = Command::new("unzip")
-        .args(["-q"])
-        .arg(archive_path)
-        .args(["-d"])
-        .arg(&target_dir)
-        .status()
-        .map_err(|e| e.to_string())?;
+    {
+        let output = Command::new("unzip")
+            .args(["-q"])
+            .arg(archive_path)
+            .args(["-d"])
+            .arg(&target_dir)
+            .output()
+            .map_err(|e| {
+                format!(
+                    "Failed to run unzip while extracting archive into {}: {e}",
+                    target_dir.display()
+                )
+            })?;
+
+        if !output.status.success() {
+            let _ = fs::remove_dir_all(&target_dir);
+            let problem = describe_invalid_zip_problem([&output]);
+            return Err(format!(
+                "Failed to extract archive into {}. {} {}",
+                target_dir.display(),
+                problem,
+                format_command_failure("unzip", &output)
+            ));
+        }
+    }
 
     #[cfg(target_os = "windows")]
-    let status = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1]",
-        ])
-        .arg(archive_path)
-        .arg(&target_dir)
-        .status()
-        .map_err(|e| e.to_string())?;
+    {
+        let output = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1]",
+            ])
+            .arg(archive_path)
+            .arg(&target_dir)
+            .output()
+            .map_err(|e| {
+                format!(
+                    "Failed to run PowerShell while extracting archive into {}: {e}",
+                    target_dir.display()
+                )
+            })?;
 
-    if !status.success() {
-        let _ = fs::remove_dir_all(&target_dir);
-        return Err(format!(
-            "Failed to extract archive into {}",
-            target_dir.display()
-        ));
+        if !output.status.success() {
+            let _ = fs::remove_dir_all(&target_dir);
+            let problem = describe_invalid_zip_problem([&output]);
+            return Err(format!(
+                "Failed to extract archive into {}. {} {}",
+                target_dir.display(),
+                problem,
+                format_command_failure("powershell", &output)
+            ));
+        }
     }
+
     Ok(target_dir.to_string_lossy().to_string())
 }
 
-fn create_zip_archive(path: &str) -> Result<String, String> {
-    use std::process::Command;
+fn format_command_failure(command_name: &str, output: &std::process::Output) -> String {
+    let status = output
+        .status
+        .code()
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "terminated by signal".to_string());
+    let stderr = compact_command_output(&output.stderr);
+    let stdout = compact_command_output(&output.stdout);
+    let mut details = Vec::new();
 
-    let source_dir = Path::new(path);
+    if let Some(stderr) = stderr {
+        details.push(format!("stderr: {stderr}"));
+    }
+    if let Some(stdout) = stdout {
+        details.push(format!("stdout: {stdout}"));
+    }
+
+    if details.is_empty() {
+        format!("{command_name} exited with status {status}")
+    } else {
+        format!(
+            "{command_name} exited with status {status} ({})",
+            details.join(" | ")
+        )
+    }
+}
+
+fn compact_command_output(output: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(output);
+    let compact = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.is_empty() {
+        None
+    } else {
+        Some(compact)
+    }
+}
+
+fn describe_invalid_zip_problem<'a, I>(outputs: I) -> &'static str
+where
+    I: IntoIterator<Item = &'a std::process::Output>,
+{
+    if outputs
+        .into_iter()
+        .any(command_output_indicates_invalid_zip)
+    {
+        "Archive appears to be corrupted or incomplete."
+    } else {
+        "Archive extraction failed."
+    }
+}
+
+fn command_output_indicates_invalid_zip(output: &std::process::Output) -> bool {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    indicates_invalid_zip_message(&stderr) || indicates_invalid_zip_message(&stdout)
+}
+
+fn indicates_invalid_zip_message(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+
+    lower.contains("pkzip signature")
+        || lower.contains("end-of-central-directory signature not found")
+        || lower.contains("cannot find zipfile directory")
+        || lower.contains("not a zip archive")
+        || lower.contains("central directory")
+}
+
+fn create_zip_archive(
+    app: &tauri::AppHandle,
+    path: &str,
+    cancel_flag: &Arc<AtomicBool>,
+) -> Result<String, String> {
+    let source_dir = validate_zip_source_directory(path)?;
+    let archive_path = get_unique_archive_path(&source_dir)?;
+    let total_entries = count_zip_entries_for_directory_contents(&source_dir)?;
+
+    create_zip_archive_with_zip_command(
+        app,
+        source_dir.clone(),
+        archive_path,
+        vec![".".to_string()],
+        total_entries,
+        cancel_flag,
+    )
+}
+
+fn validate_zip_source_directory(path: &str) -> Result<PathBuf, String> {
+    let source_dir = PathBuf::from(path);
     if !source_dir.is_dir() {
         return Err(format!("{path} is not a directory"));
     }
 
-    let archive_path = get_unique_archive_path(source_dir)?;
-
-    #[cfg(target_os = "macos")]
-    let status = Command::new("ditto")
-        .args(["-c", "-k", "."])
-        .current_dir(source_dir)
-        .arg(&archive_path)
-        .status()
-        .map_err(|e| e.to_string())?;
-
-    #[cfg(target_os = "linux")]
-    let status = Command::new("zip")
-        .args(["-rq"])
-        .arg(&archive_path)
-        .arg(".")
-        .current_dir(source_dir)
-        .status()
-        .map_err(|e| e.to_string())?;
-
-    #[cfg(target_os = "windows")]
-    let status = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "$items = @(Get-ChildItem -LiteralPath $args[0] -Force); if ($items.Count -eq 0) { throw 'Cannot compress an empty directory.' }; Compress-Archive -LiteralPath $items.FullName -DestinationPath $args[1]",
-        ])
-        .arg(source_dir)
-        .arg(&archive_path)
-        .status()
-        .map_err(|e| e.to_string())?;
-
-    if !status.success() {
-        let _ = fs::remove_file(&archive_path);
-        return Err(format!(
-            "Failed to create archive at {}",
-            archive_path.display()
-        ));
-    }
-
-    Ok(archive_path.to_string_lossy().to_string())
+    Ok(source_dir)
 }
 
 fn get_unique_extraction_dir(archive_path: &Path) -> Result<PathBuf, String> {
@@ -560,12 +727,12 @@ fn get_unique_archive_path_named(target_dir: &Path, stem: &str) -> Result<PathBu
 }
 
 fn create_zip_archive_from_paths(
+    app: &tauri::AppHandle,
     paths: &[String],
     target_dir: &str,
     archive_name: &str,
+    cancel_flag: &Arc<AtomicBool>,
 ) -> Result<String, String> {
-    use std::process::Command;
-
     if paths.is_empty() {
         return Err("No paths provided".to_string());
     }
@@ -577,71 +744,321 @@ fn create_zip_archive_from_paths(
         archive_name
     };
     let archive_path = get_unique_archive_path_named(target_dir_path, stem)?;
-
-    // Collect only the file/folder names (relative to target_dir) that exist
-    let item_names: Vec<String> = paths
+    let entry_names = paths
         .iter()
-        .filter_map(|p| {
-            let path = Path::new(p);
-            if path.exists() {
-                path.file_name()?.to_str().map(|s| s.to_owned())
-            } else {
-                None
+        .filter_map(|raw_path| {
+            let path = PathBuf::from(raw_path);
+            if !path.exists() {
+                return None;
             }
-        })
-        .collect();
 
-    if item_names.is_empty() {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_string())
+        })
+        .collect::<Vec<_>>();
+
+    if entry_names.is_empty() {
         return Err("No valid paths to compress".to_string());
     }
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    let status = {
-        let mut cmd = Command::new("zip");
-        cmd.arg("-r").arg(&archive_path);
-        for name in &item_names {
-            cmd.arg(name);
-        }
-        cmd.current_dir(target_dir_path)
-            .status()
-            .map_err(|e| e.to_string())?
-    };
+    let total_entries = count_zip_entries_for_named_paths(target_dir_path, &entry_names)?;
 
-    #[cfg(target_os = "windows")]
-    let status = {
-        let paths_ps = item_names
-            .iter()
-            .map(|n| {
-                format!(
-                    "'{}'",
-                    target_dir_path
-                        .join(n)
-                        .to_string_lossy()
-                        .replace('\'', "''")
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
-        let dest = archive_path.to_string_lossy();
-        let script = format!(
-            "Compress-Archive -LiteralPath {} -DestinationPath '{}'",
-            paths_ps, dest
-        );
-        Command::new("powershell")
-            .args(["-NoProfile", "-Command", &script])
-            .status()
-            .map_err(|e| e.to_string())?
-    };
+    create_zip_archive_with_zip_command(
+        app,
+        target_dir_path.to_path_buf(),
+        archive_path,
+        entry_names,
+        total_entries,
+        cancel_flag,
+    )
+}
 
-    if !status.success() {
-        let _ = fs::remove_file(&archive_path);
-        return Err(format!(
-            "Failed to create archive at {}",
-            archive_path.display()
-        ));
+fn count_zip_entries_for_directory_contents(source_dir: &Path) -> Result<u64, String> {
+    let mut total_entries = 0u64;
+
+    for entry in walkdir::WalkDir::new(source_dir)
+        .sort_by_file_name()
+        .min_depth(1)
+    {
+        entry.map_err(|e| e.to_string())?;
+        total_entries += 1;
     }
 
-    Ok(archive_path.to_string_lossy().to_string())
+    Ok(total_entries.max(1))
+}
+
+fn count_zip_entries_for_named_paths(
+    working_dir: &Path,
+    entry_names: &[String],
+) -> Result<u64, String> {
+    let mut total_entries = 0u64;
+
+    for entry_name in entry_names {
+        let path = working_dir.join(entry_name);
+        let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+
+        if metadata.is_file() {
+            total_entries += 1;
+            continue;
+        }
+
+        if metadata.is_dir() {
+            total_entries += 1;
+            for entry in walkdir::WalkDir::new(&path)
+                .sort_by_file_name()
+                .min_depth(1)
+            {
+                entry.map_err(|e| e.to_string())?;
+                total_entries += 1;
+            }
+        }
+    }
+
+    Ok(total_entries.max(1))
+}
+
+fn create_zip_archive_with_zip_command(
+    app: &tauri::AppHandle,
+    working_dir: PathBuf,
+    archive_path: PathBuf,
+    entries: Vec<String>,
+    total_entries: u64,
+    cancel_flag: &Arc<AtomicBool>,
+) -> Result<String, String> {
+    use std::process::{Command, Stdio};
+
+    let temp_archive_path = get_hidden_temp_archive_path(&archive_path)?;
+    let temp_archive_arg = temp_archive_path.to_string_lossy().to_string();
+
+    let progress_counter = Arc::new(AtomicU64::new(0));
+    emit_zip_progress(app, 0, total_entries, "Preparing...");
+
+    let mut command = Command::new("zip");
+    command
+        .current_dir(&working_dir)
+        .args(["-r", "-1", &temp_archive_arg, "--"])
+        .args(&entries)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command.spawn().map_err(|e| {
+        format!(
+            "Failed to start zip while creating archive at {}: {e}",
+            archive_path.display()
+        )
+    })?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture zip stdout.".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to capture zip stderr.".to_string())?;
+
+    let progress_counter_for_stdout = progress_counter.clone();
+    let app_for_stdout = app.clone();
+    let stdout_handle = std::thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        let mut collected = Vec::new();
+
+        for line_result in reader.lines() {
+            match line_result {
+                Ok(line) => {
+                    let trimmed = line.trim().to_string();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+
+                    if let Some(entry_name) = parse_zip_progress_entry(&trimmed) {
+                        let current =
+                            progress_counter_for_stdout.fetch_add(1, Ordering::SeqCst) + 1;
+                        emit_zip_progress(
+                            &app_for_stdout,
+                            current.min(total_entries),
+                            total_entries,
+                            &entry_name,
+                        );
+                    }
+
+                    collected.push(trimmed);
+                }
+                Err(error) => {
+                    collected.push(format!("stdout read error: {error}"));
+                    break;
+                }
+            }
+        }
+
+        collected
+    });
+
+    let stderr_handle = std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        let mut collected = Vec::new();
+
+        for line_result in reader.lines() {
+            match line_result {
+                Ok(line) => {
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        collected.push(trimmed);
+                    }
+                }
+                Err(error) => {
+                    collected.push(format!("stderr read error: {error}"));
+                    break;
+                }
+            }
+        }
+
+        collected
+    });
+
+    loop {
+        if cancel_flag.load(Ordering::SeqCst) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let stdout_lines = stdout_handle.join().unwrap_or_default();
+            let stderr_lines = stderr_handle.join().unwrap_or_default();
+            let _ = fs::remove_file(&temp_archive_path);
+            return Err(build_zip_canceled_message(&stdout_lines, &stderr_lines));
+        }
+
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(status) => {
+                let stdout_lines = stdout_handle.join().unwrap_or_default();
+                let stderr_lines = stderr_handle.join().unwrap_or_default();
+
+                if !status.success() {
+                    let _ = fs::remove_file(&temp_archive_path);
+                    return Err(format!(
+                        "Failed to create archive at {}. {}",
+                        archive_path.display(),
+                        build_zip_failure_details(status.code(), &stdout_lines, &stderr_lines)
+                    ));
+                }
+
+                emit_zip_progress(
+                    app,
+                    total_entries,
+                    total_entries,
+                    archive_path.to_string_lossy().as_ref(),
+                );
+                fs::rename(&temp_archive_path, &archive_path).map_err(|e| {
+                    let _ = fs::remove_file(&temp_archive_path);
+                    format!(
+                        "Failed to finalize archive at {}: {e}",
+                        archive_path.display()
+                    )
+                })?;
+
+                return Ok(archive_path.to_string_lossy().to_string());
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(100)),
+        }
+    }
+}
+
+fn parse_zip_progress_entry(line: &str) -> Option<String> {
+    let stripped = line.strip_prefix("adding:")?.trim();
+    let entry = stripped
+        .split_once(" (")
+        .map(|(name, _)| name)
+        .unwrap_or(stripped)
+        .trim();
+
+    if entry.is_empty() {
+        None
+    } else {
+        Some(entry.to_string())
+    }
+}
+
+fn build_zip_failure_details(
+    status_code: Option<i32>,
+    stdout_lines: &[String],
+    stderr_lines: &[String],
+) -> String {
+    let status = status_code
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "terminated by signal".to_string());
+    let mut details = Vec::new();
+
+    if !stderr_lines.is_empty() {
+        details.push(format!("stderr: {}", stderr_lines.join(" | ")));
+    }
+    if !stdout_lines.is_empty() {
+        details.push(format!("stdout: {}", stdout_lines.join(" | ")));
+    }
+
+    if details.is_empty() {
+        format!("zip exited with status {status}")
+    } else {
+        format!("zip exited with status {status} ({})", details.join(" | "))
+    }
+}
+
+fn build_zip_canceled_message(stdout_lines: &[String], stderr_lines: &[String]) -> String {
+    let mut details = Vec::new();
+
+    if !stderr_lines.is_empty() {
+        details.push(format!("stderr: {}", stderr_lines.join(" | ")));
+    }
+    if !stdout_lines.is_empty() {
+        details.push(format!("stdout: {}", stdout_lines.join(" | ")));
+    }
+
+    if details.is_empty() {
+        "Archive creation was canceled.".to_string()
+    } else {
+        format!("Archive creation was canceled. {}", details.join(" | "))
+    }
+}
+
+fn emit_zip_progress(app: &tauri::AppHandle, current: u64, total: u64, current_file: &str) {
+    let _ = app.emit(
+        "fs-progress",
+        ProgressPayload {
+            operation: "zip".to_string(),
+            current,
+            total,
+            current_file: current_file.to_string(),
+            unit: "items".to_string(),
+        },
+    );
+}
+
+fn get_hidden_temp_archive_path(archive_path: &Path) -> Result<PathBuf, String> {
+    let parent_dir = archive_path.parent().ok_or_else(|| {
+        format!(
+            "Could not find parent directory for {}",
+            archive_path.display()
+        )
+    })?;
+    let file_name = archive_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Archive.zip");
+
+    let initial = parent_dir.join(format!(".{file_name}.partial"));
+    if !initial.exists() {
+        return Ok(initial);
+    }
+
+    for suffix in 2.. {
+        let candidate = parent_dir.join(format!(".{file_name}.partial.{suffix}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not find a temporary archive path for {}",
+        archive_path.display()
+    ))
 }
 
 fn apply_batch_rename_operations(operations: Vec<BatchRenameOperation>) -> Result<(), String> {
@@ -901,7 +1318,9 @@ fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
     let base_stem = {
         let copy_n_re = regex::Regex::new(r"^(.*) copy(?: (\d+))?$").unwrap();
         if let Some(caps) = copy_n_re.captures(&stem) {
-            caps.get(1).map(|m| m.as_str().to_string()).unwrap_or(stem.clone())
+            caps.get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or(stem.clone())
         } else {
             stem.clone()
         }
@@ -1194,6 +1613,21 @@ mod tests {
     }
 
     #[test]
+    fn unique_extraction_dir_handles_unicode_and_spaces() {
+        let tmp = create_test_dir("extract_unicode_space");
+        let parent = tmp.join("내 드라이브").join("_aaa");
+        fs::create_dir_all(&parent).unwrap();
+
+        let archive = parent.join("watchcat.zip");
+        fs::write(&archive, b"").unwrap();
+
+        let result = get_unique_extraction_dir(&archive).unwrap();
+        assert_eq!(result, parent.join("watchcat"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn unique_archive_path_base_name() {
         let tmp = std::env::temp_dir().join("test_archive_unique");
         let source = tmp.join("data");
@@ -1226,7 +1660,7 @@ mod tests {
         let _ = fs::remove_file(&tmp);
         fs::write(&tmp, b"hello").unwrap();
 
-        let result = create_zip_archive(tmp.to_str().unwrap());
+        let result = validate_zip_source_directory(tmp.to_str().unwrap());
         assert!(result.is_err());
 
         let _ = fs::remove_file(&tmp);
@@ -1250,6 +1684,23 @@ mod tests {
     fn compute_path_size_nonexistent_path() {
         let result = compute_path_size("/nonexistent/path/that/should/not/exist");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn compact_command_output_removes_extra_whitespace() {
+        let result = compact_command_output(b"line one\n  line two\t\tline three  ");
+        assert_eq!(result.as_deref(), Some("line one line two line three"));
+    }
+
+    #[test]
+    fn indicates_invalid_zip_message_detects_missing_central_directory() {
+        assert!(indicates_invalid_zip_message(
+            "End-of-central-directory signature not found."
+        ));
+        assert!(indicates_invalid_zip_message(
+            "ditto: Couldn't read pkzip signature."
+        ));
+        assert!(!indicates_invalid_zip_message("permission denied"));
     }
 
     #[test]

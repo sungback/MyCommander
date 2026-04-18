@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-create-zip-from-paths"
+description = "Enables the create_zip_from_paths command without any pre-configured scope."
+commands.allow = ["create_zip_from_paths"]
+
+[[permission]]
+identifier = "deny-create-zip-from-paths"
+description = "Denies the create_zip_from_paths command without any pre-configured scope."
+commands.deny = ["create_zip_from_paths"]
