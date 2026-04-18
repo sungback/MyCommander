@@ -44,7 +44,10 @@ pub fn sync_watched_directories(
         .difference(&desired_paths)
         .cloned()
         .collect();
-    let paths_to_add: Vec<PathBuf> = desired_paths.difference(&currently_watched).cloned().collect();
+    let paths_to_add: Vec<PathBuf> = desired_paths
+        .difference(&currently_watched)
+        .cloned()
+        .collect();
 
     let watcher = manager
         .watcher

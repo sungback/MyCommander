@@ -74,7 +74,11 @@ pub async fn write_files_to_pasteboard(
                 .filter_map(|p| {
                     let path_str = NSString::alloc(nil).init_str(p);
                     let url = NSURL::fileURLWithPath_(nil, path_str);
-                    if url == nil { None } else { Some(url) }
+                    if url == nil {
+                        None
+                    } else {
+                        Some(url)
+                    }
                 })
                 .collect();
 
@@ -94,8 +98,8 @@ pub async fn write_files_to_pasteboard(
             // cut 작업인 경우 Finder가 인식하는 잘라내기 마킹 추가
             // com.apple.finder.pasteboard-operation = "cut"
             if operation == "cut" {
-                let type_str = NSString::alloc(nil)
-                    .init_str("com.apple.finder.pasteboard-operation");
+                let type_str =
+                    NSString::alloc(nil).init_str("com.apple.finder.pasteboard-operation");
                 let val_str = NSString::alloc(nil).init_str("cut");
                 let _: () = msg_send![gen_pb, setString: val_str forType: type_str];
             }

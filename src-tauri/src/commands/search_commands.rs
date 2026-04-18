@@ -17,8 +17,12 @@ pub struct SearchResult {
 #[serde(tag = "type", content = "payload")]
 pub enum SearchEvent {
     ResultBatch(Vec<SearchResult>),
-    Progress { current_dir: String },
-    Finished { total_matches: usize },
+    Progress {
+        current_dir: String,
+    },
+    Finished {
+        total_matches: usize,
+    },
     #[allow(dead_code)]
     Error(String),
 }

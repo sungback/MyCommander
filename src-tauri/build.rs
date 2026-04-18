@@ -21,6 +21,7 @@ fn main() {
         "apply_batch_rename",
         "copy_files",
         "move_files",
+        "check_copy_conflicts",
         "extract_zip",
         "create_zip",
         "create_zip_from_paths",
@@ -28,6 +29,8 @@ fn main() {
         "read_file_content",
         "search_files",
         "get_dir_size",
+        "compare_directories",
+        "sync_watched_directories",
     ]);
 
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(app_manifest))
