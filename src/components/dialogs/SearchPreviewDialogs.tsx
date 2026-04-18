@@ -14,9 +14,11 @@ import {
   refreshPanelsForEntryPaths,
 } from "../../store/panelRefresh";
 import { File, Folder } from "lucide-react";
+import { PanelState } from "../../types/file";
 
 const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
 const DEFAULT_DIALOG_SIZE = { width: 700, height: 560 };
+const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
 
 export const SearchPreviewDialogs: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -68,7 +70,7 @@ export const SearchPreviewDialogs: React.FC = () => {
     setSearchError(null);
     setSearchProgress("");
     try {
-      await fs.searchFiles(activePanel.currentPath, searchQuery, false, (event) => {
+      await fs.searchFiles(getPanelAccessPath(activePanel), searchQuery, false, (event) => {
         if (event.type === "ResultBatch") {
           setSearchResults((current) => [...current, ...event.payload]);
         } else if (event.type === "Progress") {
@@ -195,9 +197,13 @@ export const SearchPreviewDialogs: React.FC = () => {
       return;
     }
 
-    const resolvedTarget = isAbsolutePath(trimmedTarget)
-      ? trimmedTarget
-      : joinPath(targetPanel.currentPath, trimmedTarget);
+    const directTarget =
+      trimmedTarget.normalize("NFC") === targetPanel.currentPath.normalize("NFC")
+        ? getPanelAccessPath(targetPanel)
+        : trimmedTarget;
+    const resolvedTarget = isAbsolutePath(directTarget)
+      ? directTarget
+      : joinPath(getPanelAccessPath(targetPanel), directTarget);
 
     try {
       setIsApplyingSearchOperation(true);

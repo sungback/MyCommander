@@ -11,6 +11,9 @@ import { writeClipboardText } from "../../utils/clipboard";
 
 let clearStatusMessageTimeoutId: number | undefined;
 
+const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string }) =>
+  panel.resolvedPath ?? panel.currentPath;
+
 const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   const { setStatusMessage } = useUiStore.getState();
   if (clearStatusMessageTimeoutId !== undefined) {
@@ -109,7 +112,11 @@ export const ContextMenu: React.FC = () => {
                   const archiveName =
                     panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
                     "Archive";
-                  await fs.createZipFromPaths(selectedPaths, panel.currentPath, archiveName);
+                  await fs.createZipFromPaths(
+                    selectedPaths,
+                    getPanelAccessPath(panel),
+                    archiveName
+                  );
                 } else {
                   if (targetEntry.kind !== "directory") {
                     closeDialog();

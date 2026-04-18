@@ -28,7 +28,7 @@ export const collectWatchDirectories = (panels: PanelState[]): string[] => {
 
   for (const panel of panels) {
     for (const tab of getTabsForWatch(panel)) {
-      const currentPath = tab.currentPath.trim();
+      const currentPath = (tab.resolvedPath ?? tab.currentPath).trim();
       if (currentPath.length === 0 || !isAbsolutePath(currentPath)) {
         continue;
       }

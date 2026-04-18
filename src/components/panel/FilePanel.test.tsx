@@ -7,7 +7,9 @@ const mockListDirectory = vi.fn();
 const mockGetHomeDir = vi.fn();
 const mockResolvePath = vi.fn();
 const mockGetDirSize = vi.fn();
+const mockOpenFile = vi.fn();
 const mockOpenContextMenu = vi.fn();
+let lastFileListProps: { onEnter: (entry: unknown) => Promise<void> | void } | null = null;
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
@@ -19,6 +21,7 @@ vi.mock("../../hooks/useFileSystem", () => ({
     getHomeDir: mockGetHomeDir,
     resolvePath: mockResolvePath,
     getDirSize: mockGetDirSize,
+    openFile: mockOpenFile,
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
@@ -46,7 +49,10 @@ vi.mock("./TabBar", () => ({
 }));
 
 vi.mock("./FileList", () => ({
-  FileList: () => <div data-testid="file-list" />,
+  FileList: (props: { onEnter: (entry: unknown) => Promise<void> | void }) => {
+    lastFileListProps = props;
+    return <div data-testid="file-list" />;
+  },
 }));
 
 vi.mock("./archiveEnter", () => ({
@@ -85,10 +91,13 @@ describe("FilePanel", () => {
 
   beforeEach(() => {
     usePanelStore.setState(usePanelStore.getInitialState());
+    lastFileListProps = null;
     mockListDirectory.mockReset();
     mockGetHomeDir.mockReset();
     mockResolvePath.mockReset();
+    mockResolvePath.mockImplementation(async (path: string) => path);
     mockGetDirSize.mockReset();
+    mockOpenFile.mockReset();
     mockOpenContextMenu.mockReset();
     alertSpy.mockClear();
   });
@@ -116,7 +125,11 @@ describe("FilePanel", () => {
 
       throw new Error(`unexpected path: ${path}`);
     });
-    mockResolvePath.mockResolvedValueOnce("/Users/back/Library/CloudStorage/Dropbox");
+    mockResolvePath.mockImplementation(async (path: string) =>
+      path === "/Users/back/Dropbox"
+        ? "/Users/back/Library/CloudStorage/Dropbox"
+        : path
+    );
     mockGetDirSize.mockResolvedValue(0);
 
     render(<FilePanel id="left" />);
@@ -125,12 +138,10 @@ describe("FilePanel", () => {
       expect(mockResolvePath).toHaveBeenCalledWith("/Users/back/Dropbox");
     });
 
-    await waitFor(() => {
-      expect(usePanelStore.getState().leftPanel.currentPath).toBe(
-        "/Users/back/Library/CloudStorage/Dropbox"
-      );
-    });
-
+    expect(usePanelStore.getState().leftPanel.currentPath).toBe("/Users/back/Dropbox");
+    expect(usePanelStore.getState().leftPanel.resolvedPath).toBe(
+      "/Users/back/Library/CloudStorage/Dropbox"
+    );
     expect(usePanelStore.getState().leftPanel.files).toEqual(resolvedEntries);
     expect(alertSpy).not.toHaveBeenCalled();
   });
@@ -149,7 +160,7 @@ describe("FilePanel", () => {
 
       throw new Error("permission denied");
     });
-    mockResolvePath.mockResolvedValue("/Users/back/Dropbox");
+    mockResolvePath.mockImplementation(async (path: string) => path);
     mockGetDirSize.mockResolvedValue(0);
 
     render(<FilePanel id="left" />);
@@ -167,5 +178,93 @@ describe("FilePanel", () => {
     });
 
     expect(alertSpy).toHaveBeenCalledWith("permission denied");
+  });
+
+  it("enters symlinked directories on open", async () => {
+    const symlinkEntry = {
+      name: "Dropbox",
+      path: "/Users/back/Dropbox",
+      kind: "symlink" as const,
+      size: 40,
+    };
+
+    mockListDirectory.mockImplementation(async (path: string) => {
+      if (path === "/Users/back") {
+        return [symlinkEntry];
+      }
+
+      if (path === "/Users/back/Library/CloudStorage/Dropbox") {
+        return [];
+      }
+
+      throw new Error(`unexpected path: ${path}`);
+    });
+    mockResolvePath.mockImplementation(async (path: string) =>
+      path === "/Users/back/Dropbox"
+        ? "/Users/back/Library/CloudStorage/Dropbox"
+        : path
+    );
+    mockGetDirSize.mockResolvedValue(0);
+
+    setLeftPanelPath("/Users/back");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(lastFileListProps).not.toBeNull();
+      expect(usePanelStore.getState().leftPanel.files).toEqual([symlinkEntry]);
+    });
+
+    await act(async () => {
+      await lastFileListProps?.onEnter(symlinkEntry);
+    });
+
+    expect(mockResolvePath).toHaveBeenCalledWith("/Users/back/Dropbox");
+    expect(usePanelStore.getState().leftPanel.currentPath).toBe("/Users/back/Dropbox");
+  });
+
+  it("enters Dropbox-like directories even when they are listed as directories", async () => {
+    const dropboxEntry = {
+      name: "Dropbox",
+      path: "/Users/back/Dropbox",
+      kind: "directory" as const,
+      size: null,
+    };
+
+    mockListDirectory.mockImplementation(async (path: string) => {
+      if (path === "/Users/back") {
+        return [dropboxEntry];
+      }
+
+      if (path === "/Users/back/Library/CloudStorage/Dropbox") {
+        return [];
+      }
+
+      throw new Error(`unexpected path: ${path}`);
+    });
+    mockResolvePath.mockImplementation(async (path: string) =>
+      path === "/Users/back/Dropbox"
+        ? "/Users/back/Library/CloudStorage/Dropbox"
+        : path
+    );
+    mockGetDirSize.mockResolvedValue(0);
+
+    setLeftPanelPath("/Users/back");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(lastFileListProps).not.toBeNull();
+      expect(usePanelStore.getState().leftPanel.files).toEqual([dropboxEntry]);
+    });
+
+    await act(async () => {
+      await lastFileListProps?.onEnter(dropboxEntry);
+    });
+
+    expect(mockResolvePath).toHaveBeenCalledWith("/Users/back/Dropbox");
+    expect(mockListDirectory).toHaveBeenCalledWith(
+      "/Users/back/Library/CloudStorage/Dropbox",
+      false
+    );
+    expect(usePanelStore.getState().leftPanel.currentPath).toBe("/Users/back/Dropbox");
   });
 });

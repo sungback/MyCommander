@@ -15,6 +15,7 @@ export type SortDirection = "asc" | "desc";
 
 export interface PanelViewState {
   currentPath: string;
+  resolvedPath?: string;
   history: string[];
   historyIndex: number;
   files: FileEntry[];

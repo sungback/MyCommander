@@ -9,6 +9,7 @@ import { formatDate, formatSize } from "../../utils/format";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { SettingsDialog } from "./SettingsDialog";
+import { PanelState } from "../../types/file";
 
 const getPathBaseName = (path: string) => {
   const normalized = path.replace(/[\\/]+$/, "");
@@ -22,6 +23,8 @@ const getSelectedItemsText = (paths: string[]) => {
   if (paths.length <= 3) return paths.map((p) => `"${getPathBaseName(p)}"`).join(", ");
   return `"${getPathBaseName(paths[0])}", "${getPathBaseName(paths[1])}" and ${paths.length - 2} more file(s)`;
 };
+
+const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
 
 // Reusable Radix UI Dialog Wrapper
 const BaseDialog: React.FC<{
@@ -234,10 +237,10 @@ export const DialogContainer: React.FC = () => {
     try {
       setIsSubmitting(true);
       setOperationError(null);
-      const fullPath = joinPath(activePanel.currentPath, inputValue);
+      const fullPath = joinPath(getPanelAccessPath(activePanel), inputValue);
       await fs.createDirectory(fullPath);
       closeDialog();
-      refreshPanelsForDirectories([activePanel.currentPath]);
+      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to create directory."));
@@ -251,10 +254,10 @@ export const DialogContainer: React.FC = () => {
     try {
       setIsSubmitting(true);
       setOperationError(null);
-      const fullPath = joinPath(activePanel.currentPath, inputValue);
+      const fullPath = joinPath(getPanelAccessPath(activePanel), inputValue);
       await fs.createFile(fullPath);
       closeDialog();
-      refreshPanelsForDirectories([activePanel.currentPath]);
+      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to create file."));
@@ -293,7 +296,7 @@ export const DialogContainer: React.FC = () => {
       setOperationError(null);
       await fs.deleteFiles(selectedPaths, false);
       closeDialog();
-      refreshPanelsForDirectories([activePanel.currentPath]);
+      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
     } catch (e) {
       console.error(e);
       setOperationError(getErrorMessage(e, "Failed to delete selected items."));
@@ -308,13 +311,18 @@ export const DialogContainer: React.FC = () => {
       return "";
     }
 
+    const basePanel = isPasteMode ? activePanel : targetPanel;
+    const directPath =
+      trimmedValue.normalize("NFC") === basePanel.currentPath.normalize("NFC")
+        ? getPanelAccessPath(basePanel)
+        : trimmedValue;
     const basePath =
       openDialog === "copy" && dragCopyRequest
         ? dragCopyRequest.targetPath
-        : (isPasteMode ? activePanel : targetPanel).currentPath;
-    return isAbsolutePath(trimmedValue)
-      ? trimmedValue
-      : joinPath(basePath, trimmedValue);
+        : getPanelAccessPath(basePanel);
+    return isAbsolutePath(directPath)
+      ? directPath
+      : joinPath(basePath, directPath);
   };
 
   const executeCopyMove = async (
@@ -353,7 +361,7 @@ export const DialogContainer: React.FC = () => {
       }
       closeDialog();
       refreshPanelsForDirectories([
-        (openDialog === "copy" && dragCopyRequest ? dragSourcePanel : activePanel).currentPath,
+        getPanelAccessPath(openDialog === "copy" && dragCopyRequest ? dragSourcePanel : activePanel),
         targetPath,
       ]);
     } catch (e) {

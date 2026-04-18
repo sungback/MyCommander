@@ -40,12 +40,14 @@ const {
   mockPanelState: {
     leftPanel: {
       currentPath: '/home/user',
+      resolvedPath: '/home/user',
       lastUpdated: 0,
       tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }],
       activeTabId: 'tab1',
     },
     rightPanel: {
       currentPath: '/target',
+      resolvedPath: '/target',
       lastUpdated: 0,
       tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }],
       activeTabId: 'tab2',
@@ -131,6 +133,7 @@ const TEST_FILES: FileEntry[] = [
 
 const makeProps = (overrides: Partial<React.ComponentProps<typeof FileList>> = {}) => ({
   currentPath: '/home/user',
+  accessPath: '/home/user',
   files: TEST_FILES,
   selectedItems: new Set<string>(),
   cursorIndex: 0,
@@ -200,8 +203,10 @@ describe('FileList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPanelState.leftPanel.currentPath = '/home/user';
+    mockPanelState.leftPanel.resolvedPath = '/home/user';
     mockPanelState.leftPanel.lastUpdated = 0;
     mockPanelState.rightPanel.currentPath = '/target';
+    mockPanelState.rightPanel.resolvedPath = '/target';
     mockPanelState.rightPanel.lastUpdated = 0;
     mockPanelState.dragInfo = null;
     mockSetDragInfo.mockImplementation((dragInfo) => {

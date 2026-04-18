@@ -20,7 +20,9 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
 
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const normalizedCurrentPath = normalizePathForComparison(panel.currentPath);
+    const normalizedCurrentPath = normalizePathForComparison(
+      panel.resolvedPath ?? panel.currentPath
+    );
 
     if (normalizedDirectories.has(normalizedCurrentPath)) {
       state.refreshPanel(panelId);

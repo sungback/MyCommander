@@ -48,4 +48,20 @@ describe("useAppCommands — syncOtherPanelToCurrentPath", () => {
 
     expect(usePanelStore.getState().rightPanel).toBe(beforeRightPanel);
   });
+
+  it("resolvedPath가 같으면 다시 동기화하지 않는다", () => {
+    const { result } = renderHook(() => useAppCommands());
+
+    usePanelStore.getState().setPath("left", "/Users/back/Dropbox");
+    usePanelStore
+      .getState()
+      .setResolvedPath("left", "/Users/back/Library/CloudStorage/Dropbox");
+    usePanelStore.getState().setPath("right", "/Users/back/Library/CloudStorage/Dropbox");
+
+    const beforeRightPanel = usePanelStore.getState().rightPanel;
+
+    result.current.syncOtherPanelToCurrentPath("left");
+
+    expect(usePanelStore.getState().rightPanel).toBe(beforeRightPanel);
+  });
 });

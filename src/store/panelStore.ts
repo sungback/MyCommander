@@ -40,6 +40,7 @@ interface AppState {
   activateTab: (panel: PanelId, tabId: string) => void;
   closeTab: (panel: PanelId, tabId: string) => void;
   setPath: (panel: PanelId, path: string, pendingCursorName?: string) => void;
+  setResolvedPath: (panel: PanelId, path: string) => void;
   goBack: (panel: PanelId) => void;
   goForward: (panel: PanelId) => void;
   setFiles: (panel: PanelId, files: FileEntry[]) => void;
@@ -269,6 +270,7 @@ export const sortEntries = (
 const defaultTabState = (currentPath: string): PanelTabState => ({
   id: createTabId(),
   currentPath,
+  resolvedPath: currentPath,
   history: [],
   historyIndex: -1,
   files: [],
@@ -302,6 +304,7 @@ const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
     activeTabId: activeTab.id,
     tabs,
     currentPath: activeTab.currentPath,
+    resolvedPath: activeTab.resolvedPath ?? activeTab.currentPath,
     history: activeTab.history,
     historyIndex: activeTab.historyIndex,
     files: activeTab.files,
@@ -345,6 +348,7 @@ const restorePersistedPanelState = (
   const tabs: PanelTabState[] = persistedPanel.tabs.map((tab) => ({
     id: tab.id,
     currentPath: tab.currentPath,
+    resolvedPath: tab.currentPath,
     history: [...tab.history],
     historyIndex: tab.historyIndex,
     files: [],
@@ -365,6 +369,7 @@ const restorePersistedPanelState = (
     tabs,
     activeTabId,
     currentPath: tabs[0].currentPath,
+    resolvedPath: tabs[0].resolvedPath ?? tabs[0].currentPath,
     history: tabs[0].history,
     historyIndex: tabs[0].historyIndex,
     files: tabs[0].files,
@@ -507,6 +512,7 @@ export const usePanelStore = create<AppState>((set) => {
         const newLeft = updateActiveTab(state.leftPanel, (tab) => ({
           ...tab,
           currentPath: rightPath,
+          resolvedPath: rightPath,
           cursorIndex: 0,
           selectedItems: new Set<string>(),
           lastUpdated: now,
@@ -514,6 +520,7 @@ export const usePanelStore = create<AppState>((set) => {
         const newRight = updateActiveTab(state.rightPanel, (tab) => ({
           ...tab,
           currentPath: leftPath,
+          resolvedPath: leftPath,
           cursorIndex: 0,
           selectedItems: new Set<string>(),
           lastUpdated: now + 1,
@@ -703,6 +710,7 @@ export const usePanelStore = create<AppState>((set) => {
         return {
           ...tab,
           currentPath: path,
+          resolvedPath: path,
           history: newHistory,
           historyIndex: newHistory.length - 1,
           cursorIndex: 0,
@@ -719,6 +727,25 @@ export const usePanelStore = create<AppState>((set) => {
         state.themePreference,
         state.panelViewModes
       );
+
+      return {
+        [panelKey]: nextPanelState,
+      };
+    }),
+
+  setResolvedPath: (panel, path) =>
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
+        if ((tab.resolvedPath ?? tab.currentPath) === path) {
+          return tab;
+        }
+
+        return {
+          ...tab,
+          resolvedPath: path,
+        };
+      });
 
       return {
         [panelKey]: nextPanelState,
@@ -882,6 +909,7 @@ export const usePanelStore = create<AppState>((set) => {
       const nextPanelState = updateActiveTab(currentPanel, (tab) => ({
         ...tab,
         currentPath: newPath,
+        resolvedPath: newPath,
         historyIndex: newIndex,
         cursorIndex: 0,
         selectedItems: new Set<string>(),
@@ -914,6 +942,7 @@ export const usePanelStore = create<AppState>((set) => {
       const nextPanelState = updateActiveTab(currentPanel, (tab) => ({
         ...tab,
         currentPath: newPath,
+        resolvedPath: newPath,
         historyIndex: newIndex,
         cursorIndex: 0,
         selectedItems: new Set<string>(),

@@ -6,6 +6,7 @@ const createPanelState = (id: "left" | "right", paths: string[]): PanelState => 
   const tabs = paths.map((currentPath, index) => ({
     id: `${id}-tab-${index}`,
     currentPath,
+    resolvedPath: currentPath,
     history: [],
     historyIndex: -1,
     files: [],
@@ -24,6 +25,7 @@ const createPanelState = (id: "left" | "right", paths: string[]): PanelState => 
     tabs,
     activeTabId: activeTab.id,
     currentPath: activeTab.currentPath,
+    resolvedPath: activeTab.resolvedPath,
     history: activeTab.history,
     historyIndex: activeTab.historyIndex,
     files: activeTab.files,
@@ -66,5 +68,17 @@ describe("collectWatchDirectories", () => {
     const watched = collectWatchDirectories([leftPanel, rightPanel]);
 
     expect(watched).toEqual(["/absolute", "D:\\absolute"]);
+  });
+
+  it("deduplicates by resolved paths when display paths differ", () => {
+    const leftPanel = createPanelState("left", ["/Users/back/Dropbox"]);
+    leftPanel.tabs[0].resolvedPath = "/Users/back/Library/CloudStorage/Dropbox";
+    leftPanel.resolvedPath = "/Users/back/Library/CloudStorage/Dropbox";
+
+    const rightPanel = createPanelState("right", ["/Users/back/Library/CloudStorage/Dropbox"]);
+
+    const watched = collectWatchDirectories([leftPanel, rightPanel]);
+
+    expect(watched).toEqual(["/Users/back/Library/CloudStorage/Dropbox"]);
   });
 });

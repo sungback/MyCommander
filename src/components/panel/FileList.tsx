@@ -15,6 +15,7 @@ import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 
 interface FileListProps {
   currentPath: string;
+  accessPath: string;
   files: FileEntry[];
   selectedItems: Set<string>;
   cursorIndex: number;
@@ -135,6 +136,7 @@ const getDragIcon = (): string => {
 
 export const FileList: React.FC<FileListProps> = ({
   currentPath,
+  accessPath,
   files,
   selectedItems,
   cursorIndex,
@@ -226,7 +228,7 @@ export const FileList: React.FC<FileListProps> = ({
     }
 
     await copyFiles(paths, targetPath);
-    refreshPanelsForDirectories([currentPath, targetPath]);
+    refreshPanelsForDirectories([accessPath, targetPath]);
     showTransientStatusMessage("선택한 파일을 복사했습니다.");
     return true;
   };
@@ -473,7 +475,10 @@ export const FileList: React.FC<FileListProps> = ({
           const stateSnapshot = usePanelStore.getState();
           const destinationPanel =
             targetPanel === "left" ? stateSnapshot.leftPanel : stateSnapshot.rightPanel;
-          const targetPath = sharedDragState.dropTargetPath ?? destinationPanel.currentPath;
+          const targetPath =
+            sharedDragState.dropTargetPath ??
+            destinationPanel.resolvedPath ??
+            destinationPanel.currentPath;
 
           void handleDraggedCopy(state.paths, targetPath, targetPanel).catch((error) => {
             console.error("Failed to copy dragged files:", error);
@@ -505,6 +510,7 @@ export const FileList: React.FC<FileListProps> = ({
   }, [
     checkCopyConflicts,
     copyFiles,
+    accessPath,
     currentPath,
     openDragCopyDialog,
     panelId,
@@ -716,7 +722,7 @@ export const FileList: React.FC<FileListProps> = ({
         try {
           await invoke("copy_files", {
             source_paths: paths,
-            target_path: currentPath,
+            target_path: accessPath,
           });
         } catch (error) {
           console.error("Failed to copy external files:", error);

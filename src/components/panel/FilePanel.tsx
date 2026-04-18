@@ -27,6 +27,7 @@ interface BackgroundSizeScheduler {
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const lastLoadedPathRef = useRef<string | null>(null);
+  const lastResolvedPathRef = useRef<string | null>(null);
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
@@ -36,6 +37,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const setCursor = usePanelStore((s) => s.setCursor);
   const setPath = usePanelStore((s) => s.setPath);
   const setFiles = usePanelStore((s) => s.setFiles);
+  const setResolvedPath = usePanelStore((s) => s.setResolvedPath);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const openContextMenu = useContextMenuStore((s) => s.openContextMenu);
@@ -67,7 +69,11 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         return home;
       };
 
-      const commitLoadedEntries = (path: string, entries: Parameters<typeof setFiles>[1]) => {
+      const commitLoadedEntries = (
+        path: string,
+        resolvedPath: string,
+        entries: Parameters<typeof setFiles>[1]
+      ) => {
         if (cancelled) {
           return;
         }
@@ -75,8 +81,10 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         if (path !== panelState.currentPath) {
           setPath(id, path);
         }
+        setResolvedPath(id, resolvedPath);
         setFiles(id, entries);
         lastLoadedPathRef.current = path;
+        lastResolvedPathRef.current = resolvedPath;
       };
 
       try {
@@ -85,57 +93,52 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           activePath = await resolveHomeDirectory();
         }
 
-        const entries = await fs.listDirectory(activePath, showHiddenFiles);
-        commitLoadedEntries(activePath, entries);
+        let accessPath = activePath;
+        try {
+          accessPath = await fs.resolvePath(activePath);
+        } catch (resolveError) {
+          console.warn(`Failed to resolve path for ${activePath}:`, resolveError);
+        }
+
+        const entries = await fs.listDirectory(accessPath, showHiddenFiles);
+        commitLoadedEntries(activePath, accessPath, entries);
       } catch (err) {
         if (cancelled) {
           return;
         }
+        console.error("Failed loading dir: ", err);
 
-        try {
-          const resolvedPath = await fs.resolvePath(activePath);
-          if (cancelled) {
-            return;
+        const previousPath = lastLoadedPathRef.current;
+        const previousResolvedPath = lastResolvedPathRef.current;
+        if (previousPath && previousPath !== panelState.currentPath) {
+          setPath(id, previousPath, getLeafName(panelState.currentPath) ?? undefined);
+          if (previousResolvedPath) {
+            setResolvedPath(id, previousResolvedPath);
           }
-
-          if (resolvedPath !== activePath) {
-            const entries = await fs.listDirectory(resolvedPath, showHiddenFiles);
+        } else if (startedFromRootPlaceholder) {
+          try {
+            const home = await resolveHomeDirectory();
             if (cancelled) {
               return;
             }
-            commitLoadedEntries(resolvedPath, entries);
-            return;
-          }
 
-          throw new Error("Resolved path matches the original path");
-        } catch (resolvedPathError) {
-          if (cancelled) {
-            return;
-          }
-
-          console.error("Failed loading dir: ", err);
-          console.error("Failed resolving path for retry: ", resolvedPathError);
-
-          const previousPath = lastLoadedPathRef.current;
-          if (previousPath && previousPath !== panelState.currentPath) {
-            setPath(id, previousPath, getLeafName(panelState.currentPath) ?? undefined);
-          } else if (startedFromRootPlaceholder) {
+            let resolvedHome = home;
             try {
-              const home = await resolveHomeDirectory();
-              if (cancelled) {
-                return;
-              }
-              const entries = await fs.listDirectory(home, showHiddenFiles);
-              commitLoadedEntries(home, entries);
-            } catch (fallbackError) {
-              console.error("Failed loading fallback home dir: ", fallbackError);
+              resolvedHome = await fs.resolvePath(home);
+            } catch (resolveHomeError) {
+              console.warn(`Failed to resolve home path for ${home}:`, resolveHomeError);
             }
-          }
 
-          window.alert(
-            getErrorMessage(err, `${panelState.currentPath} 폴더를 열지 못했습니다.`)
-          );
+            const entries = await fs.listDirectory(resolvedHome, showHiddenFiles);
+            commitLoadedEntries(home, resolvedHome, entries);
+          } catch (fallbackError) {
+            console.error("Failed loading fallback home dir: ", fallbackError);
+          }
         }
+
+        window.alert(
+          getErrorMessage(err, `${panelState.currentPath} 폴더를 열지 못했습니다.`)
+        );
       }
     };
 
@@ -304,7 +307,34 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   }, [id, openContextMenu, panelState.selectedItems, selectOnly, setActivePanel, setCursor]);
 
   const handleEnter = async (entry: any) => {
-    if (entry.kind === "directory") {
+    const openDirectoryEntry = async (targetPath: string) => {
+      let resolvedPath = targetPath;
+
+      try {
+        resolvedPath = await fs.resolvePath(targetPath);
+      } catch (error) {
+        console.warn(`Failed to resolve path for ${targetPath}:`, error);
+      }
+
+      const candidatePaths = Array.from(
+        new Set([resolvedPath, targetPath].filter((path) => path.length > 0))
+      );
+
+      let lastError: unknown = null;
+      for (const candidatePath of candidatePaths) {
+        try {
+          await fs.listDirectory(candidatePath, showHiddenFiles);
+          setPath(id, targetPath);
+          return true;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError ?? new Error(`${targetPath} 폴더를 열지 못했습니다.`);
+    };
+
+    if (entry.kind === "directory" || entry.kind === "symlink") {
       if (entry.name === "..") {
         const currentName = panelState.currentPath
           .replace(/[\\/]+$/, "")
@@ -312,14 +342,27 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           .split("/")
           .pop();
         setPath(id, getParentPath(panelState.currentPath), currentName);
-      } else {
-        setPath(id, entry.path);
+        return;
+      }
+
+      try {
+        await openDirectoryEntry(entry.path);
+        return;
+      } catch (error) {
+        console.error(`Failed to enter directory ${entry.path}:`, error);
+        window.alert(getErrorMessage(error, `${entry.path} 폴더를 열지 못했습니다.`));
+        return;
       }
     } else {
       const isZipArchive = isZipArchiveEntry(entry);
 
       if (!isArchiveEntry(entry)) {
-        console.log("Cannot enter file, need to open:", entry.path);
+        try {
+          await fs.openFile(entry.path);
+        } catch (error) {
+          console.error("Failed to open file:", error);
+          window.alert(getErrorMessage(error, `${entry.path} 파일을 열지 못했습니다.`));
+        }
         return;
       }
 
@@ -373,6 +416,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       ) : null}
       <FileList
         currentPath={panelState.currentPath}
+        accessPath={panelState.resolvedPath ?? panelState.currentPath}
         files={panelState.files}
         selectedItems={panelState.selectedItems}
         cursorIndex={panelState.cursorIndex}

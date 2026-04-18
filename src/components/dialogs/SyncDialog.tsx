@@ -3,10 +3,12 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
+import { PanelState } from "../../types/file";
 import { SyncItem, SyncStatus } from "../../types/sync";
 import { Loader2 } from "lucide-react";
 
 type SyncStage = "paths" | "analyzing" | "results" | "executing";
+const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
 
 export const SyncDialog: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -16,8 +18,8 @@ export const SyncDialog: React.FC = () => {
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
 
   const [stage, setStage] = useState<SyncStage>("paths");
-  const [leftPath, setLeftPath] = useState(leftPanel.currentPath);
-  const [rightPath, setRightPath] = useState(rightPanel.currentPath);
+  const [leftPath, setLeftPath] = useState(getPanelAccessPath(leftPanel));
+  const [rightPath, setRightPath] = useState(getPanelAccessPath(rightPanel));
   const [syncItems, setSyncItems] = useState<SyncItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
@@ -26,14 +28,14 @@ export const SyncDialog: React.FC = () => {
   // Update paths when dialog opens
   useEffect(() => {
     if (openDialog === "sync") {
-      setLeftPath(leftPanel.currentPath);
-      setRightPath(rightPanel.currentPath);
+      setLeftPath(getPanelAccessPath(leftPanel));
+      setRightPath(getPanelAccessPath(rightPanel));
       setStage("paths");
       setError(null);
       setSyncItems([]);
       setExecuting(false);
     }
-  }, [openDialog, leftPanel.currentPath, rightPanel.currentPath]);
+  }, [openDialog, leftPanel.currentPath, leftPanel.resolvedPath, rightPanel.currentPath, rightPanel.resolvedPath]);
 
   const handleStartAnalysis = async () => {
     if (!leftPath || !rightPath) {

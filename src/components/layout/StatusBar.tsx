@@ -57,6 +57,8 @@ const getAvailableSpaceText = (availableSpace: number | null | undefined) => {
 const shouldSkipAvailableSpaceRequest = (panel: PanelState) =>
   panel.files.length === 0 && /^[A-Z]:\\$/.test(panel.currentPath);
 
+const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+
 const PanelStatus: React.FC<PanelStatusProps> = ({
   panelId,
   panel,
@@ -138,7 +140,7 @@ export const StatusBar: React.FC = () => {
 
     setAvailableSpace((current) => ({ ...current, left: undefined }));
 
-    void getAvailableSpace(leftPanel.currentPath).then((space) => {
+    void getAvailableSpace(getPanelAccessPath(leftPanel)).then((space) => {
       if (!cancelled) {
         setAvailableSpace((current) => ({ ...current, left: space }));
       }
@@ -147,7 +149,7 @@ export const StatusBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [getAvailableSpace, leftPanel.currentPath, leftPanel.files.length]);
+  }, [getAvailableSpace, leftPanel.currentPath, leftPanel.resolvedPath, leftPanel.files.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,7 +162,7 @@ export const StatusBar: React.FC = () => {
 
     setAvailableSpace((current) => ({ ...current, right: undefined }));
 
-    void getAvailableSpace(rightPanel.currentPath).then((space) => {
+    void getAvailableSpace(getPanelAccessPath(rightPanel)).then((space) => {
       if (!cancelled) {
         setAvailableSpace((current) => ({ ...current, right: space }));
       }
@@ -169,7 +171,7 @@ export const StatusBar: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [getAvailableSpace, rightPanel.currentPath, rightPanel.files.length]);
+  }, [getAvailableSpace, rightPanel.currentPath, rightPanel.resolvedPath, rightPanel.files.length]);
 
   return (
     <div className="w-full shrink-0 border-t border-border-color bg-bg-secondary">

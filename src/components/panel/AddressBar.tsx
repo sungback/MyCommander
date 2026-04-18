@@ -13,18 +13,16 @@ import { clsx } from "clsx";
 import { arePathsEquivalent, getBreadcrumbParts } from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
+import { PanelState } from "../../types/file";
 
 interface AddressBarProps {
   panelId: "left" | "right";
 }
 
 export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
-  const currentPath = usePanelStore((s) =>
-    panelId === "left" ? s.leftPanel.currentPath : s.rightPanel.currentPath
-  );
-  const otherPanelPath = usePanelStore((s) =>
-    panelId === "left" ? s.rightPanel.currentPath : s.leftPanel.currentPath
-  );
+  const currentPanel = usePanelStore((s) => (panelId === "left" ? s.leftPanel : s.rightPanel));
+  const otherPanel = usePanelStore((s) => (panelId === "left" ? s.rightPanel : s.leftPanel));
+  const currentPath = currentPanel.currentPath;
   const setPath = usePanelStore((s) => s.setPath);
   const goBack = usePanelStore((s) => s.goBack);
   const goForward = usePanelStore((s) => s.goForward);
@@ -44,7 +42,11 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   const { syncOtherPanelToCurrentPath, copyCurrentPath } = useAppCommands();
   const isMac = isMacPlatform();
   const otherPanelLabel = panelId === "left" ? "right" : "left";
-  const isAlreadySynced = arePathsEquivalent(currentPath, otherPanelPath);
+  const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+  const isAlreadySynced = arePathsEquivalent(
+    getPanelAccessPath(currentPanel),
+    getPanelAccessPath(otherPanel)
+  );
 
   const parts = getBreadcrumbParts(currentPath);
 

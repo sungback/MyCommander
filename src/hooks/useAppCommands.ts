@@ -5,6 +5,7 @@ import { writeClipboardText } from "../utils/clipboard";
 import { arePathsEquivalent } from "../utils/path";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 import { ClipboardState } from "../store/panelStore";
+import { PanelState } from "../types/file";
 
 export const isMacPlatform = () => {
   if (typeof window === "undefined") {
@@ -31,6 +32,8 @@ const getPrimaryTargetPath = () => {
 };
 
 let clearStatusMessageTimeoutId: number | undefined;
+
+const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
 
 export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   const { setStatusMessage } = useUiStore.getState();
@@ -91,7 +94,7 @@ export function useAppCommands() {
       resolvedSourcePanelId === "left" ? state.leftPanel : state.rightPanel;
     const targetPanel = targetPanelId === "left" ? state.leftPanel : state.rightPanel;
 
-    if (arePathsEquivalent(sourcePanel.currentPath, targetPanel.currentPath)) {
+    if (arePathsEquivalent(getPanelAccessPath(sourcePanel), getPanelAccessPath(targetPanel))) {
       return;
     }
 
@@ -178,7 +181,7 @@ export function useAppCommands() {
       const sourcePaths = clipboard.paths;
       const sameFolder = sourcePaths.every((p) => {
         const parent = p.substring(0, p.lastIndexOf("/")) || p.substring(0, p.lastIndexOf("\\"));
-        return parent === panel.currentPath;
+        return parent === getPanelAccessPath(panel);
       });
       if (sameFolder) {
         showTransientStatusMessage("이미 같은 위치에 있습니다");
@@ -205,7 +208,7 @@ export function useAppCommands() {
     const panel = resolvedPanelId === "left" ? state.leftPanel : state.rightPanel;
 
     try {
-      await fs.runShellCommand(panel.currentPath, trimmedCommand);
+      await fs.runShellCommand(getPanelAccessPath(panel), trimmedCommand);
       showTransientStatusMessage("Command started");
     } catch (error) {
       console.error("Failed to run command:", error);

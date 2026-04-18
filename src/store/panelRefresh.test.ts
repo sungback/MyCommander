@@ -50,4 +50,19 @@ describe("panelRefresh", () => {
 
     nowSpy.mockRestore();
   });
+
+  it("refreshes panels when the display path differs from the resolved path", () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(777);
+
+    usePanelStore.getState().setPath("left", "/Users/back/Dropbox");
+    usePanelStore
+      .getState()
+      .setResolvedPath("left", "/Users/back/Library/CloudStorage/Dropbox");
+
+    refreshPanelsForDirectories(["/Users/back/Library/CloudStorage/Dropbox"]);
+
+    expect(usePanelStore.getState().leftPanel.lastUpdated).toBe(777);
+
+    nowSpy.mockRestore();
+  });
 });
