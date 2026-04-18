@@ -116,6 +116,15 @@ pub async fn get_home_dir() -> Result<String, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn resolve_path(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+
+    tokio::task::spawn_blocking(move || resolve_path_for_navigation(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_available_space(path: String) -> Result<u64, String> {
     let path = PathBuf::from(path);
 
@@ -149,6 +158,18 @@ fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
                 )
             })
     }
+}
+
+fn resolve_path_for_navigation(path: &Path) -> Result<String, String> {
+    if !path.exists() {
+        return Err(format!("{} does not exist", path.display()));
+    }
+
+    Ok(path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .to_string())
 }
 
 #[cfg(target_os = "windows")]

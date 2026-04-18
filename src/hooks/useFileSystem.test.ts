@@ -61,6 +61,20 @@ describe('useFileSystem', () => {
     });
   });
 
+  describe('resolvePath', () => {
+    it('returns the resolved path', async () => {
+      mockInvoke.mockResolvedValueOnce('/real/path');
+      const result = await useFileSystem().resolvePath('/alias/path');
+      expect(mockInvoke).toHaveBeenCalledWith('resolve_path', { path: '/alias/path' });
+      expect(result).toBe('/real/path');
+    });
+
+    it('throws when resolution fails', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('does not exist'));
+      await expect(useFileSystem().resolvePath('/missing')).rejects.toThrow('does not exist');
+    });
+  });
+
   // ─── getDrives ─────────────────────────────────────────────────────────────
   describe('getDrives', () => {
     it('returns list of drives', async () => {

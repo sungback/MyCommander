@@ -34,6 +34,7 @@ export const createMockInvoke = () =>
     switch (cmd) {
       case 'list_directory':      return Promise.resolve(mockFiles);
       case 'get_home_dir':        return Promise.resolve('/home/user');
+      case 'resolve_path':        return Promise.resolve('/home/user');
       case 'get_drives':          return Promise.resolve(mockDrives);
       case 'get_available_space': return Promise.resolve(100_000_000_000);
       case 'get_dir_size':        return Promise.resolve(4096);

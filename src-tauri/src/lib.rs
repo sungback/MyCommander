@@ -460,6 +460,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system_commands::get_drives,
             commands::system_commands::get_home_dir,
+            commands::system_commands::resolve_path,
             commands::system_commands::get_available_space,
             commands::system_commands::open_in_terminal,
             commands::system_commands::open_in_editor,

@@ -43,6 +43,10 @@ const fileSystem = {
     }
   },
 
+  resolvePath: async (path: string): Promise<string> => {
+    return await invoke<string>("resolve_path", { path });
+  },
+
   getAvailableSpace: async (path: string): Promise<number | null> => {
     try {
       return await invoke<number>("get_available_space", { path });

@@ -2,6 +2,7 @@ fn main() {
     let app_manifest = tauri_build::AppManifest::new().commands(&[
         "get_drives",
         "get_home_dir",
+        "resolve_path",
         "get_available_space",
         "open_in_terminal",
         "open_in_editor",

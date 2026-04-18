@@ -26,6 +26,7 @@ interface BackgroundSizeScheduler {
 
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const lastLoadedPathRef = useRef<string | null>(null);
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
@@ -50,6 +51,10 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   useEffect(() => {
     let cancelled = false;
     let activePath = panelState.currentPath;
+    const startedFromRootPlaceholder = activePath === "/";
+
+    const getLeafName = (path: string) =>
+      path.replace(/[\\/]+$/, "").replace(/\\/g, "/").split("/").pop() || null;
 
     const loadDir = async () => {
       const resolveHomeDirectory = async () => {
@@ -62,37 +67,74 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         return home;
       };
 
-      try {
-        // Only replace the generic root placeholder. Windows drive roots are real targets.
-        if (activePath === "/") {
-          await resolveHomeDirectory();
-        }
-
-        const entries = await fs.listDirectory(activePath, showHiddenFiles);
+      const commitLoadedEntries = (path: string, entries: Parameters<typeof setFiles>[1]) => {
         if (cancelled) {
           return;
         }
+
+        if (path !== panelState.currentPath) {
+          setPath(id, path);
+        }
         setFiles(id, entries);
+        lastLoadedPathRef.current = path;
+      };
+
+      try {
+        // Only replace the generic root placeholder. Windows drive roots are real targets.
+        if (activePath === "/") {
+          activePath = await resolveHomeDirectory();
+        }
+
+        const entries = await fs.listDirectory(activePath, showHiddenFiles);
+        commitLoadedEntries(activePath, entries);
       } catch (err) {
         if (cancelled) {
           return;
         }
+
         try {
-          const home = await resolveHomeDirectory();
+          const resolvedPath = await fs.resolvePath(activePath);
           if (cancelled) {
             return;
           }
-          const entries = await fs.listDirectory(home, showHiddenFiles);
+
+          if (resolvedPath !== activePath) {
+            const entries = await fs.listDirectory(resolvedPath, showHiddenFiles);
+            if (cancelled) {
+              return;
+            }
+            commitLoadedEntries(resolvedPath, entries);
+            return;
+          }
+
+          throw new Error("Resolved path matches the original path");
+        } catch (resolvedPathError) {
           if (cancelled) {
             return;
           }
-          setFiles(id, entries);
-        } catch (fallbackError) {
-          if (cancelled) {
-            return;
-          }
+
           console.error("Failed loading dir: ", err);
-          console.error("Failed loading fallback home dir: ", fallbackError);
+          console.error("Failed resolving path for retry: ", resolvedPathError);
+
+          const previousPath = lastLoadedPathRef.current;
+          if (previousPath && previousPath !== panelState.currentPath) {
+            setPath(id, previousPath, getLeafName(panelState.currentPath) ?? undefined);
+          } else if (startedFromRootPlaceholder) {
+            try {
+              const home = await resolveHomeDirectory();
+              if (cancelled) {
+                return;
+              }
+              const entries = await fs.listDirectory(home, showHiddenFiles);
+              commitLoadedEntries(home, entries);
+            } catch (fallbackError) {
+              console.error("Failed loading fallback home dir: ", fallbackError);
+            }
+          }
+
+          window.alert(
+            getErrorMessage(err, `${panelState.currentPath} 폴더를 열지 못했습니다.`)
+          );
         }
       }
     };
