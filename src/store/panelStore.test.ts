@@ -358,6 +358,41 @@ describe("panelStore — refreshPanel", () => {
     const after = usePanelStore.getState().leftPanel.lastUpdated;
     expect(after).toBeGreaterThanOrEqual(before);
   });
+
+  it("keeps focus on the pending file name after a refresh reload", () => {
+    usePanelStore.setState((state) => ({
+      ...state,
+      leftPanel: {
+        ...state.leftPanel,
+        cursorIndex: 1,
+        files: [
+          { name: "..", path: "/home", kind: "directory" },
+          { name: "archive.zip", path: "/home/user/archive.zip", kind: "file", size: 1 },
+        ],
+        tabs: state.leftPanel.tabs.map((tab) =>
+          tab.id === state.leftPanel.activeTabId
+            ? {
+                ...tab,
+                cursorIndex: 1,
+                files: [
+                  { name: "..", path: "/home", kind: "directory" },
+                  { name: "archive.zip", path: "/home/user/archive.zip", kind: "file", size: 1 },
+                ],
+              }
+            : tab
+        ),
+      },
+    }));
+
+    usePanelStore.getState().setPendingCursorName("left", "archive.zip");
+    usePanelStore.getState().setFiles("left", [
+      { name: "..", path: "/home", kind: "directory" },
+      { name: "archive", path: "/home/user/archive", kind: "directory", size: null },
+      { name: "archive.zip", path: "/home/user/archive.zip", kind: "file", size: 1 },
+    ]);
+
+    expect(usePanelStore.getState().leftPanel.cursorIndex).toBe(2);
+  });
 });
 
 describe("panelStore — settings", () => {

@@ -45,6 +45,7 @@ interface AppState {
   goForward: (panel: PanelId) => void;
   setFiles: (panel: PanelId, files: FileEntry[]) => void;
   setSelection: (panel: PanelId, paths: string[]) => void;
+  setPendingCursorName: (panel: PanelId, name: string | null) => void;
   toggleSelection: (panel: PanelId, path: string) => void;
   selectOnly: (panel: PanelId, path: string | null) => void;
   clearSelection: (panel: PanelId) => void;
@@ -784,6 +785,19 @@ export const usePanelStore = create<AppState>((set) => {
       const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
         ...tab,
         selectedItems: new Set(paths),
+      }));
+
+      return {
+        [panelKey]: nextPanelState,
+      };
+    }),
+
+  setPendingCursorName: (panel, name) =>
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
+        ...tab,
+        pendingCursorName: name,
       }));
 
       return {

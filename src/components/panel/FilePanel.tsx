@@ -38,6 +38,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const setPath = usePanelStore((s) => s.setPath);
   const setFiles = usePanelStore((s) => s.setFiles);
   const setResolvedPath = usePanelStore((s) => s.setResolvedPath);
+  const setPendingCursorName = usePanelStore((s) => s.setPendingCursorName);
+  const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const openContextMenu = useContextMenuStore((s) => s.openContextMenu);
@@ -370,8 +372,12 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         const handled = await enterArchiveEntry({
           entry,
           fs,
-          panelId: id,
-          setPath,
+          onZipExtracted: isZipArchive
+            ? () => {
+                setPendingCursorName(id, entry.name);
+                refreshPanel(id);
+              }
+            : undefined,
         });
 
         if (!handled) {

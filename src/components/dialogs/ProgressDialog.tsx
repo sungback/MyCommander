@@ -6,7 +6,7 @@ import { formatSize } from "../../utils/format";
 import { useFileSystem } from "../../hooks/useFileSystem";
 
 interface ProgressPayload {
-  operation: "copy" | "move" | "zip";
+  operation: "copy" | "move" | "zip" | "delete";
   current: number;
   total: number;
   currentFile: string;
@@ -54,6 +54,8 @@ export const ProgressDialog: React.FC = () => {
   const operationLabel =
     progress?.operation === "move"
       ? "Moving"
+      : progress?.operation === "delete"
+        ? "Deleting"
       : progress?.operation === "zip"
         ? "Compressing"
         : "Copying";
@@ -73,6 +75,9 @@ export const ProgressDialog: React.FC = () => {
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
+          <Dialog.Description className="sr-only">
+            Displays progress for long-running file system operations.
+          </Dialog.Description>
           <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-4">
             {operationLabel} Files...
           </Dialog.Title>

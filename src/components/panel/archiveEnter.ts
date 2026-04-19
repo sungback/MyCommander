@@ -1,7 +1,5 @@
 import { FileEntry } from "../../types/file";
 
-type PanelId = "left" | "right";
-
 interface ArchiveFs {
   extractZip: (path: string) => Promise<string>;
   openFile: (path: string) => Promise<void>;
@@ -10,8 +8,7 @@ interface ArchiveFs {
 interface EnterArchiveEntryOptions {
   entry: FileEntry;
   fs: ArchiveFs;
-  panelId: PanelId;
-  setPath: (panel: PanelId, path: string) => void;
+  onZipExtracted?: (path: string) => void;
 }
 
 export const isZipArchiveEntry = (entry: Pick<FileEntry, "name">) =>
@@ -26,12 +23,11 @@ export const isArchiveEntry = (entry: Pick<FileEntry, "name">) =>
 export const enterArchiveEntry = async ({
   entry,
   fs,
-  panelId,
-  setPath,
+  onZipExtracted,
 }: EnterArchiveEntryOptions) => {
   if (isZipArchiveEntry(entry)) {
     const extractedPath = await fs.extractZip(entry.path);
-    setPath(panelId, extractedPath);
+    onZipExtracted?.(extractedPath);
     return true;
   }
 

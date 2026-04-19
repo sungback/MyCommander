@@ -556,6 +556,45 @@ describe('FileList', () => {
       // listDirectory는 최초 1회만 호출됨
       expect(mockListDirectory).toHaveBeenCalledTimes(1);
     });
+
+    it('상위 목록이 새로고침되면 펼친 폴더 캐시를 다시 동기화한다', async () => {
+      const { rerender } = render(<FileList {...makeProps()} />);
+
+      mockListDirectory.mockResolvedValueOnce(CHILD_FILES);
+      await act(async () => {
+        fireEvent.click(getDocExpandBtn());
+      });
+
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).toBeInTheDocument();
+
+      mockListDirectory.mockResolvedValueOnce([
+        { name: 'report.pdf', path: '/home/user/Documents/report.pdf', kind: 'file', size: 512 },
+      ]);
+
+      await act(async () => {
+        rerender(
+          <FileList
+            {...makeProps({
+              files: [...TEST_FILES.map((entry) => ({ ...entry }))],
+            })}
+          />
+        );
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockListDirectory).toHaveBeenCalledTimes(2);
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/report.pdf"]')
+      ).toBeInTheDocument();
+    });
   });
 
   describe('같은 패널 드래그 복사', () => {

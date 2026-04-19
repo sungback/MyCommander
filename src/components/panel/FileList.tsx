@@ -184,6 +184,7 @@ export const FileList: React.FC<FileListProps> = ({
   const selectionAnchorIndexRef = useRef<number | null>(null);
   const searchStringRef = useRef<string>("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expandedPathsRef = useRef<Set<string>>(new Set());
   // Counter for HTML5 drag events (for external Finder→App drops)
   const dragCounterRef = useRef(0);
 
@@ -271,11 +272,80 @@ export const FileList: React.FC<FileListProps> = ({
 
   useEffect(() => {
     setExpandedPaths(new Set());
+    expandedPathsRef.current = new Set();
     setChildEntriesByPath({});
     selectionAnchorIndexRef.current = null;
     searchStringRef.current = "";
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
   }, [currentPath, showHiddenFiles]);
+
+  useEffect(() => {
+    expandedPathsRef.current = expandedPaths;
+  }, [expandedPaths]);
+
+  useEffect(() => {
+    const expandedPathsToRefresh = [...expandedPathsRef.current];
+
+    if (expandedPathsToRefresh.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshExpandedDirectories = async () => {
+      const results = await Promise.all(
+        expandedPathsToRefresh.map(async (path) => {
+          try {
+            const children = await listDirectory(path, showHiddenFiles);
+            return {
+              path,
+              children: children.filter((child) => child.name !== ".."),
+            };
+          } catch (error) {
+            console.error(`Failed to refresh child entries for ${path}:`, error);
+            return {
+              path,
+              children: null as FileEntry[] | null,
+            };
+          }
+        })
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      const nextExpandedPaths = new Set(expandedPathsRef.current);
+      for (const result of results) {
+        if (result.children === null) {
+          nextExpandedPaths.delete(result.path);
+        }
+      }
+
+      expandedPathsRef.current = nextExpandedPaths;
+      setExpandedPaths(nextExpandedPaths);
+      setChildEntriesByPath((current) => {
+        const next = { ...current };
+
+        for (const result of results) {
+          if (result.children === null) {
+            delete next[result.path];
+            continue;
+          }
+
+          next[result.path] = result.children;
+        }
+
+        return next;
+      });
+    };
+
+    void refreshExpandedDirectories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPath, files, listDirectory, showHiddenFiles]);
 
   useEffect(() => {
     if (visibleRows.length === 0) return;

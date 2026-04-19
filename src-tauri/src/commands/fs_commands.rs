@@ -204,22 +204,16 @@ pub async fn create_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn delete_files(paths: Vec<String>, permanent: bool) -> Result<(), String> {
-    let paths = collapse_nested_paths(paths);
+pub async fn delete_files(
+    app: tauri::AppHandle,
+    paths: Vec<String>,
+    permanent: bool,
+) -> Result<(), String> {
+    let targets = collect_delete_progress_targets(paths);
 
-    for path in paths {
-        let p = Path::new(&path);
-        if permanent {
-            if p.is_dir() {
-                fs::remove_dir_all(p).map_err(|e| e.to_string())?;
-            } else {
-                fs::remove_file(p).map_err(|e| e.to_string())?;
-            }
-        } else {
-            move_to_trash(p).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
+    tokio::task::spawn_blocking(move || delete_files_blocking(&app, targets, permanent))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -552,7 +546,55 @@ fn extract_zip_archive(path: &str) -> Result<String, String> {
         }
     }
 
+    flatten_matching_archive_root_dir(&target_dir, archive_path)?;
+
     Ok(target_dir.to_string_lossy().to_string())
+}
+
+fn flatten_matching_archive_root_dir(
+    extraction_dir: &Path,
+    archive_path: &Path,
+) -> Result<(), String> {
+    let top_level_entries = fs::read_dir(extraction_dir)
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    if top_level_entries.len() != 1 {
+        return Ok(());
+    }
+
+    let nested_root = &top_level_entries[0];
+    if !nested_root.file_type().map_err(|e| e.to_string())?.is_dir() {
+        return Ok(());
+    }
+
+    let nested_name = nested_root.file_name();
+    let matches_archive_name = archive_path
+        .file_stem()
+        .is_some_and(|archive_stem| archive_stem == nested_name.as_os_str());
+    let matches_target_name = extraction_dir
+        .file_name()
+        .is_some_and(|target_name| target_name == nested_name.as_os_str());
+
+    if !matches_archive_name && !matches_target_name {
+        return Ok(());
+    }
+
+    move_directory_contents(nested_root.path().as_path(), extraction_dir)?;
+    fs::remove_dir(nested_root.path()).map_err(|e| e.to_string())
+}
+
+fn move_directory_contents(source_dir: &Path, target_dir: &Path) -> Result<(), String> {
+    let entries = fs::read_dir(source_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let destination = target_dir.join(entry.file_name());
+        fs::rename(entry.path(), destination).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 fn format_command_failure(command_name: &str, output: &std::process::Output) -> String {
@@ -1250,6 +1292,58 @@ fn collapse_nested_paths(paths: Vec<String>) -> Vec<PathBuf> {
     collapsed
 }
 
+fn collect_delete_progress_targets(paths: Vec<String>) -> Vec<PathBuf> {
+    collapse_nested_paths(paths)
+}
+
+fn delete_files_blocking(
+    app: &tauri::AppHandle,
+    targets: Vec<PathBuf>,
+    permanent: bool,
+) -> Result<(), String> {
+    if targets.is_empty() {
+        return Ok(());
+    }
+
+    let total = targets.len() as u64;
+    emit_delete_progress(app, 0, total, "Preparing...");
+
+    for (index, path) in targets.iter().enumerate() {
+        let current_file = path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| path.to_string_lossy().to_string());
+
+        if permanent {
+            if path.is_dir() {
+                fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+            } else {
+                fs::remove_file(path).map_err(|e| e.to_string())?;
+            }
+        } else {
+            move_to_trash(path).map_err(|e| e.to_string())?;
+        }
+
+        emit_delete_progress(app, index as u64 + 1, total, &current_file);
+    }
+
+    Ok(())
+}
+
+fn emit_delete_progress(app: &tauri::AppHandle, current: u64, total: u64, current_file: &str) {
+    let _ = app.emit(
+        "fs-progress",
+        ProgressPayload {
+            operation: "delete".to_string(),
+            current,
+            total,
+            current_file: current_file.to_string(),
+            unit: "items".to_string(),
+        },
+    );
+}
+
 fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     #[cfg(target_os = "macos")]
     {
@@ -1556,6 +1650,22 @@ mod tests {
     }
 
     #[test]
+    fn collect_delete_progress_targets_collapses_nested_entries() {
+        let paths = vec![
+            "/tmp/root".to_string(),
+            "/tmp/root/child.txt".to_string(),
+            "/tmp/other.txt".to_string(),
+        ];
+
+        let result = collect_delete_progress_targets(paths);
+
+        assert_eq!(
+            result,
+            vec![PathBuf::from("/tmp/root"), PathBuf::from("/tmp/other.txt")]
+        );
+    }
+
+    #[test]
     fn hidden_entry_dot_prefix() {
         let dir = std::env::temp_dir();
         let metadata = fs::metadata(&dir).unwrap();
@@ -1650,6 +1760,42 @@ mod tests {
 
         let result = get_unique_archive_path(&source).unwrap();
         assert_eq!(result, tmp.join("data 2.zip"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn flattens_single_top_level_directory_matching_archive_name() {
+        let tmp = create_test_dir("flatten_archive_root");
+        let extraction_dir = tmp.join("abc");
+        let nested_root = extraction_dir.join("abc");
+        let nested_child = nested_root.join("notes.txt");
+
+        fs::create_dir_all(&nested_root).unwrap();
+        fs::write(&nested_child, b"hello").unwrap();
+
+        flatten_matching_archive_root_dir(&extraction_dir, Path::new("abc.zip")).unwrap();
+
+        assert!(extraction_dir.join("notes.txt").exists());
+        assert!(!nested_root.exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn keeps_single_top_level_directory_when_name_differs_from_archive() {
+        let tmp = create_test_dir("keep_archive_root");
+        let extraction_dir = tmp.join("abc");
+        let nested_root = extraction_dir.join("other");
+        let nested_child = nested_root.join("notes.txt");
+
+        fs::create_dir_all(&nested_root).unwrap();
+        fs::write(&nested_child, b"hello").unwrap();
+
+        flatten_matching_archive_root_dir(&extraction_dir, Path::new("abc.zip")).unwrap();
+
+        assert!(nested_child.exists());
+        assert!(!extraction_dir.join("notes.txt").exists());
 
         let _ = fs::remove_dir_all(&tmp);
     }

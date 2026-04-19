@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import { refreshPanelsForDirectories } from "../../store/panelRefresh";
+import {
+  refreshPanelsForDirectories,
+  refreshPanelsForEntryPaths,
+  removeDeletedPathsFromVisiblePanels,
+} from "../../store/panelRefresh";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getPathDirectoryName, isAbsolutePath, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
@@ -59,6 +63,9 @@ const BaseDialog: React.FC<{
                 onSubmit();
               }}
             >
+              <Dialog.Description className="sr-only">
+                {title} dialog
+              </Dialog.Description>
               <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-4">
                 {title}
               </Dialog.Title>
@@ -291,14 +298,18 @@ export const DialogContainer: React.FC = () => {
 
   const handleDelete = async () => {
     if (selectedPaths.length === 0) return;
+    const deleteTargets = [...selectedPaths];
     try {
       setIsSubmitting(true);
       setOperationError(null);
-      await fs.deleteFiles(selectedPaths, false);
+      setOpenDialog("progress");
+      await fs.deleteFiles(deleteTargets, false);
+      removeDeletedPathsFromVisiblePanels(deleteTargets);
       closeDialog();
-      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
+      refreshPanelsForEntryPaths(deleteTargets);
     } catch (e) {
       console.error(e);
+      setOpenDialog("delete");
       setOperationError(getErrorMessage(e, "Failed to delete selected items."));
     } finally {
       setIsSubmitting(false);
