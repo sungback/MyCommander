@@ -6,17 +6,19 @@ import { useSettingsStore } from "../../store/settingsStore";
 export const DualPanel: React.FC = () => {
   const panelLeftRatio = useSettingsStore(s => s.panelLeftRatio);
   const setPanelLeftRatio = useSettingsStore(s => s.setPanelLeftRatio);
-  
+  const leftPanelSize = `${panelLeftRatio}%`;
+  const rightPanelSize = `${100 - panelLeftRatio}%`;
+
   const leftPanelRef = useRef<PanelImperativeHandle>(null);
 
   useEffect(() => {
     if (leftPanelRef.current) {
       const currentSize = leftPanelRef.current.getSize().asPercentage;
       if (Math.abs(currentSize - panelLeftRatio) > 0.5) {
-        leftPanelRef.current.resize(panelLeftRatio);
+        leftPanelRef.current.resize(leftPanelSize);
       }
     }
-  }, [panelLeftRatio]);
+  }, [leftPanelSize, panelLeftRatio]);
 
   return (
     <PanelGroup 
@@ -29,7 +31,7 @@ export const DualPanel: React.FC = () => {
         }
       }}
     >
-      <Panel id="left-panel" panelRef={leftPanelRef} defaultSize={panelLeftRatio} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Panel id="left-panel" panelRef={leftPanelRef} defaultSize={leftPanelSize} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
         <FilePanel id="left" />
       </Panel>
 
@@ -37,7 +39,7 @@ export const DualPanel: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-black/20 rounded" />
       </PanelResizeHandle>
 
-      <Panel id="right-panel" defaultSize={100 - panelLeftRatio} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Panel id="right-panel" defaultSize={rightPanelSize} minSize={20} className="flex flex-col h-full min-h-0 overflow-hidden">
         <FilePanel id="right" />
       </Panel>
     </PanelGroup>
