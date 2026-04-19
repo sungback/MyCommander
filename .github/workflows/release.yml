@@ -40,6 +40,9 @@ jobs:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      # Fine-grained PAT is more reliable for release creation when GitHub blocks
+      # the default workflow token on specific release/tag edge cases.
+      RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -103,7 +106,7 @@ jobs:
       - name: Tauri 앱 빌드 및 GitHub Release 배포
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ env.RELEASE_TOKEN }}
           APPLE_ID: ${{ env.APPLE_ID }}
           APPLE_PASSWORD: ${{ env.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
