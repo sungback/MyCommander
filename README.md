@@ -228,3 +228,9 @@ cargo clean --manifest-path src-tauri/Cargo.toml
 
 - 프로젝트 컨텍스트 문서는 [CLAUDE.md](./CLAUDE.md)
 - 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)
+
+## 참고2 : 1 줄 tag push
+
+```bash
+git add -A && git commit -m "12th commit" && npm version 1.1.12 && git push origin main && git push origin --tags
+```
