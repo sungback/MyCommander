@@ -1,0 +1,60 @@
+name: "CI"
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+
+      - name: TypeScript 타입 체크
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Rust 체크
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+
+      - name: 프론트엔드 테스트 실행
+        run: npm run test
+
+      - name: Rust 테스트 실행
+        run: npm run test:rust
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [check, test]
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+        with:
+          install_rust: "false"
+          install_linux_tauri_deps: "false"
+
+      - name: 프런트엔드 빌드
+        run: npm run build
