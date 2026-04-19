@@ -10,19 +10,20 @@ const mockGetDirSize = vi.fn();
 const mockOpenFile = vi.fn();
 const mockOpenContextMenu = vi.fn();
 let lastFileListProps: { onEnter: (entry: unknown) => Promise<void> | void } | null = null;
+const mockFileSystem = {
+  listDirectory: mockListDirectory,
+  getHomeDir: mockGetHomeDir,
+  resolvePath: mockResolvePath,
+  getDirSize: mockGetDirSize,
+  openFile: mockOpenFile,
+};
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../hooks/useFileSystem", () => ({
-  useFileSystem: () => ({
-    listDirectory: mockListDirectory,
-    getHomeDir: mockGetHomeDir,
-    resolvePath: mockResolvePath,
-    getDirSize: mockGetDirSize,
-    openFile: mockOpenFile,
-  }),
+  useFileSystem: () => mockFileSystem,
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
 }));
@@ -142,7 +143,10 @@ describe("FilePanel", () => {
     expect(usePanelStore.getState().leftPanel.resolvedPath).toBe(
       "/Users/back/Library/CloudStorage/Dropbox"
     );
-    expect(usePanelStore.getState().leftPanel.files).toEqual(resolvedEntries);
+    expect(usePanelStore.getState().leftPanel.files).toEqual([
+      resolvedEntries[0],
+      { ...resolvedEntries[1], size: 0 },
+    ]);
     expect(alertSpy).not.toHaveBeenCalled();
   });
 
@@ -166,7 +170,10 @@ describe("FilePanel", () => {
     render(<FilePanel id="left" />);
 
     await waitFor(() => {
-      expect(usePanelStore.getState().leftPanel.files).toEqual(homeEntries);
+      expect(usePanelStore.getState().leftPanel.files).toEqual([
+        homeEntries[0],
+        { ...homeEntries[1], size: 0 },
+      ]);
     });
 
     await act(async () => {
@@ -253,7 +260,9 @@ describe("FilePanel", () => {
 
     await waitFor(() => {
       expect(lastFileListProps).not.toBeNull();
-      expect(usePanelStore.getState().leftPanel.files).toEqual([dropboxEntry]);
+      expect(usePanelStore.getState().leftPanel.files).toEqual([
+        { ...dropboxEntry, size: 0 },
+      ]);
     });
 
     await act(async () => {
