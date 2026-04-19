@@ -2,6 +2,8 @@ name: "Lint GitHub Actions"
 
 on:
   push:
+    tags-ignore:
+      - "v*"
     paths:
       - ".github/workflows/**"
       - ".github/actions/**"
