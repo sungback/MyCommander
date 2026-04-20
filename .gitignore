@@ -6,6 +6,9 @@ dist/
 dist-ssr/
 coverage/
 src-tauri/target/
+.vitest-localstorage
+.vitest-localstorage-shm
+.vitest-localstorage-wal
 
 # === 로그 ===
 logs/

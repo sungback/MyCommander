@@ -28,9 +28,11 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 비디오
 - PDF
 - 일반 텍스트 / 소스 코드 하이라이팅
+- R script (`.R`)
 - Markdown 렌더링
 - HTML 렌더링
 - Excel (`.xlsx`, `.xls`)
+- Word (`.docx`)
 - Jupyter Notebook (`.ipynb`)
 - PowerPoint (`.pptx`)
 - HWPX

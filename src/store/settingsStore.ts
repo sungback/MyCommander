@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   resolvePersistedFontFamily,
 } from "../constants/fontOptions";
@@ -13,6 +13,30 @@ interface SettingsState {
   setFontFamily: (fontFamily: string) => void;
   setPanelLeftRatio: (ratio: number) => void;
 }
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+const getSettingsStorage = (): StateStorage => {
+  if (typeof window === "undefined") {
+    return noopStorage;
+  }
+
+  const storage = window.localStorage;
+  if (
+    storage &&
+    typeof storage.getItem === "function" &&
+    typeof storage.setItem === "function" &&
+    typeof storage.removeItem === "function"
+  ) {
+    return storage;
+  }
+
+  return noopStorage;
+};
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -30,6 +54,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "mycommander-settings",
+      storage: createJSONStorage(getSettingsStorage),
       merge: (persistedState, currentState) => {
         const state =
           persistedState && typeof persistedState === "object"

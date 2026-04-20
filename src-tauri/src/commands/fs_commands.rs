@@ -1,8 +1,9 @@
+use encoding_rs::EUC_KR;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -51,6 +52,7 @@ struct PreparedBatchRenameOperation {
 }
 
 static ZIP_OPERATION_STATE: OnceLock<Mutex<Option<Arc<AtomicBool>>>> = OnceLock::new();
+const MAX_PREVIEW_BYTES: u64 = 100 * 1024;
 
 fn zip_operation_state() -> &'static Mutex<Option<Arc<AtomicBool>>> {
     ZIP_OPERATION_STATE.get_or_init(|| Mutex::new(None))
@@ -384,16 +386,130 @@ pub fn cancel_zip_operation() -> Result<(), String> {
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn read_file_content(path: String) -> Result<String, String> {
-    use std::io::Read;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
 
     // Read only first 100KB to prevent UI lag on huge files
-    let mut buffer = String::new();
-    file.take(100 * 1024)
-        .read_to_string(&mut buffer)
+    let mut buffer = Vec::new();
+    file.take(MAX_PREVIEW_BYTES)
+        .read_to_end(&mut buffer)
         .map_err(|e| e.to_string())?;
 
-    Ok(buffer)
+    Ok(decode_preview_bytes(&buffer))
+}
+
+fn decode_preview_bytes(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        return decode_utf16_bytes(&bytes[2..], true);
+    }
+
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        return decode_utf16_bytes(&bytes[2..], false);
+    }
+
+    if looks_like_utf16_le(bytes) {
+        return decode_utf16_bytes(bytes, true);
+    }
+
+    if looks_like_utf16_be(bytes) {
+        return decode_utf16_bytes(bytes, false);
+    }
+
+    match String::from_utf8(bytes.to_vec()) {
+        Ok(text) => text,
+        Err(_) => {
+            if let Some(text) = try_decode_korean_legacy_text(bytes) {
+                return text;
+            }
+
+            String::from_utf8_lossy(bytes).into_owned()
+        }
+    }
+}
+
+fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> String {
+    let units = bytes
+        .chunks_exact(2)
+        .map(|chunk| {
+            if little_endian {
+                u16::from_le_bytes([chunk[0], chunk[1]])
+            } else {
+                u16::from_be_bytes([chunk[0], chunk[1]])
+            }
+        })
+        .collect::<Vec<u16>>();
+
+    String::from_utf16_lossy(&units)
+}
+
+fn looks_like_utf16_le(bytes: &[u8]) -> bool {
+    looks_like_utf16_with_zero_stride(bytes, true)
+}
+
+fn looks_like_utf16_be(bytes: &[u8]) -> bool {
+    looks_like_utf16_with_zero_stride(bytes, false)
+}
+
+fn looks_like_utf16_with_zero_stride(bytes: &[u8], zero_on_odd: bool) -> bool {
+    let sample_len = bytes.len().min(64);
+    if sample_len < 4 {
+        return false;
+    }
+
+    let pairs = bytes[..sample_len].chunks_exact(2);
+    let pair_count = pairs.len();
+    if pair_count < 2 {
+        return false;
+    }
+
+    let mut zero_matches = 0usize;
+    let mut printable_matches = 0usize;
+
+    for pair in pairs {
+        let [first, second] = [pair[0], pair[1]];
+        let zero_byte = if zero_on_odd { second } else { first };
+        let text_byte = if zero_on_odd { first } else { second };
+
+        if zero_byte == 0 {
+            zero_matches += 1;
+        }
+
+        if text_byte == b'\n'
+            || text_byte == b'\r'
+            || text_byte == b'\t'
+            || (0x20..=0x7E).contains(&text_byte)
+        {
+            printable_matches += 1;
+        }
+    }
+
+    zero_matches * 2 >= pair_count && printable_matches * 2 >= pair_count
+}
+
+fn try_decode_korean_legacy_text(bytes: &[u8]) -> Option<String> {
+    let (decoded, _, had_errors) = EUC_KR.decode(bytes);
+    if had_errors {
+        return None;
+    }
+
+    let text = decoded.into_owned();
+    if contains_hangul(&text) {
+        return Some(text);
+    }
+
+    None
+}
+
+fn contains_hangul(text: &str) -> bool {
+    text.chars().any(|ch| {
+        matches!(
+            ch as u32,
+            0x1100..=0x11FF
+                | 0x3130..=0x318F
+                | 0xA960..=0xA97F
+                | 0xAC00..=0xD7A3
+                | 0xD7B0..=0xD7FF
+        )
+    })
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -1602,6 +1718,7 @@ pub async fn check_copy_conflicts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use encoding_rs::EUC_KR;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1677,6 +1794,54 @@ mod tests {
         let dir = std::env::temp_dir();
         let metadata = fs::metadata(&dir).unwrap();
         assert!(!is_hidden_entry("visible.txt", &metadata));
+    }
+
+    #[test]
+    fn decode_preview_bytes_keeps_utf8_text() {
+        let decoded = decode_preview_bytes("plain utf8 text".as_bytes());
+
+        assert_eq!(decoded, "plain utf8 text");
+    }
+
+    #[test]
+    fn decode_preview_bytes_decodes_utf16le_with_bom() {
+        let mut bytes = vec![0xFF, 0xFE];
+        for unit in "Hello UTF16".encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+
+        let decoded = decode_preview_bytes(&bytes);
+
+        assert_eq!(decoded, "Hello UTF16");
+    }
+
+    #[test]
+    fn decode_preview_bytes_decodes_utf16le_without_bom_when_pattern_matches() {
+        let mut bytes = Vec::new();
+        for unit in "Hello".encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+
+        let decoded = decode_preview_bytes(&bytes);
+
+        assert_eq!(decoded, "Hello");
+    }
+
+    #[test]
+    fn decode_preview_bytes_falls_back_to_lossy_utf8() {
+        let decoded = decode_preview_bytes(&[0x66, 0x6f, 0x80, 0x6f]);
+
+        assert_eq!(decoded, "fo\u{FFFD}o");
+    }
+
+    #[test]
+    fn decode_preview_bytes_decodes_euc_kr_text() {
+        let (bytes, _, had_errors) = EUC_KR.encode("안녕하세요");
+        assert!(!had_errors);
+
+        let decoded = decode_preview_bytes(bytes.as_ref());
+
+        assert_eq!(decoded, "안녕하세요");
     }
 
     #[test]

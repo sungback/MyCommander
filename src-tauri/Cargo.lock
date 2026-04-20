@@ -2289,6 +2289,7 @@ version = "0.3.0"
 dependencies = [
  "cocoa",
  "dirs",
+ "encoding_rs",
  "glob",
  "notify",
  "objc",
