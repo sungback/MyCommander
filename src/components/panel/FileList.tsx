@@ -11,7 +11,6 @@ import { useUiStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
 import { arePathsEquivalent, getPathDirectoryName, isSameOrNestedPath } from "../../utils/path";
-import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 
 interface FileListProps {
   currentPath: string;
@@ -148,7 +147,7 @@ export const FileList: React.FC<FileListProps> = ({
   setCursorIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { checkCopyConflicts, copyFiles, moveFiles, getDirSize, listDirectory } = useFileSystem();
+  const { checkCopyConflicts, submitJob, getDirSize, listDirectory } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const setSelection = usePanelStore((s) => s.setSelection);
   const selectOnly = usePanelStore((s) => s.selectOnly);
@@ -228,9 +227,12 @@ export const FileList: React.FC<FileListProps> = ({
       return false;
     }
 
-    await copyFiles(paths, targetPath);
-    refreshPanelsForDirectories([accessPath, targetPath]);
-    showTransientStatusMessage("선택한 파일을 복사했습니다.");
+    await submitJob({
+      kind: "copy",
+      sourcePaths: paths,
+      targetPath,
+    });
+    showTransientStatusMessage("선택한 파일을 복사 대기열에 추가했습니다.");
     return true;
   };
 
@@ -299,9 +301,12 @@ export const FileList: React.FC<FileListProps> = ({
       return false;
     }
 
-    await moveFiles(collapsedPaths, targetPath);
-    refreshPanelsForDirectories([accessPath, targetPath]);
-    showTransientStatusMessage("선택한 폴더를 이동했습니다.");
+    await submitJob({
+      kind: "move",
+      sourcePaths: collapsedPaths,
+      targetDir: targetPath,
+    });
+    showTransientStatusMessage("선택한 폴더를 이동 대기열에 추가했습니다.");
     return true;
   };
 
@@ -675,13 +680,13 @@ export const FileList: React.FC<FileListProps> = ({
     };
   }, [
     checkCopyConflicts,
-    copyFiles,
     accessPath,
     currentPath,
     openDragCopyDialog,
     panelId,
     setActivePanel,
     setDragInfo,
+    submitJob,
     visibleRows,
   ]);
 

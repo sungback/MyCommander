@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { useDialogStore } from "../../store/dialogStore";
 import { formatSize } from "../../utils/format";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { useJobStore } from "../../store/jobStore";
 
 interface ProgressPayload {
   operation: "copy" | "move" | "zip" | "delete";
@@ -14,22 +15,32 @@ interface ProgressPayload {
 }
 
 export const ProgressDialog: React.FC = () => {
-  const { openDialog } = useDialogStore();
-  const { cancelZipOperation } = useFileSystem();
+  const { openDialog, closeDialog } = useDialogStore();
+  const { cancelJob, clearFinishedJobs, retryJob } = useFileSystem();
+  const activeJob = useJobStore((state) => state.activeJob);
+  const queuedJobs = useJobStore((state) => state.queuedJobs);
+  const failedJobs = useJobStore((state) => state.failedJobs);
+  const finishedJobs = useJobStore((state) => state.finishedJobs);
+  const clearFinishedJobsLocal = useJobStore((state) => state.clearFinishedJobsLocal);
+  const upsertJob = useJobStore((state) => state.upsertJob);
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isClearingFinished, setIsClearingFinished] = useState(false);
 
   useEffect(() => {
     if (openDialog !== "progress") {
       setProgress(null);
       setIsCancelling(false);
+      setIsRetrying(false);
+      setIsClearingFinished(false);
       return;
     }
 
     let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    let unlistenProgress: (() => void) | undefined;
 
-    listen<ProgressPayload>("fs-progress", (event) => {
+    void listen<ProgressPayload>("fs-progress", (event) => {
       if (!cancelled) {
         setProgress(event.payload);
       }
@@ -37,29 +48,47 @@ export const ProgressDialog: React.FC = () => {
       if (cancelled) {
         fn();
       } else {
-        unlisten = fn;
+        unlistenProgress = fn;
       }
     });
 
     return () => {
       cancelled = true;
-      unlisten?.();
+      unlistenProgress?.();
     };
   }, [openDialog]);
 
+  useEffect(() => {
+    if (openDialog !== "progress") {
+      return;
+    }
+
+    const hasRunningOrQueued = Boolean(activeJob);
+    const hasFailed = failedJobs.length > 0;
+    const hasFinished = finishedJobs.length > 0;
+
+    if (!hasRunningOrQueued && !hasFailed && !hasFinished) {
+      closeDialog();
+    }
+  }, [activeJob, closeDialog, failedJobs.length, finishedJobs.length, openDialog]);
+
+  useEffect(() => {
+    setProgress(null);
+  }, [activeJob?.id]);
+
   const isOpen = openDialog === "progress";
+  const latestFailedJob = failedJobs.length > 0 ? failedJobs[failedJobs.length - 1] : null;
   const percent = progress && progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0;
   const operationLabel =
-    progress?.operation === "move"
+    activeJob?.kind === "move" || progress?.operation === "move"
       ? "Moving"
-      : progress?.operation === "delete"
+      : activeJob?.kind === "delete" || progress?.operation === "delete"
         ? "Deleting"
-      : progress?.operation === "zip"
-        ? "Compressing"
-        : "Copying";
-  const canCancel = progress?.operation === "zip";
+        : activeJob?.kind === "zip" || progress?.operation === "zip"
+          ? "Compressing"
+          : "Copying";
   const progressText = progress
     ? progress.unit === "bytes"
       ? `${formatSize(progress.current)} / ${formatSize(progress.total)}`
@@ -88,12 +117,10 @@ export const ProgressDialog: React.FC = () => {
                 {progress ? (
                   <span className="text-text-primary font-mono">{progress.currentFile}</span>
                 ) : (
-                  "Preparing..."
+                  activeJob?.progress.currentFile || "Preparing..."
                 )}
               </span>
-              <span className="shrink-0 ml-2">
-                {progressText}
-              </span>
+              <span className="shrink-0 ml-2">{progressText}</span>
             </div>
 
             <div className="w-full bg-bg-secondary rounded-full h-2 overflow-hidden">
@@ -105,26 +132,95 @@ export const ProgressDialog: React.FC = () => {
 
             <p className="text-xs text-text-secondary text-right">{percent}%</p>
 
-            {canCancel ? (
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isCancelling) {
-                      return;
-                    }
+            <div className="flex items-center justify-between text-[11px] text-text-secondary">
+              <span>Queued: {queuedJobs.length}</span>
+              <span>Failed: {failedJobs.length}</span>
+            </div>
 
-                    setIsCancelling(true);
-                    void cancelZipOperation().catch((error) => {
-                      console.error("Failed to cancel archive creation:", error);
-                      setIsCancelling(false);
-                    });
-                  }}
-                  disabled={isCancelling}
-                  className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isCancelling ? "Cancelling..." : "Cancel"}
-                </button>
+            {latestFailedJob ? (
+              <div className="rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-text-secondary">
+                <span className="block font-medium text-text-primary">
+                  Last failed job: {latestFailedJob.kind}
+                </span>
+                {latestFailedJob.error ? (
+                  <span className="block mt-1 break-words text-red-400">
+                    {latestFailedJob.error}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {activeJob || latestFailedJob || finishedJobs.length > 0 ? (
+              <div className="flex justify-end gap-2 pt-1">
+                {latestFailedJob ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isRetrying) {
+                        return;
+                      }
+
+                      setIsRetrying(true);
+                      void retryJob(latestFailedJob.id)
+                        .then((job) => {
+                          upsertJob(job);
+                        })
+                        .finally(() => {
+                          setIsRetrying(false);
+                        });
+                    }}
+                    disabled={isRetrying}
+                    className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isRetrying ? "Retrying..." : "Retry failed"}
+                  </button>
+                ) : null}
+                {finishedJobs.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isClearingFinished) {
+                        return;
+                      }
+
+                      setIsClearingFinished(true);
+                      void clearFinishedJobs()
+                        .then(() => {
+                          clearFinishedJobsLocal();
+                        })
+                        .finally(() => {
+                          setIsClearingFinished(false);
+                        });
+                    }}
+                    disabled={isClearingFinished}
+                    className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isClearingFinished ? "Clearing..." : "Clear finished"}
+                  </button>
+                ) : null}
+                {activeJob ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCancelling) {
+                        return;
+                      }
+
+                      setIsCancelling(true);
+                      void cancelJob(activeJob.id)
+                        .then((job) => {
+                          upsertJob(job);
+                        })
+                        .finally(() => {
+                          setIsCancelling(false);
+                        });
+                    }}
+                    disabled={isCancelling}
+                    className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isCancelling ? "Cancelling..." : "Cancel"}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

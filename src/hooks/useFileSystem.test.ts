@@ -159,6 +159,87 @@ describe('useFileSystem', () => {
     });
   });
 
+  describe('submitJob', () => {
+    it('invokes submit_job with a unified copy payload', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-1',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+
+      await useFileSystem().submitJob({
+        kind: 'copy',
+        sourcePaths: ['/home/user/a.txt'],
+        targetPath: '/home/user/dest',
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('submit_job', {
+        job: {
+          kind: 'copy',
+          sourcePaths: ['/home/user/a.txt'],
+          targetPath: '/home/user/dest',
+        },
+      });
+    });
+  });
+
+  describe('listJobs', () => {
+    it('invokes list_jobs without arguments', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+      await useFileSystem().listJobs();
+      expect(mockInvoke).toHaveBeenCalledWith('list_jobs');
+    });
+  });
+
+  describe('cancelJob', () => {
+    it('invokes cancel_job with the target id', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-1',
+        kind: 'copy',
+        status: 'cancelled',
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: 'Cancelled before start',
+        result: null,
+      });
+
+      await useFileSystem().cancelJob('job-1');
+      expect(mockInvoke).toHaveBeenCalledWith('cancel_job', { job_id: 'job-1' });
+    });
+  });
+
+  describe('retryJob', () => {
+    it('invokes retry_job with the target id', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-2',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 2,
+        updatedAt: 2,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+
+      await useFileSystem().retryJob('job-1');
+      expect(mockInvoke).toHaveBeenCalledWith('retry_job', { job_id: 'job-1' });
+    });
+  });
+
+  describe('clearFinishedJobs', () => {
+    it('invokes clear_finished_jobs without arguments', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().clearFinishedJobs();
+      expect(mockInvoke).toHaveBeenCalledWith('clear_finished_jobs');
+    });
+  });
+
   // ─── renameFile ────────────────────────────────────────────────────────────
   describe('renameFile', () => {
     it('invokes rename_file with old and new paths', async () => {

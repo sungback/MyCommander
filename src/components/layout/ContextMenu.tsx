@@ -104,29 +104,28 @@ export const ContextMenu: React.FC = () => {
                 return;
               }
               setActivePanel(panelId);
-              setOpenDialog("progress");
               const selectedPaths = [...panel.selectedItems];
-              try {
-                if (selectedPaths.length > 1) {
-                  // 다중 선택: 선택된 항목 모두 압축
-                  const archiveName =
-                    panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
-                    "Archive";
-                  await fs.createZipFromPaths(
-                    selectedPaths,
-                    getPanelAccessPath(panel),
-                    archiveName
-                  );
-                } else {
-                  if (targetEntry.kind !== "directory") {
-                    closeDialog();
-                    return;
-                  }
-                  await fs.createZip(targetPath);
+              if (selectedPaths.length > 1) {
+                const archiveName =
+                  panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
+                  "Archive";
+                await fs.submitJob({
+                  kind: "zipSelection",
+                  paths: selectedPaths,
+                  targetDir: getPanelAccessPath(panel),
+                  archiveName,
+                });
+              } else {
+                if (targetEntry.kind !== "directory") {
+                  closeDialog();
+                  return;
                 }
-              } finally {
-                closeDialog();
+                await fs.submitJob({
+                  kind: "zipDirectory",
+                  path: targetPath,
+                });
               }
+              setOpenDialog("progress");
               refreshPanel(panelId);
               closeContextMenu();
               return;

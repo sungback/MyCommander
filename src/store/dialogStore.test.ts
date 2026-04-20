@@ -28,7 +28,19 @@ describe("dialogStore — setOpenDialog", () => {
   });
 
   it("supports all dialog types", () => {
-    const types = ["copy", "move", "mkdir", "newfile", "delete", "search", "preview", "info"] as const;
+    const types = [
+      "copy",
+      "move",
+      "mkdir",
+      "newfile",
+      "delete",
+      "search",
+      "preview",
+      "info",
+      "progress",
+      "jobcenter",
+      "settings",
+    ] as const;
     for (const type of types) {
       useDialogStore.getState().setOpenDialog(type);
       expect(useDialogStore.getState().openDialog).toBe(type);

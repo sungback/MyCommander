@@ -10,7 +10,7 @@ const {
   mockCloseDialog,
   mockRefreshPanel,
   mockSetActivePanel,
-  mockCreateZip,
+  mockSubmitJob,
   mockOpenInTerminal,
   mockRevealItemInDir,
   mockWriteClipboardText,
@@ -24,7 +24,7 @@ const {
   mockCloseDialog: vi.fn(),
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
-  mockCreateZip: vi.fn(),
+  mockSubmitJob: vi.fn(),
   mockOpenInTerminal: vi.fn(),
   mockRevealItemInDir: vi.fn(),
   mockWriteClipboardText: vi.fn(),
@@ -90,7 +90,7 @@ vi.mock("../../utils/clipboard", () => ({
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     openInTerminal: mockOpenInTerminal,
-    createZip: mockCreateZip,
+    submitJob: mockSubmitJob,
   }),
 }));
 
@@ -148,7 +148,16 @@ describe("ContextMenu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listenHandlers.clear();
-    mockCreateZip.mockResolvedValue("/home/user/Documents.zip");
+    mockSubmitJob.mockResolvedValue({
+      id: "job-1",
+      kind: "zip",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
     mockOpenInTerminal.mockResolvedValue(undefined);
     mockRevealItemInDir.mockResolvedValue(undefined);
     mockWriteClipboardText.mockResolvedValue(undefined);
@@ -163,7 +172,11 @@ describe("ContextMenu", () => {
     await listenHandlers.get("context-menu-action")?.({ payload: "create-zip" });
 
     expect(mockSetActivePanel).toHaveBeenCalledWith("left");
-    expect(mockCreateZip).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockSubmitJob).toHaveBeenCalledWith({
+      kind: "zipDirectory",
+      path: "/home/user/Documents",
+    });
+    expect(mockSetOpenDialog).toHaveBeenCalledWith("progress");
     expect(mockRefreshPanel).toHaveBeenCalledWith("left");
     expect(mockCloseContextMenu).toHaveBeenCalled();
   });

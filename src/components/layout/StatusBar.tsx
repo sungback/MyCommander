@@ -7,7 +7,7 @@ import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
-import { Settings } from "lucide-react";
+import { Settings, ListTodo } from "lucide-react";
 
 type PanelId = "left" | "right";
 
@@ -234,6 +234,16 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
+          <button
+            type="button"
+            onClick={() => setOpenDialog("jobcenter")}
+            className="flex items-center gap-2 rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-hover"
+            title="작업 센터"
+            aria-label="작업 센터"
+          >
+            <ListTodo size={15} className="text-accent-color" />
+            <span>작업</span>
+          </button>
           <button
             type="button"
             onClick={() => setOpenDialog("settings")}

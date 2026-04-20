@@ -4,8 +4,6 @@ import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import {
   refreshPanelsForDirectories,
-  refreshPanelsForEntryPaths,
-  removeDeletedPathsFromVisiblePanels,
 } from "../../store/panelRefresh";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getPathDirectoryName, isAbsolutePath, joinPath } from "../../utils/path";
@@ -134,8 +132,6 @@ export const DialogContainer: React.FC = () => {
 
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
-  const dragSourcePanel =
-    dragCopyRequest?.sourcePanelId === "left" ? leftPanel : rightPanel;
   const infoPanel = dialogTarget?.panelId === "left" ? leftPanel : rightPanel;
   const infoEntry = dialogTarget
     ? infoPanel.files.find((entry) => entry.path.normalize("NFC") === dialogTarget.path.normalize("NFC")) ?? null
@@ -302,11 +298,12 @@ export const DialogContainer: React.FC = () => {
     try {
       setIsSubmitting(true);
       setOperationError(null);
+      await fs.submitJob({
+        kind: "delete",
+        paths: deleteTargets,
+        permanent: false,
+      });
       setOpenDialog("progress");
-      await fs.deleteFiles(deleteTargets, false);
-      removeDeletedPathsFromVisiblePanels(deleteTargets);
-      closeDialog();
-      refreshPanelsForEntryPaths(deleteTargets);
     } catch (e) {
       console.error(e);
       setOpenDialog("delete");
@@ -345,39 +342,26 @@ export const DialogContainer: React.FC = () => {
     setOpenDialog("progress");
     try {
       if (isMove) {
-        await fs.moveFiles(paths, targetPath);
+        await fs.submitJob({
+          kind: "move",
+          sourcePaths: paths,
+          targetDir: targetPath,
+        });
       } else {
-        const savedNames = await fs.copyFiles(paths, targetPath, keepBoth);
-
-        // keep_both 모드에서 이름이 바뀐 파일이 있으면 안내
-        if (keepBoth && savedNames.length > 0) {
-          const origNames = paths.map((p) => p.split(/[\\/]/).pop() ?? "");
-          const renamed = savedNames.filter((saved, i) => saved !== origNames[i]);
-          if (renamed.length > 0) {
-            const preview =
-              renamed.length === 1
-                ? `'${renamed[0]}'`
-                : `'${renamed[0]}' 외 ${renamed.length - 1}개`;
-            showTransientStatusMessage(
-              `${renamed.length}개 파일이 이미 존재하여 ${preview}(으)로 저장됨`,
-              3000
-            );
-          }
-        }
+        await fs.submitJob({
+          kind: "copy",
+          sourcePaths: paths,
+          targetPath,
+          keepBoth,
+        });
       }
-      // cut 작업이 완료되면 클립보드 초기화
+
       if (isPasteMode && clipboard?.operation === "cut") {
         clearClipboard();
-        if (!keepBoth) showTransientStatusMessage(`${paths.length}개 항목 이동됨`);
       }
-      closeDialog();
-      refreshPanelsForDirectories([
-        getPanelAccessPath(openDialog === "copy" && dragCopyRequest ? dragSourcePanel : activePanel),
-        targetPath,
-      ]);
+      showTransientStatusMessage(isMove ? "이동 작업이 대기열에 추가되었습니다." : "복사 작업이 대기열에 추가되었습니다.");
     } catch (e) {
       console.error(e);
-      // Switch back to the form dialog so the error message can be displayed
       setOpenDialog(isMove ? "move" : "copy");
       throw e;
     }

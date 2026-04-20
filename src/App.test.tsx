@@ -5,6 +5,7 @@ import { useDialogStore } from './store/dialogStore';
 import App from './App';
 
 const mockSyncOtherPanelToCurrentPath = vi.fn();
+const mockListJobs = vi.fn();
 const listenHandlers = new Map<string, () => void>();
 
 // ── Tauri IPC / event mocks ───────────────────────────────────────────────────
@@ -28,11 +29,19 @@ vi.mock('./hooks/useAppCommands', () => ({
     syncOtherPanelToCurrentPath: mockSyncOtherPanelToCurrentPath,
   }),
 }));
+vi.mock('./hooks/useFileSystem', () => ({
+  useFileSystem: () => ({
+    listJobs: mockListJobs,
+    syncWatchedDirectories: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
 
 // ── 자식 컴포넌트 stub (렌더링 비용 제거) ───────────────────────────────────────
 vi.mock('./components/panel/DualPanel',          () => ({ DualPanel:          () => null }));
 vi.mock('./components/layout/StatusBar',         () => ({ StatusBar:          () => null }));
 vi.mock('./components/dialogs/DialogContainer',  () => ({ DialogContainer:    () => null }));
+vi.mock('./components/dialogs/ProgressDialog',   () => ({ ProgressDialog:     () => null }));
+vi.mock('./components/dialogs/JobCenterDialog',  () => ({ JobCenterDialog:    () => null }));
 vi.mock('./components/dialogs/MultiRenameDialog', () => ({ MultiRenameDialog: () => null }));
 vi.mock('./components/dialogs/SearchPreviewDialogs', () => ({ SearchPreviewDialogs: () => null }));
 vi.mock('./components/dialogs/SyncDialog',       () => ({ SyncDialog:         () => null }));
@@ -45,6 +54,8 @@ describe('App — Tab 키 패널 전환', () => {
     useDialogStore.setState(useDialogStore.getInitialState());
     listenHandlers.clear();
     mockSyncOtherPanelToCurrentPath.mockReset();
+    mockListJobs.mockReset();
+    mockListJobs.mockResolvedValue([]);
   });
 
   it('초기 activePanel은 left', () => {
@@ -133,5 +144,27 @@ describe('App — Tab 키 패널 전환', () => {
     handler?.();
 
     expect(useDialogStore.getState().openDialog).toBe('settings');
+  });
+
+  it('restores queued jobs by opening the progress dialog on startup', async () => {
+    mockListJobs.mockResolvedValueOnce([
+      {
+        id: 'job-1',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<App />);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useDialogStore.getState().openDialog).toBe('progress');
   });
 });

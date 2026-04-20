@@ -5,15 +5,9 @@ import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 
 const {
-  mockDeleteFiles,
-  mockRefreshPanelsForDirectories,
-  mockRefreshPanelsForEntryPaths,
-  mockRemoveDeletedPathsFromVisiblePanels,
+  mockSubmitJob,
 } = vi.hoisted(() => ({
-  mockDeleteFiles: vi.fn(),
-  mockRefreshPanelsForDirectories: vi.fn(),
-  mockRefreshPanelsForEntryPaths: vi.fn(),
-  mockRemoveDeletedPathsFromVisiblePanels: vi.fn(),
+  mockSubmitJob: vi.fn(),
 }));
 
 vi.mock("../../hooks/useFileSystem", () => ({
@@ -21,7 +15,7 @@ vi.mock("../../hooks/useFileSystem", () => ({
     createDirectory: vi.fn(),
     createFile: vi.fn(),
     renameFile: vi.fn(),
-    deleteFiles: mockDeleteFiles,
+    submitJob: mockSubmitJob,
     copyFiles: vi.fn(),
     moveFiles: vi.fn(),
     checkCopyConflicts: vi.fn().mockResolvedValue([]),
@@ -29,12 +23,6 @@ vi.mock("../../hooks/useFileSystem", () => ({
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
-}));
-
-vi.mock("../../store/panelRefresh", () => ({
-  refreshPanelsForDirectories: mockRefreshPanelsForDirectories,
-  refreshPanelsForEntryPaths: mockRefreshPanelsForEntryPaths,
-  removeDeletedPathsFromVisiblePanels: mockRemoveDeletedPathsFromVisiblePanels,
 }));
 
 vi.mock("./QuickPreviewDialog", () => ({
@@ -93,37 +81,32 @@ describe("DialogContainer", () => {
     usePanelStore.setState(usePanelStore.getInitialState());
     setSelectedDeleteState();
     useDialogStore.getState().setOpenDialog("delete");
-    mockDeleteFiles.mockReset();
-    mockRefreshPanelsForDirectories.mockReset();
-    mockRefreshPanelsForEntryPaths.mockReset();
-    mockRemoveDeletedPathsFromVisiblePanels.mockReset();
+    mockSubmitJob.mockReset();
   });
 
-  it("switches to the progress dialog while deleting and refreshes deleted parent entries", async () => {
-    let resolveDelete: (() => void) | undefined;
-    mockDeleteFiles.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveDelete = resolve;
-        })
-    );
+  it("submits a delete job and switches to the progress dialog", async () => {
+    mockSubmitJob.mockResolvedValue({
+      id: "job-1",
+      kind: "delete",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
 
     render(<DialogContainer />);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(mockDeleteFiles).toHaveBeenCalledWith(["/home/user/LargeFolder"], false);
-    expect(useDialogStore.getState().openDialog).toBe("progress");
-
-    resolveDelete?.();
-
     await waitFor(() => {
-      expect(useDialogStore.getState().openDialog).toBeNull();
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: "delete",
+        paths: ["/home/user/LargeFolder"],
+        permanent: false,
+      });
     });
-
-    expect(mockRemoveDeletedPathsFromVisiblePanels).toHaveBeenCalledWith([
-      "/home/user/LargeFolder",
-    ]);
-    expect(mockRefreshPanelsForEntryPaths).toHaveBeenCalledWith(["/home/user/LargeFolder"]);
+    expect(useDialogStore.getState().openDialog).toBe("progress");
   });
 });

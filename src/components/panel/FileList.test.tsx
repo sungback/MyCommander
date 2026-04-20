@@ -11,8 +11,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 // ── useFileSystem mock (vi.hoisted로 호이스팅 — 팩토리 실행 전에 변수 준비) ──
 const {
-  mockCopyFiles,
-  mockMoveFiles,
+  mockSubmitJob,
   mockCheckCopyConflicts,
   mockGetDirSize,
   mockListDirectory,
@@ -26,8 +25,7 @@ const {
   mockOpenPreviewDialog,
   mockPanelState,
 } = vi.hoisted(() => ({
-  mockCopyFiles: vi.fn(),
-  mockMoveFiles: vi.fn(),
+  mockSubmitJob: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
@@ -67,8 +65,7 @@ const {
 vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     checkCopyConflicts: mockCheckCopyConflicts,
-    copyFiles: mockCopyFiles,
-    moveFiles: mockMoveFiles,
+    submitJob: mockSubmitJob,
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,
   }),
@@ -215,8 +212,16 @@ describe('FileList', () => {
     mockSetDragInfo.mockImplementation((dragInfo) => {
       mockPanelState.dragInfo = dragInfo;
     });
-    mockCopyFiles.mockResolvedValue(undefined);
-    mockMoveFiles.mockResolvedValue(undefined);
+    mockSubmitJob.mockResolvedValue({
+      id: 'job-1',
+      kind: 'copy',
+      status: 'queued',
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+      error: null,
+      result: null,
+    });
     mockCheckCopyConflicts.mockResolvedValue([]);
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
@@ -632,8 +637,11 @@ describe('FileList', () => {
         ['/home/user/notes.txt'],
         '/home/user/Documents'
       );
-      expect(mockCopyFiles).toHaveBeenCalledWith(['/home/user/notes.txt'], '/home/user/Documents');
-      expect(mockRefreshPanel).toHaveBeenCalledWith('left');
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'copy',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/home/user/Documents',
+      });
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
@@ -675,7 +683,7 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 44, clientY: 44 }));
       });
 
-      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
       expect(mockRefreshPanel).not.toHaveBeenCalled();
     });
 
@@ -719,11 +727,11 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
       });
 
-      expect(mockCopyFiles).not.toHaveBeenCalled();
-      expect(mockMoveFiles).toHaveBeenCalledWith(
-        ['/home/user/Project'],
-        '/home/user/Downloads'
-      );
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'move',
+        sourcePaths: ['/home/user/Project'],
+        targetDir: '/home/user/Downloads',
+      });
       expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
         ['/home/user/Project'],
         '/home/user/Downloads'
@@ -777,8 +785,7 @@ describe('FileList', () => {
         ['/home/user/Project'],
         '/home/user/Downloads'
       );
-      expect(mockMoveFiles).not.toHaveBeenCalled();
-      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
@@ -839,11 +846,11 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
       });
 
-      expect(mockMoveFiles).toHaveBeenCalledWith(
-        ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox'],
-        '/Users/back/_Dn_/abc/backup_2026-04'
-      );
-      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'move',
+        sourcePaths: ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox'],
+        targetDir: '/Users/back/_Dn_/abc/backup_2026-04',
+      });
     });
 
     it('같은 패널 파일 드롭은 copyFiles를 호출한다', async () => {
@@ -870,15 +877,15 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
       });
 
-      expect(mockMoveFiles).not.toHaveBeenCalled();
       expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
         ['/home/user/notes.txt'],
         '/home/user/Documents'
       );
-      expect(mockCopyFiles).toHaveBeenCalledWith(
-        ['/home/user/notes.txt'],
-        '/home/user/Documents'
-      );
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'copy',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/home/user/Documents',
+      });
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
@@ -939,11 +946,11 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
       });
 
-      expect(mockCopyFiles).toHaveBeenCalledWith(
-        ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py'],
-        '/Users/back/_Dn_/abc/backup_2026-04'
-      );
-      expect(mockMoveFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'copy',
+        sourcePaths: ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py'],
+        targetPath: '/Users/back/_Dn_/abc/backup_2026-04',
+      });
     });
 
     it('현재 루트에 이미 있는 폴더를 빈 영역에 드롭하면 이동을 시도하지 않는다', async () => {
@@ -984,8 +991,7 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
       });
 
-      expect(mockMoveFiles).not.toHaveBeenCalled();
-      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
     });
   });
 
@@ -1074,10 +1080,12 @@ describe('FileList', () => {
         ['/home/user/notes.txt'],
         '/target'
       );
-      expect(mockCopyFiles).toHaveBeenCalledWith(['/home/user/notes.txt'], '/target');
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'copy',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/target',
+      });
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
-      expect(mockRefreshPanel).toHaveBeenCalledWith('left');
-      expect(mockRefreshPanel).toHaveBeenCalledWith('right');
     });
 
     it('충돌이 있으면 드래그 복사 다이얼로그를 연다', async () => {
@@ -1162,7 +1170,7 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 364, clientY: 44 }));
       });
 
-      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
       expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
         sourcePanelId: 'left',
         targetPanelId: 'right',

@@ -211,9 +211,33 @@ pub async fn delete_files(
     paths: Vec<String>,
     permanent: bool,
 ) -> Result<(), String> {
+    delete_files_with_cancel(app, paths, permanent, None).await
+}
+
+pub async fn delete_files_with_cancel(
+    app: tauri::AppHandle,
+    paths: Vec<String>,
+    permanent: bool,
+    cancel_flag: Option<Arc<AtomicBool>>,
+) -> Result<(), String> {
+    delete_files_with_cancel_and_progress(paths, permanent, cancel_flag, move |payload| {
+        let _ = app.emit("fs-progress", payload);
+    })
+    .await
+}
+
+pub async fn delete_files_with_cancel_and_progress<F>(
+    paths: Vec<String>,
+    permanent: bool,
+    cancel_flag: Option<Arc<AtomicBool>>,
+    emit_progress: F,
+) -> Result<(), String>
+where
+    F: Fn(ProgressPayload) + Send + 'static,
+{
     let targets = collect_delete_progress_targets(paths);
 
-    tokio::task::spawn_blocking(move || delete_files_blocking(&app, targets, permanent))
+    tokio::task::spawn_blocking(move || delete_files_blocking(targets, permanent, cancel_flag, emit_progress))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -237,6 +261,32 @@ pub async fn copy_files(
     target_path: String,
     keep_both: Option<bool>,
 ) -> Result<Vec<String>, String> {
+    copy_files_with_cancel(app, source_paths, target_path, keep_both, None).await
+}
+
+pub async fn copy_files_with_cancel(
+    app: tauri::AppHandle,
+    source_paths: Vec<String>,
+    target_path: String,
+    keep_both: Option<bool>,
+    cancel_flag: Option<Arc<AtomicBool>>,
+) -> Result<Vec<String>, String> {
+    copy_files_with_cancel_and_progress(source_paths, target_path, keep_both, cancel_flag, move |payload| {
+        let _ = app.emit("fs-progress", payload);
+    })
+    .await
+}
+
+pub async fn copy_files_with_cancel_and_progress<F>(
+    source_paths: Vec<String>,
+    target_path: String,
+    keep_both: Option<bool>,
+    cancel_flag: Option<Arc<AtomicBool>>,
+    emit_progress: F,
+) -> Result<Vec<String>, String>
+where
+    F: Fn(ProgressPayload) + Send + 'static,
+{
     let keep_both = keep_both.unwrap_or(false);
     let total = source_paths.len() as u64;
     tokio::task::spawn_blocking(move || {
@@ -244,22 +294,23 @@ pub async fn copy_files(
             return Ok(vec![]);
         }
 
+        if is_operation_cancelled(cancel_flag.as_deref()) {
+            return Err("Operation cancelled.".to_string());
+        }
+
         if source_paths.len() == 1 {
             let file_name = Path::new(&source_paths[0])
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source_paths[0].clone());
-            let _ = app.emit(
-                "fs-progress",
-                ProgressPayload {
-                    operation: "copy".to_string(),
-                    current: 1,
-                    total,
-                    current_file: file_name,
-                    unit: "items".to_string(),
-                },
-            );
             let saved = copy_single_path(Path::new(&source_paths[0]), &target_path, keep_both)?;
+            emit_progress(ProgressPayload {
+                operation: "copy".to_string(),
+                current: 1,
+                total,
+                current_file: file_name,
+                unit: "items".to_string(),
+            });
             return Ok(vec![saved]);
         }
 
@@ -271,22 +322,22 @@ pub async fn copy_files(
 
         let mut saved_names = Vec::with_capacity(source_paths.len());
         for (i, source) in source_paths.iter().enumerate() {
+            if is_operation_cancelled(cancel_flag.as_deref()) {
+                return Err("Operation cancelled.".to_string());
+            }
             let file_name = Path::new(source)
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source.clone());
-            let _ = app.emit(
-                "fs-progress",
-                ProgressPayload {
-                    operation: "copy".to_string(),
-                    current: (i + 1) as u64,
-                    total,
-                    current_file: file_name,
-                    unit: "items".to_string(),
-                },
-            );
             let saved = copy_path_into_dir(Path::new(source), target_root, keep_both)?;
             saved_names.push(saved);
+            emit_progress(ProgressPayload {
+                operation: "copy".to_string(),
+                current: (i + 1) as u64,
+                total,
+                current_file: file_name,
+                unit: "items".to_string(),
+            });
         }
         Ok(saved_names)
     })
@@ -300,8 +351,35 @@ pub async fn move_files(
     source_paths: Vec<String>,
     target_dir: String,
 ) -> Result<(), String> {
+    move_files_with_cancel(app, source_paths, target_dir, None).await
+}
+
+pub async fn move_files_with_cancel(
+    app: tauri::AppHandle,
+    source_paths: Vec<String>,
+    target_dir: String,
+    cancel_flag: Option<Arc<AtomicBool>>,
+) -> Result<(), String> {
+    move_files_with_cancel_and_progress(source_paths, target_dir, cancel_flag, move |payload| {
+        let _ = app.emit("fs-progress", payload);
+    })
+    .await
+}
+
+pub async fn move_files_with_cancel_and_progress<F>(
+    source_paths: Vec<String>,
+    target_dir: String,
+    cancel_flag: Option<Arc<AtomicBool>>,
+    emit_progress: F,
+) -> Result<(), String>
+where
+    F: Fn(ProgressPayload) + Send + 'static,
+{
     let total = source_paths.len() as u64;
     for (i, path) in source_paths.iter().enumerate() {
+        if is_operation_cancelled(cancel_flag.as_deref()) {
+            return Err("Operation cancelled.".to_string());
+        }
         let src = Path::new(path);
         if let Some(file_name) = src.file_name() {
             let file_name_str = file_name.to_string_lossy().to_string();
@@ -318,17 +396,14 @@ pub async fn move_files(
                 }
             }
 
-            let _ = app.emit(
-                "fs-progress",
-                ProgressPayload {
-                    operation: "move".to_string(),
-                    current: (i + 1) as u64,
-                    total,
-                    current_file: file_name_str,
-                    unit: "items".to_string(),
-                },
-            );
             fs::rename(src, &dest).map_err(|e| e.to_string())?;
+            emit_progress(ProgressPayload {
+                operation: "move".to_string(),
+                current: (i + 1) as u64,
+                total,
+                current_file: file_name_str,
+                unit: "items".to_string(),
+            });
         }
     }
     Ok(())
@@ -1412,19 +1487,26 @@ fn collect_delete_progress_targets(paths: Vec<String>) -> Vec<PathBuf> {
     collapse_nested_paths(paths)
 }
 
-fn delete_files_blocking(
-    app: &tauri::AppHandle,
+fn delete_files_blocking<F>(
     targets: Vec<PathBuf>,
     permanent: bool,
-) -> Result<(), String> {
+    cancel_flag: Option<Arc<AtomicBool>>,
+    emit_progress: F,
+) -> Result<(), String>
+where
+    F: Fn(ProgressPayload),
+{
     if targets.is_empty() {
         return Ok(());
     }
 
     let total = targets.len() as u64;
-    emit_delete_progress(app, 0, total, "Preparing...");
+    emit_delete_progress(&emit_progress, 0, total, "Preparing...");
 
     for (index, path) in targets.iter().enumerate() {
+        if is_operation_cancelled(cancel_flag.as_deref()) {
+            return Err("Operation cancelled.".to_string());
+        }
         let current_file = path
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
@@ -1441,23 +1523,27 @@ fn delete_files_blocking(
             move_to_trash(path).map_err(|e| e.to_string())?;
         }
 
-        emit_delete_progress(app, index as u64 + 1, total, &current_file);
+        emit_delete_progress(&emit_progress, index as u64 + 1, total, &current_file);
     }
 
     Ok(())
 }
 
-fn emit_delete_progress(app: &tauri::AppHandle, current: u64, total: u64, current_file: &str) {
-    let _ = app.emit(
-        "fs-progress",
-        ProgressPayload {
-            operation: "delete".to_string(),
-            current,
-            total,
-            current_file: current_file.to_string(),
-            unit: "items".to_string(),
-        },
-    );
+fn is_operation_cancelled(cancel_flag: Option<&AtomicBool>) -> bool {
+    cancel_flag.is_some_and(|flag| flag.load(Ordering::SeqCst))
+}
+
+fn emit_delete_progress<F>(emit_progress: &F, current: u64, total: u64, current_file: &str)
+where
+    F: Fn(ProgressPayload),
+{
+    emit_progress(ProgressPayload {
+        operation: "delete".to_string(),
+        current,
+        total,
+        current_file: current_file.to_string(),
+        unit: "items".to_string(),
+    });
 }
 
 fn move_to_trash(path: &Path) -> Result<(), trash::Error> {

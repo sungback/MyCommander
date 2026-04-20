@@ -80,4 +80,12 @@ describe("StatusBar", () => {
 
     expect(mockSetOpenDialog).toHaveBeenCalledWith("settings");
   });
+
+  it("작업 버튼 클릭 시 jobcenter 다이얼로그를 연다", () => {
+    render(<StatusBar />);
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 센터" }));
+
+    expect(mockSetOpenDialog).toHaveBeenCalledWith("jobcenter");
+  });
 });

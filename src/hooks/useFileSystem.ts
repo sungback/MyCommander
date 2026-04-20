@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { FileEntry } from "../types/file";
 import { SyncItem } from "../types/sync";
 import { BatchRenameOperation } from "../features/multiRename";
+import { JobRecord, JobSubmission } from "../types/job";
 
 export interface DriveInfo {
   mount_point: string;
@@ -102,6 +103,26 @@ const fileSystem = {
 
   deleteFiles: async (paths: string[], permanent: boolean = false): Promise<void> => {
     await invoke("delete_files", { paths, permanent });
+  },
+
+  submitJob: async (job: JobSubmission): Promise<JobRecord> => {
+    return await invoke<JobRecord>("submit_job", { job });
+  },
+
+  listJobs: async (): Promise<JobRecord[]> => {
+    return await invoke<JobRecord[]>("list_jobs");
+  },
+
+  cancelJob: async (jobId: string): Promise<JobRecord> => {
+    return await invoke<JobRecord>("cancel_job", { job_id: jobId });
+  },
+
+  retryJob: async (jobId: string): Promise<JobRecord> => {
+    return await invoke<JobRecord>("retry_job", { job_id: jobId });
+  },
+
+  clearFinishedJobs: async (): Promise<void> => {
+    await invoke("clear_finished_jobs");
   },
 
   copyFiles: async (

@@ -442,6 +442,7 @@ pub fn run() {
                 );
             }
         })
+        .manage(commands::job_commands::JobEngineState::default())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             use tauri::Manager;
@@ -484,6 +485,11 @@ pub fn run() {
             commands::fs_commands::create_zip,
             commands::fs_commands::create_zip_from_paths,
             commands::fs_commands::cancel_zip_operation,
+            commands::job_commands::submit_job,
+            commands::job_commands::list_jobs,
+            commands::job_commands::cancel_job,
+            commands::job_commands::retry_job,
+            commands::job_commands::clear_finished_jobs,
             commands::fs_commands::read_file_content,
             commands::search_commands::search_files,
             commands::fs_commands::get_dir_size,

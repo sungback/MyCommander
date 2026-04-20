@@ -1,11 +1,15 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProgressDialog } from "./ProgressDialog";
 import { useDialogStore } from "../../store/dialogStore";
+import { useJobStore } from "../../store/jobStore";
 
-const { listenHandlers, mockCancelZipOperation } = vi.hoisted(() => ({
+const { listenHandlers, mockCancelJob, mockListJobs, mockRetryJob, mockClearFinishedJobs } = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
-  mockCancelZipOperation: vi.fn(),
+  mockCancelJob: vi.fn(),
+  mockListJobs: vi.fn(),
+  mockRetryJob: vi.fn(),
+  mockClearFinishedJobs: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -19,23 +23,47 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
-    cancelZipOperation: mockCancelZipOperation,
+    cancelJob: mockCancelJob,
+    listJobs: mockListJobs,
+    retryJob: mockRetryJob,
+    clearFinishedJobs: mockClearFinishedJobs,
   }),
 }));
 
 describe("ProgressDialog", () => {
   beforeEach(() => {
     useDialogStore.setState(useDialogStore.getInitialState());
+    useJobStore.setState(useJobStore.getInitialState());
     listenHandlers.clear();
-    mockCancelZipOperation.mockReset();
+    mockCancelJob.mockReset();
+    mockListJobs.mockReset();
+    mockRetryJob.mockReset();
+    mockClearFinishedJobs.mockReset();
+    mockListJobs.mockResolvedValue([]);
   });
 
   it("shows delete progress details", async () => {
     useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
 
     render(<ProgressDialog />);
 
     await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+    });
 
     act(() => {
       listenHandlers.get("fs-progress")?.({
@@ -53,5 +81,123 @@ describe("ProgressDialog", () => {
     expect(screen.getByText("LargeFolder")).toBeInTheDocument();
     expect(screen.getByText("1 / 4")).toBeInTheDocument();
     expect(screen.getByText("25%")).toBeInTheDocument();
+    expect(screen.getByText("Queued: 0")).toBeInTheDocument();
+    expect(screen.getByText("Failed: 0")).toBeInTheDocument();
+  });
+
+  it("cancels the active job via cancelJob", async () => {
+    mockCancelJob.mockResolvedValue({
+      id: "job-1",
+      kind: "delete",
+      status: "cancelled",
+      createdAt: 1,
+      updatedAt: 2,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: "Operation cancelled.",
+      result: null,
+    });
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Cancel" }).click();
+    });
+
+    expect(mockCancelJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("retries the most recent failed job", async () => {
+    mockRetryJob.mockResolvedValue({
+      id: "job-2",
+      kind: "copy",
+      status: "queued",
+      createdAt: 2,
+      updatedAt: 2,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "copy",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 2, currentFile: "notes.txt", unit: "items" },
+        error: "Disk full",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Retry failed" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Retry failed" }).click();
+    });
+
+    expect(mockRetryJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("clears finished jobs from the dialog state", async () => {
+    mockClearFinishedJobs.mockResolvedValue(undefined);
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 1, currentFile: "Done", unit: "items" },
+        error: null,
+        result: {
+          affectedDirectories: ["/tmp"],
+          affectedEntryPaths: ["/tmp/file.txt"],
+          archivePath: null,
+          savedNames: [],
+        },
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Clear finished" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Clear finished" }).click();
+    });
+
+    expect(mockClearFinishedJobs).toHaveBeenCalledTimes(1);
   });
 });

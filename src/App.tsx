@@ -11,6 +11,7 @@ import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs"
 import { SyncDialog } from "./components/dialogs/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { MultiRenameDialog } from "./components/dialogs/MultiRenameDialog";
+import { JobCenterDialog } from "./components/dialogs/JobCenterDialog";
 import { AppTheme, ThemePreference } from "./types/theme";
 import { ViewMode } from "./types/file";
 import { useDialogStore } from "./store/dialogStore";
@@ -20,6 +21,7 @@ import { FavoritesPanel } from "./components/favorites/FavoritesPanel";
 import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
 import { useSettingsStore } from "./store/settingsStore";
 import { buildFontFamilyStack } from "./constants/fontOptions";
+import { useJobQueue } from "./hooks/useJobQueue";
 
 type PanelId = "left" | "right";
 
@@ -75,6 +77,7 @@ function App() {
   // Initialize global shortcuts
   useKeyboard();
   useDirectoryWatch();
+  useJobQueue();
 
   // Global Keyboard listener for Tab
   useEffect(() => {
@@ -373,6 +376,7 @@ function App() {
       <StatusBar />
       <DialogContainer />
       <ProgressDialog />
+      <JobCenterDialog />
       <MultiRenameDialog />
       <SearchPreviewDialogs />
       <SyncDialog />

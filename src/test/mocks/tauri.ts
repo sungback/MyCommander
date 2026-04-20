@@ -41,6 +41,38 @@ export const createMockInvoke = () =>
       case 'create_directory':    return Promise.resolve(undefined);
       case 'create_file':         return Promise.resolve(undefined);
       case 'delete_files':        return Promise.resolve(undefined);
+      case 'submit_job':          return Promise.resolve({
+        id: 'job-1',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+      case 'list_jobs':           return Promise.resolve([]);
+      case 'cancel_job':          return Promise.resolve({
+        id: 'job-1',
+        kind: 'copy',
+        status: 'cancelled',
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: 'Cancelled before start',
+        result: null,
+      });
+      case 'retry_job':           return Promise.resolve({
+        id: 'job-2',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 2,
+        updatedAt: 2,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+      case 'clear_finished_jobs': return Promise.resolve(undefined);
       case 'rename_file':         return Promise.resolve(undefined);
       case 'apply_batch_rename':  return Promise.resolve(undefined);
       case 'copy_files':          return Promise.resolve(undefined);
