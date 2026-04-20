@@ -10,7 +10,7 @@ import { useDialogStore } from "../../store/dialogStore";
 import { useUiStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
-import { isSameOrNestedPath } from "../../utils/path";
+import { arePathsEquivalent, getPathDirectoryName, isSameOrNestedPath } from "../../utils/path";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 
 interface FileListProps {
@@ -148,7 +148,7 @@ export const FileList: React.FC<FileListProps> = ({
   setCursorIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { checkCopyConflicts, copyFiles, getDirSize, listDirectory } = useFileSystem();
+  const { checkCopyConflicts, copyFiles, moveFiles, getDirSize, listDirectory } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const setSelection = usePanelStore((s) => s.setSelection);
   const selectOnly = usePanelStore((s) => s.selectOnly);
@@ -231,6 +231,77 @@ export const FileList: React.FC<FileListProps> = ({
     await copyFiles(paths, targetPath);
     refreshPanelsForDirectories([accessPath, targetPath]);
     showTransientStatusMessage("선택한 파일을 복사했습니다.");
+    return true;
+  };
+
+  const collapseNestedDirectoryPaths = (paths: string[]) => {
+    const collapsed: string[] = [];
+
+    for (const path of paths) {
+      if (collapsed.some((keptPath) => isSameOrNestedPath(keptPath, path))) {
+        continue;
+      }
+
+      for (let index = collapsed.length - 1; index >= 0; index -= 1) {
+        if (isSameOrNestedPath(path, collapsed[index])) {
+          collapsed.splice(index, 1);
+        }
+      }
+
+      collapsed.push(path);
+    }
+
+    return collapsed;
+  };
+
+  const isSamePanelBackgroundNoOp = (paths: string[], targetPath: string) =>
+    paths.length > 0 &&
+    paths.every((path) => arePathsEquivalent(getPathDirectoryName(path), targetPath));
+
+  const resolveSamePanelBackgroundDropTarget = ({
+    isOverContainer,
+    rowPath,
+    activeDragInfo,
+  }: {
+    isOverContainer: boolean;
+    rowPath: string | null;
+    activeDragInfo: {
+      paths: string[];
+      directoryPaths: string[];
+      sourcePanel: "left" | "right";
+    } | null;
+  }) => {
+    if (!isOverContainer) {
+      return null;
+    }
+
+    if (rowPath) {
+      return null;
+    }
+
+    if (activeDragInfo?.sourcePanel !== panelId) {
+      return null;
+    }
+
+    if (isSamePanelBackgroundNoOp(activeDragInfo.paths, accessPath)) {
+      return null;
+    }
+
+    return accessPath;
+  };
+
+  const handleDraggedMove = async (paths: string[], targetPath: string) => {
+    const collapsedPaths = collapseNestedDirectoryPaths(paths);
+    const conflicts = await checkCopyConflicts(collapsedPaths, targetPath);
+
+    if (conflicts.length > 0) {
+      showTransientStatusMessage("폴더를 이동하기 전에 이름 충돌을 해결해야 합니다.");
+      return false;
+    }
+
+    await moveFiles(collapsedPaths, targetPath);
+    refreshPanelsForDirectories([accessPath, targetPath]);
+    showTransientStatusMessage("선택한 폴더를 이동했습니다.");
     return true;
   };
 
@@ -388,8 +459,22 @@ export const FileList: React.FC<FileListProps> = ({
           targetEntry?.kind === "directory" &&
           targetEntry.name !== ".." &&
           Boolean(activeDragInfo);
+        const samePanelBackgroundDropTarget = resolveSamePanelBackgroundDropTarget({
+          isOverContainer,
+          rowPath,
+          activeDragInfo,
+        });
 
-        if (isOverContainer && canAcceptDrop && activeDragInfo) {
+        if (samePanelBackgroundDropTarget) {
+          sharedDragState.dropTargetPath = samePanelBackgroundDropTarget;
+          sharedDragState.isDropAllowed = true;
+          sharedDragState.blockedReason = null;
+          updateDropUiState({
+            isPanelHovered: true,
+            dropTargetPath: samePanelBackgroundDropTarget,
+            isDropAllowed: true,
+          });
+        } else if (isOverContainer && canAcceptDrop && activeDragInfo) {
           const blockedReason = activeDragInfo.paths.includes(targetEntry!.path)
             ? "자기 자신에게는 복사할 수 없습니다."
             : activeDragInfo.directoryPaths.some((sourceDir) =>
@@ -506,6 +591,11 @@ export const FileList: React.FC<FileListProps> = ({
           targetPanel === null && activeDragInfo?.sourcePanel === panelId
             ? sharedDragState.dropTargetPath
             : null;
+        const isFolderOnlySamePanelDrag =
+          Boolean(samePanelDropTarget) &&
+          activeDragInfo?.sourcePanel === panelId &&
+          activeDragInfo.directoryPaths.length > 0 &&
+          activeDragInfo.directoryPaths.length === activeDragInfo.paths.length;
 
         if (samePanelDropTarget) {
           const targetPath = samePanelDropTarget;
@@ -530,12 +620,18 @@ export const FileList: React.FC<FileListProps> = ({
             return;
           }
 
-          void handleDraggedCopy(state.paths, targetPath, panelId)
-            .then(() => {
-            })
+          const dragAction = isFolderOnlySamePanelDrag
+            ? handleDraggedMove(state.paths, targetPath)
+            : handleDraggedCopy(state.paths, targetPath, panelId);
+
+          void dragAction
             .catch((error) => {
-              console.error("Failed to copy dragged files:", error);
-              showTransientStatusMessage("파일을 복사하지 못했습니다.");
+              console.error("Failed to process dragged files:", error);
+              showTransientStatusMessage(
+                isFolderOnlySamePanelDrag
+                  ? "폴더를 이동하지 못했습니다."
+                  : "파일을 복사하지 못했습니다."
+              );
             });
           return;
         }

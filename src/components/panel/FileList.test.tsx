@@ -12,6 +12,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 // ── useFileSystem mock (vi.hoisted로 호이스팅 — 팩토리 실행 전에 변수 준비) ──
 const {
   mockCopyFiles,
+  mockMoveFiles,
   mockCheckCopyConflicts,
   mockGetDirSize,
   mockListDirectory,
@@ -26,6 +27,7 @@ const {
   mockPanelState,
 } = vi.hoisted(() => ({
   mockCopyFiles: vi.fn(),
+  mockMoveFiles: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     checkCopyConflicts: mockCheckCopyConflicts,
     copyFiles: mockCopyFiles,
+    moveFiles: mockMoveFiles,
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,
   }),
@@ -213,6 +216,7 @@ describe('FileList', () => {
       mockPanelState.dragInfo = dragInfo;
     });
     mockCopyFiles.mockResolvedValue(undefined);
+    mockMoveFiles.mockResolvedValue(undefined);
     mockCheckCopyConflicts.mockResolvedValue([]);
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
@@ -675,9 +679,174 @@ describe('FileList', () => {
       expect(mockRefreshPanel).not.toHaveBeenCalled();
     });
 
-    it('같은 패널 드롭에서 충돌이 있으면 copy 다이얼로그를 연다', async () => {
-      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+    it('같은 패널 폴더 드롭은 중첩 선택을 접어서 moveFiles를 호출한다', async () => {
+      const nestedFolderFiles: FileEntry[] = [
+        { name: '..', path: '/home', kind: 'directory' },
+        { name: 'Project', path: '/home/user/Project', kind: 'directory', size: null },
+        {
+          name: 'Project Child',
+          path: '/home/user/Project/Child',
+          kind: 'directory',
+          size: null,
+        },
+        { name: 'Downloads', path: '/home/user/Downloads', kind: 'directory', size: null },
+      ];
 
+      render(
+        <FileList
+          {...makeProps({
+            files: nestedFolderFiles,
+            selectedItems: new Set<string>([
+              '/home/user/Project',
+              '/home/user/Project/Child',
+            ]),
+          })}
+        />
+      );
+
+      setContainerRect();
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/Project"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Downloads"]'
+      ) as HTMLElement;
+
+      await performInternalDrag(sourceRow, targetRow);
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
+      });
+
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockMoveFiles).toHaveBeenCalledWith(
+        ['/home/user/Project'],
+        '/home/user/Downloads'
+      );
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/home/user/Project'],
+        '/home/user/Downloads'
+      );
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
+    it('같은 패널 폴더 드롭은 충돌이 있으면 moveFiles를 호출하지 않는다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['Project']);
+
+      const nestedFolderFiles: FileEntry[] = [
+        { name: '..', path: '/home', kind: 'directory' },
+        { name: 'Project', path: '/home/user/Project', kind: 'directory', size: null },
+        {
+          name: 'Project Child',
+          path: '/home/user/Project/Child',
+          kind: 'directory',
+          size: null,
+        },
+        { name: 'Downloads', path: '/home/user/Downloads', kind: 'directory', size: null },
+      ];
+
+      render(
+        <FileList
+          {...makeProps({
+            files: nestedFolderFiles,
+            selectedItems: new Set<string>([
+              '/home/user/Project',
+              '/home/user/Project/Child',
+            ]),
+          })}
+        />
+      );
+
+      setContainerRect();
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/Project"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Downloads"]'
+      ) as HTMLElement;
+
+      await performInternalDrag(sourceRow, targetRow);
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
+      });
+
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/home/user/Project'],
+        '/home/user/Downloads'
+      );
+      expect(mockMoveFiles).not.toHaveBeenCalled();
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
+    it('확장된 하위 폴더를 같은 패널 빈 영역에 드롭하면 현재 루트로 이동한다', async () => {
+      const files: FileEntry[] = [
+        { name: '..', path: '/Users/back/_Dn_/abc', kind: 'directory' },
+        {
+          name: 'work',
+          path: '/Users/back/_Dn_/abc/backup_2026-04/work',
+          kind: 'directory',
+          size: null,
+        },
+      ];
+
+      mockListDirectory.mockResolvedValueOnce([
+        {
+          name: 'ag_sandbox',
+          path: '/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox',
+          kind: 'directory',
+          size: null,
+        },
+      ]);
+
+      render(
+        <FileList
+          {...makeProps({
+            currentPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            accessPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            files,
+            selectedItems: new Set<string>([
+              '/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox',
+            ]),
+          })}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(
+          document
+            .querySelector('[data-entry-path="/Users/back/_Dn_/abc/backup_2026-04/work"]')
+            ?.querySelector('[aria-label="Expand folder preview"]') as HTMLElement
+        );
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox"]'
+      ) as HTMLElement;
+      const list = getListEl();
+
+      setContainerRect();
+      mockElementFromPoint(list);
+
+      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, clientY: 320 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 154, clientY: 324 }));
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
+      });
+
+      expect(mockMoveFiles).toHaveBeenCalledWith(
+        ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox'],
+        '/Users/back/_Dn_/abc/backup_2026-04'
+      );
+      expect(mockCopyFiles).not.toHaveBeenCalled();
+    });
+
+    it('같은 패널 파일 드롭은 copyFiles를 호출한다', async () => {
       render(
         <FileList
           {...makeProps({
@@ -701,13 +870,122 @@ describe('FileList', () => {
         document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
       });
 
-      expect(mockCopyFiles).not.toHaveBeenCalled();
-      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
-        sourcePanelId: 'left',
-        targetPanelId: 'left',
-        sourcePaths: ['/home/user/notes.txt'],
-        targetPath: '/home/user/Documents',
+      expect(mockMoveFiles).not.toHaveBeenCalled();
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/home/user/notes.txt'],
+        '/home/user/Documents'
+      );
+      expect(mockCopyFiles).toHaveBeenCalledWith(
+        ['/home/user/notes.txt'],
+        '/home/user/Documents'
+      );
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
+    it('같은 패널 파일을 빈 영역에 드롭하면 현재 루트 대상으로 copy 경로를 유지한다', async () => {
+      mockListDirectory.mockResolvedValueOnce([
+        {
+          name: 'ag_sandbox.py',
+          path: '/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py',
+          kind: 'file',
+          size: 1024,
+        },
+      ]);
+
+      render(
+        <FileList
+          {...makeProps({
+            currentPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            accessPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            files: [
+              { name: '..', path: '/Users/back/_Dn_/abc', kind: 'directory' },
+              {
+                name: 'work',
+                path: '/Users/back/_Dn_/abc/backup_2026-04/work',
+                kind: 'directory',
+                size: null,
+              },
+            ],
+            selectedItems: new Set<string>([
+              '/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py',
+            ]),
+          })}
+        />
+      );
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/Users/back/_Dn_/abc/backup_2026-04/work"]'
+      ) as HTMLElement;
+
+      await act(async () => {
+        fireEvent.click(
+          sourceRow.querySelector('[aria-label="Expand folder preview"]') as HTMLElement
+        );
       });
+
+      const sourceFileRow = document.querySelector(
+        '[data-entry-path="/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py"]'
+      ) as HTMLElement;
+      const list = getListEl();
+
+      setContainerRect();
+      mockElementFromPoint(list);
+
+      fireEvent.mouseDown(sourceFileRow, { button: 0, clientX: 20, clientY: 20 });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, clientY: 320 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 154, clientY: 324 }));
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
+      });
+
+      expect(mockCopyFiles).toHaveBeenCalledWith(
+        ['/Users/back/_Dn_/abc/backup_2026-04/work/ag_sandbox.py'],
+        '/Users/back/_Dn_/abc/backup_2026-04'
+      );
+      expect(mockMoveFiles).not.toHaveBeenCalled();
+    });
+
+    it('현재 루트에 이미 있는 폴더를 빈 영역에 드롭하면 이동을 시도하지 않는다', async () => {
+      render(
+        <FileList
+          {...makeProps({
+            currentPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            accessPath: '/Users/back/_Dn_/abc/backup_2026-04',
+            files: [
+              { name: '..', path: '/Users/back/_Dn_/abc', kind: 'directory' },
+              {
+                name: 'work2',
+                path: '/Users/back/_Dn_/abc/backup_2026-04/work2',
+                kind: 'directory',
+                size: null,
+              },
+            ],
+            selectedItems: new Set<string>([
+              '/Users/back/_Dn_/abc/backup_2026-04/work2',
+            ]),
+          })}
+        />
+      );
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/Users/back/_Dn_/abc/backup_2026-04/work2"]'
+      ) as HTMLElement;
+      const list = getListEl();
+
+      setContainerRect();
+      mockElementFromPoint(list);
+
+      fireEvent.mouseDown(sourceRow, { button: 0, clientX: 20, clientY: 20 });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, clientY: 320 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 154, clientY: 324 }));
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 150, clientY: 320 }));
+      });
+
+      expect(mockMoveFiles).not.toHaveBeenCalled();
+      expect(mockCopyFiles).not.toHaveBeenCalled();
     });
   });
 
