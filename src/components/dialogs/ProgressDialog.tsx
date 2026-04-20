@@ -65,12 +65,11 @@ export const ProgressDialog: React.FC = () => {
 
     const hasRunningOrQueued = Boolean(activeJob);
     const hasFailed = failedJobs.length > 0;
-    const hasFinished = finishedJobs.length > 0;
 
-    if (!hasRunningOrQueued && !hasFailed && !hasFinished) {
+    if (!hasRunningOrQueued && !hasFailed) {
       closeDialog();
     }
-  }, [activeJob, closeDialog, failedJobs.length, finishedJobs.length, openDialog]);
+  }, [activeJob, closeDialog, failedJobs.length, openDialog]);
 
   useEffect(() => {
     setProgress(null);

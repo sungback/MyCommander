@@ -530,7 +530,7 @@ fn schedule_next_job(app: AppHandle, inner: Arc<Mutex<JobEngineInner>>) {
 
     emit_job_update(&app, &record);
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let outcome = execute_job(&app, &inner, &record.id, &submission, cancel_flag.clone()).await;
         let final_record = {
             let mut state = match inner.lock() {
@@ -948,5 +948,23 @@ mod tests {
             }
             other => panic!("unexpected retry submission: {other:?}"),
         }
+    }
+
+    #[test]
+    fn schedule_next_job_uses_tauri_runtime_spawn() {
+        let source = include_str!("job_commands.rs");
+        let production_source = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("production source");
+
+        assert!(
+            production_source.contains("tauri::async_runtime::spawn("),
+            "schedule_next_job should spawn jobs on tauri::async_runtime to avoid panicking outside a Tokio runtime"
+        );
+        assert!(
+            !production_source.contains("tokio::spawn("),
+            "schedule_next_job should not call tokio::spawn directly from Tauri invoke handlers"
+        );
     }
 }

@@ -170,6 +170,16 @@ describe("ProgressDialog", () => {
     useDialogStore.getState().setOpenDialog("progress");
     useJobStore.getState().hydrateJobs([
       {
+        id: "job-0",
+        kind: "zip",
+        status: "running",
+        createdAt: 0,
+        updatedAt: 1,
+        progress: { current: 0, total: 3, currentFile: "Folder", unit: "items" },
+        error: null,
+        result: null,
+      },
+      {
         id: "job-1",
         kind: "delete",
         status: "completed",
@@ -199,5 +209,32 @@ describe("ProgressDialog", () => {
     });
 
     expect(mockClearFinishedJobs).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes automatically when only finished jobs remain", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "zip",
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 1, currentFile: "Done", unit: "items" },
+        error: null,
+        result: {
+          affectedDirectories: ["/tmp"],
+          affectedEntryPaths: ["/tmp/folder"],
+          archivePath: "/tmp/folder.zip",
+          savedNames: [],
+        },
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBeNull();
+    });
   });
 });

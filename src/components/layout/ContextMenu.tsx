@@ -5,6 +5,7 @@ import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { useUiStore } from "../../store/uiStore";
+import { useJobStore } from "../../store/jobStore";
 import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { writeClipboardText } from "../../utils/clipboard";
@@ -105,27 +106,38 @@ export const ContextMenu: React.FC = () => {
               }
               setActivePanel(panelId);
               const selectedPaths = [...panel.selectedItems];
-              if (selectedPaths.length > 1) {
-                const archiveName =
-                  panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
-                  "Archive";
-                await fs.submitJob({
-                  kind: "zipSelection",
-                  paths: selectedPaths,
-                  targetDir: getPanelAccessPath(panel),
-                  archiveName,
-                });
-              } else {
-                if (targetEntry.kind !== "directory") {
-                  closeDialog();
-                  return;
-                }
-                await fs.submitJob({
-                  kind: "zipDirectory",
-                  path: targetPath,
-                });
+              const submittedJob =
+                selectedPaths.length > 1
+                  ? await (async () => {
+                      const archiveName =
+                        panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
+                        "Archive";
+                      return fs.submitJob({
+                        kind: "zipSelection",
+                        paths: selectedPaths,
+                        targetDir: getPanelAccessPath(panel),
+                        archiveName,
+                      });
+                    })()
+                  : await (async () => {
+                      if (targetEntry.kind !== "directory") {
+                        closeDialog();
+                        return null;
+                      }
+
+                      return fs.submitJob({
+                        kind: "zipDirectory",
+                        path: targetPath,
+                      });
+                    })();
+
+              if (!submittedJob) {
+                return;
               }
+
+              useJobStore.getState().upsertJob(submittedJob);
               setOpenDialog("progress");
+              showTransientStatusMessage("압축 작업이 대기열에 추가되었습니다.");
               refreshPanel(panelId);
               closeContextMenu();
               return;

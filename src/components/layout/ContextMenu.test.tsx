@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { ContextMenu } from "./ContextMenu";
+import { useJobStore } from "../../store/jobStore";
 
 const {
   listenHandlers,
@@ -146,6 +147,7 @@ vi.mock("../../store/uiStore", () => ({
 
 describe("ContextMenu", () => {
   beforeEach(() => {
+    useJobStore.setState(useJobStore.getInitialState());
     vi.clearAllMocks();
     listenHandlers.clear();
     mockSubmitJob.mockResolvedValue({
@@ -176,9 +178,31 @@ describe("ContextMenu", () => {
       kind: "zipDirectory",
       path: "/home/user/Documents",
     });
+    expect(useJobStore.getState().jobs[0]?.id).toBe("job-1");
     expect(mockSetOpenDialog).toHaveBeenCalledWith("progress");
+    expect(mockSetStatusMessage).toHaveBeenCalledWith("압축 작업이 대기열에 추가되었습니다.");
     expect(mockRefreshPanel).toHaveBeenCalledWith("left");
     expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("다중 선택 create-zip 액션은 zipSelection job을 제출한다", async () => {
+    mockPanelState.leftPanel.selectedItems = new Set<string>([
+      "/home/user/Documents",
+      "/home/user/notes.txt",
+    ]);
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "create-zip" });
+
+    expect(mockSubmitJob).toHaveBeenCalledWith({
+      kind: "zipSelection",
+      paths: ["/home/user/Documents", "/home/user/notes.txt"],
+      targetDir: "/home/user",
+      archiveName: "user",
+    });
+    expect(useJobStore.getState().jobs[0]?.kind).toBe("zip");
   });
 
   it("delete 액션을 처리한다", async () => {
