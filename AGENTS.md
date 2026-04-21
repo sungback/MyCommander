@@ -56,8 +56,7 @@
 - Tauri 권한 문제가 발생하면 `src-tauri/permissions/` 와 `src-tauri/tauri.conf.json` 을 함께 확인합니다.
 - 빌드가 예상과 다르게 실패하면 저장소 루트의 `build_log.txt` 를 확인합니다.
 - `.omc/`, `.omx/` 는 도구/설정 디렉터리이므로, 명시적으로 필요한 작업이 아니면 수정하지 않습니다.
-- **유니코드 파일명 정책:** 현재 파일명 생성 동작을 그대로 유지합니다. 새 파일/폴더 이름에 NFD 정규화를 추가하지 않습니다. 한글 파일명은 현재의 NFC 보존 동작과 호환되어야 하며, 그래야 Windows로 복사해도 글자가 분해되어 보이지 않습니다.
-- **새 파일 다이얼로그 기본값:** "새 파일" 다이얼로그 입력값은 기본적으로 빈 칸이어야 합니다. `New File.txt` 같은 문자열을 기본 프리필 값으로 다시 넣지 않습니다.
+- **유니코드 파일명 정책 / 새 파일 다이얼로그 기본값:** [`CLAUDE.md` 설계 정책](./CLAUDE.md#설계-정책) 참조.
 - **ESM/Vite 호환성:** 프런트엔드 소스에서 인라인 `require()` 를 사용하지 않습니다. `@types/node` 관련 타입 오류를 피하기 위해 표준 ESM `import` 또는 동적 `import()` 를 사용합니다.
 - **서드파티 API 변경 대응:** `react-resizable-panels` 같은 UI 라이브러리를 다룰 때는 실제 export된 정확한 타입을 반드시 확인합니다. 예: `ImperativePanelHandle` 대신 `PanelImperativeHandle`, 레이아웃 반환이 배열이 아니라 맵일 수 있음.
 - **Zustand mock 유지보수:** 테스트에서 `"Cannot read properties of undefined"` 오류가 나면 `vi.mock` 안의 mock 데이터 구조가 실제 스토어 정의와 어긋났을 가능성이 큽니다. 새 경계값, 배열, 유틸 export 등이 빠지지 않았는지 실제 구현과 맞춰 확인합니다.

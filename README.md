@@ -130,9 +130,7 @@ npm run dev
 
 ## macOS CloudStorage 경로
 
-- macOS의 `~/Dropbox`처럼 실제로는 `~/Library/CloudStorage/...`를 가리키는 symlink 경로도 탐색할 수 있습니다.
-- UI에는 사용자가 익숙한 표시 경로를 유지하면서, 실제 파일 작업은 해석된 실제 경로 기준으로 처리합니다.
-- 이 동작은 폴더 열기, 새로고침, 반대 패널 동기화, 감시 경로 수집 같은 탐색 흐름과 함께 맞물리도록 설계되어 있습니다.
+macOS의 `~/Dropbox` 같은 symlink 경로도 탐색할 수 있습니다.
 
 ## 프로젝트 구조
 
@@ -230,9 +228,3 @@ cargo clean --manifest-path src-tauri/Cargo.toml
 
 - 프로젝트 컨텍스트 문서는 [CLAUDE.md](./CLAUDE.md)
 - 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)
-
-## 참고2 : 1 줄 tag push
-
-```bash
-git add -A && git commit -m "12th commit" && npm version 1.1.12 && git push origin main && git push origin --tags
-```
