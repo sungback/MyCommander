@@ -1,33 +1,67 @@
-# 의존성 폴더 (가장 중요!)
+# --- 의존성 및 환경 (High Impact) ---
 node_modules/
 vendor/
+.venv/
+venv/
+env/
+__pycache__/
+target/           # Rust 및 일반 빌드 타겟 전체
+ios/Pods/
+android/.gradle/
 
-# 빌드 및 출력물
+# --- 빌드 및 출력물 ---
 dist/
+build/
 .next/
 out/
-src-tauri/target/
+.expo/
+*.exe
+*.dll
+*.so
 
-# 로그 및 임시 파일
+# --- 로그, 캐시 및 임시 파일 ---
 *.log
 build_log.txt
 tmp/
 .cache/
+.pytest_cache/
+.eslintcache
+.ipynb_checkpoints/
 
-# 민감한 정보
+# --- 대용량 데이터 및 AI 모델 ---
+*.csv
+*.parquet
+*.jsonl
+*.pth
+*.bin
+*.h5
+*.onnx
+
+# --- 민감한 정보 ---
 .env
 .env.*
+*.secret
 
-# 프로젝트 특화 폴더
+# --- 프로젝트 특화 및 IDE ---
 .omc/
 .omx/
+.vscode/
+.cursor/
+.windsurf/
+.history/
 
-# macOS
+# --- OS 파편물 ---
 .DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
-# Git 내부
+# --- Git 내부 ---
 .git/
 
-# 락 파일 (용량이 크나 참고용으로 제외)
+# --- 락 파일 (선택 사항) ---
+# 라이브러리 구조를 분석해야 할 때는 주석 처리하세요.
 package-lock.json
 yarn.lock
+pnpm-lock.yaml
+Bun.lockb
