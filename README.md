@@ -3,6 +3,8 @@
 MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
 현재 구현은 듀얼 패널 탐색을 중심으로, 검색, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX까지 포함합니다.
 
+![MyCommander](public/screenshot.png)
+
 ## 주요 기능
 
 - 좌/우 **듀얼 패널** 파일 탐색
