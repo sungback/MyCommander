@@ -4,30 +4,15 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import { useUiStore } from "../../store/uiStore";
 import { useJobStore } from "../../store/jobStore";
 import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { writeClipboardText } from "../../utils/clipboard";
 import { coalescePanelPath } from "../../utils/path";
-
-let clearStatusMessageTimeoutId: number | undefined;
+import { showTransientToast } from "../../store/toastStore";
 
 const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string }) =>
   coalescePanelPath(panel.resolvedPath, panel.currentPath);
-
-const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
-  const { setStatusMessage } = useUiStore.getState();
-  if (clearStatusMessageTimeoutId !== undefined) {
-    window.clearTimeout(clearStatusMessageTimeoutId);
-  }
-
-  setStatusMessage(message);
-  clearStatusMessageTimeoutId = window.setTimeout(() => {
-    useUiStore.getState().setStatusMessage(null);
-    clearStatusMessageTimeoutId = undefined;
-  }, durationMs);
-};
 
 const resolveContext = () => {
   const { panelId, targetPath } = useContextMenuStore.getState();
@@ -138,7 +123,7 @@ export const ContextMenu: React.FC = () => {
 
               useJobStore.getState().upsertJob(submittedJob);
               setOpenDialog("progress");
-              showTransientStatusMessage("압축 작업이 대기열에 추가되었습니다.");
+              showTransientToast("압축 작업이 대기열에 추가되었습니다.");
               refreshPanel(panelId);
               closeContextMenu();
               return;
@@ -154,7 +139,7 @@ export const ContextMenu: React.FC = () => {
               return;
             case "copy-path":
               await writeClipboardText(targetPath ?? panel.currentPath);
-              showTransientStatusMessage("경로를 복사했습니다.");
+              showTransientToast("경로를 복사했습니다.");
               closeContextMenu();
               return;
             case "copy":
@@ -191,26 +176,26 @@ export const ContextMenu: React.FC = () => {
 
           switch (event.payload) {
             case "reveal":
-              showTransientStatusMessage("항목 위치를 열 수 없습니다.");
+              showTransientToast("항목 위치를 열 수 없습니다.", { tone: "error" });
               break;
             case "terminal":
-              showTransientStatusMessage("터미널을 열 수 없습니다.");
+              showTransientToast("터미널을 열 수 없습니다.", { tone: "error" });
               break;
             case "copy-path":
-              showTransientStatusMessage("클립보드를 사용할 수 없습니다.");
+              showTransientToast("클립보드를 사용할 수 없습니다.", { tone: "error" });
               break;
             case "create-zip":
               if (message.toLowerCase().includes("canceled")) {
-                showTransientStatusMessage("압축을 취소했습니다.");
+                showTransientToast("압축을 취소했습니다.", { tone: "warning" });
                 break;
               }
-              showTransientStatusMessage("압축 작업을 완료하지 못했습니다.");
+              showTransientToast("압축 작업을 완료하지 못했습니다.", { tone: "error" });
               break;
             case "extract-zip":
-              showTransientStatusMessage("압축 작업을 완료하지 못했습니다.");
+              showTransientToast("압축 작업을 완료하지 못했습니다.", { tone: "error" });
               break;
             default:
-              showTransientStatusMessage("작업을 완료하지 못했습니다.");
+              showTransientToast("작업을 완료하지 못했습니다.", { tone: "error" });
               break;
           }
         }

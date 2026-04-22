@@ -4,7 +4,6 @@ import { FavoritesPanel } from "./FavoritesPanel";
 
 const {
   mockFavoriteState,
-  mockUiState,
   mockPanelState,
   mockAddFavorite,
   mockRemoveFavorite,
@@ -12,14 +11,10 @@ const {
   mockReorderFavorites,
   mockSetPath,
   mockToggleFavoritesPanel,
-  mockSetStatusMessage,
+  mockShowTransientToast,
 } = vi.hoisted(() => ({
   mockFavoriteState: {
     favorites: [] as Array<{ id: string; name: string; path: string; order: number }>,
-  },
-  mockUiState: {
-    statusMessage: null as string | null,
-    showFavoritesPanel: true,
   },
   mockPanelState: {
     activePanel: "left" as const,
@@ -50,9 +45,7 @@ const {
   mockReorderFavorites: vi.fn(),
   mockSetPath: vi.fn(),
   mockToggleFavoritesPanel: vi.fn(),
-  mockSetStatusMessage: vi.fn((message: string | null) => {
-    mockUiState.statusMessage = message;
-  }),
+  mockShowTransientToast: vi.fn(),
 }));
 
 vi.mock("../../store/favoriteStore", () => ({
@@ -113,21 +106,21 @@ vi.mock("../../store/uiStore", () => ({
     (selector?: (state: Record<string, unknown>) => unknown) =>
       selector
         ? selector({
-            statusMessage: mockUiState.statusMessage,
-            setStatusMessage: mockSetStatusMessage,
-            showFavoritesPanel: mockUiState.showFavoritesPanel,
+            showFavoritesPanel: true,
             toggleFavoritesPanel: mockToggleFavoritesPanel,
           })
         : null,
     {
       getState: () => ({
-        statusMessage: mockUiState.statusMessage,
-        setStatusMessage: mockSetStatusMessage,
-        showFavoritesPanel: mockUiState.showFavoritesPanel,
+        showFavoritesPanel: true,
         toggleFavoritesPanel: mockToggleFavoritesPanel,
       }),
     }
   ),
+}));
+
+vi.mock("../../store/toastStore", () => ({
+  showTransientToast: mockShowTransientToast,
 }));
 
 describe("FavoritesPanel", () => {
@@ -152,8 +145,6 @@ describe("FavoritesPanel", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockFavoriteState.favorites = [];
-    mockUiState.statusMessage = null;
-    mockUiState.showFavoritesPanel = true;
     mockPanelState.activePanel = "left";
     mockPanelState.dragInfo = null;
   });
@@ -193,7 +184,10 @@ describe("FavoritesPanel", () => {
         path: "/home/user/Documents",
       }),
     ]);
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("즐겨찾기에 폴더를 추가했습니다.");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("즐겨찾기에 폴더를 추가했습니다.", {
+      durationMs: 1800,
+      tone: "success",
+    });
   });
 
   it("파일만 드래그하면 즐겨찾기에 추가하지 않는다", async () => {
@@ -220,7 +214,10 @@ describe("FavoritesPanel", () => {
 
     expect(mockAddFavorite).not.toHaveBeenCalled();
     expect(mockFavoriteState.favorites).toHaveLength(0);
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("폴더만 즐겨찾기에 추가할 수 있습니다.");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("폴더만 즐겨찾기에 추가할 수 있습니다.", {
+      durationMs: 1800,
+      tone: "warning",
+    });
   });
 
   it("이미 등록된 폴더는 중복 추가하지 않는다", async () => {
@@ -250,10 +247,13 @@ describe("FavoritesPanel", () => {
 
     expect(mockFavoriteState.favorites).toHaveLength(1);
     expect(mockAddFavorite).not.toHaveBeenCalled();
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("이미 즐겨찾기에 등록된 폴더입니다.");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("이미 즐겨찾기에 등록된 폴더입니다.", {
+      durationMs: 1800,
+      tone: "warning",
+    });
   });
 
-  it("상태 메시지 타이머가 다음 테스트로 새지 않는다", async () => {
+  it("토스트 호출이 다음 테스트로 새지 않는다", async () => {
     const { getByTestId, rerender } = render(<FavoritesPanel />);
     const panel = getByTestId("favorites-panel");
     setPanelRect(panel);
@@ -270,12 +270,9 @@ describe("FavoritesPanel", () => {
       document.dispatchEvent(new MouseEvent("mouseup", { clientX: 20, clientY: 20 }));
     });
 
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("즐겨찾기에 폴더를 추가했습니다.");
-
-    act(() => {
-      vi.runOnlyPendingTimers();
+    expect(mockShowTransientToast).toHaveBeenCalledWith("즐겨찾기에 폴더를 추가했습니다.", {
+      durationMs: 1800,
+      tone: "success",
     });
-
-    expect(mockSetStatusMessage).toHaveBeenLastCalledWith(null);
   });
 });

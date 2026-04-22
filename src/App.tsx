@@ -12,6 +12,7 @@ import { SyncDialog } from "./components/dialogs/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { MultiRenameDialog } from "./components/dialogs/MultiRenameDialog";
 import { JobCenterDialog } from "./components/dialogs/JobCenterDialog";
+import { ToastViewport } from "./components/layout/ToastViewport";
 import { AppTheme, ThemePreference } from "./types/theme";
 import { ViewMode } from "./types/file";
 import { useDialogStore } from "./store/dialogStore";
@@ -381,6 +382,7 @@ function App() {
       <SearchPreviewDialogs />
       <SyncDialog />
       <ContextMenu />
+      <ToastViewport />
     </div>
   );
 }

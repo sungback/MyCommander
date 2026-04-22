@@ -6,8 +6,8 @@ import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import { useDragStore } from "../../store/dragStore";
 import { useDialogStore } from "../../store/dialogStore";
-import { useUiStore } from "../../store/uiStore";
 import { coalescePanelPath } from "../../utils/path";
+import { showTransientToast } from "../../store/toastStore";
 import {
   clearSharedDropTargetForPanel,
   resetSharedDragState,
@@ -28,22 +28,6 @@ export interface VisibleEntryRow {
 }
 
 const DRAG_THRESHOLD_PX = 6;
-
-let clearStatusMessageTimeoutId: number | undefined;
-
-const showTransientStatusMessage = (message: string, durationMs: number = 1800) => {
-  const { setStatusMessage } = useUiStore.getState();
-  if (clearStatusMessageTimeoutId !== undefined) {
-    window.clearTimeout(clearStatusMessageTimeoutId);
-  }
-
-  setStatusMessage(message);
-  clearStatusMessageTimeoutId = window.setTimeout(() => {
-    useUiStore.getState().setStatusMessage(null);
-    clearStatusMessageTimeoutId = undefined;
-  }, durationMs);
-};
-
 let _cachedDragIcon: string | null = null;
 const getDragIcon = (): string => {
   if (_cachedDragIcon) return _cachedDragIcon;
@@ -138,7 +122,10 @@ export const useFileListDrag = ({
     const conflicts = await checkCopyConflicts(collapsedPaths, targetPath);
 
     if (conflicts.length > 0) {
-      showTransientStatusMessage("폴더를 이동하기 전에 이름 충돌을 해결해야 합니다.");
+      showTransientToast("폴더를 이동하기 전에 이름 충돌을 해결해야 합니다.", {
+        durationMs: 1800,
+        tone: "warning",
+      });
       return false;
     }
 
@@ -147,7 +134,10 @@ export const useFileListDrag = ({
       sourcePaths: collapsedPaths,
       targetDir: targetPath,
     });
-    showTransientStatusMessage("선택한 폴더를 이동 대기열에 추가했습니다.");
+    showTransientToast("선택한 폴더를 이동 대기열에 추가했습니다.", {
+      durationMs: 1800,
+      tone: "success",
+    });
     return true;
   };
 
@@ -363,7 +353,10 @@ export const useFileListDrag = ({
           });
 
           if (!isDropAllowed) {
-            showTransientStatusMessage(blockedReason ?? "여기로는 복사할 수 없습니다.");
+            showTransientToast(blockedReason ?? "여기로는 복사할 수 없습니다.", {
+              durationMs: 1800,
+              tone: "warning",
+            });
             return;
           }
 
@@ -374,10 +367,11 @@ export const useFileListDrag = ({
           void dragAction
             .catch((error) => {
               console.error("Failed to process dragged files:", error);
-              showTransientStatusMessage(
+              showTransientToast(
                 isFolderOnlySamePanelDrag
                   ? "폴더를 이동하지 못했습니다."
-                  : "파일을 복사하지 못했습니다."
+                  : "파일을 복사하지 못했습니다.",
+                { durationMs: 1800, tone: "error" }
               );
             });
           return;
@@ -403,13 +397,19 @@ export const useFileListDrag = ({
             : getBlockedDropReason(activeDragInfo, targetPath);
 
           if (blockedReason) {
-            showTransientStatusMessage(blockedReason);
+            showTransientToast(blockedReason, {
+              durationMs: 1800,
+              tone: "warning",
+            });
             return;
           }
 
           void handleDraggedCopy(state.paths, targetPath, targetPanel).catch((error) => {
             console.error("Failed to copy dragged files:", error);
-            showTransientStatusMessage("파일을 복사하지 못했습니다.");
+            showTransientToast("파일을 복사하지 못했습니다.", {
+              durationMs: 1800,
+              tone: "error",
+            });
           });
         }
       }

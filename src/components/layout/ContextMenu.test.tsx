@@ -16,7 +16,7 @@ const {
   mockRevealItemInDir,
   mockWriteClipboardText,
   mockCloseContextMenu,
-  mockSetStatusMessage,
+  mockShowTransientToast,
 } = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: string }) => void | Promise<void>>(),
   mockSetOpenDialog: vi.fn(),
@@ -30,7 +30,7 @@ const {
   mockRevealItemInDir: vi.fn(),
   mockWriteClipboardText: vi.fn(),
   mockCloseContextMenu: vi.fn(),
-  mockSetStatusMessage: vi.fn(),
+  mockShowTransientToast: vi.fn(),
 }));
 
 const mockContextState = {
@@ -88,6 +88,10 @@ vi.mock("../../utils/clipboard", () => ({
   writeClipboardText: mockWriteClipboardText,
 }));
 
+vi.mock("../../store/toastStore", () => ({
+  showTransientToast: mockShowTransientToast,
+}));
+
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     openInTerminal: mockOpenInTerminal,
@@ -137,14 +141,6 @@ vi.mock("../../store/panelStore", () => ({
   ),
 }));
 
-vi.mock("../../store/uiStore", () => ({
-  useUiStore: {
-    getState: () => ({
-      setStatusMessage: mockSetStatusMessage,
-    }),
-  },
-}));
-
 describe("ContextMenu", () => {
   beforeEach(() => {
     useJobStore.setState(useJobStore.getInitialState());
@@ -180,7 +176,7 @@ describe("ContextMenu", () => {
     });
     expect(useJobStore.getState().jobs[0]?.id).toBe("job-1");
     expect(mockSetOpenDialog).toHaveBeenCalledWith("progress");
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("압축 작업이 대기열에 추가되었습니다.");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("압축 작업이 대기열에 추가되었습니다.");
     expect(mockRefreshPanel).toHaveBeenCalledWith("left");
     expect(mockCloseContextMenu).toHaveBeenCalled();
   });
@@ -225,6 +221,6 @@ describe("ContextMenu", () => {
     await listenHandlers.get("context-menu-action")?.({ payload: "copy-path" });
 
     expect(mockWriteClipboardText).toHaveBeenCalledWith("/home/user/Documents");
-    expect(mockSetStatusMessage).toHaveBeenCalledWith("경로를 복사했습니다.");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("경로를 복사했습니다.");
   });
 });

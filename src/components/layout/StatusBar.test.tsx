@@ -32,8 +32,8 @@ vi.mock("../../store/panelStore", () => ({
 }));
 
 vi.mock("../../store/uiStore", () => ({
-  useUiStore: (selector: (state: { statusMessage: string | null }) => unknown) =>
-    selector({ statusMessage: null }),
+  useUiStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({}),
 }));
 
 vi.mock("../../store/dialogStore", () => ({
@@ -79,13 +79,5 @@ describe("StatusBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "설정" }));
 
     expect(mockSetOpenDialog).toHaveBeenCalledWith("settings");
-  });
-
-  it("작업 버튼 클릭 시 jobcenter 다이얼로그를 연다", () => {
-    render(<StatusBar />);
-
-    fireEvent.click(screen.getByRole("button", { name: "작업 센터" }));
-
-    expect(mockSetOpenDialog).toHaveBeenCalledWith("jobcenter");
   });
 });

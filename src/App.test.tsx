@@ -39,6 +39,7 @@ vi.mock('./hooks/useFileSystem', () => ({
 // ── 자식 컴포넌트 stub (렌더링 비용 제거) ───────────────────────────────────────
 vi.mock('./components/panel/DualPanel',          () => ({ DualPanel:          () => null }));
 vi.mock('./components/layout/StatusBar',         () => ({ StatusBar:          () => null }));
+vi.mock('./components/layout/ToastViewport',     () => ({ ToastViewport:      () => null }));
 vi.mock('./components/dialogs/DialogContainer',  () => ({ DialogContainer:    () => null }));
 vi.mock('./components/dialogs/ProgressDialog',   () => ({ ProgressDialog:     () => null }));
 vi.mock('./components/dialogs/JobCenterDialog',  () => ({ JobCenterDialog:    () => null }));

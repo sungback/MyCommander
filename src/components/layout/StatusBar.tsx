@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
-import { useUiStore } from "../../store/uiStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
@@ -8,7 +7,7 @@ import { formatSize } from "../../utils/format";
 import { coalescePanelPath } from "../../utils/path";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
-import { Settings, ListTodo } from "lucide-react";
+import { Settings } from "lucide-react";
 
 type PanelId = "left" | "right";
 
@@ -108,7 +107,6 @@ export const StatusBar: React.FC = () => {
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
-  const statusMessage = useUiStore((s) => s.statusMessage);
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const { getAvailableSpace } = useFileSystem();
   const appCommands = useAppCommands();
@@ -238,16 +236,6 @@ export const StatusBar: React.FC = () => {
           ))}
           <button
             type="button"
-            onClick={() => setOpenDialog("jobcenter")}
-            className="flex items-center gap-2 rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-hover"
-            title="작업 센터"
-            aria-label="작업 센터"
-          >
-            <ListTodo size={15} className="text-accent-color" />
-            <span>작업</span>
-          </button>
-          <button
-            type="button"
             onClick={() => setOpenDialog("settings")}
             className="flex items-center gap-2 rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-hover"
             title="설정"
@@ -256,11 +244,6 @@ export const StatusBar: React.FC = () => {
             <Settings size={15} className="text-accent-color" />
             <span>설정</span>
           </button>
-          {statusMessage ? (
-            <div className="ml-auto rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-secondary">
-              {statusMessage}
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

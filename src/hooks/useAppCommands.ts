@@ -1,7 +1,7 @@
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
 import { useClipboardStore, ClipboardState } from "../store/clipboardStore";
-import { useUiStore } from "../store/uiStore";
+import { showTransientToast } from "../store/toastStore";
 import { writeClipboardText } from "../utils/clipboard";
 import { arePathsEquivalent, coalescePanelPath } from "../utils/path";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
@@ -31,22 +31,11 @@ const getPrimaryTargetPath = () => {
   return cursorEntry.path;
 };
 
-let clearStatusMessageTimeoutId: number | undefined;
-
 const getPanelAccessPath = (panel: PanelState) =>
   coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
-  const { setStatusMessage } = useUiStore.getState();
-  if (clearStatusMessageTimeoutId !== undefined) {
-    window.clearTimeout(clearStatusMessageTimeoutId);
-  }
-
-  setStatusMessage(message);
-  clearStatusMessageTimeoutId = window.setTimeout(() => {
-    useUiStore.getState().setStatusMessage(null);
-    clearStatusMessageTimeoutId = undefined;
-  }, durationMs);
+  showTransientToast(message, { durationMs });
 };
 
 export function useAppCommands() {

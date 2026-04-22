@@ -5,21 +5,7 @@ import { useFavoriteStore, Favorite } from "../../store/favoriteStore";
 import { usePanelStore } from "../../store/panelStore";
 import { useDragStore } from "../../store/dragStore";
 import { useUiStore } from "../../store/uiStore";
-
-let clearStatusMessageTimeoutId: number | undefined;
-
-const showTransientStatusMessage = (message: string, durationMs: number = 1800) => {
-  const { setStatusMessage } = useUiStore.getState();
-  if (clearStatusMessageTimeoutId !== undefined) {
-    window.clearTimeout(clearStatusMessageTimeoutId);
-  }
-
-  setStatusMessage(message);
-  clearStatusMessageTimeoutId = window.setTimeout(() => {
-    useUiStore.getState().setStatusMessage(null);
-    clearStatusMessageTimeoutId = undefined;
-  }, durationMs);
-};
+import { showTransientToast } from "../../store/toastStore";
 
 export const FavoritesPanel: React.FC = () => {
   const favorites = useFavoriteStore((s) => s.favorites);
@@ -93,7 +79,10 @@ export const FavoritesPanel: React.FC = () => {
       }
 
       if (!canDropDraggedFolders) {
-        showTransientStatusMessage("폴더만 즐겨찾기에 추가할 수 있습니다.");
+        showTransientToast("폴더만 즐겨찾기에 추가할 수 있습니다.", {
+          durationMs: 1800,
+          tone: "warning",
+        });
         return;
       }
 
@@ -103,15 +92,19 @@ export const FavoritesPanel: React.FC = () => {
       );
 
       if (uniquePaths.length === 0) {
-        showTransientStatusMessage("이미 즐겨찾기에 등록된 폴더입니다.");
+        showTransientToast("이미 즐겨찾기에 등록된 폴더입니다.", {
+          durationMs: 1800,
+          tone: "warning",
+        });
         return;
       }
 
       uniquePaths.forEach((path) => addFavorite(path));
-      showTransientStatusMessage(
+      showTransientToast(
         uniquePaths.length === 1
           ? "즐겨찾기에 폴더를 추가했습니다."
-          : `즐겨찾기에 폴더 ${uniquePaths.length}개를 추가했습니다.`
+          : `즐겨찾기에 폴더 ${uniquePaths.length}개를 추가했습니다.`,
+        { durationMs: 1800, tone: "success" }
       );
     };
 

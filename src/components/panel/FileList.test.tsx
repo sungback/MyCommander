@@ -2,7 +2,6 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import { FileList } from './FileList';
 import type { FileEntry } from '../../types/file';
-import { useUiStore } from '../../store/uiStore';
 import { useClipboardStore } from '../../store/clipboardStore';
 import { useDragStore } from '../../store/dragStore';
 import {
@@ -29,6 +28,7 @@ const {
   mockSetActivePanel,
   mockOpenDragCopyDialog,
   mockOpenPreviewDialog,
+  mockShowTransientToast,
   mockPanelState,
 } = vi.hoisted(() => ({
   mockSubmitJob: vi.fn(),
@@ -42,6 +42,7 @@ const {
   mockSetActivePanel: vi.fn(),
   mockOpenDragCopyDialog: vi.fn(),
   mockOpenPreviewDialog: vi.fn(),
+  mockShowTransientToast: vi.fn(),
   mockPanelState: {
     leftPanel: {
       currentPath: '/home/user',
@@ -77,6 +78,10 @@ vi.mock('../../store/dialogStore', () => ({
     }), {
     getState: () => ({}),
   }),
+}));
+
+vi.mock('../../store/toastStore', () => ({
+  showTransientToast: mockShowTransientToast,
 }));
 
 vi.mock('../../store/panelStore', () => ({
@@ -203,7 +208,6 @@ const performInternalDrag = async (
 describe('FileList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useUiStore.getState().setStatusMessage(null);
     mockPanelState.leftPanel.currentPath = '/home/user';
     mockPanelState.leftPanel.resolvedPath = '/home/user';
     mockPanelState.leftPanel.lastUpdated = 0;
@@ -705,7 +709,7 @@ describe('FileList', () => {
         sourcePaths: ['/home/user/notes.txt'],
         targetPath: '/home/user/Documents',
       });
-      expect(useUiStore.getState().statusMessage).toBeNull();
+      expect(mockShowTransientToast).not.toHaveBeenCalled();
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
