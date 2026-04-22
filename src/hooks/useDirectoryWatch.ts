@@ -1,7 +1,10 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef } from "react";
 import { usePanelStore } from "../store/panelStore";
-import { refreshPanelsForDirectories } from "../store/panelRefresh";
+import {
+  refreshPanelsForDirectories,
+  refreshPanelsForEntryPaths,
+} from "../store/panelRefresh";
 import { collectWatchDirectories } from "../store/panelWatch";
 import { useFileSystem } from "./useFileSystem";
 import { getPathDirectoryName, normalizePathForComparison } from "../utils/path";
@@ -53,6 +56,7 @@ export const useDirectoryWatch = () => {
     let isMounted = true;
     let refreshTimer: number | undefined;
     const pendingDirectories = new Set<string>();
+    const pendingPaths = new Set<string>();
 
     const queueDirectory = (path: string) => {
       if (!path) {
@@ -61,18 +65,32 @@ export const useDirectoryWatch = () => {
       pendingDirectories.add(path);
     };
 
+    const queuePath = (path: string) => {
+      if (!path) {
+        return;
+      }
+      pendingPaths.add(path);
+    };
+
     const scheduleRefresh = () => {
       if (refreshTimer !== undefined) {
         window.clearTimeout(refreshTimer);
       }
 
       refreshTimer = window.setTimeout(() => {
-        if (!isMounted || pendingDirectories.size === 0) {
+        if (!isMounted || (pendingDirectories.size === 0 && pendingPaths.size === 0)) {
           return;
         }
 
+        const paths = Array.from(pendingPaths);
         const directories = Array.from(pendingDirectories);
+        pendingPaths.clear();
         pendingDirectories.clear();
+
+        if (paths.length > 0) {
+          refreshPanelsForEntryPaths(paths);
+        }
+
         refreshPanelsForDirectories(directories);
       }, REFRESH_DEBOUNCE_MS);
     };
@@ -88,6 +106,7 @@ export const useDirectoryWatch = () => {
         }
 
         for (const changedPath of event.payload.paths ?? []) {
+          queuePath(changedPath);
           queueDirectory(changedPath);
           queueDirectory(getPathDirectoryName(changedPath));
         }
@@ -112,6 +131,7 @@ export const useDirectoryWatch = () => {
       if (refreshTimer !== undefined) {
         window.clearTimeout(refreshTimer);
       }
+      pendingPaths.clear();
       pendingDirectories.clear();
       cleanup?.();
     };

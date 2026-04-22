@@ -18,6 +18,7 @@ export const SyncDialog: React.FC = () => {
   const fs = useFileSystem();
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
+  const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
 
   const [stage, setStage] = useState<SyncStage>("paths");
@@ -50,7 +51,7 @@ export const SyncDialog: React.FC = () => {
     setError(null);
 
     try {
-      const items = await fs.compareDirectories(leftPath, rightPath);
+      const items = await fs.compareDirectories(leftPath, rightPath, showHiddenFiles);
       setSyncItems(items);
       setStage("results");
     } catch (e) {

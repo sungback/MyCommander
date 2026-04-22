@@ -283,7 +283,11 @@ const fileSystem = {
     return await invoke<number>("get_dir_size", { path });
   },
 
-  compareDirectories: async (leftPath: string, rightPath: string): Promise<SyncItem[]> => {
+  compareDirectories: async (
+    leftPath: string,
+    rightPath: string,
+    showHidden: boolean = false
+  ): Promise<SyncItem[]> => {
     interface RawSyncItem {
       rel_path: string;
       left_path: string | null;
@@ -309,6 +313,7 @@ const fileSystem = {
     const raw = await invoke<RawSyncItem[]>("compare_directories", {
       left: leftPath,
       right: rightPath,
+      show_hidden: showHidden,
     });
 
     return raw.map((item) => ({

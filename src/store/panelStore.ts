@@ -52,6 +52,7 @@ interface AppState {
   clearSelection: (panel: PanelId) => void;
   setCursor: (panel: PanelId, index: number) => void;
   refreshPanel: (panel: PanelId) => void;
+  bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: string) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   dragInfo: DragInfo | null;
@@ -282,6 +283,7 @@ const defaultTabState = (currentPath: string): PanelTabState => ({
   sortDirection: "asc",
   lastUpdated: Date.now(),
   pendingCursorName: null,
+  expandedChildrenVersion: 0,
 });
 
 const cloneTabState = (tab: PanelTabState): PanelTabState => ({
@@ -291,6 +293,7 @@ const cloneTabState = (tab: PanelTabState): PanelTabState => ({
   selectedItems: new Set(),
   cursorIndex: 0,
   lastUpdated: Date.now(),
+  expandedChildrenVersion: 0,
 });
 
 const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
@@ -360,6 +363,7 @@ const restorePersistedPanelState = (
     sortDirection: tab.sortDirection,
     lastUpdated: Date.now(),
     pendingCursorName: null,
+    expandedChildrenVersion: 0,
   }));
 
   const activeTabId = tabs.some((tab) => tab.id === persistedPanel.activeTabId)
@@ -873,6 +877,19 @@ export const usePanelStore = create<AppState>((set) => {
       const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
         ...tab,
         lastUpdated: Date.now(),
+      }));
+
+      return {
+        [panelKey]: nextPanelState,
+      };
+    }),
+
+  bumpExpandedChildrenVersion: (panel) =>
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
+        ...tab,
+        expandedChildrenVersion: tab.expandedChildrenVersion + 1,
       }));
 
       return {

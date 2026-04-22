@@ -43,14 +43,14 @@ const {
       currentPath: '/home/user',
       resolvedPath: '/home/user',
       lastUpdated: 0,
-      tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }],
+      tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }],
       activeTabId: 'tab1',
     },
     rightPanel: {
       currentPath: '/target',
       resolvedPath: '/target',
       lastUpdated: 0,
-      tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }],
+      tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }],
       activeTabId: 'tab2',
     },
     dragInfo: null as
@@ -207,9 +207,13 @@ describe('FileList', () => {
     mockPanelState.leftPanel.currentPath = '/home/user';
     mockPanelState.leftPanel.resolvedPath = '/home/user';
     mockPanelState.leftPanel.lastUpdated = 0;
+    mockPanelState.leftPanel.tabs = [{ id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }];
+    mockPanelState.leftPanel.activeTabId = 'tab1';
     mockPanelState.rightPanel.currentPath = '/target';
     mockPanelState.rightPanel.resolvedPath = '/target';
     mockPanelState.rightPanel.lastUpdated = 0;
+    mockPanelState.rightPanel.tabs = [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }];
+    mockPanelState.rightPanel.activeTabId = 'tab2';
     mockPanelState.dragInfo = null;
     mockSetDragInfo.mockImplementation((dragInfo) => {
       mockPanelState.dragInfo = dragInfo;
@@ -595,6 +599,42 @@ describe('FileList', () => {
       });
 
       await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockListDirectory).toHaveBeenCalledTimes(2);
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/report.pdf"]')
+      ).toBeInTheDocument();
+    });
+
+    it('패널 refresh 신호만 바뀌어도 펼친 폴더 캐시를 다시 동기화한다', async () => {
+      const props = makeProps();
+      const { rerender } = render(<FileList {...props} />);
+
+      mockListDirectory.mockResolvedValueOnce(CHILD_FILES);
+      await act(async () => {
+        fireEvent.click(getDocExpandBtn());
+      });
+
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).toBeInTheDocument();
+
+      mockPanelState.leftPanel.tabs = [
+        { id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 999 },
+      ];
+      mockPanelState.leftPanel.activeTabId = 'tab1';
+      mockPanelState.leftPanel.lastUpdated = 999;
+      mockListDirectory.mockResolvedValueOnce([
+        { name: 'report.pdf', path: '/home/user/Documents/report.pdf', kind: 'file', size: 512 },
+      ]);
+
+      await act(async () => {
+        rerender(<FileList {...props} />);
         await Promise.resolve();
       });
 

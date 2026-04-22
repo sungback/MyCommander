@@ -7,11 +7,13 @@ const {
   mockCompareDirectories,
   mockCopyFiles,
   mockRefreshPanel,
+  mockShowHiddenFiles,
 } = vi.hoisted(() => ({
   mockCloseDialog: vi.fn(),
   mockCompareDirectories: vi.fn(),
   mockCopyFiles: vi.fn(),
   mockRefreshPanel: vi.fn(),
+  mockShowHiddenFiles: { value: false },
 }));
 
 vi.mock("../../store/dialogStore", () => ({
@@ -32,6 +34,7 @@ vi.mock("../../store/panelStore", () => ({
         currentPath: "/right",
         resolvedPath: "/right",
       },
+      showHiddenFiles: mockShowHiddenFiles.value,
       refreshPanel: mockRefreshPanel,
     }),
 }));
@@ -51,7 +54,20 @@ describe("SyncDialog", () => {
     mockCompareDirectories.mockReset();
     mockCopyFiles.mockReset();
     mockRefreshPanel.mockReset();
+    mockShowHiddenFiles.value = false;
     mockCopyFiles.mockResolvedValue([]);
+  });
+
+  it("passes the global hidden-files toggle to directory analysis", async () => {
+    mockCompareDirectories.mockResolvedValue([]);
+
+    render(<SyncDialog />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+
+    await waitFor(() => {
+      expect(mockCompareDirectories).toHaveBeenCalledWith("/left", "/right", false);
+    });
   });
 
   it("preserves relative paths when synchronizing changed files", async () => {

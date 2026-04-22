@@ -177,6 +177,8 @@ export const FileList: React.FC<FileListProps> = ({
   });
   const sortField = activeTab?.sortField ?? "name";
   const sortDirection = activeTab?.sortDirection ?? "asc";
+  const refreshKey = activeTab?.lastUpdated ?? 0;
+  const expandedChildrenVersion = activeTab?.expandedChildrenVersion ?? 0;
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<
     Record<string, FileEntry[]>
@@ -440,7 +442,7 @@ export const FileList: React.FC<FileListProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [currentPath, files, listDirectory, showHiddenFiles]);
+  }, [currentPath, expandedChildrenVersion, files, listDirectory, refreshKey, showHiddenFiles]);
 
   useEffect(() => {
     if (visibleRows.length === 0) return;

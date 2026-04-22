@@ -504,6 +504,53 @@ describe('useFileSystem', () => {
     });
   });
 
+  // ─── compareDirectories ───────────────────────────────────────────────────
+  describe('compareDirectories', () => {
+    it('invokes compare_directories with show_hidden=false by default', async () => {
+      mockInvoke.mockResolvedValueOnce([
+        {
+          rel_path: 'docs/report.md',
+          left_path: '/left/docs/report.md',
+          right_path: '/right/docs/report.md',
+          left_kind: 'file',
+          right_kind: 'file',
+          status: 'LeftNewer',
+        },
+      ]);
+
+      const result = await useFileSystem().compareDirectories('/left', '/right');
+
+      expect(mockInvoke).toHaveBeenCalledWith('compare_directories', {
+        left: '/left',
+        right: '/right',
+        show_hidden: false,
+      });
+      expect(result).toEqual([
+        {
+          relPath: 'docs/report.md',
+          leftPath: '/left/docs/report.md',
+          rightPath: '/right/docs/report.md',
+          leftKind: 'file',
+          rightKind: 'file',
+          status: 'LeftNewer',
+          direction: 'toRight',
+        },
+      ]);
+    });
+
+    it('passes show_hidden=true when requested', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+
+      await useFileSystem().compareDirectories('/left', '/right', true);
+
+      expect(mockInvoke).toHaveBeenCalledWith('compare_directories', {
+        left: '/left',
+        right: '/right',
+        show_hidden: true,
+      });
+    });
+  });
+
   // ─── syncWatchedDirectories ────────────────────────────────────────────────
   describe('syncWatchedDirectories', () => {
     it('invokes sync_watched_directories with path list', async () => {

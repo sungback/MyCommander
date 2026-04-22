@@ -23,6 +23,7 @@ const getTabsForWatch = (panel: PanelState): PanelTabState[] => {
       sortDirection: "asc",
       lastUpdated: panel.lastUpdated,
       pendingCursorName: null,
+      expandedChildrenVersion: 0,
     },
   ];
 };

@@ -89,6 +89,16 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
       state.refreshPanel(panelId);
     }
 
+    if (normalizedActivePath) {
+      const nestedPrefix = normalizedActivePath.endsWith("/")
+        ? normalizedActivePath
+        : `${normalizedActivePath}/`;
+      const hasNestedChange = [...normalizedDirectories].some((d) => d.startsWith(nestedPrefix));
+      if (hasNestedChange) {
+        state.bumpExpandedChildrenVersion(panelId);
+      }
+    }
+
     const nextPanel = updatePanelTabs(panel, (tab) => {
       if (tab.id === panel.activeTabId) {
         return tab;
@@ -138,6 +148,14 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
 
     if (normalizedPaths.some((path) => isSameOrNestedPath(activePanelPath, path))) {
       state.refreshPanel(panelId);
+    }
+
+    const normalizedActivePanelPath = normalizePathForComparison(activePanelPath);
+    const nestedPrefix = normalizedActivePanelPath.endsWith("/")
+      ? normalizedActivePanelPath
+      : `${normalizedActivePanelPath}/`;
+    if (normalizedPaths.some((path) => normalizePathForComparison(path).startsWith(nestedPrefix))) {
+      state.bumpExpandedChildrenVersion(panelId);
     }
 
     const nextPanel = updatePanelTabs(panel, (tab) => {

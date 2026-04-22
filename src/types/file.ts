@@ -29,6 +29,7 @@ export interface PanelViewState {
 
 export interface PanelTabState extends PanelViewState {
   id: string;
+  expandedChildrenVersion: number;
 }
 
 export interface PanelState extends PanelViewState {

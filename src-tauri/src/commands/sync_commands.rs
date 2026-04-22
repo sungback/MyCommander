@@ -38,6 +38,53 @@ struct FileInfo {
     kind: SyncEntryKind,
 }
 
+fn is_hidden_sync_entry(file_name: &str, metadata: &fs::Metadata) -> bool {
+    if file_name == "." || file_name == ".." {
+        return false;
+    }
+
+    if file_name.starts_with('.') {
+        return true;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::macos::fs::MetadataExt;
+
+        const UF_HIDDEN: u32 = 0x0000_8000;
+        return metadata.st_flags() & UF_HIDDEN != 0;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = metadata;
+        false
+    }
+}
+
+fn normalize_relative_path(path: &str) -> String {
+    path.replace('\\', "/").trim_matches('/').to_string()
+}
+
+fn is_descendant_relative_path(ancestor: &str, candidate: &str) -> bool {
+    let normalized_ancestor = normalize_relative_path(ancestor);
+    let normalized_candidate = normalize_relative_path(candidate);
+
+    if normalized_ancestor.is_empty() || normalized_ancestor == normalized_candidate {
+        return false;
+    }
+
+    normalized_candidate.starts_with(&format!("{normalized_ancestor}/"))
+}
+
+fn is_one_sided_directory(item: &SyncItem) -> bool {
+    matches!(
+        (&item.status, item.left_kind, item.right_kind),
+        (SyncStatus::LeftOnly, Some(SyncEntryKind::Directory), None)
+            | (SyncStatus::RightOnly, None, Some(SyncEntryKind::Directory))
+    )
+}
+
 fn get_last_modified_millis(path: &str) -> Option<u64> {
     fs::metadata(path)
         .ok()
@@ -46,7 +93,7 @@ fn get_last_modified_millis(path: &str) -> Option<u64> {
         .map(|d| d.as_millis() as u64)
 }
 
-fn scan_directory(dir_path: &str) -> Result<HashMap<String, FileInfo>, String> {
+fn scan_directory(dir_path: &str, show_hidden: bool) -> Result<HashMap<String, FileInfo>, String> {
     let mut files = HashMap::new();
     let base_path = Path::new(dir_path);
 
@@ -54,12 +101,31 @@ fn scan_directory(dir_path: &str) -> Result<HashMap<String, FileInfo>, String> {
         return Err(format!("{} is not a directory", dir_path));
     }
 
-    for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
+    let mut entries = WalkDir::new(dir_path).into_iter();
+
+    while let Some(entry) = entries.next() {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
         let path = entry.path();
         let abs_path_str = path.to_string_lossy().to_string();
 
         // Skip the base directory itself
         if path == base_path {
+            continue;
+        }
+
+        let metadata = fs::metadata(&abs_path_str).map_err(|e| e.to_string())?;
+        let file_name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        if !show_hidden && is_hidden_sync_entry(&file_name, &metadata) {
+            if entry.file_type().is_dir() {
+                entries.skip_current_dir();
+            }
             continue;
         }
 
@@ -69,9 +135,8 @@ fn scan_directory(dir_path: &str) -> Result<HashMap<String, FileInfo>, String> {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| abs_path_str.clone());
 
-        let metadata = fs::metadata(&abs_path_str).ok();
         let last_modified = get_last_modified_millis(&abs_path_str);
-        let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+        let size = metadata.len();
         let kind = if entry.file_type().is_dir() {
             SyncEntryKind::Directory
         } else {
@@ -92,10 +157,14 @@ fn scan_directory(dir_path: &str) -> Result<HashMap<String, FileInfo>, String> {
     Ok(files)
 }
 
-#[tauri::command]
-pub async fn compare_directories(left: String, right: String) -> Result<Vec<SyncItem>, String> {
-    let left_files = scan_directory(&left)?;
-    let right_files = scan_directory(&right)?;
+#[tauri::command(rename_all = "snake_case")]
+pub async fn compare_directories(
+    left: String,
+    right: String,
+    show_hidden: bool,
+) -> Result<Vec<SyncItem>, String> {
+    let left_files = scan_directory(&left, show_hidden)?;
+    let right_files = scan_directory(&right, show_hidden)?;
 
     let mut result = Vec::new();
     let mut processed = std::collections::HashSet::new();
@@ -167,7 +236,25 @@ pub async fn compare_directories(left: String, right: String) -> Result<Vec<Sync
     // Sort by relative path for consistent ordering
     result.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
 
-    Ok(result)
+    let mut filtered = Vec::with_capacity(result.len());
+    let mut collapsed_roots: Vec<String> = Vec::new();
+
+    for item in result {
+        if collapsed_roots
+            .iter()
+            .any(|ancestor| is_descendant_relative_path(ancestor, &item.rel_path))
+        {
+            continue;
+        }
+
+        if is_one_sided_directory(&item) {
+            collapsed_roots.push(item.rel_path.clone());
+        }
+
+        filtered.push(item);
+    }
+
+    Ok(filtered)
 }
 
 #[cfg(test)]
@@ -206,6 +293,7 @@ mod tests {
             .block_on(compare_directories(
                 left.to_string_lossy().to_string(),
                 right.to_string_lossy().to_string(),
+                false,
             ))
             .expect("compare directories");
 
@@ -218,6 +306,97 @@ mod tests {
             items.iter().any(|item| item.rel_path == "docs/report.md"),
             "changed nested files should still be reported"
         );
+
+        fs::remove_dir_all(left).expect("cleanup left");
+        fs::remove_dir_all(right).expect("cleanup right");
+    }
+
+    #[test]
+    fn compare_directories_accepts_snake_case_invoke_args() {
+        let left = unique_temp_dir("invoke-left");
+        let right = unique_temp_dir("invoke-right");
+
+        let app = tauri::test::mock_builder()
+            .invoke_handler(tauri::generate_handler![compare_directories])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("build test app");
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("build test webview");
+
+        let response = tauri::test::get_ipc_response(
+            &webview,
+            tauri::webview::InvokeRequest {
+                cmd: "compare_directories".into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: "http://tauri.localhost".parse().expect("parse invoke url"),
+                body: tauri::ipc::InvokeBody::from(serde_json::json!({
+                    "left": left.to_string_lossy().to_string(),
+                    "right": right.to_string_lossy().to_string(),
+                    "show_hidden": false,
+                })),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        );
+
+        assert!(
+            response.is_ok(),
+            "snake_case invoke payload should be accepted: {response:?}"
+        );
+
+        fs::remove_dir_all(left).expect("cleanup left");
+        fs::remove_dir_all(right).expect("cleanup right");
+    }
+
+    #[test]
+    fn compare_directories_hides_hidden_entries_and_descendants_by_default() {
+        let left = unique_temp_dir("hidden-left");
+        let right = unique_temp_dir("hidden-right");
+
+        fs::create_dir_all(left.join(".claude/worktrees")).expect("create hidden left dir");
+        fs::write(left.join(".claude/settings.local.json"), "{}").expect("write hidden config");
+        fs::write(left.join(".claude/worktrees/trace.txt"), "secret").expect("write hidden child");
+        fs::write(left.join(".DS_Store"), "mac").expect("write ds_store");
+        fs::write(left.join("visible.txt"), "visible").expect("write visible file");
+
+        let runtime = tokio::runtime::Runtime::new().expect("create runtime");
+        let items = runtime
+            .block_on(compare_directories(
+                left.to_string_lossy().to_string(),
+                right.to_string_lossy().to_string(),
+                false,
+            ))
+            .expect("compare directories");
+
+        let rel_paths = items.iter().map(|item| item.rel_path.clone()).collect::<Vec<_>>();
+        assert_eq!(rel_paths, vec!["visible.txt"]);
+
+        fs::remove_dir_all(left).expect("cleanup left");
+        fs::remove_dir_all(right).expect("cleanup right");
+    }
+
+    #[test]
+    fn compare_directories_collapses_descendants_under_one_sided_directory() {
+        let left = unique_temp_dir("collapse-left");
+        let right = unique_temp_dir("collapse-right");
+
+        fs::create_dir_all(left.join("docs/nested")).expect("create left docs tree");
+        fs::write(left.join("docs/report.md"), "left").expect("write left file");
+        fs::write(left.join("docs/nested/a.txt"), "nested").expect("write nested file");
+
+        let runtime = tokio::runtime::Runtime::new().expect("create runtime");
+        let items = runtime
+            .block_on(compare_directories(
+                left.to_string_lossy().to_string(),
+                right.to_string_lossy().to_string(),
+                false,
+            ))
+            .expect("compare directories");
+
+        let rel_paths = items.iter().map(|item| item.rel_path.clone()).collect::<Vec<_>>();
+        assert_eq!(rel_paths, vec!["docs"]);
 
         fs::remove_dir_all(left).expect("cleanup left");
         fs::remove_dir_all(right).expect("cleanup right");

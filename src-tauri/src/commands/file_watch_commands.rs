@@ -62,7 +62,7 @@ pub fn sync_watched_directories(
 
     for path in &paths_to_add {
         watcher
-            .watch(path, RecursiveMode::NonRecursive)
+            .watch(path, RecursiveMode::Recursive)
             .map_err(|error| format!("Failed to watch {}: {error}", path.display()))?;
     }
 
