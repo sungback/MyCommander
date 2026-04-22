@@ -3,6 +3,10 @@ import { FileEntry } from "../types/file";
 import { SyncItem } from "../types/sync";
 import { BatchRenameOperation } from "../features/multiRename";
 import { JobRecord, JobSubmission } from "../types/job";
+import {
+  DEFAULT_SEARCH_MAX_RESULTS,
+  SearchOptions,
+} from "../types/search";
 
 export interface DriveInfo {
   mount_point: string;
@@ -24,6 +28,8 @@ export type SearchEvent =
   | { type: "ResultBatch"; payload: SearchResult[] }
   | { type: "Progress"; payload: { current_dir: string } }
   | { type: "Finished"; payload: { total_matches: number } };
+
+type SearchHandler = (event: SearchEvent) => void;
 
 type TauriJobSubmission =
   | {
@@ -258,19 +264,51 @@ const fileSystem = {
 
 
   searchFiles: async (
-    startPath: string, 
-    query: string, 
-    useRegex: boolean,
-    onEvent: (event: SearchEvent) => void
+    startPath: string,
+    queryOrOptions: string | SearchOptions,
+    useRegexOrOnEvent: boolean | SearchHandler,
+    maybeOnEvent?: SearchHandler
   ): Promise<void> => {
     const { Channel } = await import("@tauri-apps/api/core");
     const channel = new Channel<SearchEvent>();
-    channel.onmessage = onEvent;
-    
+    const options =
+      typeof queryOrOptions === "string"
+        ? {
+            query: queryOrOptions,
+            useRegex: useRegexOrOnEvent as boolean,
+            caseSensitive: true,
+            includeHidden: true,
+            scope: "name" as const,
+            entryKind: "all" as const,
+            extensions: [],
+            minSizeBytes: null,
+            maxSizeBytes: null,
+            modifiedAfterMs: null,
+            modifiedBeforeMs: null,
+            maxResults: DEFAULT_SEARCH_MAX_RESULTS,
+          }
+        : queryOrOptions;
+    const onEvent =
+      typeof queryOrOptions === "string"
+        ? maybeOnEvent
+        : (useRegexOrOnEvent as SearchHandler);
+
+    channel.onmessage = onEvent ?? (() => {});
+
     await invoke("search_files", {
       start_path: startPath,
-      query,
-      use_regex: useRegex,
+      query: options.query,
+      use_regex: options.useRegex,
+      case_sensitive: options.caseSensitive,
+      include_hidden: options.includeHidden,
+      scope: options.scope,
+      entry_kind: options.entryKind,
+      extensions: options.extensions,
+      min_size_bytes: options.minSizeBytes,
+      max_size_bytes: options.maxSizeBytes,
+      modified_after_ms: options.modifiedAfterMs,
+      modified_before_ms: options.modifiedBeforeMs,
+      max_results: options.maxResults,
       on_event: channel,
     });
   },

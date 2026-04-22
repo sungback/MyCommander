@@ -10,6 +10,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystem, getErrorMessage } from './useFileSystem';
 import { mockFiles, mockDrives } from '../test/mocks/tauri';
+import type { SearchOptions } from '../types/search';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -466,6 +467,16 @@ describe('useFileSystem', () => {
         start_path: '/home/user',
         query: 'notes',
         use_regex: false,
+        case_sensitive: true,
+        include_hidden: true,
+        scope: 'name',
+        entry_kind: 'all',
+        extensions: [],
+        min_size_bytes: null,
+        max_size_bytes: null,
+        modified_after_ms: null,
+        modified_before_ms: null,
+        max_results: 5000,
         on_event: expect.objectContaining({ onmessage: onEvent }),
       });
     });
@@ -499,6 +510,54 @@ describe('useFileSystem', () => {
         start_path: '/home/user',
         query: '.*\\.txt',
         use_regex: true,
+        case_sensitive: true,
+        include_hidden: true,
+        scope: 'name',
+        entry_kind: 'all',
+        extensions: [],
+        min_size_bytes: null,
+        max_size_bytes: null,
+        modified_after_ms: null,
+        modified_before_ms: null,
+        max_results: 5000,
+        on_event: expect.objectContaining({ onmessage: onEvent }),
+      });
+    });
+
+    it('passes advanced search options through to the backend payload', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      const onEvent = vi.fn();
+      const options: SearchOptions = {
+        query: 'report',
+        useRegex: false,
+        caseSensitive: false,
+        includeHidden: false,
+        scope: 'path',
+        entryKind: 'files',
+        extensions: ['md', 'txt'],
+        minSizeBytes: 100,
+        maxSizeBytes: 4096,
+        modifiedAfterMs: 1000,
+        modifiedBeforeMs: 2000,
+        maxResults: 250,
+      };
+
+      await useFileSystem().searchFiles('/home/user', options, onEvent);
+
+      expect(mockInvoke).toHaveBeenCalledWith('search_files', {
+        start_path: '/home/user',
+        query: 'report',
+        use_regex: false,
+        case_sensitive: false,
+        include_hidden: false,
+        scope: 'path',
+        entry_kind: 'files',
+        extensions: ['md', 'txt'],
+        min_size_bytes: 100,
+        max_size_bytes: 4096,
+        modified_after_ms: 1000,
+        modified_before_ms: 2000,
+        max_results: 250,
         on_event: expect.objectContaining({ onmessage: onEvent }),
       });
     });
