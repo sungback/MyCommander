@@ -15,6 +15,29 @@
 - 프로젝트 전반에 대한 가정을 하기 전에 [`CLAUDE.md`](./CLAUDE.md)를 먼저 읽습니다.
 - 코드베이스 질문에 답하거나 아키텍처를 추정하기 전에, 관련 저장소 파일을 직접 확인합니다.
 
+## 에이전트 행동 원칙
+
+### 핵심 4대 원칙
+
+- **추측 금지 (Don't Assume):** 모호한 요구 사항이 있으면 독자적으로 판단해 구현하지 않습니다. 사용자 질문이나 저장소 증거로 경계를 먼저 확인합니다.
+- **단순함 우선 (Simplicity First):** 문제를 해결하는 최소한의 코드만 작성합니다. 추측성 확장이나 불필요한 추상화는 넣지 않습니다.
+- **정밀한 수정 (Surgical Changes):** 요청받은 범위만 정확히 수정합니다. 인접한 스타일, 포맷, 관련 없는 로직을 함께 바꾸지 않습니다.
+- **목표 중심 실행 (Goal-Driven Execution):** 코드 작성 전에 성공 기준(테스트·예상 동작)을 먼저 정의하고, 기준을 통과할 때까지 수정과 검증을 반복합니다.
+
+### 운영 지침
+
+- 코드를 작성하기 전에 기존 파일을 먼저 읽습니다.
+- 결과물은 핵심만 전달하되 논리적 근거는 충분히 확인합니다.
+- 전체 재작성보다 부분 수정을 선호합니다.
+- 변경 사항이 없는 한 이미 읽은 파일을 다시 읽지 않습니다.
+- 명시적 요청이 없다면 100KB 이상의 대용량 파일은 건너뜁니다.
+- 세션이 길어지면 `/cost` 실행을 제안합니다.
+- 관련 없는 작업으로 전환할 때는 새 세션을 권장합니다.
+- 완료 선언 전 반드시 범위에 맞는 테스트를 실행합니다.
+- 아첨하는 도입부나 의미 없는 맺음말을 쓰지 않습니다.
+- 해결책은 단순하고 직관적으로 유지합니다.
+- 사용자의 지침은 항상 이 문서보다 우선합니다.
+
 ## 작업 방식
 
 - 변경은 현재 기능 또는 버그 범위 안에서 작고 국소적으로 유지합니다.
@@ -23,7 +46,7 @@
 - 프런트엔드 스타일링에는 Tailwind 유틸리티 클래스를 사용합니다.
 - 공유 프런트엔드 상태에는 Zustand를 사용합니다.
 - 새 Tauri command 추가 시 아래 4단계를 순서대로 완료합니다:
-  1. `src-tauri/src/commands/*.rs` 에 함수 작성
+  1. `src-tauri/src/commands/**` 아래 적절한 모듈에 함수 작성
   2. `src-tauri/src/lib.rs` `invoke_handler!` 에 등록
   3. `src-tauri/permissions/` 에 해당 command 권한 추가
   4. `src-tauri/capabilities/` 에서 해당 permission 포함 여부 확인
@@ -39,6 +62,9 @@
 - Rust/Tauri 관련 변경:
   - `cargo check --manifest-path src-tauri/Cargo.toml`
   - `npm run test:rust`
+- 프런트엔드와 Rust 테스트를 한 번에:
+  - `npm run test:all`
+  - `npm run test:coverage` (커버리지 포함)
 - 필요한 경우 전체 프런트엔드 프로덕션 빌드:
   - `npm run build`
 - 필요한 경우 전체 앱 수동 실행:
@@ -64,5 +90,6 @@
 - **ESM/Vite 호환성:** 프런트엔드 소스에서 인라인 `require()` 를 사용하지 않습니다. `@types/node` 관련 타입 오류를 피하기 위해 표준 ESM `import` 또는 동적 `import()` 를 사용합니다.
 - **서드파티 API 변경 대응:** `react-resizable-panels` 같은 UI 라이브러리를 다룰 때는 실제 export된 정확한 타입을 반드시 확인합니다. 예: `ImperativePanelHandle` 대신 `PanelImperativeHandle`, 레이아웃 반환이 배열이 아니라 맵일 수 있음.
 - **Zustand mock 유지보수:** 테스트에서 `"Cannot read properties of undefined"` 오류가 나면 `vi.mock` 안의 mock 데이터 구조가 실제 스토어 정의와 어긋났을 가능성이 큽니다. 새 경계값, 배열, 유틸 export 등이 빠지지 않았는지 실제 구현과 맞춰 확인합니다.
-- **macOS CloudStorage symlink 경로:** `~/Dropbox` 같은 경로는 실제 디렉터리가 아니라 `~/Library/CloudStorage/...`를 가리키는 symlink일 수 있습니다. UI/히스토리에는 표시 경로(`currentPath`)를 유지하고, 파일 시스템 접근/비교/감시는 해석된 경로(`resolvedPath`) 기준으로 확인합니다.
+- **contextMenuStore mock:** 테스트에서 컨텍스트 메뉴 관련 오류가 나면 `vi.mock("../store/contextMenuStore")`가 실제 export 구조(`isOpen`, `position`, `items` 등)와 일치하는지 확인합니다.
+- **macOS CloudStorage symlink 경로:** 상세 정책은 [`CLAUDE.md` 설계 정책](./CLAUDE.md#설계-정책) 참조.
 - **CloudStorage 열기 버그 검증:** Dropbox류 폴더 열기 문제를 수정할 때는 최소한 더블클릭 진입, 새로고침, 반대 패널 동기화, 감시 경로 수집, 컨텍스트 메뉴 액션이 표시 경로와 실제 경로를 섞어 쓰지 않는지 함께 확인합니다.

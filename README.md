@@ -12,6 +12,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - **즐겨찾기 패널** 추가 / 이름 변경 / 재정렬 / 접기
 - 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
 - 패널 간 **드래그 드롭 복사**
+- 같은 패널 안에서 폴더만 선택한 경우 **드래그 이동**
 - 같은 폴더를 보는 양쪽 패널의 **자동 동기 갱신**
 - macOS에서 **Dropbox / iCloud Drive / CloudStorage symlink 경로 탐색 지원**
 - **빠른 미리보기**와 텍스트/문서 계열 렌더링
@@ -21,6 +22,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - **폴더 비교** 기반 동기화 보조 다이얼로그
 - 현재 폴더 기준 **터미널 명령 실행**
 - 앱 메뉴 / 컨텍스트 메뉴 / 단축키 연동
+- **자동 테마 전환**: 07:00–19:00 light, 그 외 dark 자동 적용. 수동으로 light / dark / auto 선택 가능
 
 ## 미리보기 지원 예시
 
@@ -124,7 +126,8 @@ npm run dev
 
 ## 드래그 드롭 동작
 
-- 같은 패널 안에서 폴더 위로 드롭하면 바로 복사합니다.
+- 같은 패널 안에서 **파일 드래그**는 복사합니다.
+- 같은 패널 안에서 **폴더만 선택한 드래그**는 이동으로 처리합니다.
 - 왼쪽 패널에서 오른쪽 패널, 또는 반대로 드롭하면 대상 패널 현재 폴더로 복사합니다.
 - 이름 충돌이 없으면 즉시 복사합니다.
 - 이름 충돌이 있으면 복사 확인 다이얼로그를 열어 후속 동작을 선택합니다.
@@ -139,23 +142,29 @@ macOS의 `~/Dropbox` 같은 symlink 경로도 탐색할 수 있습니다.
 ```text
 src/
   components/
-    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경
+    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경 UI + dialog helper
     favorites/     # 즐겨찾기 사이드바
     layout/        # 상태바, 컨텍스트 메뉴, 하단 액션
-    panel/         # 듀얼 패널, 파일 목록, 주소창, 탭, 드라이브 목록
+    panel/         # 듀얼 패널, 파일 목록, 주소창, 탭, 드라이브 목록 + drag helper
   features/        # 기능 단위 로직
   hooks/           # 키보드 및 Tauri command wrapper
-  store/           # Zustand 스토어
+  store/           # Zustand 스토어 + persistence/refresh helper
   test/            # 테스트 설정 / mock
   types/           # 타입 정의
   utils/           # 포맷/경로/클립보드 유틸
 
 src-tauri/
-  src/commands/    # Rust Tauri commands
+  src/commands/
+    fs/            # 파일 시스템 관련 command 하위 모듈
+    jobs/          # Job Engine 상태/실행/영속화 하위 모듈
+    system/        # 드라이브, 경로, 메뉴, 실행 관련 하위 모듈
+    *.rs           # file watch, search, sync, drag 같은 독립 command
   capabilities/    # Tauri capability 정의
   permissions/     # 명령 권한 설정
   tauri.conf.json  # Tauri 앱 설정
 ```
+
+구현 컨텍스트와 내부 구조 설명은 [CLAUDE.md](./CLAUDE.md), 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
 
 ## 버전 업데이트
 
@@ -166,9 +175,9 @@ src-tauri/
 ```bash
 git add -A
 git commit -m "release: prepare next version"
-npm version 1.1.20
+npm version <new-version>   # 예: 1.1.22
 git push origin main
-git push origin v1.1.10
+git push origin v<new-version>
 ```
 
 `npm version` 실행 시:

@@ -1,23 +1,7 @@
 # MyCommander — CLAUDE.md
 
 이 파일은 MyCommander 프로젝트의 현재 구현 상태를 빠르게 파악하기 위한 컨텍스트 문서입니다.
-작업 절차, 검증 규칙, 커밋/빌드 위생은 [`AGENTS.md`](./AGENTS.md)를 우선 따릅니다.
-
----
-
-## 에이전트 행동 원칙
-
-- **행동 전 먼저 생각할 것.** 코드를 작성하기 전에 기존 파일을 먼저 읽는다.
-- **출력은 간결하게, 추론은 철저하게.** 결과물은 핵심만 전달하되 논리적 근거는 상세히 갖춘다.
-- **전체 재작성보다 부분 수정을 선호할 것.** 필요한 부분만 Edit 도구로 수정한다.
-- **변경 사항이 없는 한 이미 읽은 파일을 다시 읽지 말 것.**
-- **100KB 이상의 파일은 건너뛸 것.** 명시적인 요청이 없다면 대용량 파일은 제외한다.
-- **세션이 길어지면 `/cost` 실행을 제안할 것.** 캐시 효율(Cache Ratio)을 모니터링할 수 있도록 안내한다.
-- **관련 없는 작업으로 전환 시 새 세션을 권장할 것.** 컨텍스트 혼선을 막기 위해 새 대화를 시작하도록 유도한다.
-- **완료 선언 전 반드시 코드를 테스트할 것.**
-- **아첨하는 도입부나 의미 없는 맺음말 금지.**
-- **해결책은 단순하고 직관적으로 유지할 것.**
-- **사용자의 지침은 항상 이 설정보다 우선함.**
+작업 절차, 검증 규칙, 커밋/빌드 위생, 에이전트 작업 원칙은 [`AGENTS.md`](./AGENTS.md)를 우선 따릅니다.
 
 ---
 
@@ -61,29 +45,49 @@
 
 ### 앱 구성
 
-`src/App.tsx`는 앱 뼈대를 조립합니다: `FavoritesPanel`, `DualPanel`, `StatusBar`, `DialogContainer`, `MultiRenameDialog`, `SearchPreviewDialogs`, `SyncDialog`, `ContextMenu`.
+`src/App.tsx`는 앱 뼈대를 조립합니다: `FavoritesPanel`, `DualPanel`, `StatusBar`, `DialogContainer`, `ProgressDialog`, `JobCenterDialog`, `MultiRenameDialog`, `SearchPreviewDialogs`, `SyncDialog`, `ContextMenu`.
+
+자동 테마(auto): 07:00–19:00는 light, 그 외는 dark로 자동 전환되며 창 포커스 시 재평가합니다.
 
 ### 상태 관리
 
 - `panelStore` — 좌/우 패널 상태, 탭·경로·히스토리·선택·커서·정렬·보기 모드, 숨김 파일 표시, 테마 선호도, 드래그 상태
   - `currentPath`: UI/히스토리에 보이는 경로
   - `resolvedPath`: 실제 파일 시스템 접근 경로
+- `clipboardStore` — copy/cut 클립보드 상태
+- `dragStore` — 패널 간/패널 내부 드래그 상태
 - `dialogStore` — 현재 열린 다이얼로그, 대상 파일/폴더, 드래그 복사 요청 상태, 일괄 이름 변경 세션
 - `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침
+- `persistence` — 패널 상태 localStorage 직렬화/복원
+- `panelHelpers` — `panelStore`가 사용하는 탭/정렬/영속화 보조 로직
 - `uiStore` — 상태 메시지, 즐겨찾기 패널 열림/닫힘
 - `favoriteStore` — 즐겨찾기 목록, 순서, 이름 변경
 - `jobStore` / `useJobQueue` — Unified Job Engine: copy/move/delete/zip 작업을 큐로 관리. submit/list/cancel/retry/clear-finished 지원, 앱 재시작 시 큐 복원
-- `settingsStore` — 앱 설정 영속화 (localStorage)
+- `settingsStore` — 앱 설정 영속화 (localStorage): 폰트 패밀리, 폰트 크기, 행 높이 등 UI 표시 설정
+- `contextMenuStore` — 컨텍스트 메뉴 열림 상태 및 대상 항목
+- `panelWatch` — 파일시스템 감시 경로 등록/해제 보조 로직
 
 `localStorage` 저장 항목: 패널 상태, 즐겨찾기, 테마 선호도.
 
 ### 핵심 컴포넌트
 
 - `FileList.tsx` — 가상 스크롤, 키보드/드래그 상호작용의 핵심
+  - `useFileListDrag.ts` — drag DOM 이벤트 오케스트레이션
+  - `fileListDragSharedState.ts` — 패널 간 drag 공유 상태
+  - `fileListDragRules.ts` — drop 허용/차단 규칙과 경로 판정
+- `FilePanel.tsx` — 단일 패널(주소창 + 탭 바 + 파일 리스트 + 드라이브 목록) 조합
 - `AddressBar.tsx` — breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화
 - `StatusBar.tsx` — 패널 요약, 여유 공간, 명령 실행 입력창, 하단 액션 버튼
+- `DialogContainer.tsx` — 다이얼로그 조립과 제출 진입점
+  - `dialogTargetPath.ts` — 선택 항목/대상 경로 계산
+  - `useDialogInfo.ts` — info 다이얼로그 크기 로딩
+  - `useCopyMoveFlow.ts` — copy/move/overwrite/paste 흐름
 - `ProgressDialog.tsx` — 진행 중인 작업 목록 빠른 보기, 완료 작업만 남으면 자동 닫힘
-- `JobCenter.tsx` — 전체 작업 이력 다이얼로그, 필터/정렬/상세 패널 포함
+- `JobCenterDialog.tsx` — 전체 작업 이력 다이얼로그, 필터/정렬/상세 패널 포함
+- `SettingsDialog.tsx` — 폰트, 폰트 크기, 행 높이 설정 다이얼로그
+- `QuickPreviewDialog.tsx` — F3 단축키 기반 파일 빠른 미리보기
+  - `quickPreviewLoader.ts` — 확장자 판별과 preview dispatcher
+  - `quickPreviewRenderers/` — markdown / notebook / pptx / hwpx / xlsx / text highlight renderer
 
 파일 생성/삭제/이름 변경/복사/이동 후에는 같은 디렉터리를 보고 있는 다른 패널도 함께 갱신됩니다.
 
@@ -96,21 +100,22 @@
 ```text
 src/
   components/
-    dialogs/     # 복사/이동/검색/미리보기/동기화/일괄이름변경/진행상황(ProgressDialog)/작업센터(JobCenter) UI
+    dialogs/     # 복사/이동/검색/미리보기/동기화/일괄이름변경 UI + preview/dialog helper modules
     favorites/   # 즐겨찾기 사이드 패널
     layout/      # 상태바, 컨텍스트 메뉴, 하단 액션
-    panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록
+    panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록 + drag helper modules
   features/      # 기능 단위 로직 (예: multiRename)
   hooks/         # Tauri 명령 래퍼 및 키보드 훅
-  store/         # Zustand 스토어 + 패널 갱신 보조 로직
+  constants/     # 앱 전역 상수 (폰트 옵션 등)
+  store/         # Zustand 스토어 + 패널 영속화/새로고침 보조 로직
   types/         # 파일/테마/동기화 타입 정의
   utils/         # 포맷팅, 경로, 클립보드 유틸
 
 src-tauri/src/commands/
-  system_commands.rs  # 드라이브·홈·여유공간, 파일/에디터/터미널 열기, 셸 실행, 메뉴
-  fs_commands.rs          # 디렉터리 목록, 파일/폴더 CRUD, ZIP, 충돌 점검, keep_both 이름 생성
+  system/             # drives / paths / menu / launch 하위 모듈
+  fs/                 # metadata / operations / archive / shared 하위 모듈
+  jobs/               # state / persistence / execution / commands 하위 모듈
   file_watch_commands.rs  # notify 기반 파일시스템 감시, 변경 시 패널 자동 갱신 이벤트 발송
-  job_commands.rs         # Copy/Move/Delete/Zip 작업을 큐에 넣고 비동기 실행하는 백그라운드 잡 엔진
   search_commands.rs      # 파일 검색
   sync_commands.rs        # 디렉터리 비교
   drag_commands.rs        # 네이티브 드래그 시작
