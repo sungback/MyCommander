@@ -10,7 +10,12 @@ import { useDialogStore } from "../../store/dialogStore";
 import { useUiStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
-import { arePathsEquivalent, getPathDirectoryName, isSameOrNestedPath } from "../../utils/path";
+import {
+  arePathsEquivalent,
+  coalescePanelPath,
+  getPathDirectoryName,
+  isSameOrNestedPath,
+} from "../../utils/path";
 
 interface FileListProps {
   currentPath: string;
@@ -41,9 +46,15 @@ const isSelectableEntry = (entry: FileEntry) => entry.name !== "..";
 // Both FileList instances (left + right) share this object.
 const sharedDragState = {
   hoveredPanel: null as "left" | "right" | null,
+  hoveredPanelPath: null as string | null,
   dropTargetPath: null as string | null,
   isDropAllowed: false,
   blockedReason: null as string | null,
+};
+
+const sharedPanelPaths = {
+  left: { accessPath: "", currentPath: "" },
+  right: { accessPath: "", currentPath: "" },
 };
 
 let clearStatusMessageTimeoutId: number | undefined;
@@ -232,7 +243,6 @@ export const FileList: React.FC<FileListProps> = ({
       sourcePaths: paths,
       targetPath,
     });
-    showTransientStatusMessage("선택한 파일을 복사 대기열에 추가했습니다.");
     return true;
   };
 
@@ -334,11 +344,20 @@ export const FileList: React.FC<FileListProps> = ({
   const clearDropTargetForPanel = (targetPanel: "left" | "right") => {
     if (sharedDragState.hoveredPanel === targetPanel) {
       sharedDragState.hoveredPanel = null;
+      sharedDragState.hoveredPanelPath = null;
       sharedDragState.dropTargetPath = null;
       sharedDragState.isDropAllowed = false;
       sharedDragState.blockedReason = null;
     }
   };
+
+  useEffect(() => {
+    sharedPanelPaths[panelId] = { accessPath, currentPath };
+
+    return () => {
+      sharedPanelPaths[panelId] = { accessPath: "", currentPath: "" };
+    };
+  }, [accessPath, currentPath, panelId]);
 
   useEffect(() => {
     if (isActivePanel && cursorIndex >= 0 && cursorIndex < visibleRows.length) {
@@ -447,6 +466,7 @@ export const FileList: React.FC<FileListProps> = ({
 
         if (isOverContainer && activeDragInfo?.sourcePanel !== panelId) {
           sharedDragState.hoveredPanel = panelId;
+          sharedDragState.hoveredPanelPath = accessPath || currentPath;
         }
 
         const rowElement = document
@@ -498,7 +518,10 @@ export const FileList: React.FC<FileListProps> = ({
             isDropAllowed,
           });
         } else {
-          if (activeDragInfo?.sourcePanel === panelId) {
+          if (
+            activeDragInfo?.sourcePanel === panelId &&
+            (sharedDragState.hoveredPanel === null || sharedDragState.hoveredPanel === panelId)
+          ) {
             sharedDragState.dropTargetPath = null;
             sharedDragState.isDropAllowed = false;
             sharedDragState.blockedReason = null;
@@ -561,6 +584,7 @@ export const FileList: React.FC<FileListProps> = ({
           .then(() => {
             setDragInfo(null);
             sharedDragState.hoveredPanel = null;
+            sharedDragState.hoveredPanelPath = null;
             sharedDragState.dropTargetPath = null;
             sharedDragState.isDropAllowed = false;
             sharedDragState.blockedReason = null;
@@ -576,7 +600,7 @@ export const FileList: React.FC<FileListProps> = ({
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (event: MouseEvent) => {
       const state = dragStateRef.current;
       if (!state) return;
 
@@ -591,7 +615,18 @@ export const FileList: React.FC<FileListProps> = ({
 
       if (state.dragging) {
         const activeDragInfo = usePanelStore.getState().dragInfo;
-        const targetPanel = sharedDragState.hoveredPanel;
+        const panelElement = document
+          .elementFromPoint(event.clientX, event.clientY)
+          ?.closest("[data-panel-id]") as HTMLElement | null;
+        const hoveredPanelFromPointer =
+          panelElement?.dataset.panelId === "left" || panelElement?.dataset.panelId === "right"
+            ? (panelElement.dataset.panelId as "left" | "right")
+            : null;
+        const targetPanel =
+          sharedDragState.hoveredPanel ??
+          (hoveredPanelFromPointer && hoveredPanelFromPointer !== panelId
+            ? hoveredPanelFromPointer
+            : null);
         const samePanelDropTarget =
           targetPanel === null && activeDragInfo?.sourcePanel === panelId
             ? sharedDragState.dropTargetPath
@@ -609,6 +644,7 @@ export const FileList: React.FC<FileListProps> = ({
 
           setDragInfo(null);
           sharedDragState.hoveredPanel = null;
+          sharedDragState.hoveredPanelPath = null;
           sharedDragState.dropTargetPath = null;
           sharedDragState.isDropAllowed = false;
           sharedDragState.blockedReason = null;
@@ -646,10 +682,29 @@ export const FileList: React.FC<FileListProps> = ({
           const stateSnapshot = usePanelStore.getState();
           const destinationPanel =
             targetPanel === "left" ? stateSnapshot.leftPanel : stateSnapshot.rightPanel;
+          const fallbackPanelPath = coalescePanelPath(
+            sharedPanelPaths[targetPanel].accessPath,
+            sharedPanelPaths[targetPanel].currentPath
+          );
           const targetPath =
             sharedDragState.dropTargetPath ??
-            destinationPanel.resolvedPath ??
-            destinationPanel.currentPath;
+            sharedDragState.hoveredPanelPath ??
+            (fallbackPanelPath ||
+              coalescePanelPath(destinationPanel.resolvedPath, destinationPanel.currentPath));
+          const blockedReason = sharedDragState.dropTargetPath
+            ? sharedDragState.isDropAllowed
+              ? null
+              : sharedDragState.blockedReason ?? "여기로는 복사할 수 없습니다."
+            : activeDragInfo?.directoryPaths.some((sourceDir) =>
+                isSameOrNestedPath(sourceDir, targetPath)
+              )
+              ? "폴더를 자기 자신 안이나 하위 폴더로 복사할 수 없습니다."
+              : null;
+
+          if (blockedReason) {
+            showTransientStatusMessage(blockedReason);
+            return;
+          }
 
           void handleDraggedCopy(state.paths, targetPath, targetPanel).catch((error) => {
             console.error("Failed to copy dragged files:", error);
@@ -660,6 +715,7 @@ export const FileList: React.FC<FileListProps> = ({
 
       setDragInfo(null);
       sharedDragState.hoveredPanel = null;
+      sharedDragState.hoveredPanelPath = null;
       sharedDragState.dropTargetPath = null;
       sharedDragState.isDropAllowed = false;
       sharedDragState.blockedReason = null;
@@ -835,6 +891,12 @@ export const FileList: React.FC<FileListProps> = ({
 
     // Prevent text selection immediately on mousedown
     e.preventDefault();
+
+    sharedDragState.hoveredPanel = null;
+    sharedDragState.hoveredPanelPath = null;
+    sharedDragState.dropTargetPath = null;
+    sharedDragState.isDropAllowed = false;
+    sharedDragState.blockedReason = null;
 
     const pathsToDrag = selectedItems.has(entry.path)
       ? Array.from(selectedItems)

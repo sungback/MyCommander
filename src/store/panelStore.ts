@@ -8,6 +8,7 @@ import {
   ViewMode,
 } from "../types/file";
 import { ThemePreference } from "../types/theme";
+import { coalescePanelPath } from "../utils/path";
 
 type PanelId = "left" | "right";
 type PanelViewModes = Record<PanelId, ViewMode>;
@@ -305,7 +306,7 @@ const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
     activeTabId: activeTab.id,
     tabs,
     currentPath: activeTab.currentPath,
-    resolvedPath: activeTab.resolvedPath ?? activeTab.currentPath,
+    resolvedPath: coalescePanelPath(activeTab.resolvedPath, activeTab.currentPath),
     history: activeTab.history,
     historyIndex: activeTab.historyIndex,
     files: activeTab.files,
@@ -370,7 +371,7 @@ const restorePersistedPanelState = (
     tabs,
     activeTabId,
     currentPath: tabs[0].currentPath,
-    resolvedPath: tabs[0].resolvedPath ?? tabs[0].currentPath,
+    resolvedPath: coalescePanelPath(tabs[0].resolvedPath, tabs[0].currentPath),
     history: tabs[0].history,
     historyIndex: tabs[0].historyIndex,
     files: tabs[0].files,
@@ -738,13 +739,13 @@ export const usePanelStore = create<AppState>((set) => {
     set((state) => {
       const panelKey = getPanelKey(panel);
       const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        if ((tab.resolvedPath ?? tab.currentPath) === path) {
+        if (coalescePanelPath(tab.resolvedPath, tab.currentPath) === path) {
           return tab;
         }
 
         return {
           ...tab,
-          resolvedPath: path,
+          resolvedPath: coalescePanelPath(path, tab.currentPath),
         };
       });
 

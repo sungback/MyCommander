@@ -87,6 +87,15 @@ export function arePathsEquivalent(left: string, right: string): boolean {
   return normalizePathForComparison(left) === normalizePathForComparison(right);
 }
 
+export function coalescePanelPath(
+  resolvedPath: string | null | undefined,
+  currentPath: string
+): string {
+  return typeof resolvedPath === "string" && resolvedPath.length > 0
+    ? resolvedPath
+    : currentPath;
+}
+
 export function isSameOrNestedPath(basePath: string, targetPath: string): boolean {
   const normalizedBase = normalizePathForComparison(basePath);
   const normalizedTarget = normalizePathForComparison(targetPath);

@@ -6,9 +6,12 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { SyncItem, SyncStatus } from "../../types/sync";
 import { Loader2 } from "lucide-react";
+import { coalescePanelPath } from "../../utils/path";
+import { buildSyncExecutionOperations } from "../../features/syncExecution";
 
 type SyncStage = "paths" | "analyzing" | "results" | "executing";
-const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+const getPanelAccessPath = (panel: PanelState) =>
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const SyncDialog: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -86,27 +89,29 @@ export const SyncDialog: React.FC = () => {
       return;
     }
 
+    const operations = buildSyncExecutionOperations(syncItems, leftPath, rightPath);
+    if (operations.length === 0) {
+      setError("No actionable items to synchronize.");
+      return;
+    }
+
     setStage("executing");
     setExecuting(true);
     setError(null);
-    setExecutionProgress({ done: 0, total: itemsToSync.length });
+    setExecutionProgress({ done: 0, total: operations.length });
 
     try {
       let completed = 0;
 
-      for (const item of itemsToSync) {
+      for (const operation of operations) {
         try {
-          if (item.direction === "toRight" && item.leftPath) {
-            await fs.copyFiles([item.leftPath], rightPath);
-          } else if (item.direction === "toLeft" && item.rightPath) {
-            await fs.copyFiles([item.rightPath], leftPath);
-          }
+          await fs.copyFiles([operation.sourcePath], operation.targetPath);
         } catch (itemError) {
-          console.error(`Failed to sync ${item.relPath}:`, itemError);
+          console.error(`Failed to sync ${operation.relPath}:`, itemError);
           // Continue with next item even if one fails
         }
         completed++;
-        setExecutionProgress({ done: completed, total: itemsToSync.length });
+        setExecutionProgress({ done: completed, total: operations.length });
       }
 
       // Refresh both panels
@@ -171,6 +176,9 @@ export const SyncDialog: React.FC = () => {
           <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-4">
             Folder Synchronization
           </Dialog.Title>
+          <Dialog.Description className="sr-only">
+            Compare two folders and synchronize the selected differences.
+          </Dialog.Description>
 
           <div className="flex-1 overflow-y-auto mb-4">
             {/* Stage: Paths */}

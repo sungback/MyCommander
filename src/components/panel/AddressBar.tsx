@@ -10,7 +10,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { arePathsEquivalent, getBreadcrumbParts } from "../../utils/path";
+import {
+  arePathsEquivalent,
+  coalescePanelPath,
+  getBreadcrumbParts,
+} from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
@@ -42,7 +46,8 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   const { syncOtherPanelToCurrentPath, copyCurrentPath } = useAppCommands();
   const isMac = isMacPlatform();
   const otherPanelLabel = panelId === "left" ? "right" : "left";
-  const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+  const getPanelAccessPath = (panel: PanelState) =>
+    coalescePanelPath(panel.resolvedPath, panel.currentPath);
   const isAlreadySynced = arePathsEquivalent(
     getPanelAccessPath(currentPanel),
     getPanelAccessPath(otherPanel)

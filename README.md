@@ -166,7 +166,7 @@ src-tauri/
 ```bash
 git add -A
 git commit -m "release: prepare next version"
-npm version 1.1.10
+npm version 1.1.20
 git push origin main
 git push origin v1.1.10
 ```

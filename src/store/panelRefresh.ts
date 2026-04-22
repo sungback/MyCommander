@@ -1,6 +1,7 @@
 import { usePanelStore } from "./panelStore";
 import { PanelState, PanelTabState } from "../types/file";
 import {
+  coalescePanelPath,
   getPathDirectoryName,
   isSameOrNestedPath,
   normalizePathForComparison,
@@ -31,7 +32,7 @@ const syncPanelWithActiveTab = (panelState: PanelState, tabs: PanelTabState[]): 
     tabs,
     activeTabId: activeTab.id,
     currentPath: activeTab.currentPath,
-    resolvedPath: activeTab.resolvedPath ?? activeTab.currentPath,
+    resolvedPath: coalescePanelPath(activeTab.resolvedPath, activeTab.currentPath),
     history: activeTab.history,
     historyIndex: activeTab.historyIndex,
     files: activeTab.files,
@@ -80,7 +81,9 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
 
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const normalizedActivePath = getNormalizedPanelPath(panel.resolvedPath ?? panel.currentPath);
+    const normalizedActivePath = getNormalizedPanelPath(
+      coalescePanelPath(panel.resolvedPath, panel.currentPath)
+    );
 
     if (normalizedActivePath && normalizedDirectories.has(normalizedActivePath)) {
       state.refreshPanel(panelId);
@@ -91,7 +94,9 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
         return tab;
       }
 
-      const normalizedCurrentPath = getNormalizedPanelPath(tab.resolvedPath ?? tab.currentPath);
+      const normalizedCurrentPath = getNormalizedPanelPath(
+        coalescePanelPath(tab.resolvedPath, tab.currentPath)
+      );
 
       if (!normalizedCurrentPath || !normalizedDirectories.has(normalizedCurrentPath)) {
         return tab;
@@ -129,7 +134,7 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
 
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const activePanelPath = panel.resolvedPath ?? panel.currentPath;
+    const activePanelPath = coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
     if (normalizedPaths.some((path) => isSameOrNestedPath(activePanelPath, path))) {
       state.refreshPanel(panelId);
@@ -140,7 +145,7 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
         return tab;
       }
 
-      const tabPath = tab.resolvedPath ?? tab.currentPath;
+      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
       if (!normalizedPaths.some((path) => isSameOrNestedPath(tabPath, path))) {
         return tab;
       }
@@ -187,7 +192,9 @@ export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
     const nextPanel = updatePanelTabs(panel, (tab) => {
-      const normalizedCurrentPath = getNormalizedPanelPath(tab.resolvedPath ?? tab.currentPath);
+      const normalizedCurrentPath = getNormalizedPanelPath(
+        coalescePanelPath(tab.resolvedPath, tab.currentPath)
+      );
 
       if (!normalizedCurrentPath || !normalizedParentDirectories.has(normalizedCurrentPath)) {
         return tab;

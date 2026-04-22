@@ -2,7 +2,7 @@ import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
 import { useUiStore } from "../store/uiStore";
 import { writeClipboardText } from "../utils/clipboard";
-import { arePathsEquivalent } from "../utils/path";
+import { arePathsEquivalent, coalescePanelPath } from "../utils/path";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 import { ClipboardState } from "../store/panelStore";
 import { PanelState } from "../types/file";
@@ -33,7 +33,8 @@ const getPrimaryTargetPath = () => {
 
 let clearStatusMessageTimeoutId: number | undefined;
 
-const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+const getPanelAccessPath = (panel: PanelState) =>
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   const { setStatusMessage } = useUiStore.getState();
