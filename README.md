@@ -1,7 +1,7 @@
 # MyCommander
 
 MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
-현재 구현은 듀얼 패널 탐색을 중심으로, 검색, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX까지 포함합니다.
+현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX, 토스트 기반 피드백까지 포함합니다.
 
 ![MyCommander](public/screenshot.png)
 
@@ -16,12 +16,14 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 같은 폴더를 보는 양쪽 패널의 **자동 동기 갱신**
 - macOS에서 **Dropbox / iCloud Drive / CloudStorage symlink 경로 탐색 지원**
 - **빠른 미리보기**와 텍스트/문서 계열 렌더링
-- **파일 검색**과 검색 결과 복사/이동/삭제
+- 정규식 / 대소문자 / 숨김 파일 / 파일 유형 / 확장자 / 크기 / 수정일 범위를 지원하는 **고급 파일 검색**
+- 검색 결과 **복사 / 이동 / 삭제**
 - **일괄 이름 변경**
 - **ZIP 생성 / ZIP 압축 해제**
 - **폴더 비교** 기반 동기화 보조 다이얼로그
 - 현재 폴더 기준 **터미널 명령 실행**
 - 앱 메뉴 / 컨텍스트 메뉴 / 단축키 연동
+- 짧은 사용자 피드백을 위한 **토스트 알림**
 - **자동 테마 전환**: 07:00–19:00 light, 그 외 dark 자동 적용. 수동으로 light / dark / auto 선택 가능
 
 ## 미리보기 지원 예시
@@ -133,6 +135,27 @@ npm run dev
 - 이름 충돌이 있으면 복사 확인 다이얼로그를 열어 후속 동작을 선택합니다.
 - 파일 생성, 삭제, 이름 변경, 복사, 이동 후 양쪽 패널이 같은 폴더를 보고 있으면 함께 갱신됩니다.
 
+## 검색 기능
+
+- 기본 파일명 검색 외에 **고급 옵션 패널**을 열 수 있습니다.
+- 현재 코드 기준으로 다음 옵션을 지원합니다.
+  - 정규식 사용
+  - 대소문자 구분
+  - 숨김 파일 포함 여부
+  - 파일만 / 폴더만 / 모두
+  - 파일명 기준 / 전체 경로 기준 검색
+  - 확장자 필터
+  - 최소 / 최대 크기
+  - 수정일 범위
+  - 최대 결과 수
+- 검색 결과는 스트리밍 방식으로 누적 표시되며, 선택한 결과를 바로 복사 / 이동 / 삭제할 수 있습니다.
+
+## 피드백 표시
+
+- 짧은 작업 피드백(예: 경로 복사, 복사 완료, 경고, 오류)은 **토스트 알림**으로 표시됩니다.
+- 오래 걸리는 작업의 진행 상태는 **ProgressDialog**가 담당합니다.
+- 작업 이력, 실패 내역, 재시도는 **JobCenterDialog**에서 확인합니다.
+
 ## macOS CloudStorage 경로
 
 macOS의 `~/Dropbox` 같은 symlink 경로도 탐색할 수 있습니다.
@@ -142,13 +165,13 @@ macOS의 `~/Dropbox` 같은 symlink 경로도 탐색할 수 있습니다.
 ```text
 src/
   components/
-    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경 UI + dialog helper
+    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경 UI + dialog/search helper
     favorites/     # 즐겨찾기 사이드바
-    layout/        # 상태바, 컨텍스트 메뉴, 하단 액션
+    layout/        # 상태바, 컨텍스트 메뉴, 하단 액션, 토스트 뷰포트
     panel/         # 듀얼 패널, 파일 목록, 주소창, 탭, 드라이브 목록 + drag helper
   features/        # 기능 단위 로직
   hooks/           # 키보드 및 Tauri command wrapper
-  store/           # Zustand 스토어 + persistence/refresh helper
+  store/           # Zustand 스토어 + persistence/refresh/toast helper
   test/            # 테스트 설정 / mock
   types/           # 타입 정의
   utils/           # 포맷/경로/클립보드 유틸

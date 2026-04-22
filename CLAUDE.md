@@ -45,7 +45,7 @@
 
 ### 앱 구성
 
-`src/App.tsx`는 앱 뼈대를 조립합니다: `FavoritesPanel`, `DualPanel`, `StatusBar`, `DialogContainer`, `ProgressDialog`, `JobCenterDialog`, `MultiRenameDialog`, `SearchPreviewDialogs`, `SyncDialog`, `ContextMenu`.
+`src/App.tsx`는 앱 뼈대를 조립합니다: `FavoritesPanel`, `DualPanel`, `StatusBar`, `DialogContainer`, `ProgressDialog`, `JobCenterDialog`, `MultiRenameDialog`, `SearchPreviewDialogs`, `SyncDialog`, `ContextMenu`, `ToastViewport`.
 
 자동 테마(auto): 07:00–19:00는 light, 그 외는 dark로 자동 전환되며 창 포커스 시 재평가합니다.
 
@@ -60,7 +60,8 @@
 - `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침
 - `persistence` — 패널 상태 localStorage 직렬화/복원
 - `panelHelpers` — `panelStore`가 사용하는 탭/정렬/영속화 보조 로직
-- `uiStore` — 상태 메시지, 즐겨찾기 패널 열림/닫힘
+- `uiStore` — 즐겨찾기 패널 열림/닫힘
+- `toastStore` — 짧은 피드백 메시지용 토스트 큐
 - `favoriteStore` — 즐겨찾기 목록, 순서, 이름 변경
 - `jobStore` / `useJobQueue` — Unified Job Engine: copy/move/delete/zip 작업을 큐로 관리. submit/list/cancel/retry/clear-finished 지원, 앱 재시작 시 큐 복원
 - `settingsStore` — 앱 설정 영속화 (localStorage): 폰트 패밀리, 폰트 크기, 행 높이 등 UI 표시 설정
@@ -78,18 +79,23 @@
 - `FilePanel.tsx` — 단일 패널(주소창 + 탭 바 + 파일 리스트 + 드라이브 목록) 조합
 - `AddressBar.tsx` — breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화
 - `StatusBar.tsx` — 패널 요약, 여유 공간, 명령 실행 입력창, 하단 액션 버튼
+- `ToastViewport.tsx` — 짧은 성공/경고/오류 피드백을 표시하는 토스트 레이어
 - `DialogContainer.tsx` — 다이얼로그 조립과 제출 진입점
   - `dialogTargetPath.ts` — 선택 항목/대상 경로 계산
   - `useDialogInfo.ts` — info 다이얼로그 크기 로딩
   - `useCopyMoveFlow.ts` — copy/move/overwrite/paste 흐름
 - `ProgressDialog.tsx` — 진행 중인 작업 목록 빠른 보기, 완료 작업만 남으면 자동 닫힘
 - `JobCenterDialog.tsx` — 전체 작업 이력 다이얼로그, 필터/정렬/상세 패널 포함
+- `SearchPreviewDialogs.tsx` — 검색 다이얼로그와 검색 결과 후속 작업 UI
+  - `searchOptions.ts` — 고급 검색 옵션 기본값/직렬화 helper
 - `SettingsDialog.tsx` — 폰트, 폰트 크기, 행 높이 설정 다이얼로그
 - `QuickPreviewDialog.tsx` — F3 단축키 기반 파일 빠른 미리보기
   - `quickPreviewLoader.ts` — 확장자 판별과 preview dispatcher
   - `quickPreviewRenderers/` — markdown / notebook / pptx / hwpx / xlsx / text highlight renderer
 
 파일 생성/삭제/이름 변경/복사/이동 후에는 같은 디렉터리를 보고 있는 다른 패널도 함께 갱신됩니다.
+
+짧은 피드백 메시지는 더 이상 `StatusBar` 오른쪽에 인라인으로 표시하지 않고, `toastStore` + `ToastViewport`를 통해 토스트로 표시합니다. 오래 걸리는 작업은 `ProgressDialog`, 작업 이력은 `JobCenterDialog`가 담당합니다.
 
 더블클릭 진입은 디렉터리가 일반 디렉터리든 symlink든 먼저 실제 경로 접근 가능 여부를 확인한 뒤 표시 경로로 진입 상태를 갱신합니다.
 
