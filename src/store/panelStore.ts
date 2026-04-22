@@ -8,6 +8,7 @@ import {
   ViewMode,
 } from "../types/file";
 import { ThemePreference } from "../types/theme";
+import { coalescePanelPath } from "../utils/path";
 
 type PanelId = "left" | "right";
 type PanelViewModes = Record<PanelId, ViewMode>;
@@ -51,6 +52,7 @@ interface AppState {
   clearSelection: (panel: PanelId) => void;
   setCursor: (panel: PanelId, index: number) => void;
   refreshPanel: (panel: PanelId) => void;
+  bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: string) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   dragInfo: DragInfo | null;
@@ -281,6 +283,7 @@ const defaultTabState = (currentPath: string): PanelTabState => ({
   sortDirection: "asc",
   lastUpdated: Date.now(),
   pendingCursorName: null,
+  expandedChildrenVersion: 0,
 });
 
 const cloneTabState = (tab: PanelTabState): PanelTabState => ({
@@ -290,6 +293,7 @@ const cloneTabState = (tab: PanelTabState): PanelTabState => ({
   selectedItems: new Set(),
   cursorIndex: 0,
   lastUpdated: Date.now(),
+  expandedChildrenVersion: 0,
 });
 
 const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
@@ -305,7 +309,7 @@ const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
     activeTabId: activeTab.id,
     tabs,
     currentPath: activeTab.currentPath,
-    resolvedPath: activeTab.resolvedPath ?? activeTab.currentPath,
+    resolvedPath: coalescePanelPath(activeTab.resolvedPath, activeTab.currentPath),
     history: activeTab.history,
     historyIndex: activeTab.historyIndex,
     files: activeTab.files,
@@ -359,6 +363,7 @@ const restorePersistedPanelState = (
     sortDirection: tab.sortDirection,
     lastUpdated: Date.now(),
     pendingCursorName: null,
+    expandedChildrenVersion: 0,
   }));
 
   const activeTabId = tabs.some((tab) => tab.id === persistedPanel.activeTabId)
@@ -370,7 +375,7 @@ const restorePersistedPanelState = (
     tabs,
     activeTabId,
     currentPath: tabs[0].currentPath,
-    resolvedPath: tabs[0].resolvedPath ?? tabs[0].currentPath,
+    resolvedPath: coalescePanelPath(tabs[0].resolvedPath, tabs[0].currentPath),
     history: tabs[0].history,
     historyIndex: tabs[0].historyIndex,
     files: tabs[0].files,
@@ -738,13 +743,13 @@ export const usePanelStore = create<AppState>((set) => {
     set((state) => {
       const panelKey = getPanelKey(panel);
       const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        if ((tab.resolvedPath ?? tab.currentPath) === path) {
+        if (coalescePanelPath(tab.resolvedPath, tab.currentPath) === path) {
           return tab;
         }
 
         return {
           ...tab,
-          resolvedPath: path,
+          resolvedPath: coalescePanelPath(path, tab.currentPath),
         };
       });
 
@@ -872,6 +877,19 @@ export const usePanelStore = create<AppState>((set) => {
       const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
         ...tab,
         lastUpdated: Date.now(),
+      }));
+
+      return {
+        [panelKey]: nextPanelState,
+      };
+    }),
+
+  bumpExpandedChildrenVersion: (panel) =>
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
+        ...tab,
+        expandedChildrenVersion: tab.expandedChildrenVersion + 1,
       }));
 
       return {

@@ -73,12 +73,17 @@ pub struct JobRecord {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum JobSubmission {
     Copy {
+        #[serde(alias = "sourcePaths")]
         source_paths: Vec<String>,
+        #[serde(alias = "targetPath")]
         target_path: String,
+        #[serde(alias = "keepBoth")]
         keep_both: Option<bool>,
     },
     Move {
+        #[serde(alias = "sourcePaths")]
         source_paths: Vec<String>,
+        #[serde(alias = "targetDir")]
         target_dir: String,
     },
     Delete {
@@ -90,7 +95,9 @@ pub enum JobSubmission {
     },
     ZipSelection {
         paths: Vec<String>,
+        #[serde(alias = "targetDir")]
         target_dir: String,
+        #[serde(alias = "archiveName")]
         archive_name: String,
     },
 }
@@ -966,5 +973,29 @@ mod tests {
             !production_source.contains("tokio::spawn("),
             "schedule_next_job should not call tokio::spawn directly from Tauri invoke handlers"
         );
+    }
+
+    #[test]
+    fn job_submission_deserializes_camel_case_copy_fields() {
+        let submission = serde_json::from_value::<JobSubmission>(serde_json::json!({
+            "kind": "copy",
+            "sourcePaths": ["/tmp/a.txt"],
+            "targetPath": "/tmp/dest",
+            "keepBoth": true,
+        }))
+        .expect("camelCase copy payload should deserialize");
+
+        match submission {
+            JobSubmission::Copy {
+                source_paths,
+                target_path,
+                keep_both,
+            } => {
+                assert_eq!(source_paths, vec!["/tmp/a.txt"]);
+                assert_eq!(target_path, "/tmp/dest");
+                assert_eq!(keep_both, Some(true));
+            }
+            other => panic!("unexpected submission: {other:?}"),
+        }
     }
 }

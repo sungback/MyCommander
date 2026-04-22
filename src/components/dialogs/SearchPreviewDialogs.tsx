@@ -5,6 +5,7 @@ import { useDialogStore } from "../../store/dialogStore";
 import { getErrorMessage, SearchResult, useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import {
+  coalescePanelPath,
   getPathDirectoryName,
   isAbsolutePath,
   joinPath,
@@ -18,7 +19,8 @@ import { PanelState } from "../../types/file";
 
 const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
 const DEFAULT_DIALOG_SIZE = { width: 700, height: 560 };
-const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+const getPanelAccessPath = (panel: PanelState) =>
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const SearchPreviewDialogs: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();

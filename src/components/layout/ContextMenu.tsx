@@ -9,11 +9,12 @@ import { useJobStore } from "../../store/jobStore";
 import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { writeClipboardText } from "../../utils/clipboard";
+import { coalescePanelPath } from "../../utils/path";
 
 let clearStatusMessageTimeoutId: number | undefined;
 
 const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string }) =>
-  panel.resolvedPath ?? panel.currentPath;
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   const { setStatusMessage } = useUiStore.getState();

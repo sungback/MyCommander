@@ -5,6 +5,7 @@ import { useDialogStore } from "../../store/dialogStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
+import { coalescePanelPath } from "../../utils/path";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
 import { Settings, ListTodo } from "lucide-react";
@@ -57,7 +58,8 @@ const getAvailableSpaceText = (availableSpace: number | null | undefined) => {
 const shouldSkipAvailableSpaceRequest = (panel: PanelState) =>
   panel.files.length === 0 && /^[A-Z]:\\$/.test(panel.currentPath);
 
-const getPanelAccessPath = (panel: PanelState) => panel.resolvedPath ?? panel.currentPath;
+const getPanelAccessPath = (panel: PanelState) =>
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 const PanelStatus: React.FC<PanelStatusProps> = ({
   panelId,

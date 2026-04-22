@@ -8,7 +8,7 @@ import { clsx } from "clsx";
 import { DriveList } from "./DriveList";
 import { TabBar } from "./TabBar";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
-import { getParentPath } from "../../utils/path";
+import { coalescePanelPath, getParentPath } from "../../utils/path";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
 
@@ -422,7 +422,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       ) : null}
       <FileList
         currentPath={panelState.currentPath}
-        accessPath={panelState.resolvedPath ?? panelState.currentPath}
+        accessPath={coalescePanelPath(panelState.resolvedPath, panelState.currentPath)}
         files={panelState.files}
         selectedItems={panelState.selectedItems}
         cursorIndex={panelState.cursorIndex}

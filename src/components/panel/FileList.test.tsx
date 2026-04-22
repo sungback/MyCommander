@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import { FileList } from './FileList';
 import type { FileEntry } from '../../types/file';
+import { useUiStore } from '../../store/uiStore';
 
 // ── Tauri IPC mock ──────────────────────────────────────────────────────────
 vi.mock('@tauri-apps/api/core', () => ({
@@ -42,14 +43,14 @@ const {
       currentPath: '/home/user',
       resolvedPath: '/home/user',
       lastUpdated: 0,
-      tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc' }],
+      tabs: [{ id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }],
       activeTabId: 'tab1',
     },
     rightPanel: {
       currentPath: '/target',
       resolvedPath: '/target',
       lastUpdated: 0,
-      tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc' }],
+      tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }],
       activeTabId: 'tab2',
     },
     dragInfo: null as
@@ -202,12 +203,17 @@ const performInternalDrag = async (
 describe('FileList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useUiStore.getState().setStatusMessage(null);
     mockPanelState.leftPanel.currentPath = '/home/user';
     mockPanelState.leftPanel.resolvedPath = '/home/user';
     mockPanelState.leftPanel.lastUpdated = 0;
+    mockPanelState.leftPanel.tabs = [{ id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }];
+    mockPanelState.leftPanel.activeTabId = 'tab1';
     mockPanelState.rightPanel.currentPath = '/target';
     mockPanelState.rightPanel.resolvedPath = '/target';
     mockPanelState.rightPanel.lastUpdated = 0;
+    mockPanelState.rightPanel.tabs = [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }];
+    mockPanelState.rightPanel.activeTabId = 'tab2';
     mockPanelState.dragInfo = null;
     mockSetDragInfo.mockImplementation((dragInfo) => {
       mockPanelState.dragInfo = dragInfo;
@@ -604,6 +610,42 @@ describe('FileList', () => {
         document.querySelector('[data-entry-path="/home/user/Documents/report.pdf"]')
       ).toBeInTheDocument();
     });
+
+    it('패널 refresh 신호만 바뀌어도 펼친 폴더 캐시를 다시 동기화한다', async () => {
+      const props = makeProps();
+      const { rerender } = render(<FileList {...props} />);
+
+      mockListDirectory.mockResolvedValueOnce(CHILD_FILES);
+      await act(async () => {
+        fireEvent.click(getDocExpandBtn());
+      });
+
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).toBeInTheDocument();
+
+      mockPanelState.leftPanel.tabs = [
+        { id: 'tab1', sortField: 'name', sortDirection: 'asc', lastUpdated: 999 },
+      ];
+      mockPanelState.leftPanel.activeTabId = 'tab1';
+      mockPanelState.leftPanel.lastUpdated = 999;
+      mockListDirectory.mockResolvedValueOnce([
+        { name: 'report.pdf', path: '/home/user/Documents/report.pdf', kind: 'file', size: 512 },
+      ]);
+
+      await act(async () => {
+        rerender(<FileList {...props} />);
+        await Promise.resolve();
+      });
+
+      expect(mockListDirectory).toHaveBeenCalledTimes(2);
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/Work"]')
+      ).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-entry-path="/home/user/Documents/report.pdf"]')
+      ).toBeInTheDocument();
+    });
   });
 
   describe('같은 패널 드래그 복사', () => {
@@ -642,6 +684,7 @@ describe('FileList', () => {
         sourcePaths: ['/home/user/notes.txt'],
         targetPath: '/home/user/Documents',
       });
+      expect(useUiStore.getState().statusMessage).toBeNull();
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
@@ -1008,6 +1051,7 @@ describe('FileList', () => {
           <FileList
             {...makeProps({
               currentPath: '/target',
+              accessPath: '/target',
               files: [
                 { name: '..', path: '/', kind: 'directory' },
                 { name: 'Inbox', path: '/target/Inbox', kind: 'directory', size: null },
@@ -1088,6 +1132,302 @@ describe('FileList', () => {
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
 
+    it('right 패널에서 left 패널의 폴더 위로 드롭하면 해당 폴더를 대상으로 복사한다', async () => {
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              currentPath: '/left',
+              accessPath: '/left',
+              files: [
+                { name: '..', path: '/', kind: 'directory' },
+                { name: 'Inbox', path: '/left/Inbox', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/right',
+              accessPath: '/right',
+              files: [
+                { name: '..', path: '/', kind: 'directory' },
+                { name: 'notes.txt', path: '/right/notes.txt', kind: 'file', size: 1024 },
+              ],
+              selectedItems: new Set<string>(['/right/notes.txt']),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const targetList = lists[0] as HTMLElement;
+      const sourceList = lists[1] as HTMLElement;
+
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/right/notes.txt"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/left/Inbox"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetRow);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 340,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 40, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 44, clientY: 44 })
+        );
+      });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 44, clientY: 44 }));
+      });
+
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ['/right/notes.txt'],
+        '/left/Inbox'
+      );
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: 'copy',
+        sourcePaths: ['/right/notes.txt'],
+        targetPath: '/left/Inbox',
+      });
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
+    it('cross-panel에서 폴더를 자기 하위 폴더 루트로 빈 영역 드롭하면 복사하지 않는다', async () => {
+      mockPanelState.leftPanel.currentPath = '/home/user/Project/Child';
+      mockPanelState.leftPanel.resolvedPath = '/home/user/Project/Child';
+      mockPanelState.rightPanel.currentPath = '/home/user';
+      mockPanelState.rightPanel.resolvedPath = '/home/user';
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              currentPath: '/home/user/Project/Child',
+              accessPath: '/home/user/Project/Child',
+              files: [
+                { name: '..', path: '/home/user/Project', kind: 'directory' },
+                { name: 'file.txt', path: '/home/user/Project/Child/file.txt', kind: 'file', size: 1 },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/home/user',
+              accessPath: '/home/user',
+              files: [
+                { name: '..', path: '/home', kind: 'directory' },
+                { name: 'Project', path: '/home/user/Project', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(['/home/user/Project']),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const targetList = lists[0] as HTMLElement;
+      const sourceList = lists[1] as HTMLElement;
+
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/Project"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 340,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 80, clientY: 180 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 84, clientY: 184 })
+        );
+      });
+
+      await act(async () => {
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 84, clientY: 184 }));
+      });
+
+      expect(mockCheckCopyConflicts).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
+    it('cross-panel에서 폴더를 자기 하위 폴더 위로 드롭하면 복사하지 않는다', async () => {
+      mockPanelState.leftPanel.currentPath = '/home/user/Project';
+      mockPanelState.leftPanel.resolvedPath = '/home/user/Project';
+      mockPanelState.rightPanel.currentPath = '/home/user';
+      mockPanelState.rightPanel.resolvedPath = '/home/user';
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              currentPath: '/home/user/Project',
+              accessPath: '/home/user/Project',
+              files: [
+                { name: '..', path: '/home/user', kind: 'directory' },
+                { name: 'Child', path: '/home/user/Project/Child', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/home/user',
+              accessPath: '/home/user',
+              files: [
+                { name: '..', path: '/home', kind: 'directory' },
+                { name: 'Project', path: '/home/user/Project', kind: 'directory', size: null },
+              ],
+              selectedItems: new Set<string>(['/home/user/Project']),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const targetList = lists[0] as HTMLElement;
+      const sourceList = lists[1] as HTMLElement;
+
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/Project"]'
+      ) as HTMLElement;
+      const targetRow = document.querySelector(
+        '[data-entry-path="/home/user/Project/Child"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetRow);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 340,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 40, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 44, clientY: 44 })
+        );
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 44, clientY: 44 }));
+      });
+
+      expect(mockCheckCopyConflicts).not.toHaveBeenCalled();
+      expect(mockSubmitJob).not.toHaveBeenCalled();
+      expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
+    });
+
     it('충돌이 있으면 드래그 복사 다이얼로그를 연다', async () => {
       mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
 
@@ -1102,6 +1442,7 @@ describe('FileList', () => {
           <FileList
             {...makeProps({
               currentPath: '/target',
+              accessPath: '/target',
               files: [
                 { name: '..', path: '/', kind: 'directory' },
                 { name: 'Inbox', path: '/target/Inbox', kind: 'directory', size: null },
@@ -1174,6 +1515,266 @@ describe('FileList', () => {
       expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
         sourcePanelId: 'left',
         targetPanelId: 'right',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/target',
+      });
+    });
+
+    it('충돌 드래그 시 대상 패널 resolvedPath가 빈 문자열이면 currentPath를 대상으로 사용한다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+      mockPanelState.rightPanel.currentPath = '/target';
+      mockPanelState.rightPanel.resolvedPath = '';
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              selectedItems: new Set<string>(['/home/user/notes.txt']),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/target',
+              accessPath: '/target',
+              files: [
+                { name: '..', path: '/', kind: 'directory' },
+              ],
+              selectedItems: new Set<string>(),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const sourceList = lists[0] as HTMLElement;
+      const targetList = lists[1] as HTMLElement;
+
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 360, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 364, clientY: 44 })
+        );
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 364, clientY: 44 }));
+      });
+
+      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
+        sourcePanelId: 'left',
+        targetPanelId: 'right',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/target',
+      });
+    });
+
+    it('충돌 드래그 시 store 경로가 비어 있어도 대상 패널 props 경로를 대상으로 사용한다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+      mockPanelState.rightPanel.currentPath = '';
+      mockPanelState.rightPanel.resolvedPath = '';
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              selectedItems: new Set<string>(['/home/user/notes.txt']),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              currentPath: '/target',
+              accessPath: '/target',
+              files: [{ name: '..', path: '/', kind: 'directory' }],
+              selectedItems: new Set<string>(),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const sourceList = lists[0] as HTMLElement;
+      const targetList = lists[1] as HTMLElement;
+
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 360, clientY: 40 })
+        );
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 364, clientY: 44 })
+        );
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 364, clientY: 44 }));
+      });
+
+      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
+        sourcePanelId: 'left',
+        targetPanelId: 'right',
+        sourcePaths: ['/home/user/notes.txt'],
+        targetPath: '/target',
+      });
+    });
+
+    it('한 번의 mousemove 후 바로 drop해도 대상 패널 props 경로를 대상으로 사용한다', async () => {
+      mockCheckCopyConflicts.mockResolvedValueOnce(['notes.txt']);
+      mockPanelState.leftPanel.currentPath = '';
+      mockPanelState.leftPanel.resolvedPath = '';
+
+      render(
+        <>
+          <FileList
+            {...makeProps({
+              currentPath: '/target',
+              accessPath: '/target',
+              files: [{ name: '..', path: '/', kind: 'directory' }],
+              selectedItems: new Set<string>(),
+              panelId: 'left',
+            })}
+          />
+          <FileList
+            {...makeProps({
+              selectedItems: new Set<string>(['/home/user/notes.txt']),
+              panelId: 'right',
+            })}
+          />
+        </>
+      );
+
+      const lists = document.querySelectorAll('[tabindex="0"]');
+      const targetList = lists[0] as HTMLElement;
+      const sourceList = lists[1] as HTMLElement;
+
+      Object.defineProperty(targetList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          right: 300,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+      Object.defineProperty(sourceList, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          left: 320,
+          top: 0,
+          right: 620,
+          bottom: 300,
+          width: 300,
+          height: 300,
+          x: 320,
+          y: 0,
+          toJSON: () => ({}),
+        }),
+      });
+
+      const sourceRow = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+
+      mockElementFromPoint(targetList);
+      fireEvent.mouseDown(sourceRow, {
+        button: 0,
+        clientX: 340,
+        clientY: 20,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 40, clientY: 40 })
+        );
+        document.dispatchEvent(new MouseEvent('mouseup', { clientX: 40, clientY: 40 }));
+      });
+
+      expect(mockOpenDragCopyDialog).toHaveBeenCalledWith({
+        sourcePanelId: 'right',
+        targetPanelId: 'left',
         sourcePaths: ['/home/user/notes.txt'],
         targetPath: '/target',
       });

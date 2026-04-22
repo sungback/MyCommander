@@ -16,6 +16,7 @@ const createPanelState = (id: "left" | "right", paths: string[]): PanelState => 
     sortDirection: "asc" as const,
     lastUpdated: 0,
     pendingCursorName: null as string | null,
+    expandedChildrenVersion: 0,
   }));
 
   const activeTab = tabs[0];

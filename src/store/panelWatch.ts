@@ -1,5 +1,9 @@
 import { PanelState, PanelTabState } from "../types/file";
-import { isAbsolutePath, normalizePathForComparison } from "../utils/path";
+import {
+  coalescePanelPath,
+  isAbsolutePath,
+  normalizePathForComparison,
+} from "../utils/path";
 
 const getTabsForWatch = (panel: PanelState): PanelTabState[] => {
   if (panel.tabs.length > 0) {
@@ -19,6 +23,7 @@ const getTabsForWatch = (panel: PanelState): PanelTabState[] => {
       sortDirection: "asc",
       lastUpdated: panel.lastUpdated,
       pendingCursorName: null,
+      expandedChildrenVersion: 0,
     },
   ];
 };
@@ -28,7 +33,7 @@ export const collectWatchDirectories = (panels: PanelState[]): string[] => {
 
   for (const panel of panels) {
     for (const tab of getTabsForWatch(panel)) {
-      const currentPath = (tab.resolvedPath ?? tab.currentPath).trim();
+      const currentPath = coalescePanelPath(tab.resolvedPath, tab.currentPath).trim();
       if (currentPath.length === 0 || !isAbsolutePath(currentPath)) {
         continue;
       }

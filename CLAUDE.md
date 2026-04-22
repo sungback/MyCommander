@@ -72,6 +72,8 @@
 - `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침
 - `uiStore` — 상태 메시지, 즐겨찾기 패널 열림/닫힘
 - `favoriteStore` — 즐겨찾기 목록, 순서, 이름 변경
+- `jobStore` / `useJobQueue` — Unified Job Engine: copy/move/delete/zip 작업을 큐로 관리. submit/list/cancel/retry/clear-finished 지원, 앱 재시작 시 큐 복원
+- `settingsStore` — 앱 설정 영속화 (localStorage)
 
 `localStorage` 저장 항목: 패널 상태, 즐겨찾기, 테마 선호도.
 
@@ -80,6 +82,8 @@
 - `FileList.tsx` — 가상 스크롤, 키보드/드래그 상호작용의 핵심
 - `AddressBar.tsx` — breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화
 - `StatusBar.tsx` — 패널 요약, 여유 공간, 명령 실행 입력창, 하단 액션 버튼
+- `ProgressDialog.tsx` — 진행 중인 작업 목록 빠른 보기, 완료 작업만 남으면 자동 닫힘
+- `JobCenter.tsx` — 전체 작업 이력 다이얼로그, 필터/정렬/상세 패널 포함
 
 파일 생성/삭제/이름 변경/복사/이동 후에는 같은 디렉터리를 보고 있는 다른 패널도 함께 갱신됩니다.
 
@@ -92,7 +96,7 @@
 ```text
 src/
   components/
-    dialogs/     # 복사/이동/검색/미리보기/동기화/일괄이름변경 UI
+    dialogs/     # 복사/이동/검색/미리보기/동기화/일괄이름변경/진행상황(ProgressDialog)/작업센터(JobCenter) UI
     favorites/   # 즐겨찾기 사이드 패널
     layout/      # 상태바, 컨텍스트 메뉴, 하단 액션
     panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록

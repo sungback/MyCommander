@@ -160,7 +160,7 @@ describe('useFileSystem', () => {
   });
 
   describe('submitJob', () => {
-    it('invokes submit_job with a unified copy payload', async () => {
+    it('invokes submit_job with a snake_case copy payload for Tauri', async () => {
       mockInvoke.mockResolvedValueOnce({
         id: 'job-1',
         kind: 'copy',
@@ -181,8 +181,64 @@ describe('useFileSystem', () => {
       expect(mockInvoke).toHaveBeenCalledWith('submit_job', {
         job: {
           kind: 'copy',
-          sourcePaths: ['/home/user/a.txt'],
-          targetPath: '/home/user/dest',
+          source_paths: ['/home/user/a.txt'],
+          target_path: '/home/user/dest',
+        },
+      });
+    });
+
+    it('invokes submit_job with a snake_case move payload for Tauri', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-2',
+        kind: 'move',
+        status: 'queued',
+        createdAt: 2,
+        updatedAt: 2,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+
+      await useFileSystem().submitJob({
+        kind: 'move',
+        sourcePaths: ['/home/user/a.txt'],
+        targetDir: '/home/user/dest',
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('submit_job', {
+        job: {
+          kind: 'move',
+          source_paths: ['/home/user/a.txt'],
+          target_dir: '/home/user/dest',
+        },
+      });
+    });
+
+    it('invokes submit_job with a snake_case zipSelection payload for Tauri', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-3',
+        kind: 'zip',
+        status: 'queued',
+        createdAt: 3,
+        updatedAt: 3,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+
+      await useFileSystem().submitJob({
+        kind: 'zipSelection',
+        paths: ['/home/user/a.txt'],
+        targetDir: '/home/user',
+        archiveName: 'Archive.zip',
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('submit_job', {
+        job: {
+          kind: 'zipSelection',
+          paths: ['/home/user/a.txt'],
+          target_dir: '/home/user',
+          archive_name: 'Archive.zip',
         },
       });
     });
@@ -444,6 +500,53 @@ describe('useFileSystem', () => {
         query: '.*\\.txt',
         use_regex: true,
         on_event: expect.objectContaining({ onmessage: onEvent }),
+      });
+    });
+  });
+
+  // ─── compareDirectories ───────────────────────────────────────────────────
+  describe('compareDirectories', () => {
+    it('invokes compare_directories with show_hidden=false by default', async () => {
+      mockInvoke.mockResolvedValueOnce([
+        {
+          rel_path: 'docs/report.md',
+          left_path: '/left/docs/report.md',
+          right_path: '/right/docs/report.md',
+          left_kind: 'file',
+          right_kind: 'file',
+          status: 'LeftNewer',
+        },
+      ]);
+
+      const result = await useFileSystem().compareDirectories('/left', '/right');
+
+      expect(mockInvoke).toHaveBeenCalledWith('compare_directories', {
+        left: '/left',
+        right: '/right',
+        show_hidden: false,
+      });
+      expect(result).toEqual([
+        {
+          relPath: 'docs/report.md',
+          leftPath: '/left/docs/report.md',
+          rightPath: '/right/docs/report.md',
+          leftKind: 'file',
+          rightKind: 'file',
+          status: 'LeftNewer',
+          direction: 'toRight',
+        },
+      ]);
+    });
+
+    it('passes show_hidden=true when requested', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+
+      await useFileSystem().compareDirectories('/left', '/right', true);
+
+      expect(mockInvoke).toHaveBeenCalledWith('compare_directories', {
+        left: '/left',
+        right: '/right',
+        show_hidden: true,
       });
     });
   });

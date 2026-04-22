@@ -25,6 +25,70 @@ export type SearchEvent =
   | { type: "Progress"; payload: { current_dir: string } }
   | { type: "Finished"; payload: { total_matches: number } };
 
+type TauriJobSubmission =
+  | {
+      kind: "copy";
+      source_paths: string[];
+      target_path: string;
+      keep_both?: boolean;
+    }
+  | {
+      kind: "move";
+      source_paths: string[];
+      target_dir: string;
+    }
+  | {
+      kind: "delete";
+      paths: string[];
+      permanent?: boolean;
+    }
+  | {
+      kind: "zipDirectory";
+      path: string;
+    }
+  | {
+      kind: "zipSelection";
+      paths: string[];
+      target_dir: string;
+      archive_name: string;
+    };
+
+const toTauriJobSubmission = (job: JobSubmission): TauriJobSubmission => {
+  switch (job.kind) {
+    case "copy":
+      return {
+        kind: "copy",
+        source_paths: job.sourcePaths,
+        target_path: job.targetPath,
+        keep_both: job.keepBoth,
+      };
+    case "move":
+      return {
+        kind: "move",
+        source_paths: job.sourcePaths,
+        target_dir: job.targetDir,
+      };
+    case "delete":
+      return {
+        kind: "delete",
+        paths: job.paths,
+        permanent: job.permanent,
+      };
+    case "zipDirectory":
+      return {
+        kind: "zipDirectory",
+        path: job.path,
+      };
+    case "zipSelection":
+      return {
+        kind: "zipSelection",
+        paths: job.paths,
+        target_dir: job.targetDir,
+        archive_name: job.archiveName,
+      };
+  }
+};
+
 const fileSystem = {
   getDrives: async (): Promise<DriveInfo[]> => {
     try {
@@ -106,7 +170,7 @@ const fileSystem = {
   },
 
   submitJob: async (job: JobSubmission): Promise<JobRecord> => {
-    return await invoke<JobRecord>("submit_job", { job });
+    return await invoke<JobRecord>("submit_job", { job: toTauriJobSubmission(job) });
   },
 
   listJobs: async (): Promise<JobRecord[]> => {
@@ -219,11 +283,17 @@ const fileSystem = {
     return await invoke<number>("get_dir_size", { path });
   },
 
-  compareDirectories: async (leftPath: string, rightPath: string): Promise<SyncItem[]> => {
+  compareDirectories: async (
+    leftPath: string,
+    rightPath: string,
+    showHidden: boolean = false
+  ): Promise<SyncItem[]> => {
     interface RawSyncItem {
       rel_path: string;
       left_path: string | null;
       right_path: string | null;
+      left_kind: "file" | "directory" | null;
+      right_kind: "file" | "directory" | null;
       status: string;
     }
 
@@ -243,12 +313,15 @@ const fileSystem = {
     const raw = await invoke<RawSyncItem[]>("compare_directories", {
       left: leftPath,
       right: rightPath,
+      show_hidden: showHidden,
     });
 
     return raw.map((item) => ({
       relPath: item.rel_path,
       leftPath: item.left_path,
       rightPath: item.right_path,
+      leftKind: item.left_kind,
+      rightKind: item.right_kind,
       status: item.status as any,
       direction: autoDirection(item.status),
     }));
