@@ -2,12 +2,15 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { fireEvent } from '@testing-library/react';
 import { useKeyboard } from './useKeyboard';
+import { useClipboardStore } from '../store/clipboardStore';
 
 // ── hoisted mocks ────────────────────────────────────────────────────────────
 const {
   mockOpenPreview, mockOpenEditor, mockOpenCopy, mockOpenMove,
   mockOpenMkdir, mockOpenNewFile, mockOpenDelete, mockOpenSearch,
   mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
+  mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard,
+  mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
   mockUpdateEntrySize, mockSetPanelViewMode,
   mockGetDirSize, mockIsMacPlatform,
@@ -20,12 +23,18 @@ const {
   mockOpenNewFile:     vi.fn(),
   mockOpenDelete:      vi.fn(),
   mockOpenSearch:      vi.fn(),
-  mockCloseApp:        vi.fn().mockResolvedValue(undefined),
-  mockSyncOtherPanel:  vi.fn(),
-  mockCopyCurrentPath: vi.fn().mockResolvedValue(undefined),
-  mockOpenInfoDialog:  vi.fn(),
-  mockCloseDialog:     vi.fn(),
-  mockUpdateEntrySize: vi.fn(),
+    mockCloseApp:        vi.fn().mockResolvedValue(undefined),
+    mockSyncOtherPanel:  vi.fn(),
+    mockCopyCurrentPath: vi.fn().mockResolvedValue(undefined),
+    mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
+    mockCutToClipboard: vi.fn().mockResolvedValue(undefined),
+    mockPasteFromClipboard: vi.fn(),
+    mockOpenSync:        vi.fn(),
+    mockSwapPanels:      vi.fn(),
+    mockShowTransientStatusMessage: vi.fn(),
+    mockOpenInfoDialog:  vi.fn(),
+    mockCloseDialog:     vi.fn(),
+    mockUpdateEntrySize: vi.fn(),
   mockSetPanelViewMode: vi.fn(),
   mockGetDirSize:      vi.fn().mockResolvedValue(0),
   mockIsMacPlatform:   vi.fn().mockReturnValue(false),
@@ -36,6 +45,7 @@ let mockOpenDialogValue: string | null = null;
 
 vi.mock('./useAppCommands', () => ({
   isMacPlatform: () => mockIsMacPlatform(),
+  showTransientStatusMessage: mockShowTransientStatusMessage,
   useAppCommands: () => ({
     openDialog:                 mockOpenDialogValue,
     openPreview:                mockOpenPreview,
@@ -46,9 +56,14 @@ vi.mock('./useAppCommands', () => ({
     openNewFile:                mockOpenNewFile,
     openDelete:                 mockOpenDelete,
     openSearch:                 mockOpenSearch,
+    openSync:                   mockOpenSync,
+    swapPanels:                 mockSwapPanels,
     closeApp:                   mockCloseApp,
     syncOtherPanelToCurrentPath: mockSyncOtherPanel,
     copyCurrentPath:            mockCopyCurrentPath,
+    copyToClipboard:            mockCopyToClipboard,
+    cutToClipboard:             mockCutToClipboard,
+    pasteFromClipboard:         mockPasteFromClipboard,
   }),
 }));
 
@@ -96,6 +111,7 @@ describe('useKeyboard', () => {
     vi.clearAllMocks();
     mockOpenDialogValue = null;
     mockIsMacPlatform.mockReturnValue(false);
+    useClipboardStore.setState({ clipboard: null });
   });
 
   // ── F키 단축키 ───────────────────────────────────────────────────────────────
@@ -155,6 +171,12 @@ describe('useKeyboard', () => {
       press('Delete');
       expect(mockOpenDelete).toHaveBeenCalledTimes(1);
     });
+
+    it('F11 → openSync 호출', () => {
+      renderKeyboard();
+      press('F11');
+      expect(mockOpenSync).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── Ctrl/Cmd 단축키 ──────────────────────────────────────────────────────────
@@ -175,6 +197,30 @@ describe('useKeyboard', () => {
       renderKeyboard();
       press('c', { code: 'KeyC', ctrlKey: true, shiftKey: true });
       expect(mockCopyCurrentPath).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+U → swapPanels 호출', () => {
+      renderKeyboard();
+      press('u', { code: 'KeyU', ctrlKey: true });
+      expect(mockSwapPanels).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+C → copyToClipboard 호출', () => {
+      renderKeyboard();
+      press('c', { code: 'KeyC', ctrlKey: true });
+      expect(mockCopyToClipboard).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+X → cutToClipboard 호출', () => {
+      renderKeyboard();
+      press('x', { code: 'KeyX', ctrlKey: true });
+      expect(mockCutToClipboard).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+V → pasteFromClipboard 호출', () => {
+      renderKeyboard();
+      press('v', { code: 'KeyV', ctrlKey: true });
+      expect(mockPasteFromClipboard).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -216,6 +262,24 @@ describe('useKeyboard', () => {
       renderKeyboard();
       press('Escape');
       expect(mockCloseDialog).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('클립보드 Escape 처리', () => {
+    it('클립보드가 있으면 Escape로 비우고 상태 메시지를 남긴다', () => {
+      useClipboardStore.setState({
+        clipboard: {
+          paths: ['/tmp/file.txt'],
+          operation: 'copy',
+          sourcePanel: 'left',
+        },
+      });
+
+      renderKeyboard();
+      press('Escape');
+
+      expect(useClipboardStore.getState().clipboard).toBeNull();
+      expect(mockShowTransientStatusMessage).toHaveBeenCalledWith('클립보드 초기화됨');
     });
   });
 });

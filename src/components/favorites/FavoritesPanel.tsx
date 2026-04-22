@@ -3,6 +3,7 @@ import { Check, ChevronLeft, ChevronRight, GripVertical, Pencil, Plus, Star, X }
 import { clsx } from "clsx";
 import { useFavoriteStore, Favorite } from "../../store/favoriteStore";
 import { usePanelStore } from "../../store/panelStore";
+import { useDragStore } from "../../store/dragStore";
 import { useUiStore } from "../../store/uiStore";
 
 let clearStatusMessageTimeoutId: number | undefined;
@@ -29,7 +30,7 @@ export const FavoritesPanel: React.FC = () => {
   const showFavoritesPanel = useUiStore((s) => s.showFavoritesPanel);
   const toggleFavoritesPanel = useUiStore((s) => s.toggleFavoritesPanel);
   const activePanel = usePanelStore((s) => s.activePanel);
-  const dragInfo = usePanelStore((s) => s.dragInfo);
+  const dragInfo = useDragStore((s) => s.dragInfo);
   const setPath = usePanelStore((s) => s.setPath);
 
   const panelRef = useRef<HTMLDivElement | null>(null);

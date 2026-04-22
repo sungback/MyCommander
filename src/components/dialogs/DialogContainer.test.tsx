@@ -3,30 +3,45 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DialogContainer } from "./DialogContainer";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
+import { useClipboardStore } from "../../store/clipboardStore";
 
 const {
+  mockCreateDirectory,
+  mockCreateFile,
+  mockRenameFile,
+  mockGetDirSize,
   mockSubmitJob,
   mockCheckCopyConflicts,
   mockShowTransientStatusMessage,
+  mockRefreshPanelsForDirectories,
 } = vi.hoisted(() => ({
+  mockCreateDirectory: vi.fn(),
+  mockCreateFile: vi.fn(),
+  mockRenameFile: vi.fn(),
+  mockGetDirSize: vi.fn(),
   mockSubmitJob: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
   mockShowTransientStatusMessage: vi.fn(),
+  mockRefreshPanelsForDirectories: vi.fn(),
 }));
 
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
-    createDirectory: vi.fn(),
-    createFile: vi.fn(),
-    renameFile: vi.fn(),
+    createDirectory: mockCreateDirectory,
+    createFile: mockCreateFile,
+    renameFile: mockRenameFile,
     submitJob: mockSubmitJob,
     copyFiles: vi.fn(),
     moveFiles: vi.fn(),
     checkCopyConflicts: mockCheckCopyConflicts,
-    getDirSize: vi.fn().mockResolvedValue(0),
+    getDirSize: mockGetDirSize,
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
+}));
+
+vi.mock("../../store/panelRefresh", () => ({
+  refreshPanelsForDirectories: mockRefreshPanelsForDirectories,
 }));
 
 vi.mock("./QuickPreviewDialog", () => ({
@@ -83,12 +98,110 @@ describe("DialogContainer", () => {
   beforeEach(() => {
     useDialogStore.setState(useDialogStore.getInitialState());
     usePanelStore.setState(usePanelStore.getInitialState());
+    useClipboardStore.setState({ clipboard: null });
     setSelectedDeleteState();
     useDialogStore.getState().setOpenDialog("delete");
+    mockCreateDirectory.mockReset();
+    mockCreateFile.mockReset();
+    mockRenameFile.mockReset();
+    mockGetDirSize.mockReset();
     mockSubmitJob.mockReset();
     mockCheckCopyConflicts.mockReset();
     mockShowTransientStatusMessage.mockReset();
+    mockRefreshPanelsForDirectories.mockReset();
+    mockGetDirSize.mockResolvedValue(0);
     mockCheckCopyConflicts.mockResolvedValue([]);
+  });
+
+  it("loads folder size in the info dialog for directories without a cached size", async () => {
+    mockGetDirSize.mockResolvedValue(2048);
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "info",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/LargeFolder",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    expect(screen.getByText("File Information")).toBeInTheDocument();
+    expect(screen.getByText("Calculating...")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/LargeFolder");
+    });
+    await waitFor(() => {
+      expect(screen.getByText("2.0 KB")).toBeInTheDocument();
+    });
+  });
+
+  it("creates a directory in the active panel path", async () => {
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "mkdir",
+    }));
+
+    render(<DialogContainer />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "New Folder" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    await waitFor(() => {
+      expect(mockCreateDirectory).toHaveBeenCalledWith("/home/user/New Folder");
+    });
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("creates a file in the active panel path", async () => {
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "newfile",
+    }));
+
+    render(<DialogContainer />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "notes.txt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    await waitFor(() => {
+      expect(mockCreateFile).toHaveBeenCalledWith("/home/user/notes.txt");
+    });
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("renames the selected target within its parent directory", async () => {
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "rename",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/old.txt",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "new.txt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    await waitFor(() => {
+      expect(mockRenameFile).toHaveBeenCalledWith(
+        "/home/user/old.txt",
+        "/home/user/new.txt"
+      );
+    });
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
+    expect(useDialogStore.getState().openDialog).toBeNull();
   });
 
   it("submits a delete job and switches to the progress dialog", async () => {
@@ -401,5 +514,126 @@ describe("DialogContainer", () => {
     });
     expect(screen.getByDisplayValue("/target")).toBeInTheDocument();
     expect(screen.getByText('"file.txt"')).toBeInTheDocument();
+  });
+
+  it("uses clipboard paths in paste-mode copy and queues keep-both on conflict", async () => {
+    usePanelStore.setState((state) => ({
+      ...state,
+      activePanel: "right",
+      rightPanel: {
+        ...state.rightPanel,
+        currentPath: "/target",
+        resolvedPath: "/target",
+      },
+    }));
+    useClipboardStore.setState({
+      clipboard: {
+        paths: ["/source/file.txt"],
+        operation: "copy",
+        sourcePanel: "left",
+      },
+    });
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "copy",
+      dragCopyRequest: null,
+      isPasteMode: true,
+    }));
+    mockCheckCopyConflicts.mockResolvedValue(["file.txt"]);
+    mockSubmitJob.mockResolvedValue({
+      id: "job-5",
+      kind: "copy",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+
+    render(<DialogContainer />);
+
+    expect(screen.getByDisplayValue("/target")).toBeInTheDocument();
+    expect(screen.getByText('"file.txt"')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => {
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ["/source/file.txt"],
+        "/target"
+      );
+    });
+    await waitFor(() => {
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: "copy",
+        sourcePaths: ["/source/file.txt"],
+        targetPath: "/target",
+        keepBoth: true,
+      });
+    });
+    expect(screen.queryByText("Files Already Exist")).not.toBeInTheDocument();
+    expect(useClipboardStore.getState().clipboard).toEqual({
+      paths: ["/source/file.txt"],
+      operation: "copy",
+      sourcePanel: "left",
+    });
+  });
+
+  it("clears the cut clipboard after a paste-mode move completes", async () => {
+    usePanelStore.setState((state) => ({
+      ...state,
+      activePanel: "right",
+      rightPanel: {
+        ...state.rightPanel,
+        currentPath: "/target",
+        resolvedPath: "/target",
+      },
+    }));
+    useClipboardStore.setState({
+      clipboard: {
+        paths: ["/source/file.txt"],
+        operation: "cut",
+        sourcePanel: "left",
+      },
+    });
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "move",
+      dragCopyRequest: null,
+      isPasteMode: true,
+    }));
+    mockSubmitJob.mockResolvedValue({
+      id: "job-6",
+      kind: "move",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+
+    render(<DialogContainer />);
+
+    expect(screen.getByDisplayValue("/target")).toBeInTheDocument();
+    expect(screen.getByText('"file.txt"')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Move" }));
+
+    await waitFor(() => {
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ["/source/file.txt"],
+        "/target"
+      );
+    });
+    await waitFor(() => {
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: "move",
+        sourcePaths: ["/source/file.txt"],
+        targetDir: "/target",
+      });
+    });
+    expect(useClipboardStore.getState().clipboard).toBeNull();
   });
 });

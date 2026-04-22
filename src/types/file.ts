@@ -1,5 +1,6 @@
 export type FileType = "file" | "directory" | "symlink";
 export type ViewMode = "brief" | "detailed";
+export type PanelId = "left" | "right";
 
 export interface FileEntry {
   name: string;
@@ -33,7 +34,7 @@ export interface PanelTabState extends PanelViewState {
 }
 
 export interface PanelState extends PanelViewState {
-  id: "left" | "right";
+  id: PanelId;
   tabs: PanelTabState[];
   activeTabId: string;
 }

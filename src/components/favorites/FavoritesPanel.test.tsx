@@ -81,13 +81,27 @@ vi.mock("../../store/panelStore", () => ({
       selector
         ? selector({
             activePanel: mockPanelState.activePanel,
-            dragInfo: mockPanelState.dragInfo,
             setPath: mockSetPath,
           })
         : null,
     {
       getState: () => ({
         activePanel: mockPanelState.activePanel,
+      }),
+    }
+  ),
+}));
+
+vi.mock("../../store/dragStore", () => ({
+  useDragStore: Object.assign(
+    (selector?: (state: Record<string, unknown>) => unknown) =>
+      selector
+        ? selector({
+            dragInfo: mockPanelState.dragInfo,
+          })
+        : null,
+    {
+      getState: () => ({
         dragInfo: mockPanelState.dragInfo,
       }),
     }

@@ -3,6 +3,12 @@ import { render, fireEvent, act } from '@testing-library/react';
 import { FileList } from './FileList';
 import type { FileEntry } from '../../types/file';
 import { useUiStore } from '../../store/uiStore';
+import { useClipboardStore } from '../../store/clipboardStore';
+import { useDragStore } from '../../store/dragStore';
+import {
+  resetSharedDragState,
+  sharedPanelPaths,
+} from './fileListDragSharedState';
 
 // ── Tauri IPC mock ──────────────────────────────────────────────────────────
 vi.mock('@tauri-apps/api/core', () => ({
@@ -21,7 +27,6 @@ const {
   mockClearSelection,
   mockRefreshPanel,
   mockSetActivePanel,
-  mockSetDragInfo,
   mockOpenDragCopyDialog,
   mockOpenPreviewDialog,
   mockPanelState,
@@ -35,7 +40,6 @@ const {
   mockClearSelection: vi.fn(),
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
-  mockSetDragInfo: vi.fn(),
   mockOpenDragCopyDialog: vi.fn(),
   mockOpenPreviewDialog: vi.fn(),
   mockPanelState: {
@@ -53,13 +57,6 @@ const {
       tabs: [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }],
       activeTabId: 'tab2',
     },
-    dragInfo: null as
-      | {
-        paths: string[];
-        directoryPaths: string[];
-        sourcePanel: 'left' | 'right';
-      }
-      | null,
   },
 }));
 
@@ -95,13 +92,10 @@ vi.mock('../../store/panelStore', () => ({
       sizeCache: {},
       leftPanel: mockPanelState.leftPanel,
       rightPanel: mockPanelState.rightPanel,
-      dragInfo: mockPanelState.dragInfo,
-      setDragInfo: mockSetDragInfo,
     }), {
     getState: () => ({
       leftPanel: mockPanelState.leftPanel,
       rightPanel: mockPanelState.rightPanel,
-      dragInfo: mockPanelState.dragInfo,
       refreshPanel: mockRefreshPanel,
       setActivePanel: mockSetActivePanel,
     }),
@@ -173,6 +167,12 @@ const mockElementFromPoint = (element: HTMLElement) => {
   });
 };
 
+const resetSharedDragGlobals = () => {
+  resetSharedDragState();
+  sharedPanelPaths.left = { accessPath: '', currentPath: '' };
+  sharedPanelPaths.right = { accessPath: '', currentPath: '' };
+};
+
 const performInternalDrag = async (
   sourceRow: HTMLElement,
   targetRow: HTMLElement,
@@ -214,10 +214,9 @@ describe('FileList', () => {
     mockPanelState.rightPanel.lastUpdated = 0;
     mockPanelState.rightPanel.tabs = [{ id: 'tab2', sortField: 'name', sortDirection: 'asc', lastUpdated: 0 }];
     mockPanelState.rightPanel.activeTabId = 'tab2';
-    mockPanelState.dragInfo = null;
-    mockSetDragInfo.mockImplementation((dragInfo) => {
-      mockPanelState.dragInfo = dragInfo;
-    });
+    useClipboardStore.setState({ clipboard: null });
+    useDragStore.setState({ dragInfo: null });
+    resetSharedDragGlobals();
     mockSubmitJob.mockResolvedValue({
       id: 'job-1',
       kind: 'copy',
@@ -240,6 +239,11 @@ describe('FileList', () => {
     if ('elementFromPoint' in document) {
       Reflect.deleteProperty(document as unknown as Record<string, unknown>, 'elementFromPoint');
     }
+    useClipboardStore.setState({ clipboard: null });
+    useDragStore.setState({ dragInfo: null });
+    resetSharedDragGlobals();
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   });
 
   // ── 렌더링 ──────────────────────────────────────────────────────────────────
@@ -259,6 +263,23 @@ describe('FileList', () => {
     it('각 항목에 data-entry-path 속성이 설정된다', () => {
       render(<FileList {...makeProps()} />);
       expect(document.querySelectorAll('[data-entry-path]')).toHaveLength(TEST_FILES.length);
+    });
+
+    it('cut 클립보드에 포함된 항목은 흐리게 렌더링한다', () => {
+      useClipboardStore.setState({
+        clipboard: {
+          paths: ['/home/user/notes.txt'],
+          operation: 'cut',
+          sourcePanel: 'left',
+        },
+      });
+
+      render(<FileList {...makeProps()} />);
+
+      const wrapper = document.querySelector(
+        '[data-entry-path="/home/user/notes.txt"]'
+      ) as HTMLElement;
+      expect(wrapper.firstElementChild).toHaveClass('opacity-40');
     });
   });
 

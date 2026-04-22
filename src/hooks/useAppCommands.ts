@@ -1,10 +1,10 @@
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
+import { useClipboardStore, ClipboardState } from "../store/clipboardStore";
 import { useUiStore } from "../store/uiStore";
 import { writeClipboardText } from "../utils/clipboard";
 import { arePathsEquivalent, coalescePanelPath } from "../utils/path";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
-import { ClipboardState } from "../store/panelStore";
 import { PanelState } from "../types/file";
 
 export const isMacPlatform = () => {
@@ -137,7 +137,7 @@ export function useAppCommands() {
       operation: "copy",
       sourcePanel: state.activePanel,
     };
-    state.setClipboard(clipState);
+    useClipboardStore.getState().setClipboard(clipState);
 
     try {
       await fs.writeFilesToPasteboard(paths, "copy");
@@ -158,7 +158,7 @@ export function useAppCommands() {
       operation: "cut",
       sourcePanel: state.activePanel,
     };
-    state.setClipboard(clipState);
+    useClipboardStore.getState().setClipboard(clipState);
 
     try {
       await fs.writeFilesToPasteboard(paths, "cut");
@@ -171,7 +171,7 @@ export function useAppCommands() {
 
   const pasteFromClipboard = () => {
     const state = usePanelStore.getState();
-    const clipboard = state.clipboard;
+    const clipboard = useClipboardStore.getState().clipboard;
     if (!clipboard) return;
 
     const activePanel = state.activePanel;

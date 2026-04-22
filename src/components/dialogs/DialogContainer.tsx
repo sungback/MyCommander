@@ -2,37 +2,22 @@ import React, { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import {
-  refreshPanelsForDirectories,
-} from "../../store/panelRefresh";
+import { useClipboardStore } from "../../store/clipboardStore";
+import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
-import {
-  coalescePanelPath,
-  getPathDirectoryName,
-  isAbsolutePath,
-  joinPath,
-} from "../../utils/path";
+import { getPathDirectoryName, joinPath } from "../../utils/path";
 import { formatDate, formatSize } from "../../utils/format";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
-import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { SettingsDialog } from "./SettingsDialog";
-import { PanelState } from "../../types/file";
-
-const getPathBaseName = (path: string) => {
-  const normalized = path.replace(/[\\/]+$/, "");
-  const parts = normalized.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : normalized;
-};
-
-const getSelectedItemsText = (paths: string[]) => {
-  if (paths.length === 0) return "0 files";
-  if (paths.length === 1) return `"${getPathBaseName(paths[0])}"`;
-  if (paths.length <= 3) return paths.map((p) => `"${getPathBaseName(p)}"`).join(", ");
-  return `"${getPathBaseName(paths[0])}", "${getPathBaseName(paths[1])}" and ${paths.length - 2} more file(s)`;
-};
-
-const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
+import {
+  getDragCopyTargetPath,
+  getPanelAccessPath,
+  getPathBaseName,
+  getSelectedItemsText,
+  getSelectedPaths,
+} from "./dialogTargetPath";
+import { useDialogInfo } from "./useDialogInfo";
+import { useCopyMoveFlow } from "./useCopyMoveFlow";
 
 // Reusable Radix UI Dialog Wrapper
 const BaseDialog: React.FC<{
@@ -118,54 +103,68 @@ export const DialogContainer: React.FC = () => {
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
-  const clipboard = usePanelStore((s) => s.clipboard);
-  const clearClipboard = usePanelStore((s) => s.clearClipboard);
+  const clipboard = useClipboardStore((s) => s.clipboard);
+  const clearClipboard = useClipboardStore((s) => s.clearClipboard);
 
   const fs = useFileSystem();
 
-  // Dialog-specific state
   const [inputValue, setInputValue] = useState("");
-  const [infoSize, setInfoSize] = useState<number | null>(null);
-  const [infoLoading, setInfoLoading] = useState(false);
-  const [infoError, setInfoError] = useState<string | null>(null);
-  const [operationError, setOperationError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
-  const [pendingCopy, setPendingCopy] = useState<{
-    isMove: boolean;
-    allPaths: string[];
-    targetPath: string;
-  } | null>(null);
-
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
-  const dragCopyTargetPanel =
-    dragCopyRequest?.targetPanelId === "left" ? leftPanel : rightPanel;
-  const dragCopyTargetPath =
-    dragCopyRequest?.targetPath.trim()
-      ? dragCopyRequest.targetPath
-      : dragCopyRequest
-        ? getPanelAccessPath(dragCopyTargetPanel)
-        : "";
+  const dragCopyTargetPath = getDragCopyTargetPath(
+    dragCopyRequest,
+    leftPanel,
+    rightPanel
+  );
   const infoPanel = dialogTarget?.panelId === "left" ? leftPanel : rightPanel;
   const infoEntry = dialogTarget
-    ? infoPanel.files.find((entry) => entry.path.normalize("NFC") === dialogTarget.path.normalize("NFC")) ?? null
+    ? infoPanel.files.find(
+        (entry) =>
+          entry.path.normalize("NFC") === dialogTarget.path.normalize("NFC")
+      ) ?? null
     : null;
+  const selectedPaths = getSelectedPaths({
+    openDialog,
+    dragCopyRequest,
+    isPasteMode,
+    clipboard,
+    activePanel,
+  });
 
-  // Paste 모드: 클립보드 경로 사용 / 일반 모드: 현재 선택 또는 커서 사용
-  const selectedPaths: string[] =
-    openDialog === "copy" && dragCopyRequest
-      ? [...dragCopyRequest.sourcePaths]
-      : isPasteMode && clipboard
-        ? [...clipboard.paths]
-        : (() => {
-          const paths = Array.from(activePanel.selectedItems);
-          if (paths.length === 0 && activePanel.files[activePanel.cursorIndex]) {
-            const cursorFile = activePanel.files[activePanel.cursorIndex];
-            if (cursorFile.name !== "..") paths.push(cursorFile.path);
-          }
-          return paths;
-        })();
+  const { infoSize, infoLoading, infoError } = useDialogInfo({
+    openDialog,
+    dialogTarget,
+    infoEntry,
+    updateEntrySize,
+    fs,
+  });
+
+  const {
+    operationError,
+    setOperationError,
+    isSubmitting,
+    setIsSubmitting,
+    conflictFiles,
+    handleCopyMove,
+    handleOverwriteAll,
+    handleSkipExisting,
+    clearConflictState,
+  } = useCopyMoveFlow({
+    openDialog,
+    dragCopyRequest,
+    dragCopyTargetPath,
+    isPasteMode,
+    activePanel,
+    targetPanel,
+    clipboard,
+    clearClipboard,
+    selectedPaths,
+    inputValue,
+    fs,
+    setOpenDialog,
+    openDragCopyDialog,
+    closeDialog,
+  });
 
   // Effect to set default input values when dialog opens
   useEffect(() => {
@@ -193,62 +192,6 @@ export const DialogContainer: React.FC = () => {
     openDialog,
     targetPanel.currentPath,
   ]);
-
-  useEffect(() => {
-    setOperationError(null);
-    setIsSubmitting(false);
-    setConflictFiles([]);
-    setPendingCopy(null);
-  }, [openDialog]);
-
-  useEffect(() => {
-    if (openDialog !== "info" || !dialogTarget || !infoEntry) {
-      setInfoSize(null);
-      setInfoLoading(false);
-      setInfoError(null);
-      return;
-    }
-
-    if (infoEntry.kind !== "directory") {
-      setInfoSize(infoEntry.size ?? null);
-      setInfoLoading(false);
-      setInfoError(null);
-      return;
-    }
-
-    if (infoEntry.size !== undefined && infoEntry.size !== null) {
-      setInfoSize(infoEntry.size);
-      setInfoLoading(false);
-      setInfoError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setInfoSize(null);
-    setInfoLoading(true);
-    setInfoError(null);
-
-    fs.getDirSize(infoEntry.path)
-      .then((size) => {
-        if (cancelled) return;
-        setInfoSize(size);
-        updateEntrySize(dialogTarget.panelId, infoEntry.path, size);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("Failed to calculate dir size:", error);
-        setInfoError("Failed to calculate folder size.");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setInfoLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [dialogTarget, infoEntry, openDialog, updateEntrySize]);
 
   // Handle Operations
   const handleMkdir = async () => {
@@ -326,195 +269,6 @@ export const DialogContainer: React.FC = () => {
       setOperationError(getErrorMessage(e, "Failed to delete selected items."));
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const resolveTargetPath = () => {
-    const trimmedValue = inputValue.trim();
-    if (!trimmedValue) {
-      return "";
-    }
-
-    const basePanel = isPasteMode ? activePanel : targetPanel;
-    const directPath =
-      trimmedValue.normalize("NFC") === basePanel.currentPath.normalize("NFC")
-        ? getPanelAccessPath(basePanel)
-        : trimmedValue;
-    const basePath =
-      openDialog === "copy" && dragCopyRequest
-        ? dragCopyTargetPath
-        : getPanelAccessPath(basePanel);
-    return isAbsolutePath(directPath)
-      ? directPath
-      : joinPath(basePath, directPath);
-  };
-
-  const executeCopyMove = async (
-    isMove: boolean,
-    paths: string[],
-    targetPath: string,
-    keepBoth: boolean = false
-  ) => {
-    if (paths.length === 0 || targetPath.trim().length === 0) {
-      throw new Error(
-        isMove
-          ? "No source files or target folder available for move."
-          : "No source files or target folder available for copy."
-      );
-    }
-
-    setOpenDialog("progress");
-    try {
-      if (isMove) {
-        await fs.submitJob({
-          kind: "move",
-          sourcePaths: paths,
-          targetDir: targetPath,
-        });
-      } else {
-        await fs.submitJob({
-          kind: "copy",
-          sourcePaths: paths,
-          targetPath,
-          keepBoth,
-        });
-      }
-
-      if (isPasteMode && clipboard?.operation === "cut") {
-        clearClipboard();
-      }
-      if (isMove) {
-        showTransientStatusMessage("이동 작업이 대기열에 추가되었습니다.");
-      }
-    } catch (e) {
-      console.error(e);
-      if (!isMove && dragCopyRequest) {
-        openDragCopyDialog({
-          ...dragCopyRequest,
-          targetPath: dragCopyTargetPath,
-        });
-      } else {
-        setOpenDialog(isMove ? "move" : "copy");
-      }
-      throw e;
-    }
-  };
-
-  const handleCopyMove = async (isMove: boolean) => {
-    if (!inputValue || selectedPaths.length === 0) return;
-    try {
-      setIsSubmitting(true);
-      setOperationError(null);
-      const targetPath = resolveTargetPath();
-
-      // Check for conflicts
-      const conflicts = await fs.checkCopyConflicts(selectedPaths, targetPath);
-      if (conflicts.length > 0) {
-        // paste 모드(Cmd+V): 덮어쓰기 다이얼로그 없이 자동으로 "copy" 이름으로 저장
-        if (isPasteMode && !isMove) {
-          await executeCopyMove(false, selectedPaths, targetPath, true);
-          return;
-        }
-        // 일반 모드(F5/F6): 기존 덮어쓰기 확인 다이얼로그 표시
-        setConflictFiles(conflicts);
-        setPendingCopy({ isMove, allPaths: selectedPaths, targetPath });
-        setIsSubmitting(false);
-        return;
-      }
-
-      // No conflicts, proceed with copy/move
-      await executeCopyMove(isMove, selectedPaths, targetPath);
-    } catch (e) {
-      console.error(e);
-      setOperationError(
-        getErrorMessage(
-          e,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleOverwriteAll = async () => {
-    const sourcePaths =
-      pendingCopy?.allPaths && pendingCopy.allPaths.length > 0
-        ? pendingCopy.allPaths
-        : dragCopyRequest?.sourcePaths ?? [];
-    const targetPath =
-      pendingCopy?.targetPath?.trim().length
-        ? pendingCopy.targetPath
-        : dragCopyTargetPath;
-    const isMove = pendingCopy?.isMove ?? false;
-
-    if (sourcePaths.length === 0 || targetPath.trim().length === 0) {
-      setOperationError("복사할 파일 또는 대상 경로를 확인할 수 없습니다.");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await executeCopyMove(isMove, sourcePaths, targetPath);
-    } catch (e) {
-      console.error(e);
-      setOperationError(
-        getErrorMessage(
-          e,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
-    } finally {
-      setIsSubmitting(false);
-      setConflictFiles([]);
-      setPendingCopy(null);
-    }
-  };
-
-  const handleSkipExisting = async () => {
-    const sourcePaths =
-      pendingCopy?.allPaths && pendingCopy.allPaths.length > 0
-        ? pendingCopy.allPaths
-        : dragCopyRequest?.sourcePaths ?? [];
-    const targetPath =
-      pendingCopy?.targetPath?.trim().length
-        ? pendingCopy.targetPath
-        : dragCopyTargetPath;
-    const isMove = pendingCopy?.isMove ?? false;
-
-    if (sourcePaths.length === 0 || targetPath.trim().length === 0) {
-      setOperationError("복사할 파일 또는 대상 경로를 확인할 수 없습니다.");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const nonConflicting = sourcePaths.filter((p) => {
-        const baseName = p.split(/[\\/]/).pop() || "";
-        return !conflictFiles.includes(baseName);
-      });
-      if (nonConflicting.length > 0) {
-        await executeCopyMove(isMove, nonConflicting, targetPath);
-      } else {
-        closeDialog();
-      }
-    } catch (e) {
-      console.error(e);
-      setOperationError(
-        getErrorMessage(
-          e,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
-    } finally {
-      setIsSubmitting(false);
-      setConflictFiles([]);
-      setPendingCopy(null);
     }
   };
 
@@ -741,8 +495,7 @@ export const DialogContainer: React.FC = () => {
         open={conflictFiles.length > 0}
         onOpenChange={(open) => {
           if (!open) {
-            setConflictFiles([]);
-            setPendingCopy(null);
+            clearConflictState();
           }
         }}
       >
@@ -770,10 +523,7 @@ export const DialogContainer: React.FC = () => {
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setConflictFiles([]);
-                  setPendingCopy(null);
-                }}
+                onClick={clearConflictState}
                 disabled={isSubmitting}
                 className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color focus:outline-none focus:ring-1 focus:ring-accent-color transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >

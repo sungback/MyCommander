@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
+import { useClipboardStore } from "../store/clipboardStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { useFileSystem } from "./useFileSystem";
 import { PanelState } from "../types/file";
@@ -88,10 +89,10 @@ export function useKeyboard() {
 
       // Escape: 클립보드 초기화
       if (e.key === "Escape") {
-        const clipState = usePanelStore.getState().clipboard;
+        const clipState = useClipboardStore.getState().clipboard;
         if (clipState) {
           e.preventDefault();
-          usePanelStore.getState().clearClipboard();
+          useClipboardStore.getState().clearClipboard();
           showTransientStatusMessage("클립보드 초기화됨");
         }
         return;

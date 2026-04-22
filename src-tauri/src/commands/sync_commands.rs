@@ -174,7 +174,9 @@ pub async fn compare_directories(
         processed.insert(rel_path.clone());
 
         if let Some(right_info) = right_files.get(rel_path) {
-            if left_info.kind == SyncEntryKind::Directory && right_info.kind == SyncEntryKind::Directory {
+            if left_info.kind == SyncEntryKind::Directory
+                && right_info.kind == SyncEntryKind::Directory
+            {
                 continue;
             }
 
@@ -300,7 +302,10 @@ mod tests {
         assert!(
             items.iter().all(|item| item.rel_path != "docs"),
             "shared directories should not appear as actionable sync rows: {:?}",
-            items.iter().map(|item| item.rel_path.clone()).collect::<Vec<_>>()
+            items
+                .iter()
+                .map(|item| item.rel_path.clone())
+                .collect::<Vec<_>>()
         );
         assert!(
             items.iter().any(|item| item.rel_path == "docs/report.md"),
@@ -370,7 +375,10 @@ mod tests {
             ))
             .expect("compare directories");
 
-        let rel_paths = items.iter().map(|item| item.rel_path.clone()).collect::<Vec<_>>();
+        let rel_paths = items
+            .iter()
+            .map(|item| item.rel_path.clone())
+            .collect::<Vec<_>>();
         assert_eq!(rel_paths, vec!["visible.txt"]);
 
         fs::remove_dir_all(left).expect("cleanup left");
@@ -395,7 +403,10 @@ mod tests {
             ))
             .expect("compare directories");
 
-        let rel_paths = items.iter().map(|item| item.rel_path.clone()).collect::<Vec<_>>();
+        let rel_paths = items
+            .iter()
+            .map(|item| item.rel_path.clone())
+            .collect::<Vec<_>>();
         assert_eq!(rel_paths, vec!["docs"]);
 
         fs::remove_dir_all(left).expect("cleanup left");

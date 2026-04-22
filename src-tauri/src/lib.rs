@@ -333,46 +333,46 @@ pub fn run() {
                 SWAP_PANELS_MENU_ITEM_ID => {
                     let _ = app.emit("swap-panels-requested", ());
                 }
-                commands::system_commands::CONTEXT_INFO_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_INFO_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "info");
                 }
-                commands::system_commands::CONTEXT_REVEAL_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_REVEAL_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "reveal");
                 }
-                commands::system_commands::CONTEXT_TERMINAL_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_TERMINAL_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "terminal");
                 }
-                commands::system_commands::CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "create-zip");
                 }
-                commands::system_commands::CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "extract-zip");
                 }
-                commands::system_commands::CONTEXT_COPY_PATH_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_COPY_PATH_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "copy-path");
                 }
-                commands::system_commands::CONTEXT_COPY_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_COPY_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "copy");
                 }
-                commands::system_commands::CONTEXT_MOVE_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_MOVE_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "move");
                 }
-                commands::system_commands::CONTEXT_RENAME_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_RENAME_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "rename");
                 }
-                commands::system_commands::CONTEXT_DELETE_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_DELETE_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "delete");
                 }
-                commands::system_commands::CONTEXT_REFRESH_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_REFRESH_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "refresh");
                 }
-                commands::system_commands::CONTEXT_NEW_FOLDER_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_NEW_FOLDER_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "mkdir");
                 }
-                commands::system_commands::CONTEXT_NEW_FILE_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_NEW_FILE_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "newfile");
                 }
-                commands::system_commands::CONTEXT_SEARCH_MENU_ITEM_ID => {
+                commands::system::menu::CONTEXT_SEARCH_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "search");
                 }
                 _ => {}
@@ -442,7 +442,7 @@ pub fn run() {
                 );
             }
         })
-        .manage(commands::job_commands::JobEngineState::default())
+        .manage(commands::jobs::JobEngineState::default())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             use tauri::Manager;
@@ -459,40 +459,40 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::system_commands::get_drives,
-            commands::system_commands::get_home_dir,
-            commands::system_commands::resolve_path,
-            commands::system_commands::get_available_space,
-            commands::system_commands::open_in_terminal,
-            commands::system_commands::open_in_editor,
-            commands::system_commands::open_file,
-            commands::system_commands::run_shell_command,
-            commands::system_commands::quit_app,
-            commands::system_commands::show_context_menu,
-            commands::system_commands::set_show_hidden_menu_checked,
-            commands::system_commands::set_theme_menu_selection,
-            commands::system_commands::set_view_mode_menu_selection,
-            commands::fs_commands::list_directory,
-            commands::fs_commands::create_directory,
-            commands::fs_commands::create_file,
-            commands::fs_commands::delete_files,
-            commands::fs_commands::rename_file,
-            commands::fs_commands::apply_batch_rename,
-            commands::fs_commands::copy_files,
-            commands::fs_commands::move_files,
-            commands::fs_commands::check_copy_conflicts,
-            commands::fs_commands::extract_zip,
-            commands::fs_commands::create_zip,
-            commands::fs_commands::create_zip_from_paths,
-            commands::fs_commands::cancel_zip_operation,
-            commands::job_commands::submit_job,
-            commands::job_commands::list_jobs,
-            commands::job_commands::cancel_job,
-            commands::job_commands::retry_job,
-            commands::job_commands::clear_finished_jobs,
-            commands::fs_commands::read_file_content,
+            commands::system::drives::get_drives,
+            commands::system::paths::get_home_dir,
+            commands::system::paths::resolve_path,
+            commands::system::paths::get_available_space,
+            commands::system::launch::open_in_terminal,
+            commands::system::launch::open_in_editor,
+            commands::system::launch::open_file,
+            commands::system::launch::run_shell_command,
+            commands::system::menu::quit_app,
+            commands::system::menu::show_context_menu,
+            commands::system::menu::set_show_hidden_menu_checked,
+            commands::system::menu::set_theme_menu_selection,
+            commands::system::menu::set_view_mode_menu_selection,
+            commands::fs::metadata::list_directory,
+            commands::fs::operations::create_directory,
+            commands::fs::operations::create_file,
+            commands::fs::operations::delete_files,
+            commands::fs::operations::rename_file,
+            commands::fs::operations::apply_batch_rename,
+            commands::fs::operations::copy_files,
+            commands::fs::operations::move_files,
+            commands::fs::operations::check_copy_conflicts,
+            commands::fs::archive::extract_zip,
+            commands::fs::archive::create_zip,
+            commands::fs::archive::create_zip_from_paths,
+            commands::fs::archive::cancel_zip_operation,
+            commands::jobs::commands::submit_job,
+            commands::jobs::commands::list_jobs,
+            commands::jobs::commands::cancel_job,
+            commands::jobs::commands::retry_job,
+            commands::jobs::commands::clear_finished_jobs,
+            commands::fs::metadata::read_file_content,
             commands::search_commands::search_files,
-            commands::fs_commands::get_dir_size,
+            commands::fs::metadata::get_dir_size,
             commands::drag_commands::start_native_drag,
             commands::drag_commands::write_files_to_pasteboard,
             commands::sync_commands::compare_directories,
