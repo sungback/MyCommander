@@ -22,8 +22,12 @@
 - `README.md`는 사용자용, `CLAUDE.md`는 구현 컨텍스트용, `AGENTS.md`는 작업 규칙용으로 유지합니다.
 - 프런트엔드 스타일링에는 Tailwind 유틸리티 클래스를 사용합니다.
 - 공유 프런트엔드 상태에는 Zustand를 사용합니다.
-- 새 Tauri command는 `src-tauri/src/commands/` 아래에 추가하고 `src-tauri/src/lib.rs`에 등록합니다.
-- 백엔드 동작에 새 권한이 필요하면 `src-tauri/permissions/` 관련 파일과 Tauri 설정을 함께 확인합니다.
+- 새 Tauri command 추가 시 아래 4단계를 순서대로 완료합니다:
+  1. `src-tauri/src/commands/*.rs` 에 함수 작성
+  2. `src-tauri/src/lib.rs` `invoke_handler!` 에 등록
+  3. `src-tauri/permissions/` 에 해당 command 권한 추가
+  4. `src-tauri/capabilities/` 에서 해당 permission 포함 여부 확인
+  — 3·4번을 빠뜨리면 런타임 권한 오류가 발생합니다.
 - 이 저장소는 Tauri v2 전용으로 다룹니다. 검증 없이 Tauri v1 관례를 적용하지 않습니다.
 - `CLAUDE.md`에 이미 안정적으로 정리된 프로젝트 배경은 이 문서에 중복 작성하지 말고 링크로 연결합니다.
 

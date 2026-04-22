@@ -104,10 +104,12 @@ src/
 
 src-tauri/src/commands/
   system_commands.rs  # 드라이브·홈·여유공간, 파일/에디터/터미널 열기, 셸 실행, 메뉴
-  fs_commands.rs      # 디렉터리 목록, 파일/폴더 CRUD, ZIP, 충돌 점검, keep_both 이름 생성
-  search_commands.rs  # 파일 검색
-  sync_commands.rs    # 디렉터리 비교
-  drag_commands.rs    # 네이티브 드래그 시작
+  fs_commands.rs          # 디렉터리 목록, 파일/폴더 CRUD, ZIP, 충돌 점검, keep_both 이름 생성
+  file_watch_commands.rs  # notify 기반 파일시스템 감시, 변경 시 패널 자동 갱신 이벤트 발송
+  job_commands.rs         # Copy/Move/Delete/Zip 작업을 큐에 넣고 비동기 실행하는 백그라운드 잡 엔진
+  search_commands.rs      # 파일 검색
+  sync_commands.rs        # 디렉터리 비교
+  drag_commands.rs        # 네이티브 드래그 시작
 ```
 
 - `src-tauri/src/lib.rs` — Tauri 앱 빌더, 메뉴, `invoke_handler` 등록
