@@ -165,6 +165,31 @@ describe("ProgressDialog", () => {
     expect(mockRetryJob).toHaveBeenCalledWith("job-1");
   });
 
+  it("uses the latest failed move job to label the dialog when nothing is running", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-7",
+        kind: "move",
+        status: "failed",
+        createdAt: 7,
+        updatedAt: 8,
+        progress: { current: 0, total: 1, currentFile: "", unit: "items" },
+        error: "No such file or directory (os error 2)",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByText("Moving Files...")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Last failed job: move")).toBeInTheDocument();
+  });
+
   it("clears finished jobs from the dialog state", async () => {
     mockClearFinishedJobs.mockResolvedValue(undefined);
     useDialogStore.getState().setOpenDialog("progress");

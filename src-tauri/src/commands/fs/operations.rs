@@ -216,34 +216,97 @@ where
     F: Fn(ProgressPayload) + Send + 'static,
 {
     let total = source_paths.len() as u64;
+    let multiple_sources = source_paths.len() > 1;
+
     for (index, path) in source_paths.iter().enumerate() {
         if is_operation_cancelled(cancel_flag.as_deref()) {
             return Err("Operation cancelled.".to_string());
         }
         let src = Path::new(path);
-        if let Some(file_name) = src.file_name() {
-            let file_name_str = file_name.to_string_lossy().to_string();
-            let dest = Path::new(&target_dir).join(file_name);
+        let file_name = src
+            .file_name()
+            .ok_or_else(|| format!("Could not determine file name for {}", src.display()))?;
+        let file_name_str = file_name.to_string_lossy().to_string();
+        let dest = resolve_move_destination(src, &target_dir, multiple_sources)?;
 
-            if src == dest {
-                return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
-            }
-            if let (Ok(src_c), Ok(dest_c)) = (src.canonicalize(), dest.canonicalize()) {
-                if src_c == dest_c {
-                    return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
-                }
-            }
+        ensure_move_destination_valid(src, &dest, &file_name_str)?;
 
-            fs::rename(src, &dest).map_err(|e| e.to_string())?;
-            emit_progress(ProgressPayload {
-                operation: "move".to_string(),
-                current: (index + 1) as u64,
-                total,
-                current_file: file_name_str,
-                unit: "items".to_string(),
-            });
+        fs::rename(src, &dest).map_err(|e| e.to_string())?;
+        emit_progress(ProgressPayload {
+            operation: "move".to_string(),
+            current: (index + 1) as u64,
+            total,
+            current_file: file_name_str,
+            unit: "items".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn resolve_move_destination(
+    source: &Path,
+    target_path: &str,
+    multiple_sources: bool,
+) -> Result<PathBuf, String> {
+    let target = Path::new(target_path);
+
+    if target.exists() && target.is_dir() {
+        let file_name = source
+            .file_name()
+            .ok_or_else(|| format!("Could not determine file name for {}", source.display()))?;
+        return Ok(target.join(file_name));
+    }
+
+    if multiple_sources {
+        return Err(format!(
+            "Move target must be an existing folder when moving multiple items: {}",
+            target.display()
+        ));
+    }
+
+    let parent = target.parent().ok_or_else(|| {
+        format!(
+            "Could not determine target parent directory for {}",
+            target.display()
+        )
+    })?;
+    if !parent.exists() {
+        return Err(format!(
+            "Target parent directory does not exist: {}",
+            parent.display()
+        ));
+    }
+
+    Ok(target.to_path_buf())
+}
+
+fn ensure_move_destination_valid(
+    source: &Path,
+    destination: &Path,
+    file_name_str: &str,
+) -> Result<(), String> {
+    if source == destination {
+        return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
+    }
+
+    let source_canonical = source.canonicalize().map_err(|e| e.to_string())?;
+    if destination.exists() {
+        let destination_canonical = destination.canonicalize().map_err(|e| e.to_string())?;
+        if source_canonical == destination_canonical {
+            return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
         }
     }
+
+    if source.is_dir() {
+        let normalized_destination = normalize_target_path(destination)?;
+        if normalized_destination.starts_with(&source_canonical) {
+            return Err(format!(
+                "Cannot move a directory into itself: {}",
+                source.display()
+            ));
+        }
+    }
+
     Ok(())
 }
 

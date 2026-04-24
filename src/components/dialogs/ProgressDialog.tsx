@@ -77,15 +77,20 @@ export const ProgressDialog: React.FC = () => {
 
   const isOpen = openDialog === "progress";
   const latestFailedJob = failedJobs.length > 0 ? failedJobs[failedJobs.length - 1] : null;
+  const latestOperation =
+    progress?.operation ??
+    activeJob?.kind ??
+    latestFailedJob?.kind ??
+    null;
   const percent = progress && progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0;
   const operationLabel =
-    activeJob?.kind === "move" || progress?.operation === "move"
+    latestOperation === "move"
       ? "Moving"
-      : activeJob?.kind === "delete" || progress?.operation === "delete"
+      : latestOperation === "delete"
         ? "Deleting"
-        : activeJob?.kind === "zip" || progress?.operation === "zip"
+        : latestOperation === "zip"
           ? "Compressing"
           : "Copying";
   const progressText = progress

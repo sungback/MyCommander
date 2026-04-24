@@ -19,7 +19,7 @@ mod tests {
     use super::metadata::{compute_path_size, decode_preview_bytes, is_hidden_entry};
     use super::operations::{
         apply_batch_rename_operations, collapse_nested_paths, collect_delete_progress_targets,
-        BatchRenameOperation,
+        move_files_with_cancel_and_progress, BatchRenameOperation,
     };
     use super::shared::{compact_command_output, indicates_invalid_zip_message};
     use encoding_rs::EUC_KR;
@@ -33,6 +33,75 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("mycommander_{name}_{suffix}"))
+    }
+
+    #[test]
+    fn move_single_path_allows_target_file_path() {
+        let tmp = create_test_dir("move_single_target_file_path");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("old.txt");
+        let target = target_dir.join("new.txt");
+        fs::write(&source, b"hello").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            move_files_with_cancel_and_progress(
+                vec![source.to_string_lossy().to_string()],
+                target.to_string_lossy().to_string(),
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert!(result.is_ok(), "expected single-file move to target path to succeed");
+        assert!(!source.exists());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "hello");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_multiple_paths_requires_existing_target_directory() {
+        let tmp = create_test_dir("move_multiple_target_directory");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let first = source_dir.join("a.txt");
+        let second = source_dir.join("b.txt");
+        let invalid_target = target_dir.join("renamed.txt");
+        fs::write(&first, b"a").unwrap();
+        fs::write(&second, b"b").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            move_files_with_cancel_and_progress(
+                vec![
+                    first.to_string_lossy().to_string(),
+                    second.to_string_lossy().to_string(),
+                ],
+                invalid_target.to_string_lossy().to_string(),
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert_eq!(
+            result,
+            Err(format!(
+                "Move target must be an existing folder when moving multiple items: {}",
+                invalid_target.display()
+            ))
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
