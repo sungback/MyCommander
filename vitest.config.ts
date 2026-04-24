@@ -20,6 +20,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
+      thresholds: {
+        statements: 70,
+        branches: 60,
+        functions: 75,
+        lines: 70,
+      },
       exclude: [
         'node_modules/**',
         'src-tauri/**',

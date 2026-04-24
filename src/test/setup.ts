@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 
 afterEach(() => {
   try {
@@ -8,5 +8,7 @@ afterEach(() => {
   } catch {
     // Ignore environments where localStorage is unavailable or readonly.
   }
+  vi.clearAllMocks();
+  vi.useRealTimers();
   cleanup();
 });

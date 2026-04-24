@@ -17,6 +17,19 @@
 - 프로젝트 전반에 대한 가정을 하기 전에 [`CLAUDE.md`](./CLAUDE.md)를 먼저 읽습니다.
 - 코드베이스 질문에 답하거나 아키텍처를 추정하기 전에, 관련 저장소 파일을 직접 확인합니다.
 
+## 탐색 범위 가드레일
+
+- 저장소 전체를 검색하거나 파일 목록을 넓게 나열하기 전에 루트의 [`.gitignore`](./.gitignore)와 [`.claudeignore`](./.claudeignore)를 확인합니다.
+- Codex는 `.gitignore`나 `.claudeignore`를 자동 강제하지 않는다고 가정합니다. 따라서 두 파일에 정의된 경로의 **합집합**을 기본 탐색 제외 대상으로 취급합니다.
+- `rg --files`, `find`, 저장소 루트 기준 `rg` 같은 광범위 탐색은 가능하면 위 제외 경로를 빼고 실행합니다.
+- 예외는 아래 경우만 허용합니다:
+  1. 사용자가 해당 경로를 명시적으로 보거나 수정하라고 요청한 경우
+  2. 빌드, 테스트, 디버깅, 릴리즈 문제를 해결하는 데 직접 필요한 경우
+  3. 생성 산출물이나 로그를 최소 범위로 검증해야 하는 경우
+- 예외가 필요하면 폴더 전체를 다시 훑지 말고, 필요한 파일 또는 하위 경로만 좁혀 읽습니다. 왜 읽는지 진행 메시지나 최종 보고에 남깁니다.
+- 현재 저장소 기준으로 기본 제외 우선순위가 높은 경로 예시는 `node_modules/`, `dist/`, `dist-ssr/`, `coverage/`, `src-tauri/target/`, `.git/`, `.claude/worktrees/`, `.omc/`, `.omx/logs/`, `.omx/state/`, `.env*`, 각종 `*.log` 입니다.
+- [`.claudeignore`](./.claudeignore)는 에이전트 탐색 가드레일 파일입니다. 변경이 필요하면 [scripts/generate-claudeignore.sh](./scripts/generate-claudeignore.sh)를 먼저 수정하고, 스크립트로 `.claudeignore`를 재생성합니다. 한쪽만 수동 수정하고 끝내지 않습니다.
+
 ## 에이전트 행동 원칙
 
 ### 핵심 4대 원칙
@@ -73,6 +86,18 @@
 - `dist/`, `src-tauri/target/` 같은 빌드 산출물은 커밋하지 않습니다.
 - `src-tauri/target/`은 매우 커질 수 있으므로, 실제 정리가 필요할 때만 `cargo clean --manifest-path src-tauri/Cargo.toml`를 사용합니다.
 - 작업 트리가 더러운 상태일 수 있으므로, 사용자의 무관한 변경은 되돌리지 않습니다.
+
+## 릴리즈 / 태그 절차
+
+- 릴리즈 작업은 **기능 변경 커밋**과 **버전/태그 커밋**을 분리합니다.
+- 태그나 릴리즈를 만들기 전에는 최소 `npm run test:all` 을 실행합니다. 프런트엔드 번들, 배포 산출물, Tauri 패키징 영향이 있으면 `npm run build` 도 추가합니다.
+- 버전 업데이트는 기본적으로 `npm version <patch|minor|major> --no-git-tag-version` 을 사용합니다. 자동 커밋/자동 태그를 피하고, `version-sync.cjs` 로 `src-tauri/tauri.conf.json` 동기화를 함께 처리하기 위함입니다.
+- 버전 커밋에는 `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json` 만 포함합니다.
+- 릴리즈 커밋 메시지도 Lore 규칙을 따르며 영어로 작성합니다.
+- 태그는 항상 annotated tag 형식 `v<version>` 으로 생성합니다.
+- 푸시 순서는 `git push origin main` 다음 태그 푸시를 기본으로 합니다. 필요 시 `npm run release:push` 를 사용할 수 있습니다.
+- 기존 릴리즈 태그를 재사용하거나 다른 커밋으로 이동시키지 않습니다.
+- 버전 수준이 명확하지 않으면, 버그 수정/문서/내부 안정화 성격은 `patch` 를 기본으로 보고, 사용자 영향이 있는 기능 추가나 호환성 변경 가능성이 있으면 사용자와 기준을 확인합니다.
 
 ## 트러블슈팅 메모
 
