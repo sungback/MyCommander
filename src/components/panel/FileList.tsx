@@ -497,6 +497,9 @@ export const FileList: React.FC<FileListProps> = ({
               className="absolute top-0 left-0 w-full"
               data-entry-index={virtualItem.index}
               data-entry-path={entry.path}
+              data-entry-name={entry.name}
+              data-entry-kind={entry.kind}
+              data-entry-is-hidden={entry.isHidden ? "true" : "false"}
               style={{
                 height: `${virtualItem.size}px`,
                 transform: `translateY(${virtualItem.start}px)`,

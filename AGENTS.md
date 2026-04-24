@@ -93,3 +93,5 @@
 - **contextMenuStore mock:** 테스트에서 컨텍스트 메뉴 관련 오류가 나면 `vi.mock("../store/contextMenuStore")`가 실제 export 구조(`isOpen`, `position`, `items` 등)와 일치하는지 확인합니다.
 - **macOS CloudStorage symlink 경로:** 상세 정책은 [`CLAUDE.md` 설계 정책](./CLAUDE.md#설계-정책) 참조.
 - **CloudStorage 열기 버그 검증:** Dropbox류 폴더 열기 문제를 수정할 때는 최소한 더블클릭 진입, 새로고침, 반대 패널 동기화, 감시 경로 수집, 컨텍스트 메뉴 액션이 표시 경로와 실제 경로를 섞어 쓰지 않는지 함께 확인합니다.
+- **Zustand 상태 덮어쓰기(State Overwrite) 주의:** 패널 상태를 수동으로 읽어(`getState`) 복잡한 업데이트를 처리할 때, 도중에 `state.action()` 같은 동기적 변경을 호출하면 이전에 읽어둔 구버전 객체로 덮어쓰기가 발생해 변경이 유실될 수 있습니다. 단일 `setState` 또는 하나의 `updater` 안에서 상태 변경을 한 번에 처리해야 합니다.
+- **트리 하위 항목(Expanded Folder) 메타데이터:** 패널 스토어의 `files` 배열은 현재 경로의 '루트 항목'만 가집니다. 확장된 하위 폴더의 파일 객체 정보는 전역 상태를 가볍게 유지하기 위해 `FileList.tsx`의 DOM 속성(`data-entry-*`)에 심어둡니다. 우클릭 컨텍스트 메뉴 등에서 하위 항목을 처리할 때는 전역 상태 검색이 실패하면 DOM을 확인하여 `targetEntry`를 재구성해야 합니다.

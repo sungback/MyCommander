@@ -15,7 +15,7 @@ const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string 
   coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 const resolveContext = () => {
-  const { panelId, targetPath } = useContextMenuStore.getState();
+  const { panelId, targetPath, targetEntry } = useContextMenuStore.getState();
   const panelState = usePanelStore.getState();
 
   if (!panelId) {
@@ -23,17 +23,18 @@ const resolveContext = () => {
   }
 
   const panel = panelId === "left" ? panelState.leftPanel : panelState.rightPanel;
-  const targetEntry: FileEntry | null =
-    targetPath !== null
+  const resolvedTargetEntry: FileEntry | null =
+    targetEntry ??
+    (targetPath !== null
       ? panel.files.find((entry) => entry.path.normalize("NFC") === targetPath.normalize("NFC")) ??
         null
-      : null;
+      : null);
 
   return {
     panelId,
     targetPath,
     panel,
-    targetEntry,
+    targetEntry: resolvedTargetEntry,
   };
 };
 
@@ -75,7 +76,7 @@ export const ContextMenu: React.FC = () => {
                 return;
               }
               setActivePanel(panelId);
-              openInfoDialog({ panelId, path: targetPath });
+              openInfoDialog({ panelId, path: targetPath, entry: targetEntry || undefined });
               closeContextMenu();
               return;
             case "reveal":
@@ -155,7 +156,7 @@ export const ContextMenu: React.FC = () => {
                 return;
               }
               setActivePanel(panelId);
-              openRenameDialog({ panelId, path: targetPath });
+              openRenameDialog({ panelId, path: targetPath, entry: targetEntry });
               closeContextMenu();
               return;
             case "refresh":

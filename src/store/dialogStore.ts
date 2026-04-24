@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { MultiRenameSession } from "../features/multiRename";
+import { FileEntry } from "../types/file";
 
 export type DialogType =
   | "copy"
@@ -21,6 +22,7 @@ export type DialogType =
 export interface DialogTarget {
   panelId: "left" | "right";
   path: string;
+  entry?: FileEntry;
 }
 
 export interface DragCopyRequest {

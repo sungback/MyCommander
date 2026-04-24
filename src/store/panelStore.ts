@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { FileEntry, PanelState, ViewMode, PanelId } from "../types/file";
 import { ThemePreference } from "../types/theme";
-import { coalescePanelPath } from "../utils/path";
+import { coalescePanelPath, getPathDirectoryName } from "../utils/path";
 import { readPersistedPanelState } from "./persistence";
 import {
   applyCachedSizes,
@@ -49,6 +49,7 @@ interface AppState {
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: string) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  invalidateEntrySizes: (paths: string[]) => void;
   swapPanels: () => void;
 }
 
@@ -575,6 +576,78 @@ export const usePanelStore = create<AppState>((set) => {
         },
         leftPanel: updatePanelEntrySize(state.leftPanel, normPath, size),
         rightPanel: updatePanelEntrySize(state.rightPanel, normPath, size),
+      };
+    }),
+
+  invalidateEntrySizes: (paths) =>
+    set((state) => {
+      const pathsToInvalidate = new Set<string>();
+
+      for (const path of paths) {
+        if (!path) continue;
+        const norm = normalizePathKey(path);
+        pathsToInvalidate.add(norm);
+
+        let current = path;
+        let parent = getPathDirectoryName(current);
+        while (parent && parent !== current) {
+          pathsToInvalidate.add(normalizePathKey(parent));
+          current = parent;
+          parent = getPathDirectoryName(current);
+        }
+      }
+
+      if (pathsToInvalidate.size === 0) return state;
+
+      let changedSizeCache = false;
+      const nextSizeCache = { ...state.sizeCache };
+
+      for (const path of pathsToInvalidate) {
+        if (nextSizeCache[path] !== undefined) {
+          delete nextSizeCache[path];
+          changedSizeCache = true;
+        }
+      }
+
+      const removeSizesFromPanel = (panelState: PanelState): PanelState => {
+        let panelChanged = false;
+        const tabs = panelState.tabs.map((tab) => {
+          let tabChanged = false;
+          const files = tab.files.map((entry) => {
+            if (
+              entry.kind === "directory" &&
+              pathsToInvalidate.has(normalizePathKey(entry.path)) &&
+              entry.size !== undefined
+            ) {
+              tabChanged = true;
+              panelChanged = true;
+              return { ...entry, size: undefined };
+            }
+            return entry;
+          });
+          return tabChanged ? { ...tab, files } : tab;
+        });
+
+        return panelChanged
+          ? syncPanelWithActiveTab({ ...panelState, tabs })
+          : panelState;
+      };
+
+      const nextLeft = removeSizesFromPanel(state.leftPanel);
+      const nextRight = removeSizesFromPanel(state.rightPanel);
+
+      if (
+        !changedSizeCache &&
+        nextLeft === state.leftPanel &&
+        nextRight === state.rightPanel
+      ) {
+        return state;
+      }
+
+      return {
+        sizeCache: nextSizeCache,
+        leftPanel: nextLeft,
+        rightPanel: nextRight,
       };
     }),
   };

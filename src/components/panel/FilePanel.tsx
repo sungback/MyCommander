@@ -11,6 +11,7 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { coalescePanelPath, getParentPath } from "../../utils/path";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
+import { FileEntry, FileType } from "../../types/file";
 
 interface FilePanelProps {
   id: "left" | "right";
@@ -262,16 +263,29 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         }
       }
 
-      const targetEntry =
-        entryPath !== null
-          ? panelState.files.find(
-              (entry) => entry.path.normalize("NFC") === entryPath.normalize("NFC")
-            ) ?? null
-          : null;
+      let targetEntry: FileEntry | null = null;
+      if (entryPath) {
+        targetEntry = panelState.files.find(
+          (entry) => entry.path.normalize("NFC") === entryPath.normalize("NFC")
+        ) ?? null;
+
+        if (!targetEntry && entryElement) {
+          const kind = entryElement.dataset.entryKind as FileType;
+          if (kind) {
+            targetEntry = {
+              name: entryElement.dataset.entryName || "",
+              path: entryPath,
+              kind,
+              isHidden: entryElement.dataset.entryIsHidden === "true"
+            };
+          }
+        }
+      }
 
       openContextMenu({
         panelId: id,
         targetPath: entryPath,
+        targetEntry,
         x: event.clientX,
         y: event.clientY,
       });

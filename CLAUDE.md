@@ -71,7 +71,7 @@
 - `clipboardStore` — copy/cut 클립보드 상태
 - `dragStore` — 패널 간/패널 내부 드래그 상태
 - `dialogStore` — 현재 열린 다이얼로그, 대상 파일/폴더, 드래그 복사 요청 상태, 일괄 이름 변경 세션
-- `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침
+- `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침 (Zustand 상태 덮어쓰기 방지를 위해 단일 `updatePanelTabs`로 일괄 처리)
 - `persistence` — 패널 상태 localStorage 직렬화/복원
 - `panelHelpers` — `panelStore`가 사용하는 탭/정렬/영속화 보조 로직
 - `uiStore` — 즐겨찾기 패널 열림/닫힘
@@ -87,6 +87,7 @@
 ### 핵심 컴포넌트
 
 - `FileList.tsx` — 가상 스크롤, 키보드/드래그 상호작용의 핵심
+  - 전역 상태 비대화를 막기 위해, 확장된 하위 트리 폴더 항목의 메타데이터는 전역 상태가 아닌 DOM 속성(`data-entry-*`)에 저장되어 컨텍스트 메뉴 등에 제공됩니다.
   - `useFileListDrag.ts` — drag DOM 이벤트 오케스트레이션
   - `fileListDragSharedState.ts` — 패널 간 drag 공유 상태
   - `fileListDragRules.ts` — drop 허용/차단 규칙과 경로 판정

@@ -117,12 +117,12 @@ export const DialogContainer: React.FC = () => {
     rightPanel
   );
   const infoPanel = dialogTarget?.panelId === "left" ? leftPanel : rightPanel;
-  const infoEntry = dialogTarget
+  const infoEntry = dialogTarget?.entry ?? (dialogTarget
     ? infoPanel.files.find(
         (entry) =>
           entry.path.normalize("NFC") === dialogTarget.path.normalize("NFC")
       ) ?? null
-    : null;
+    : null);
   const selectedPaths = getSelectedPaths({
     openDialog,
     dragCopyRequest,

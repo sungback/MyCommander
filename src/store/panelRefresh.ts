@@ -74,6 +74,8 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
   }
 
   const state = usePanelStore.getState();
+  state.invalidateEntrySizes(directories);
+
   const now = Date.now();
   let changed = false;
   const nextPanels = {} as Partial<Record<`${PanelId}Panel`, PanelState>>;
@@ -81,40 +83,38 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
 
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const normalizedActivePath = getNormalizedPanelPath(
-      coalescePanelPath(panel.resolvedPath, panel.currentPath)
-    );
-
-    if (normalizedActivePath && normalizedDirectories.has(normalizedActivePath)) {
-      state.refreshPanel(panelId);
-    }
-
-    if (normalizedActivePath) {
-      const nestedPrefix = normalizedActivePath.endsWith("/")
-        ? normalizedActivePath
-        : `${normalizedActivePath}/`;
-      const hasNestedChange = [...normalizedDirectories].some((d) => d.startsWith(nestedPrefix));
-      if (hasNestedChange) {
-        state.bumpExpandedChildrenVersion(panelId);
-      }
-    }
 
     const nextPanel = updatePanelTabs(panel, (tab) => {
-      if (tab.id === panel.activeTabId) {
+      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
+      const normalizedCurrentPath = getNormalizedPanelPath(tabPath);
+
+      if (!normalizedCurrentPath) {
         return tab;
       }
 
-      const normalizedCurrentPath = getNormalizedPanelPath(
-        coalescePanelPath(tab.resolvedPath, tab.currentPath)
-      );
+      let nextLastUpdated = tab.lastUpdated;
+      let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
 
-      if (!normalizedCurrentPath || !normalizedDirectories.has(normalizedCurrentPath)) {
+      if (normalizedDirectories.has(normalizedCurrentPath)) {
+        nextLastUpdated = now;
+      }
+
+      const nestedPrefix = normalizedCurrentPath.endsWith("/")
+        ? normalizedCurrentPath
+        : `${normalizedCurrentPath}/`;
+      const hasNestedChange = [...normalizedDirectories].some((d) => d.startsWith(nestedPrefix));
+      if (hasNestedChange) {
+        nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
+      }
+
+      if (nextLastUpdated === tab.lastUpdated && nextExpandedChildrenVersion === tab.expandedChildrenVersion) {
         return tab;
       }
 
       return {
         ...tab,
-        lastUpdated: now,
+        lastUpdated: nextLastUpdated,
+        expandedChildrenVersion: nextExpandedChildrenVersion,
       };
     });
 
@@ -137,6 +137,8 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
   }
 
   const state = usePanelStore.getState();
+  state.invalidateEntrySizes(paths);
+
   const now = Date.now();
   let changed = false;
   const nextPanels = {} as Partial<Record<`${PanelId}Panel`, PanelState>>;
@@ -144,33 +146,33 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
 
   for (const panelId of PANEL_IDS) {
     const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const activePanelPath = coalescePanelPath(panel.resolvedPath, panel.currentPath);
-
-    if (normalizedPaths.some((path) => isSameOrNestedPath(activePanelPath, path))) {
-      state.refreshPanel(panelId);
-    }
-
-    const normalizedActivePanelPath = normalizePathForComparison(activePanelPath);
-    const nestedPrefix = normalizedActivePanelPath.endsWith("/")
-      ? normalizedActivePanelPath
-      : `${normalizedActivePanelPath}/`;
-    if (normalizedPaths.some((path) => normalizePathForComparison(path).startsWith(nestedPrefix))) {
-      state.bumpExpandedChildrenVersion(panelId);
-    }
 
     const nextPanel = updatePanelTabs(panel, (tab) => {
-      if (tab.id === panel.activeTabId) {
-        return tab;
+      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
+
+      let nextLastUpdated = tab.lastUpdated;
+      let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
+
+      if (normalizedPaths.some((path) => isSameOrNestedPath(tabPath, path))) {
+        nextLastUpdated = now;
       }
 
-      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
-      if (!normalizedPaths.some((path) => isSameOrNestedPath(tabPath, path))) {
+      const normalizedTabPath = normalizePathForComparison(tabPath);
+      const nestedPrefix = normalizedTabPath.endsWith("/")
+        ? normalizedTabPath
+        : `${normalizedTabPath}/`;
+      if (normalizedPaths.some((path) => normalizePathForComparison(path).startsWith(nestedPrefix))) {
+        nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
+      }
+
+      if (nextLastUpdated === tab.lastUpdated && nextExpandedChildrenVersion === tab.expandedChildrenVersion) {
         return tab;
       }
 
       return {
         ...tab,
-        lastUpdated: now,
+        lastUpdated: nextLastUpdated,
+        expandedChildrenVersion: nextExpandedChildrenVersion,
       };
     });
 
