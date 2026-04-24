@@ -16,6 +16,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     execArgv: vitestExecArgv,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -27,6 +28,7 @@ export default defineConfig({
         '**/*.d.ts',
         'vite.config.ts',
         'vitest.config.ts',
+        '.claude/worktrees/**',
       ],
     },
   },

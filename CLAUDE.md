@@ -51,62 +51,14 @@
 
 ## 프런트엔드 구조 메모
 
-### 앱 구성
+### 비명시적 동작 (코드만으로 파악하기 어려운 것)
 
-`src/App.tsx`는 앱 뼈대를 조립합니다: `FavoritesPanel`, `DualPanel`, `StatusBar`, `DialogContainer`, `ProgressDialog`, `JobCenterDialog`, `MultiRenameDialog`, `SearchPreviewDialogs`, `SyncDialog`, `ContextMenu`, `ToastViewport`.
-
-자동 테마(auto): 07:00–19:00는 light, 그 외는 dark로 자동 전환되며 창 포커스 시 재평가합니다.
-
-### 상태 관리
-
-- `panelStore` — 좌/우 패널 상태, 탭·경로·히스토리·선택·커서·정렬·보기 모드, 숨김 파일 표시, 테마 선호도, 드래그 상태
-  - `currentPath`: UI/히스토리에 보이는 경로
-  - `resolvedPath`: 실제 파일 시스템 접근 경로
-- `clipboardStore` — copy/cut 클립보드 상태
-- `dragStore` — 패널 간/패널 내부 드래그 상태
-- `dialogStore` — 현재 열린 다이얼로그, 대상 파일/폴더, 드래그 복사 요청 상태, 일괄 이름 변경 세션
-- `panelRefresh` — 변경된 디렉터리를 보고 있는 패널만 선택적으로 새로고침 (Zustand 상태 덮어쓰기 방지를 위해 단일 `updatePanelTabs`로 일괄 처리)
-- `persistence` — 패널 상태 localStorage 직렬화/복원
-- `panelHelpers` — `panelStore`가 사용하는 탭/정렬/영속화 보조 로직
-- `uiStore` — 즐겨찾기 패널 열림/닫힘
-- `toastStore` — 짧은 피드백 메시지용 토스트 큐
-- `favoriteStore` — 즐겨찾기 목록, 순서, 이름 변경
-- `jobStore` / `useJobQueue` — Unified Job Engine: copy/move/delete/zip 작업을 큐로 관리. submit/list/cancel/retry/clear-finished 지원, 앱 재시작 시 큐 복원
-- `settingsStore` — 앱 설정 영속화 (localStorage): 폰트 패밀리, 폰트 크기, 행 높이 등 UI 표시 설정
-- `contextMenuStore` — 컨텍스트 메뉴 열림 상태 및 대상 항목
-- `panelWatch` — 파일시스템 감시 경로 등록/해제 보조 로직
-
-`localStorage` 저장 항목: 패널 상태, 즐겨찾기, 테마 선호도.
-
-### 핵심 컴포넌트
-
-- `FileList.tsx` — 가상 스크롤, 키보드/드래그 상호작용의 핵심
-  - 전역 상태 비대화를 막기 위해, 확장된 하위 트리 폴더 항목의 메타데이터는 전역 상태가 아닌 DOM 속성(`data-entry-*`)에 저장되어 컨텍스트 메뉴 등에 제공됩니다.
-  - `useFileListDrag.ts` — drag DOM 이벤트 오케스트레이션
-  - `fileListDragSharedState.ts` — 패널 간 drag 공유 상태
-  - `fileListDragRules.ts` — drop 허용/차단 규칙과 경로 판정
-- `FilePanel.tsx` — 단일 패널(주소창 + 탭 바 + 파일 리스트 + 드라이브 목록) 조합
-- `AddressBar.tsx` — breadcrumb, 홈 이동, 새로고침, 경로 복사, 반대 패널 동기화
-- `StatusBar.tsx` — 패널 요약, 여유 공간, 명령 실행 입력창, 하단 액션 버튼
-- `ToastViewport.tsx` — 짧은 성공/경고/오류 피드백을 표시하는 토스트 레이어
-- `DialogContainer.tsx` — 다이얼로그 조립과 제출 진입점
-  - `dialogTargetPath.ts` — 선택 항목/대상 경로 계산
-  - `useDialogInfo.ts` — info 다이얼로그 크기 로딩
-  - `useCopyMoveFlow.ts` — copy/move/overwrite/paste 흐름
-- `ProgressDialog.tsx` — 진행 중인 작업 목록 빠른 보기, 완료 작업만 남으면 자동 닫힘
-- `JobCenterDialog.tsx` — 전체 작업 이력 다이얼로그, 필터/정렬/상세 패널 포함
-- `SearchPreviewDialogs.tsx` — 검색 다이얼로그와 검색 결과 후속 작업 UI
-  - `searchOptions.ts` — 고급 검색 옵션 기본값/직렬화 helper
-- `SettingsDialog.tsx` — 폰트, 폰트 크기, 행 높이 설정 다이얼로그
-- `QuickPreviewDialog.tsx` — F3 단축키 기반 파일 빠른 미리보기
-  - `quickPreviewLoader.ts` — 확장자 판별과 preview dispatcher
-  - `quickPreviewRenderers/` — markdown / notebook / pptx / hwpx / xlsx / text highlight renderer
-
-파일 생성/삭제/이름 변경/복사/이동 후에는 같은 디렉터리를 보고 있는 다른 패널도 함께 갱신됩니다.
-
-짧은 피드백 메시지는 더 이상 `StatusBar` 오른쪽에 인라인으로 표시하지 않고, `toastStore` + `ToastViewport`를 통해 토스트로 표시합니다. 오래 걸리는 작업은 `ProgressDialog`, 작업 이력은 `JobCenterDialog`가 담당합니다.
-
-더블클릭 진입은 디렉터리가 일반 디렉터리든 symlink든 먼저 실제 경로 접근 가능 여부를 확인한 뒤 표시 경로로 진입 상태를 갱신합니다.
+- **자동 테마:** 07:00–19:00는 light, 그 외는 dark. 창 포커스 시 재평가.
+- **토스트 피드백:** 짧은 성공/경고/오류는 `StatusBar` 인라인이 아닌 `toastStore` + `ToastViewport`로 표시. 긴 작업은 `ProgressDialog`, 이력은 `JobCenterDialog`.
+- **패널 갱신:** 파일 생성/삭제/이름 변경/복사/이동 후 같은 디렉터리를 보고 있는 다른 패널도 함께 갱신. `panelRefresh`는 Zustand 덮어쓰기 방지를 위해 단일 `updatePanelTabs`로 일괄 처리.
+- **더블클릭 진입:** 일반 디렉터리든 symlink든 실제 경로 접근 가능 여부를 먼저 확인 후 표시 경로로 상태를 갱신.
+- **확장 트리 메타데이터:** `FileList.tsx`의 확장된 하위 폴더 항목 정보는 전역 상태가 아닌 DOM 속성(`data-entry-*`)에 저장. 컨텍스트 메뉴 등에서 하위 항목 처리 시 DOM에서 재구성 필요.
+- **`panelStore` 경로 이중 구조:** `currentPath`(UI/히스토리 표시용) / `resolvedPath`(실제 파일시스템 접근용). 경로 비교·접근은 `resolvedPath ?? currentPath` 패턴 우선.
 
 ---
 
