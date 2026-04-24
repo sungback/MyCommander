@@ -1,5 +1,7 @@
 # MyCommander
 
+이 문서는 MyCommander의 사용자/기여자용 시작 안내입니다. 구현 컨텍스트와 설계 정책은 [`CLAUDE.md`](./CLAUDE.md), 에이전트 작업 규칙과 검증 기준은 [`AGENTS.md`](./AGENTS.md)를 참고합니다.
+
 MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
 현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX, 토스트 기반 피드백까지 포함합니다.
 
@@ -10,7 +12,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 좌/우 **듀얼 패널** 파일 탐색
 - 패널별 **탭**, 뒤로/앞으로 이동, breadcrumb 경로 이동
 - **즐겨찾기 패널** 추가 / 이름 변경 / 재정렬 / 접기
-- 폴더 **트리 확장(Expand)** 및 **하위 항목별 컨텍스트 메뉴(이름 변경, 정보 보기 등) 완벽 지원**
+- 폴더 **트리 확장(Expand)** 및 **하위 항목별 컨텍스트 메뉴(이름 변경, 정보 보기 등) 지원**
 - 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
 - 패널 간 **드래그 드롭 복사**
 - 같은 패널 안에서 폴더만 선택한 경우 **드래그 이동**
@@ -47,6 +49,8 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 지원하지 않는 형식은 미리보기에서 unsupported 상태로 표시됩니다.
 
 ## 기술 스택
+
+상세 구현 컨텍스트는 [`CLAUDE.md`](./CLAUDE.md)에 정리되어 있습니다.
 
 - **Frontend**: React 19, TypeScript, Vite, Zustand
 - **Styling**: Tailwind CSS v4
@@ -159,42 +163,34 @@ npm run dev
 
 ## macOS CloudStorage 경로
 
-macOS의 `~/Dropbox` 같은 symlink 경로도 탐색할 수 있습니다.
+macOS의 `~/Dropbox`, iCloud Drive처럼 CloudStorage가 symlink로 노출되는 경로도 탐색할 수 있습니다. 내부적으로는 사용자가 선택한 표시 경로를 UI/히스토리에 유지하고, 실제 파일 접근은 해석된 경로를 사용합니다. 자세한 설계 정책은 [`CLAUDE.md#설계-정책`](./CLAUDE.md#설계-정책)을 참고합니다.
 
 ## 프로젝트 구조
 
 ```text
 src/
-  components/
-    dialogs/       # 검색, 미리보기, 복사/이동, 동기화, 일괄 이름 변경 UI + dialog/search helper
-    favorites/     # 즐겨찾기 사이드바
-    layout/        # 상태바, 컨텍스트 메뉴, 하단 액션, 토스트 뷰포트
-    panel/         # 듀얼 패널, 파일 목록, 주소창, 탭, 드라이브 목록 + drag helper
+  components/      # 앱 UI
   features/        # 기능 단위 로직
   hooks/           # 키보드 및 Tauri command wrapper
-  store/           # Zustand 스토어 + persistence/refresh/toast helper
-  test/            # 테스트 설정 / mock
+  store/           # Zustand 스토어와 영속화/갱신 보조 로직
+  test/            # 테스트 설정과 mock
   types/           # 타입 정의
   utils/           # 포맷/경로/클립보드 유틸
 
 src-tauri/
-  src/commands/
-    fs/            # 파일 시스템 관련 command 하위 모듈
-    jobs/          # Job Engine 상태/실행/영속화 하위 모듈
-    system/        # 드라이브, 경로, 메뉴, 실행 관련 하위 모듈
-    *.rs           # file watch, search, sync, drag 같은 독립 command
+  src/commands/    # 파일 시스템, 작업 큐, 검색, 동기화, 시스템 command
   capabilities/    # Tauri capability 정의
   permissions/     # 명령 권한 설정
   tauri.conf.json  # Tauri 앱 설정
 ```
 
-구현 컨텍스트와 내부 구조 설명은 [CLAUDE.md](./CLAUDE.md), 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
+구현 컨텍스트와 내부 구조 설명은 [`CLAUDE.md`](./CLAUDE.md)에 더 자세히 정리되어 있습니다.
 
-## 버전 업데이트
+## 유지보수 메모
 
-프로젝트 루트의 [`version-sync.cjs`](./version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다.
+### 버전 업데이트
 
-일반적인 릴리스 흐름:
+프로젝트 루트의 [`version-sync.cjs`](./version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다. 일반적인 릴리스 흐름은 다음과 같습니다.
 
 ```bash
 git add -A
@@ -204,38 +200,28 @@ git push origin main
 git push origin v<new-version>
 ```
 
-`npm version` 실행 시:
-
-- `package.json` 버전이 변경됩니다.
-- `version-sync.cjs`가 `src-tauri/tauri.conf.json` 버전을 함께 맞춥니다.
-- Git 태그가 로컬에 생성됩니다.
-- 원격 브랜치와 태그 push는 자동으로 하지 않습니다.
-
-필요하면 명시적으로 다음 스크립트로 브랜치와 태그를 함께 push할 수 있습니다.
+`npm version`은 로컬 버전 파일과 Git 태그를 만들지만 원격 push는 하지 않습니다. 필요하면 다음 스크립트로 브랜치와 태그를 함께 push합니다.
 
 ```bash
 npm run release:push
 ```
 
-릴리스 GitHub Actions는 `v*` 형식의 태그 push 또는 수동 실행(`workflow_dispatch`)으로 시작됩니다.
-
-과거 릴리스 과정에서 생성된 `app-v*` 태그는 legacy 호환용으로 유지합니다. 새 릴리스에서는 `v*` 태그만 사용하며, 더 이상 `app-v*` 태그를 새로 만들지 않습니다.
-
-현재 릴리스 하네스는 다음 순서로 동작합니다.
-
-- `check`: TypeScript 타입 체크와 Rust 체크
-- `test`: 프런트엔드 테스트와 Rust 테스트
-- `build`: 프런트엔드 프로덕션 빌드
-- `publish-tauri`: 위 단계를 모두 통과한 뒤 플랫폼별 Tauri 배포 빌드
-
-GitHub Actions 워크플로 또는 로컬 composite action을 수정할 때는 별도 `actionlint` 워크플로가 먼저 YAML과 액션 구성을 검증합니다.
+릴리스 GitHub Actions는 `v*` 형식의 태그 push 또는 수동 실행(`workflow_dispatch`)으로 시작됩니다. 과거 `app-v*` 태그는 legacy 호환용으로만 유지하며, 새 릴리스에서는 `v*` 태그만 사용합니다.
 
 ## 문제 해결
 
 ### 포트 1420 충돌
 
+점유 프로세스를 먼저 확인합니다.
+
 ```bash
-lsof -ti tcp:1420 | xargs kill
+lsof -ti tcp:1420
+```
+
+개발 서버 프로세스로 확인된 경우에만 종료합니다.
+
+```bash
+kill <pid>
 ```
 
 ### Vite 관련 파일 누락/설치 손상
@@ -259,7 +245,7 @@ cargo clean --manifest-path src-tauri/Cargo.toml
 - `src-tauri/permissions/`와 `src-tauri/capabilities/` 확인
 - `src-tauri/tauri.conf.json` 확인
 
-## 참고1
+## 관련 문서
 
-- 프로젝트 컨텍스트 문서는 [CLAUDE.md](./CLAUDE.md)
-- 작업 규칙과 검증 규칙은 [AGENTS.md](./AGENTS.md)
+- 구현 컨텍스트와 설계 정책: [`CLAUDE.md`](./CLAUDE.md)
+- 에이전트 작업 규칙과 검증 기준: [`AGENTS.md`](./AGENTS.md)
