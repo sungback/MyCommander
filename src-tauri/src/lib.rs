@@ -307,7 +307,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::file_watch_commands::FileWatcherState::default())
-        .menu(|app| build_app_menu(app))
+        .menu(build_app_menu)
         .on_menu_event(|app, event| {
             let event_id = event.id().as_ref();
 
@@ -495,6 +495,7 @@ pub fn run() {
             commands::fs::metadata::get_dir_size,
             commands::drag_commands::start_native_drag,
             commands::drag_commands::write_files_to_pasteboard,
+            commands::git_commands::get_git_status,
             commands::sync_commands::compare_directories,
             commands::file_watch_commands::sync_watched_directories,
         ])

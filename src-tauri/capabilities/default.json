@@ -48,6 +48,7 @@
     "allow-get-dir-size",
     "allow-compare-directories",
     "allow-sync-watched-directories",
+    "allow-get-git-status",
     "drag:default",
     "window-state:default"
   ]

@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileEntry, ViewMode } from "../../types/file";
 import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { useGitStatus } from "../../hooks/useGitStatus";
 import { usePanelStore } from "../../store/panelStore";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { sortEntries } from "../../utils/panelHelpers";
@@ -92,6 +93,12 @@ export const FileList: React.FC<FileListProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { getDirSize, listDirectory } = useFileSystem();
+  const activeTab = usePanelStore((s) => {
+    const key = panelId === "left" ? "leftPanel" : "rightPanel";
+    return s[key].tabs.find((t) => t.id === s[key].activeTabId);
+  });
+  const refreshKey = activeTab?.lastUpdated ?? 0;
+  const { gitStatus } = useGitStatus(accessPath, refreshKey);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const setSelection = usePanelStore((s) => s.setSelection);
   const selectOnly = usePanelStore((s) => s.selectOnly);
@@ -102,13 +109,8 @@ export const FileList: React.FC<FileListProps> = ({
   const cutPaths = clipboard?.operation === "cut"
     ? new Set(clipboard.paths)
     : null;
-  const activeTab = usePanelStore((s) => {
-    const key = panelId === "left" ? "leftPanel" : "rightPanel";
-    return s[key].tabs.find((t) => t.id === s[key].activeTabId);
-  });
   const sortField = activeTab?.sortField ?? "name";
   const sortDirection = activeTab?.sortDirection ?? "asc";
-  const refreshKey = activeTab?.lastUpdated ?? 0;
   const expandedChildrenVersion = activeTab?.expandedChildrenVersion ?? 0;
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [childEntriesByPath, setChildEntriesByPath] = useState<
@@ -119,6 +121,29 @@ export const FileList: React.FC<FileListProps> = ({
   const searchStringRef = useRef<string>("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expandedPathsRef = useRef<Set<string>>(new Set());
+
+  const getGitMark = (entry: FileEntry): string | undefined => {
+    if (!gitStatus) return undefined;
+
+    if (entry.kind === "directory") {
+      // Folder: check if any child file has changes
+      const name = entry.name;
+      const hasChanges = gitStatus.modified.some(p => p.startsWith(name + "/")) ||
+                         gitStatus.added.some(p => p.startsWith(name + "/")) ||
+                         gitStatus.deleted.some(p => p.startsWith(name + "/")) ||
+                         gitStatus.untracked.some(p => p.startsWith(name + "/"));
+      return hasChanges ? "~" : undefined;
+    } else {
+      // File: check direct name match in git status
+      const name = entry.name;
+      if (gitStatus.modified.includes(name)) return "M";
+      if (gitStatus.added.includes(name)) return "A";
+      if (gitStatus.deleted.includes(name)) return "D";
+      if (gitStatus.untracked.includes(name)) return "?";
+    }
+
+    return undefined;
+  };
 
   const visibleRows = getVisibleRows(
     files,
@@ -524,6 +549,7 @@ export const FileList: React.FC<FileListProps> = ({
                     : null
                 }
                 viewMode={viewMode}
+                gitMark={getGitMark(entry)}
                 onClick={(event) => {
                   handleRowClick(event, virtualItem.index, entry);
                 }}

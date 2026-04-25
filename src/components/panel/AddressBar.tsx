@@ -17,6 +17,7 @@ import {
 } from "../../utils/path";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
+import { useGitStatus } from "../../hooks/useGitStatus";
 import { PanelState } from "../../types/file";
 
 interface AddressBarProps {
@@ -54,6 +55,8 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   );
 
   const parts = getBreadcrumbParts(currentPath);
+  const gitAccessPath = coalescePanelPath(currentPanel.resolvedPath, currentPanel.currentPath);
+  const { gitStatus } = useGitStatus(gitAccessPath);
 
   const handleNavigate = (path: string) => {
     setActivePanel(panelId);
@@ -122,6 +125,24 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
           </React.Fragment>
         ))}
       </div>
+
+      {gitStatus && (
+        <div className="flex items-center gap-0.5 ml-2 px-2 rounded text-xs whitespace-nowrap text-text-secondary">
+          <span>{gitStatus.branch}</span>
+          {gitStatus.modified.length > 0 && (
+            <span className="text-yellow-400">●{gitStatus.modified.length}</span>
+          )}
+          {gitStatus.added.length > 0 && (
+            <span className="text-green-400">+{gitStatus.added.length}</span>
+          )}
+          {gitStatus.deleted.length > 0 && (
+            <span className="text-red-400">-{gitStatus.deleted.length}</span>
+          )}
+          {gitStatus.untracked.length > 0 && (
+            <span className="text-gray-400">?{gitStatus.untracked.length}</span>
+          )}
+        </div>
+      )}
 
       <button
         type="button"

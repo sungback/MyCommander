@@ -50,6 +50,7 @@ interface FileItemProps {
   isCut?: boolean;
   dropHint?: "copy" | "blocked" | null;
   viewMode?: ViewMode;
+  gitMark?: string;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
   onToggleExpand?: () => void;
@@ -67,6 +68,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   isCut = false,
   dropHint = null,
   viewMode = "detailed",
+  gitMark,
   onClick,
   onDoubleClick,
   onToggleExpand,
@@ -183,6 +185,21 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
         >
           {entry.name}
         </span>
+        {gitMark && (
+          <span className={clsx(
+            "text-xs ml-1 shrink-0 font-semibold",
+            isSelectionRow
+              ? "theme-selection-text"
+              : gitMark === "M" ? "text-yellow-400"
+              : gitMark === "A" ? "text-green-400"
+              : gitMark === "D" ? "text-red-400"
+              : gitMark === "?" ? "text-zinc-400"
+              : gitMark === "~" ? "text-blue-400"
+              : rowTextClass
+          )}>
+            {gitMark}
+          </span>
+        )}
         {dropHint ? (
           <span
             className={clsx(
