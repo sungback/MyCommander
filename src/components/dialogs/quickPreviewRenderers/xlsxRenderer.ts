@@ -1,20 +1,14 @@
-import { escapeHtml, getAppTheme, XlsxRendererModule } from "./shared";
+import {
+  buildPreviewHtmlDocument,
+  escapeHtml,
+  getPreviewTheme,
+  XlsxRendererModule,
+} from "./shared";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 const buildXlsxHtml = async (filePath: string): Promise<string> => {
   const XLSX = await import("xlsx");
-
-  const isDark = getAppTheme() === "dark";
-  const bg = isDark ? "#0d1117" : "#ffffff";
-  const fg = isDark ? "#e6edf3" : "#1f2328";
-  const borderColor = isDark ? "#30363d" : "#d1d9e0";
-  const thBg = isDark ? "#161b22" : "#f6f8fa";
-  const trEvenBg = isDark ? "#0d1117" : "#f8fafc";
-  const badgeColor = isDark ? "#3fb950" : "#1a7f37";
-  const badgeBg = isDark ? "rgba(63,185,80,0.12)" : "rgba(26,127,55,0.1)";
-  const mutedColor = isDark ? "#6e7681" : "#9ca3af";
-  const sheetHeaderBg = isDark ? "#161b22" : "#f6f8fa";
-  const sheetHeaderBorder = isDark ? "#21262d" : "#d1d9e0";
+  const theme = getPreviewTheme();
   const maxRows = 500;
 
   const url = convertFileSrc(filePath);
@@ -66,28 +60,23 @@ const buildXlsxHtml = async (filePath: string): Promise<string> => {
 </div>`;
   });
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; }
+  return buildPreviewHtmlDocument({
+    styles: `
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    font-size: 13px; color: ${fg}; background: ${bg}; margin: 0; padding: 16px 20px; }
-  .sheet-block { margin-bottom: 20px; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden; }
-  .sheet-header { background: ${sheetHeaderBg}; padding: 8px 14px; border-bottom: 1px solid ${sheetHeaderBorder}; }
-  .sheet-badge { font-size: 11px; font-weight: 600; color: ${badgeColor}; background: ${badgeBg}; padding: 2px 8px; border-radius: 10px; }
-  .sheet-empty { padding: 14px 16px; font-size: 12px; color: ${mutedColor}; font-style: italic; }
-  .truncate-note { padding: 6px 14px; font-size: 11px; color: ${mutedColor}; background: ${sheetHeaderBg}; border-bottom: 1px solid ${sheetHeaderBorder}; }
+    font-size: 13px; color: ${theme.foreground}; background: ${theme.background}; margin: 0; padding: 16px 20px; }
+  .sheet-block { margin-bottom: 20px; border: 1px solid ${theme.border}; border-radius: 8px; overflow: hidden; }
+  .sheet-header { background: ${theme.codeBackground}; padding: 8px 14px; border-bottom: 1px solid ${theme.divider}; }
+  .sheet-badge { font-size: 11px; font-weight: 600; color: ${theme.badgeGreen}; background: ${theme.badgeGreenBackground}; padding: 2px 8px; border-radius: 10px; }
+  .sheet-empty { padding: 14px 16px; font-size: 12px; color: ${theme.muted}; font-style: italic; }
+  .truncate-note { padding: 6px 14px; font-size: 11px; color: ${theme.muted}; background: ${theme.codeBackground}; border-bottom: 1px solid ${theme.divider}; }
   .table-wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; min-width: max-content; }
-  th { background: ${thBg}; font-weight: 600; text-align: left; padding: 6px 10px; border: 1px solid ${borderColor}; white-space: nowrap; position: sticky; top: 0; }
-  td { padding: 5px 10px; border: 1px solid ${borderColor}; white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
-  tr.even td { background: ${trEvenBg}; }
-</style>
-</head>
-<body>${sheetsHtml.join("\n")}</body>
-</html>`;
+  th { background: ${theme.codeBackground}; font-weight: 600; text-align: left; padding: 6px 10px; border: 1px solid ${theme.border}; white-space: nowrap; position: sticky; top: 0; }
+  td { padding: 5px 10px; border: 1px solid ${theme.border}; white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+  tr.even td { background: ${theme.alternateBackground}; }
+`,
+    body: sheetsHtml.join("\n"),
+  });
 };
 
 export const defaultLoadXlsxRenderer = async (): Promise<XlsxRendererModule> => ({

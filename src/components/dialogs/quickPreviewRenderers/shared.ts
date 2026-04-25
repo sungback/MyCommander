@@ -86,6 +86,68 @@ export const MARKDOWN_LINK_COLOR = {
 export const getAppTheme = (): "dark" | "light" =>
   (document.documentElement.dataset.theme as "dark" | "light") ?? "dark";
 
+export interface PreviewTheme {
+  isDark: boolean;
+  background: string;
+  foreground: string;
+  border: string;
+  codeBackground: string;
+  blockquote: string;
+  link: string;
+  muted: string;
+  divider: string;
+  outputBackground: string;
+  alternateBackground: string;
+  badgeBlue: string;
+  badgeBlueBackground: string;
+  badgeGreen: string;
+  badgeGreenBackground: string;
+  errorBackground: string;
+  errorForeground: string;
+}
+
+export const getPreviewTheme = (): PreviewTheme => {
+  const isDark = getAppTheme() === "dark";
+
+  return {
+    isDark,
+    background: isDark ? "#0d1117" : "#ffffff",
+    foreground: isDark ? "#e6edf3" : "#1f2328",
+    border: isDark ? "#30363d" : "#d1d9e0",
+    codeBackground: isDark ? "#161b22" : "#f6f8fa",
+    blockquote: isDark ? "#8b949e" : "#636c76",
+    link: isDark ? MARKDOWN_LINK_COLOR.dark : MARKDOWN_LINK_COLOR.light,
+    muted: isDark ? "#6e7681" : "#9ca3af",
+    divider: isDark ? "#21262d" : "#e1e4e8",
+    outputBackground: isDark ? "#0d1117" : "#f8f9fa",
+    alternateBackground: isDark ? "#0d1117" : "#f8fafc",
+    badgeBlue: isDark ? "#58a6ff" : "#0969da",
+    badgeBlueBackground: isDark ? "rgba(88,166,255,0.12)" : "rgba(9,105,218,0.1)",
+    badgeGreen: isDark ? "#3fb950" : "#1a7f37",
+    badgeGreenBackground: isDark ? "rgba(63,185,80,0.12)" : "rgba(26,127,55,0.1)",
+    errorBackground: isDark ? "#1f0a0a" : "#fff5f5",
+    errorForeground: isDark ? "#ff7b72" : "#d73a49",
+  };
+};
+
+export const buildPreviewHtmlDocument = ({
+  styles,
+  body,
+}: {
+  styles: string;
+  body: string;
+}): string => `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+${styles}
+</style>
+</head>
+<body>${body}</body>
+</html>`;
+
 export const joinSource = (src: string | string[]): string =>
   Array.isArray(src) ? src.join("") : src;
 

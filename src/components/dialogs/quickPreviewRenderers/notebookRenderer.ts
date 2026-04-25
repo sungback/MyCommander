@@ -1,10 +1,10 @@
 import {
   ansiToHtml,
+  buildPreviewHtmlDocument,
   escapeHtml,
   EXT_TO_LANG,
-  getAppTheme,
+  getPreviewTheme,
   joinSource,
-  MARKDOWN_LINK_COLOR,
   MAX_NOTEBOOK_CELLS,
   MAX_OUTPUT_BYTES,
   NotebookRendererModule,
@@ -39,16 +39,7 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
     defaultLoadTextHighlighter(),
   ]);
 
-  const isDark = getAppTheme() === "dark";
-  const bg = isDark ? "#0d1117" : "#ffffff";
-  const fg = isDark ? "#e6edf3" : "#1f2328";
-  const borderColor = isDark ? "#30363d" : "#d1d9e0";
-  const codeBg = isDark ? "#161b22" : "#f6f8fa";
-  const outputBg = isDark ? "#0d1117" : "#f8f9fa";
-  const cellBorderColor = isDark ? "#21262d" : "#e1e4e8";
-  const gutterColor = isDark ? "#6e7681" : "#8c959f";
-  const errorBg = isDark ? "#1f0a0a" : "#fff5f5";
-  const errorFg = isDark ? "#ff7b72" : "#d73a49";
+  const theme = getPreviewTheme();
 
   let notebook: NbFormat;
   try {
@@ -136,7 +127,7 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
     })
   );
 
-  const codeTheme = isDark
+  const codeTheme = theme.isDark
     ? `
     .hljs { color: #abb2bf; }
     .hljs-keyword, .hljs-selector-tag { color: #c678dd; }
@@ -160,57 +151,48 @@ const buildNotebookHtml = async (jsonContent: string): Promise<string> => {
     .hljs-type, .hljs-class { color: #c18401; }
     .hljs-built_in { color: #0184bc; }
     .hljs-variable { color: #383a42; }
-    .hljs-meta { color: #0184bc; }
+  .hljs-meta { color: #0184bc; }
   `;
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; }
+  const truncatedNote = isTruncated
+    ? `<div style="padding:10px 16px;font-size:12px;color:${theme.muted};border-top:1px solid ${theme.divider};margin-top:8px">처음 ${MAX_NOTEBOOK_CELLS}개 셀만 표시됩니다 (전체 ${totalCells}개)</div>`
+    : "";
+
+  return buildPreviewHtmlDocument({
+    styles: `
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    font-size: 14px; line-height: 1.6; color: ${fg}; background: ${bg}; margin: 0; padding: 16px 24px; }
-  .cell { margin-bottom: 12px; border: 1px solid ${cellBorderColor}; border-radius: 6px; overflow: hidden; }
+    font-size: 14px; line-height: 1.6; color: ${theme.foreground}; background: ${theme.background}; margin: 0; padding: 16px 24px; }
+  .cell { margin-bottom: 12px; border: 1px solid ${theme.divider}; border-radius: 6px; overflow: hidden; }
   .cell-row { display: flex; align-items: flex-start; }
-  .gutter { width: 72px; min-width: 72px; padding: 10px 8px; text-align: right; font-family: monospace; font-size: 11px; color: ${gutterColor}; user-select: none; }
+  .gutter { width: 72px; min-width: 72px; padding: 10px 8px; text-align: right; font-family: monospace; font-size: 11px; color: ${theme.muted}; user-select: none; }
   .exec-count { white-space: nowrap; }
-  .code-block { margin: 0; padding: 10px 12px; flex: 1; overflow-x: auto; font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; line-height: 1.5; background: ${codeBg}; }
+  .code-block { margin: 0; padding: 10px 12px; flex: 1; overflow-x: auto; font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; line-height: 1.5; background: ${theme.codeBackground}; }
   .code-block code { background: none; padding: 0; }
-  .outputs-row { border-top: 1px solid ${cellBorderColor}; }
+  .outputs-row { border-top: 1px solid ${theme.divider}; }
   .outputs { flex: 1; padding: 0; }
-  .output { padding: 8px 12px; font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; background: ${outputBg}; }
-  .output + .output { border-top: 1px solid ${cellBorderColor}; }
-  .output-error { background: ${errorBg}; color: ${errorFg}; }
+  .output { padding: 8px 12px; font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; background: ${theme.outputBackground}; }
+  .output + .output { border-top: 1px solid ${theme.divider}; }
+  .output-error { background: ${theme.errorBackground}; color: ${theme.errorForeground}; }
   .output-display img { max-width: 100%; display: block; }
-  .output-display { padding: 8px 12px; background: ${outputBg}; overflow-x: auto; }
+  .output-display { padding: 8px 12px; background: ${theme.outputBackground}; overflow-x: auto; }
   .cell-markdown { padding: 12px 16px; }
-  .cell-markdown h1, .cell-markdown h2 { border-bottom: 1px solid ${borderColor}; padding-bottom: 0.3em; }
+  .cell-markdown h1, .cell-markdown h2 { border-bottom: 1px solid ${theme.border}; padding-bottom: 0.3em; }
   .cell-markdown h1 { font-size: 2em; } .cell-markdown h2 { font-size: 1.5em; }
   .cell-markdown h3 { font-size: 1.25em; }
   .cell-markdown p { margin: 0.6em 0; }
-  .cell-markdown code { background: ${codeBg}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 85%; }
-  .cell-markdown pre { background: ${codeBg}; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  .cell-markdown code { background: ${theme.codeBackground}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 85%; }
+  .cell-markdown pre { background: ${theme.codeBackground}; padding: 12px; border-radius: 6px; overflow-x: auto; }
   .cell-markdown pre code { background: none; padding: 0; }
-  .cell-markdown blockquote { border-left: 4px solid ${borderColor}; padding: 0 1em; color: ${gutterColor}; margin: 0 0 1em; }
+  .cell-markdown blockquote { border-left: 4px solid ${theme.border}; padding: 0 1em; color: ${theme.muted}; margin: 0 0 1em; }
   .cell-markdown table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-  .cell-markdown th, .cell-markdown td { border: 1px solid ${borderColor}; padding: 6px 12px; }
+  .cell-markdown th, .cell-markdown td { border: 1px solid ${theme.border}; padding: 6px 12px; }
   .cell-markdown img { max-width: 100%; border-radius: 4px; }
-  .cell-markdown a { color: ${isDark ? MARKDOWN_LINK_COLOR.dark : MARKDOWN_LINK_COLOR.light}; }
-  .cell-raw { padding: 12px 16px; font-family: monospace; font-size: 13px; color: ${gutterColor}; }
+  .cell-markdown a { color: ${theme.link}; }
+  .cell-raw { padding: 12px 16px; font-family: monospace; font-size: 13px; color: ${theme.muted}; }
   ${codeTheme}
-</style>
-</head>
-<body>${cellsHtml.join("\n")}${
-    isTruncated
-      ? `<div style="padding:10px 16px;font-size:12px;color:${
-          isDark ? "#6e7681" : "#9ca3af"
-        };border-top:1px solid ${
-          isDark ? "#21262d" : "#e1e4e8"
-        };margin-top:8px">처음 ${MAX_NOTEBOOK_CELLS}개 셀만 표시됩니다 (전체 ${totalCells}개)</div>`
-      : ""
-  }</body>
-</html>`;
+`,
+    body: `${cellsHtml.join("\n")}${truncatedNote}`,
+  });
 };
 
 export const defaultLoadNotebookRenderer = async (): Promise<NotebookRendererModule> => ({

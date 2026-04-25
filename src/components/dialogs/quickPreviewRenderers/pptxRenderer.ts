@@ -1,17 +1,14 @@
-import { escapeHtml, getAppTheme, PptxRendererModule } from "./shared";
+import {
+  buildPreviewHtmlDocument,
+  escapeHtml,
+  getPreviewTheme,
+  PptxRendererModule,
+} from "./shared";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 const buildPptxHtml = async (filePath: string): Promise<string> => {
   const [{ default: JSZip }] = await Promise.all([import("jszip")]);
-
-  const isDark = getAppTheme() === "dark";
-  const bg = isDark ? "#0d1117" : "#ffffff";
-  const fg = isDark ? "#e6edf3" : "#1f2328";
-  const cardBg = isDark ? "#161b22" : "#f6f8fa";
-  const borderColor = isDark ? "#30363d" : "#d1d9e0";
-  const badgeColor = isDark ? "#58a6ff" : "#0969da";
-  const badgeBg = isDark ? "rgba(88,166,255,0.12)" : "rgba(9,105,218,0.1)";
-  const emptyColor = isDark ? "#6e7681" : "#9ca3af";
+  const theme = getPreviewTheme();
 
   const url = convertFileSrc(filePath);
   const buffer = await fetch(url).then((response) => response.arrayBuffer());
@@ -56,27 +53,22 @@ const buildPptxHtml = async (filePath: string): Promise<string> => {
   );
 
   if (slidesHtml.length === 0) {
-    return `<html><body style="color:${emptyColor};font-family:sans-serif;padding:32px;background:${bg}">슬라이드를 찾을 수 없습니다.</body></html>`;
+    return `<html><body style="color:${theme.muted};font-family:sans-serif;padding:32px;background:${theme.background}">슬라이드를 찾을 수 없습니다.</body></html>`;
   }
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; }
+  return buildPreviewHtmlDocument({
+    styles: `
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    font-size: 14px; line-height: 1.6; color: ${fg}; background: ${bg}; margin: 0; padding: 20px 24px; }
-  .slide-card { background: ${cardBg}; border: 1px solid ${borderColor}; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-  .slide-header { padding: 8px 14px; border-bottom: 1px solid ${borderColor}; }
-  .slide-badge { font-size: 11px; font-weight: 600; color: ${badgeColor}; background: ${badgeBg}; padding: 2px 8px; border-radius: 10px; }
+    font-size: 14px; line-height: 1.6; color: ${theme.foreground}; background: ${theme.background}; margin: 0; padding: 20px 24px; }
+  .slide-card { background: ${theme.codeBackground}; border: 1px solid ${theme.border}; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
+  .slide-header { padding: 8px 14px; border-bottom: 1px solid ${theme.border}; }
+  .slide-badge { font-size: 11px; font-weight: 600; color: ${theme.badgeBlue}; background: ${theme.badgeBlueBackground}; padding: 2px 8px; border-radius: 10px; }
   .slide-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
-  .slide-line { font-size: 13px; color: ${fg}; word-break: break-word; }
-  .slide-empty { font-size: 12px; color: ${emptyColor}; font-style: italic; }
-</style>
-</head>
-<body>${slidesHtml.join("\n")}</body>
-</html>`;
+  .slide-line { font-size: 13px; color: ${theme.foreground}; word-break: break-word; }
+  .slide-empty { font-size: 12px; color: ${theme.muted}; font-style: italic; }
+`,
+    body: slidesHtml.join("\n"),
+  });
 };
 
 export const defaultLoadPptxRenderer = async (): Promise<PptxRendererModule> => ({
