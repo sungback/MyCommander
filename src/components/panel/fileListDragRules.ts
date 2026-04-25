@@ -82,3 +82,120 @@ export const getBlockedDropReason = (
 
   return null;
 };
+
+export const getPanelIdFromElement = (element: Element | null): PanelId | null => {
+  if (!(element instanceof HTMLElement)) {
+    return null;
+  }
+
+  const panelId = element.dataset.panelId;
+  return panelId === "left" || panelId === "right" ? panelId : null;
+};
+
+interface ResolveMouseUpTargetPanelArgs {
+  sourcePanel: PanelId;
+  hoveredPanel: PanelId | null;
+  hoveredPanelFromPointer: PanelId | null;
+}
+
+export const resolveMouseUpTargetPanel = ({
+  sourcePanel,
+  hoveredPanel,
+  hoveredPanelFromPointer,
+}: ResolveMouseUpTargetPanelArgs): PanelId | null =>
+  hoveredPanel ??
+  (hoveredPanelFromPointer && hoveredPanelFromPointer !== sourcePanel
+    ? hoveredPanelFromPointer
+    : null);
+
+interface SamePanelDropIntent {
+  targetPath: string;
+  isDropAllowed: boolean;
+  blockedReason: string | null;
+  isFolderOnlyMove: boolean;
+}
+
+interface ResolveSamePanelDropIntentArgs {
+  sourcePanel: PanelId;
+  targetPanel: PanelId | null;
+  activeDragInfo: DragInfo | null;
+  dropTargetPath: string | null;
+  isDropAllowed: boolean;
+  blockedReason: string | null;
+}
+
+export const resolveSamePanelDropIntent = ({
+  sourcePanel,
+  targetPanel,
+  activeDragInfo,
+  dropTargetPath,
+  isDropAllowed,
+  blockedReason,
+}: ResolveSamePanelDropIntentArgs): SamePanelDropIntent | null => {
+  if (
+    targetPanel !== null ||
+    activeDragInfo?.sourcePanel !== sourcePanel ||
+    !dropTargetPath
+  ) {
+    return null;
+  }
+
+  return {
+    targetPath: dropTargetPath,
+    isDropAllowed,
+    blockedReason,
+    isFolderOnlyMove:
+      activeDragInfo.directoryPaths.length > 0 &&
+      activeDragInfo.directoryPaths.length === activeDragInfo.paths.length,
+  };
+};
+
+interface CrossPanelDropIntent {
+  targetPanel: PanelId;
+  targetPath: string;
+  blockedReason: string | null;
+}
+
+interface ResolveCrossPanelDropIntentArgs {
+  sourcePanel: PanelId;
+  targetPanel: PanelId | null;
+  activeDragInfo: DragInfo | null;
+  dropTargetPath: string | null;
+  hoveredPanelPath: string | null;
+  fallbackPanelPath: string;
+  destinationPanelPath: string;
+  isDropAllowed: boolean;
+  blockedReason: string | null;
+}
+
+export const resolveCrossPanelDropIntent = ({
+  sourcePanel,
+  targetPanel,
+  activeDragInfo,
+  dropTargetPath,
+  hoveredPanelPath,
+  fallbackPanelPath,
+  destinationPanelPath,
+  isDropAllowed,
+  blockedReason,
+}: ResolveCrossPanelDropIntentArgs): CrossPanelDropIntent | null => {
+  if (!targetPanel || targetPanel === sourcePanel) {
+    return null;
+  }
+
+  const targetPath =
+    dropTargetPath ??
+    hoveredPanelPath ??
+    (fallbackPanelPath || destinationPanelPath);
+  const resolvedBlockedReason = dropTargetPath
+    ? isDropAllowed
+      ? null
+      : blockedReason ?? "여기로는 복사할 수 없습니다."
+    : getBlockedDropReason(activeDragInfo, targetPath);
+
+  return {
+    targetPanel,
+    targetPath,
+    blockedReason: resolvedBlockedReason,
+  };
+};

@@ -18,6 +18,10 @@ import {
 import {
   collapseNestedDirectoryPaths,
   getBlockedDropReason,
+  getPanelIdFromElement,
+  resolveCrossPanelDropIntent,
+  resolveMouseUpTargetPanel,
+  resolveSamePanelDropIntent,
   resolveSamePanelBackgroundDropTarget,
 } from "./fileListDragRules";
 import type { VisibleEntryRow } from "./fileListRows";
@@ -313,29 +317,28 @@ export const useFileListDrag = ({
         const panelElement = document
           .elementFromPoint(event.clientX, event.clientY)
           ?.closest("[data-panel-id]") as HTMLElement | null;
-        const hoveredPanelFromPointer =
-          panelElement?.dataset.panelId === "left" || panelElement?.dataset.panelId === "right"
-            ? (panelElement.dataset.panelId as "left" | "right")
-            : null;
-        const targetPanel =
-          sharedDragState.hoveredPanel ??
-          (hoveredPanelFromPointer && hoveredPanelFromPointer !== panelId
-            ? hoveredPanelFromPointer
-            : null);
-        const samePanelDropTarget =
-          targetPanel === null && activeDragInfo?.sourcePanel === panelId
-            ? sharedDragState.dropTargetPath
-            : null;
-        const isFolderOnlySamePanelDrag =
-          Boolean(samePanelDropTarget) &&
-          activeDragInfo?.sourcePanel === panelId &&
-          activeDragInfo.directoryPaths.length > 0 &&
-          activeDragInfo.directoryPaths.length === activeDragInfo.paths.length;
+        const hoveredPanelFromPointer = getPanelIdFromElement(panelElement);
+        const targetPanel = resolveMouseUpTargetPanel({
+          sourcePanel: panelId,
+          hoveredPanel: sharedDragState.hoveredPanel,
+          hoveredPanelFromPointer,
+        });
+        const samePanelDropIntent = resolveSamePanelDropIntent({
+          sourcePanel: panelId,
+          targetPanel,
+          activeDragInfo,
+          dropTargetPath: sharedDragState.dropTargetPath,
+          isDropAllowed: sharedDragState.isDropAllowed,
+          blockedReason: sharedDragState.blockedReason,
+        });
 
-        if (samePanelDropTarget) {
-          const targetPath = samePanelDropTarget;
-          const isDropAllowed = sharedDragState.isDropAllowed;
-          const blockedReason = sharedDragState.blockedReason;
+        if (samePanelDropIntent) {
+          const {
+            targetPath,
+            isDropAllowed,
+            blockedReason,
+            isFolderOnlyMove,
+          } = samePanelDropIntent;
 
           setDragInfo(null);
           resetSharedDragState();
@@ -355,7 +358,7 @@ export const useFileListDrag = ({
             return;
           }
 
-          const dragAction = isFolderOnlySamePanelDrag
+          const dragAction = isFolderOnlyMove
             ? handleDraggedMove(state.paths, targetPath)
             : handleDraggedCopy(state.paths, targetPath, panelId);
 
@@ -363,7 +366,7 @@ export const useFileListDrag = ({
             .catch((error) => {
               console.error("Failed to process dragged files:", error);
               showTransientToast(
-                isFolderOnlySamePanelDrag
+                isFolderOnlyMove
                   ? "폴더를 이동하지 못했습니다."
                   : "파일을 복사하지 못했습니다.",
                 { durationMs: 1800, tone: "error" }
@@ -380,32 +383,42 @@ export const useFileListDrag = ({
             sharedPanelPaths[targetPanel].accessPath,
             sharedPanelPaths[targetPanel].currentPath
           );
-          const targetPath =
-            sharedDragState.dropTargetPath ??
-            sharedDragState.hoveredPanelPath ??
-            (fallbackPanelPath ||
-              coalescePanelPath(destinationPanel.resolvedPath, destinationPanel.currentPath));
-          const blockedReason = sharedDragState.dropTargetPath
-            ? sharedDragState.isDropAllowed
-              ? null
-              : sharedDragState.blockedReason ?? "여기로는 복사할 수 없습니다."
-            : getBlockedDropReason(activeDragInfo, targetPath);
-
-          if (blockedReason) {
-            showTransientToast(blockedReason, {
-              durationMs: 1800,
-              tone: "warning",
-            });
-            return;
-          }
-
-          void handleDraggedCopy(state.paths, targetPath, targetPanel).catch((error) => {
-            console.error("Failed to copy dragged files:", error);
-            showTransientToast("파일을 복사하지 못했습니다.", {
-              durationMs: 1800,
-              tone: "error",
-            });
+          const crossPanelDropIntent = resolveCrossPanelDropIntent({
+            sourcePanel: panelId,
+            targetPanel,
+            activeDragInfo,
+            dropTargetPath: sharedDragState.dropTargetPath,
+            hoveredPanelPath: sharedDragState.hoveredPanelPath,
+            fallbackPanelPath,
+            destinationPanelPath: coalescePanelPath(
+              destinationPanel.resolvedPath,
+              destinationPanel.currentPath
+            ),
+            isDropAllowed: sharedDragState.isDropAllowed,
+            blockedReason: sharedDragState.blockedReason,
           });
+
+          if (crossPanelDropIntent) {
+            if (crossPanelDropIntent.blockedReason) {
+              showTransientToast(crossPanelDropIntent.blockedReason, {
+                durationMs: 1800,
+                tone: "warning",
+              });
+              return;
+            }
+
+            void handleDraggedCopy(
+              state.paths,
+              crossPanelDropIntent.targetPath,
+              crossPanelDropIntent.targetPanel
+            ).catch((error) => {
+              console.error("Failed to copy dragged files:", error);
+              showTransientToast("파일을 복사하지 못했습니다.", {
+                durationMs: 1800,
+                tone: "error",
+              });
+            });
+          }
         }
       }
 
