@@ -1,10 +1,12 @@
+use super::fs::metadata::is_hidden_entry;
 use glob::Pattern;
 use regex::{Regex, RegexBuilder};
 use serde::Serialize;
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use walkdir::WalkDir;
-use super::fs::metadata::is_hidden_entry;
+
+const DEFAULT_SEARCH_MAX_RESULTS: usize = 5000;
 
 #[derive(Clone)]
 struct SearchConfig {
@@ -20,6 +22,16 @@ struct SearchConfig {
     modified_after_ms: Option<u64>,
     modified_before_ms: Option<u64>,
     max_results: usize,
+}
+
+impl SearchConfig {
+    fn normalized_query(&self) -> String {
+        if self.case_sensitive {
+            self.query.clone()
+        } else {
+            self.query.to_lowercase()
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -95,7 +107,11 @@ fn matches_extensions(file_name: &str, is_dir: bool, extensions: &[String]) -> b
         .is_some_and(|value| extensions.iter().any(|allowed| allowed == value))
 }
 
-fn matches_size(size: Option<u64>, min_size_bytes: Option<u64>, max_size_bytes: Option<u64>) -> bool {
+fn matches_size(
+    size: Option<u64>,
+    min_size_bytes: Option<u64>,
+    max_size_bytes: Option<u64>,
+) -> bool {
     if min_size_bytes.is_none() && max_size_bytes.is_none() {
         return true;
     }
@@ -147,6 +163,49 @@ fn matches_modified_range(
     true
 }
 
+fn normalize_extensions(extensions: Option<Vec<String>>) -> Vec<String> {
+    extensions
+        .unwrap_or_default()
+        .into_iter()
+        .map(|value| value.trim().trim_start_matches('.').to_lowercase())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn build_search_regex(query: &str, config: &SearchConfig) -> Option<Regex> {
+    if !config.use_regex {
+        return None;
+    }
+
+    RegexBuilder::new(query)
+        .case_insensitive(!config.case_sensitive)
+        .build()
+        .ok()
+}
+
+fn build_wildcard_patterns(config: &SearchConfig) -> Vec<Pattern> {
+    if config.use_regex || config.query.is_empty() {
+        return Vec::new();
+    }
+
+    config
+        .query
+        .split(';')
+        .map(str::trim)
+        .filter(|pattern| !pattern.is_empty())
+        .filter(|pattern| pattern.contains('*') || pattern.contains('?'))
+        .map(|pattern| {
+            if config.case_sensitive {
+                pattern.to_string()
+            } else {
+                pattern.to_lowercase()
+            }
+        })
+        .filter_map(|pattern| Pattern::new(&pattern).ok())
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
 pub async fn search_files(
     start_path: String,
@@ -164,53 +223,23 @@ pub async fn search_files(
     max_results: Option<usize>,
     on_event: Channel<SearchEvent>,
 ) -> Result<(), String> {
-    let trimmed_query = query.trim().to_string();
-    let case_sensitive = case_sensitive.unwrap_or(true);
     let config = SearchConfig {
-        query: trimmed_query.clone(),
+        query: query.trim().to_string(),
         use_regex,
-        case_sensitive,
+        case_sensitive: case_sensitive.unwrap_or(true),
         include_hidden: include_hidden.unwrap_or(true),
         scope: scope.unwrap_or_else(|| "name".to_string()),
         entry_kind: entry_kind.unwrap_or_else(|| "all".to_string()),
-        extensions: extensions
-            .unwrap_or_default()
-            .into_iter()
-            .map(|value| value.trim().trim_start_matches('.').to_lowercase())
-            .filter(|value| !value.is_empty())
-            .collect(),
+        extensions: normalize_extensions(extensions),
         min_size_bytes,
         max_size_bytes,
         modified_after_ms,
         modified_before_ms,
-        max_results: max_results.unwrap_or(5000),
+        max_results: max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS),
     };
-    let re = if config.use_regex {
-        RegexBuilder::new(&query)
-            .case_insensitive(!config.case_sensitive)
-            .build()
-            .ok()
-    } else {
-        None
-    };
-    let wildcard_patterns = if config.use_regex || trimmed_query.is_empty() {
-        Vec::new()
-    } else {
-        trimmed_query
-            .split(';')
-            .map(str::trim)
-            .filter(|pattern| !pattern.is_empty())
-            .filter(|pattern| pattern.contains('*') || pattern.contains('?'))
-            .map(|pattern| {
-                if case_sensitive {
-                    pattern.to_string()
-                } else {
-                    pattern.to_lowercase()
-                }
-            })
-            .filter_map(|pattern| Pattern::new(&pattern).ok())
-            .collect::<Vec<_>>()
-    };
+    let re = build_search_regex(&query, &config);
+    let wildcard_patterns = build_wildcard_patterns(&config);
+    let normalized_query = config.normalized_query();
 
     tokio::task::spawn_blocking(move || {
         let mut results_batch = Vec::new();
@@ -284,11 +313,6 @@ pub async fn search_files(
             } else {
                 search_candidate.to_lowercase()
             };
-            let normalized_query = if config.case_sensitive {
-                config.query.clone()
-            } else {
-                config.query.to_lowercase()
-            };
 
             let matches = matches_query(
                 &normalized_candidate,
@@ -334,23 +358,43 @@ pub async fn search_files(
 #[cfg(test)]
 mod tests {
     use super::{
-        matches_entry_kind, matches_extensions, matches_modified_range, matches_query,
-        matches_size,
+        matches_entry_kind, matches_extensions, matches_modified_range, matches_query, matches_size,
     };
     use glob::Pattern;
     use regex::Regex;
 
     #[test]
     fn plain_text_search_preserves_case() {
-        assert!(matches_query("Report.txt", "Report", true, false, None, &[]));
-        assert!(!matches_query("Report.txt", "report", true, false, None, &[]));
+        assert!(matches_query(
+            "Report.txt",
+            "Report",
+            true,
+            false,
+            None,
+            &[]
+        ));
+        assert!(!matches_query(
+            "Report.txt",
+            "report",
+            true,
+            false,
+            None,
+            &[]
+        ));
     }
 
     #[test]
     fn wildcard_search_preserves_case() {
         let patterns = vec![Pattern::new("*.TXT").expect("valid pattern")];
 
-        assert!(matches_query("README.TXT", "*.TXT", true, false, None, &patterns));
+        assert!(matches_query(
+            "README.TXT",
+            "*.TXT",
+            true,
+            false,
+            None,
+            &patterns
+        ));
         assert!(!matches_query(
             "readme.txt",
             "*.TXT",
@@ -385,7 +429,14 @@ mod tests {
 
     #[test]
     fn plain_text_search_can_ignore_case() {
-        assert!(matches_query("report.txt", "REPORT", false, false, None, &[]));
+        assert!(matches_query(
+            "report.txt",
+            "REPORT",
+            false,
+            false,
+            None,
+            &[]
+        ));
     }
 
     #[test]
@@ -399,8 +450,16 @@ mod tests {
 
     #[test]
     fn extension_filter_normalizes_to_lowercase() {
-        assert!(matches_extensions("Report.TXT", false, &[String::from("txt")]));
-        assert!(!matches_extensions("Report.md", false, &[String::from("txt")]));
+        assert!(matches_extensions(
+            "Report.TXT",
+            false,
+            &[String::from("txt")]
+        ));
+        assert!(!matches_extensions(
+            "Report.md",
+            false,
+            &[String::from("txt")]
+        ));
         assert!(!matches_extensions("docs", true, &[String::from("txt")]));
     }
 
