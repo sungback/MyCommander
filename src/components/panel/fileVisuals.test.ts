@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArrowUpToLine, Download, FileVideoCamera, Music4 } from "lucide-react";
+import { ArrowUpToLine, Download, FileCode, FileVideoCamera, Music4 } from "lucide-react";
 import { resolveEntryVisual, getFileExtension } from "./fileVisuals";
 import { FileEntry } from "../../types/file";
 
@@ -85,11 +85,12 @@ describe("resolveEntryVisual", () => {
     expect(visual.badgeClassName).toBe("theme-file-installer-badge");
   });
 
-  it("returns bundled SVG markup for file icons", () => {
+  it("uses local icon metadata without bundled SVG markup", () => {
     const visual = resolveEntryVisual(createFile("main.ts"));
 
-    expect(visual.svgMarkup).toContain("<svg");
-    expect(visual.svgClassName).toBe("theme-material-file-icon");
+    expect(visual.icon).toBe(FileCode);
+    expect("svgMarkup" in visual).toBe(false);
+    expect("svgClassName" in visual).toBe(false);
   });
 
   it("uses a video icon for videos and an audio icon for audio", () => {

@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react";
-import { getIcon as getMaterialFileIcon } from "material-file-icons";
 import {
   ArrowUpToLine,
   Download,
@@ -141,8 +140,6 @@ export interface EntryVisual {
   iconFillOpacity?: number;
   nameClassName: string;
   nameWeightClassName: string;
-  svgMarkup?: string;
-  svgClassName?: string;
   badgeIcon?: LucideIcon;
   badgeClassName?: string;
 }
@@ -237,7 +234,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-document-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-image": {
     group: "file-image",
@@ -247,7 +243,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-image-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-archive": {
     group: "file-archive",
@@ -257,7 +252,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-archive-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-code": {
     group: "file-code",
@@ -267,7 +261,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-code-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-config": {
     group: "file-config",
@@ -277,7 +270,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-config-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-media": {
     group: "file-media",
@@ -287,7 +279,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-media-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-installer": {
     group: "file-installer",
@@ -299,7 +290,6 @@ const FILE_VISUALS: Record<
     badgeClassName: "theme-file-installer-badge",
     nameClassName: "theme-file-installer-name",
     nameWeightClassName: "font-semibold",
-    svgClassName: "theme-material-file-icon",
   },
   "file-app": {
     group: "file-app",
@@ -309,7 +299,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate theme-file-app-plate",
     nameClassName: "theme-file-app-name",
     nameWeightClassName: "font-medium",
-    svgClassName: "theme-material-file-icon",
   },
   "file-default": {
     group: "file-default",
@@ -319,7 +308,6 @@ const FILE_VISUALS: Record<
     iconWrapperClassName: "theme-file-icon-plate",
     nameClassName: "theme-file-default-name",
     nameWeightClassName: "",
-    svgClassName: "theme-material-file-icon",
   },
 };
 
@@ -396,7 +384,6 @@ export const resolveEntryVisual = (
 
   const group = getFileGroup(entry);
   const visual = FILE_VISUALS[group];
-  const svgMarkup = getMaterialFileIcon(entry.name).svg;
 
   if (group === "file-media") {
     const extension = getFileExtension(entry.name);
@@ -404,13 +391,9 @@ export const resolveEntryVisual = (
       return {
         ...visual,
         icon: FileVideoCamera,
-        svgMarkup,
       };
     }
   }
 
-  return {
-    ...visual,
-    svgMarkup,
-  };
+  return visual;
 };

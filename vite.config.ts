@@ -25,9 +25,6 @@ const getManualChunk = (id: string) => {
   if (normalizedId.includes("/node_modules/highlight.js/")) {
     return "highlight-vendor";
   }
-  if (normalizedId.includes("/node_modules/material-file-icons/")) {
-    return "file-icons-vendor";
-  }
   if (
     normalizedId.includes("/node_modules/react/") ||
     normalizedId.includes("/node_modules/react-dom/") ||

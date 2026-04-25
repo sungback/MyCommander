@@ -1,23 +1,13 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
-  defaultLoadMarkdownRenderer,
-} from "./quickPreviewRenderers/markdownRenderer";
-import {
-  defaultLoadNotebookRenderer,
-} from "./quickPreviewRenderers/notebookRenderer";
-import { defaultLoadPptxRenderer } from "./quickPreviewRenderers/pptxRenderer";
-import { defaultLoadHwpxRenderer } from "./quickPreviewRenderers/hwpxRenderer";
-import { defaultLoadXlsxRenderer } from "./quickPreviewRenderers/xlsxRenderer";
-import {
   MAX_NOTEBOOK_BYTES,
-  MarkdownRendererModule,
-  NotebookRendererModule,
-  PptxRendererModule,
-  HwpxRendererModule,
-  XlsxRendererModule,
-  TextHighlighterModule,
+  type MarkdownRendererModule,
+  type NotebookRendererModule,
+  type PptxRendererModule,
+  type HwpxRendererModule,
+  type XlsxRendererModule,
+  type TextHighlighterModule,
 } from "./quickPreviewRenderers/shared";
-import { defaultLoadTextHighlighter } from "./quickPreviewRenderers/textHighlighter";
 
 export type PreviewType =
   | "image"
@@ -178,6 +168,54 @@ const defaultLoadDocxRenderer = async (): Promise<DocxRendererModule> => {
   return {
     renderDocx: (filePath) => renderDocx(filePath),
   };
+};
+
+const defaultLoadTextHighlighter = async (): Promise<TextHighlighterModule> => {
+  const { defaultLoadTextHighlighter: loadRenderer } = await import(
+    "./quickPreviewRenderers/textHighlighter"
+  );
+
+  return loadRenderer();
+};
+
+const defaultLoadMarkdownRenderer = async (): Promise<MarkdownRendererModule> => {
+  const { defaultLoadMarkdownRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/markdownRenderer"
+  );
+
+  return loadRenderer();
+};
+
+const defaultLoadNotebookRenderer = async (): Promise<NotebookRendererModule> => {
+  const { defaultLoadNotebookRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/notebookRenderer"
+  );
+
+  return loadRenderer();
+};
+
+const defaultLoadPptxRenderer = async (): Promise<PptxRendererModule> => {
+  const { defaultLoadPptxRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/pptxRenderer"
+  );
+
+  return loadRenderer();
+};
+
+const defaultLoadHwpxRenderer = async (): Promise<HwpxRendererModule> => {
+  const { defaultLoadHwpxRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/hwpxRenderer"
+  );
+
+  return loadRenderer();
+};
+
+const defaultLoadXlsxRenderer = async (): Promise<XlsxRendererModule> => {
+  const { defaultLoadXlsxRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/xlsxRenderer"
+  );
+
+  return loadRenderer();
 };
 
 export const loadSourceHighlightHtml = async (

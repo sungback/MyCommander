@@ -1,4 +1,3 @@
-import { marked } from "marked";
 import { getAppTheme, MARKDOWN_LINK_COLOR, MarkdownRendererModule } from "./shared";
 
 const buildMarkdownHtml = (body: string): string => {
@@ -64,6 +63,7 @@ const buildMarkdownHtml = (body: string): string => {
 
 export const defaultLoadMarkdownRenderer = async (): Promise<MarkdownRendererModule> => ({
   renderMarkdown: async (content) => {
+    const { marked } = await import("marked");
     const htmlBody = await marked.parse(content);
     return buildMarkdownHtml(htmlBody);
   },

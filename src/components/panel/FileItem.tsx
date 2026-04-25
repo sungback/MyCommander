@@ -84,9 +84,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const isDetailed = viewMode === "detailed";
   const rowTextClass = isSelectionRow ? "theme-selection-text" : visual.nameClassName;
   const secondaryTextClass = isSelectionRow ? "theme-selection-text" : "text-text-secondary";
-  const preserveFileSvgColors = Boolean(visual.svgMarkup);
-  const iconClassName =
-    isSelectionRow && !preserveFileSvgColors ? "theme-selection-text" : visual.iconClassName;
+  const iconClassName = isSelectionRow ? "theme-selection-text" : visual.iconClassName;
   const iconWrapperClassName = isSelectionRow
     ? ""
     : visual.iconWrapperClassName;
@@ -144,25 +142,13 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
               path={entry.path}
               size={visual.iconSize ?? 16}
               fallback={
-                visual.svgMarkup ? (
-                  <span
-                    className={clsx("block", visual.svgClassName)}
-                    dangerouslySetInnerHTML={{ __html: visual.svgMarkup }}
-                  />
-                ) : (
-                  <Icon
-                    size={visual.iconSize}
-                    className={iconClassName}
-                    fill={visual.iconFillOpacity ? "currentColor" : undefined}
-                    fillOpacity={visual.iconFillOpacity}
-                  />
-                )
+                <Icon
+                  size={visual.iconSize}
+                  className={iconClassName}
+                  fill={visual.iconFillOpacity ? "currentColor" : undefined}
+                  fillOpacity={visual.iconFillOpacity}
+                />
               }
-            />
-          ) : visual.svgMarkup ? (
-            <span
-              className={clsx("block", visual.svgClassName)}
-              dangerouslySetInnerHTML={{ __html: visual.svgMarkup }}
             />
           ) : (
             <Icon
