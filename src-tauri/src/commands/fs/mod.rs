@@ -58,7 +58,10 @@ mod tests {
             .await
         });
 
-        assert!(result.is_ok(), "expected single-file move to target path to succeed");
+        assert!(
+            result.is_ok(),
+            "expected single-file move to target path to succeed"
+        );
         assert!(!source.exists());
         assert_eq!(fs::read_to_string(&target).unwrap(), "hello");
 

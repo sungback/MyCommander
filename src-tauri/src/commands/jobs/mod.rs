@@ -173,8 +173,10 @@ mod tests {
 
     #[test]
     fn persisted_snapshot_roundtrips_and_requeues_queued_jobs() {
-        let mut inner = JobEngineInner::default();
-        inner.next_id = 7;
+        let mut inner = JobEngineInner {
+            next_id: 7,
+            ..Default::default()
+        };
         inner.jobs.insert(
             "job-1".into(),
             InternalJobRecord {

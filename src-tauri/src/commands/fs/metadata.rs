@@ -43,48 +43,46 @@ pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
         });
     }
 
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let metadata = entry.metadata().map_err(|e| e.to_string());
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            let file_path = entry.path().to_string_lossy().to_string();
+    for entry in entries.flatten() {
+        let metadata = entry.metadata().map_err(|e| e.to_string());
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        let file_path = entry.path().to_string_lossy().to_string();
 
-            if let Ok(meta) = metadata {
-                let is_hidden = is_hidden_entry(&file_name, &meta);
+        if let Ok(meta) = metadata {
+            let is_hidden = is_hidden_entry(&file_name, &meta);
 
-                if is_hidden && !show_hidden {
-                    continue;
-                }
-
-                let kind = if meta.is_dir() {
-                    "directory".to_string()
-                } else if meta.is_symlink() {
-                    "symlink".to_string()
-                } else {
-                    "file".to_string()
-                };
-
-                let size = if meta.is_dir() {
-                    None
-                } else {
-                    Some(meta.len())
-                };
-
-                let last_modified = meta
-                    .modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| d.as_millis() as u64);
-
-                files.push(FileEntry {
-                    name: file_name,
-                    path: file_path,
-                    kind,
-                    size,
-                    last_modified,
-                    is_hidden,
-                });
+            if is_hidden && !show_hidden {
+                continue;
             }
+
+            let kind = if meta.is_dir() {
+                "directory".to_string()
+            } else if meta.is_symlink() {
+                "symlink".to_string()
+            } else {
+                "file".to_string()
+            };
+
+            let size = if meta.is_dir() {
+                None
+            } else {
+                Some(meta.len())
+            };
+
+            let last_modified = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64);
+
+            files.push(FileEntry {
+                name: file_name,
+                path: file_path,
+                kind,
+                size,
+                last_modified,
+                is_hidden,
+            });
         }
     }
 
@@ -120,7 +118,7 @@ pub(crate) fn is_hidden_entry(file_name: &str, metadata: &fs::Metadata) -> bool 
     #[cfg(target_os = "macos")]
     {
         const UF_HIDDEN: u32 = 0x0000_8000;
-        return metadata.st_flags() & UF_HIDDEN != 0;
+        metadata.st_flags() & UF_HIDDEN != 0
     }
 
     #[cfg(not(target_os = "macos"))]

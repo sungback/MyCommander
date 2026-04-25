@@ -370,25 +370,19 @@ pub(crate) fn apply_batch_rename_operations(
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    let mut moved_to_temp = 0usize;
-    for operation in &prepared_operations {
+    for (i, operation) in prepared_operations.iter().enumerate() {
         if let Err(error) = fs::rename(&operation.old_path, &operation.temp_path) {
-            rollback_temp_renames(&prepared_operations[..moved_to_temp]);
+            rollback_temp_renames(&prepared_operations[..i]);
             return Err(error.to_string());
         }
-
-        moved_to_temp += 1;
     }
 
-    let mut moved_to_target = 0usize;
-    for operation in &prepared_operations {
+    for (i, operation) in prepared_operations.iter().enumerate() {
         if let Err(error) = fs::rename(&operation.temp_path, &operation.new_path) {
-            rollback_target_renames(&prepared_operations[..moved_to_target]);
-            rollback_pending_temp_renames(&prepared_operations[moved_to_target..]);
+            rollback_target_renames(&prepared_operations[..i]);
+            rollback_pending_temp_renames(&prepared_operations[i..]);
             return Err(error.to_string());
         }
-
-        moved_to_target += 1;
     }
 
     Ok(())
@@ -525,7 +519,7 @@ fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     {
         let mut ctx = trash::TrashContext::new();
         ctx.set_delete_method(DeleteMethod::NsFileManager);
-        return ctx.delete(path);
+        ctx.delete(path)
     }
 
     #[cfg(not(target_os = "macos"))]

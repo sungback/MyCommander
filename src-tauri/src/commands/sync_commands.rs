@@ -52,7 +52,7 @@ fn is_hidden_sync_entry(file_name: &str, metadata: &fs::Metadata) -> bool {
         use std::os::macos::fs::MetadataExt;
 
         const UF_HIDDEN: u32 = 0x0000_8000;
-        return metadata.st_flags() & UF_HIDDEN != 0;
+        metadata.st_flags() & UF_HIDDEN != 0
     }
 
     #[cfg(not(target_os = "macos"))]

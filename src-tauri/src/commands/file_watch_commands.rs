@@ -179,7 +179,8 @@ mod tests {
         let base = PathBuf::from("/tmp/mycommander");
         let changed_file = base.join("file.txt");
 
-        let (directories, paths) = collect_changed_directories_and_paths(&[changed_file.clone()]);
+        let (directories, paths) =
+            collect_changed_directories_and_paths(std::slice::from_ref(&changed_file));
 
         assert!(paths.contains(&changed_file.to_string_lossy().to_string()));
         assert!(directories.contains(&changed_file.to_string_lossy().to_string()));
