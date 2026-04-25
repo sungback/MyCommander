@@ -1,15 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import {
-  X,
-  FileText,
-  ImageIcon,
-  VideoIcon,
-  AlertCircle,
-  Loader2,
-  Code2,
-  Eye,
-} from "lucide-react";
 import { useDialogStore } from "../../store/dialogStore";
 import {
   type PreviewState,
@@ -17,22 +7,12 @@ import {
   loadPreviewForPath,
   loadSourceHighlightHtml,
 } from "./quickPreviewLoader";
+import { getPreviewStatusContent } from "./quickPreviewStatus";
 import {
-  type PreviewStatusContent,
-  getPreviewStatusContent,
-} from "./quickPreviewStatus";
-
-const getStatusIcon = (status: PreviewStatusContent) => {
-  if (status.kind === "loading") {
-    return <Loader2 size={24} className="animate-spin" />;
-  }
-
-  if (status.kind === "unsupported") {
-    return <FileText size={24} />;
-  }
-
-  return <AlertCircle size={24} className="text-red-500" />;
-};
+  QuickPreviewBody,
+  QuickPreviewFooter,
+  QuickPreviewHeader,
+} from "./QuickPreviewDialogViews";
 
 export const QuickPreviewDialog: React.FC = () => {
   const { openDialog, dialogTarget, closeDialog } = useDialogStore();
@@ -151,162 +131,23 @@ export const QuickPreviewDialog: React.FC = () => {
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col bg-bg-panel border border-border-color rounded-lg shadow-2xl focus:outline-none"
           style={{ width: "min(95vw, 1280px)", height: "min(95vh, 900px)" }}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-color shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              {preview.type === "image" ? (
-                <ImageIcon size={14} className="text-text-secondary shrink-0" />
-              ) : preview.type === "video" ? (
-                <VideoIcon size={14} className="text-text-secondary shrink-0" />
-              ) : isRendered ? (
-                <Eye size={14} className="text-text-secondary shrink-0" />
-              ) : (
-                <FileText size={14} className="text-text-secondary shrink-0" />
-              )}
-              {preview.type === "pdf" && (
-                <span className="shrink-0 text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono">
-                  PDF
-                </span>
-              )}
-              <Dialog.Title className="text-sm font-medium text-text-primary truncate">
-                {fileName}
-              </Dialog.Title>
-              {preview.language && (
-                <span className="shrink-0 text-xs text-text-secondary bg-bg-secondary px-1.5 py-0.5 rounded font-mono">
-                  {preview.language}
-                </span>
-              )}
-              {preview.renderExt && (
-                <span className="shrink-0 text-xs text-text-secondary bg-bg-secondary px-1.5 py-0.5 rounded font-mono">
-                  {preview.renderExt}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 ml-4 shrink-0">
-              {canToggleSource && (
-                <button
-                  onClick={() => setShowSource((value) => !value)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border-color text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-                  title={showSource ? "렌더링 보기" : "소스 보기"}
-                >
-                  {showSource ? <Eye size={12} /> : <Code2 size={12} />}
-                  <span>{showSource ? "렌더링" : "소스"}</span>
-                </button>
-              )}
-              <button
-                onClick={closeDialog}
-                className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
-                aria-label="Close preview"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {previewStatus && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3 px-6 text-center text-text-secondary">
-                {getStatusIcon(previewStatus)}
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-text-primary">
-                    {previewStatus.title}
-                  </p>
-                  <p className="text-xs">{previewStatus.description}</p>
-                </div>
-                {previewStatus.detail && (
-                  <p className="max-w-xs break-all font-mono text-xs text-red-400">
-                    {previewStatus.detail}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {preview.type === "image" && preview.src && (
-              <div className="flex items-center justify-center p-4 overflow-auto flex-1">
-                <img
-                  src={preview.src}
-                  alt={fileName}
-                  className="max-w-full max-h-full object-contain rounded select-none"
-                  draggable={false}
-                />
-              </div>
-            )}
-
-            {preview.type === "video" && preview.src && (
-              <div className="flex items-center justify-center flex-1 bg-black">
-                <video
-                  src={preview.src}
-                  controls
-                  className="max-w-full max-h-full"
-                  style={{ maxHeight: "calc(100% - 0px)" }}
-                >
-                  지원하지 않는 형식입니다.
-                </video>
-              </div>
-            )}
-
-            {preview.type === "pdf" && preview.src && (
-              <iframe
-                src={preview.src}
-                className="w-full flex-1 border-none"
-                title="PDF preview"
-              />
-            )}
-
-            {preview.type === "rendered" && !showSource && preview.renderedHtml && (
-              <iframe
-                srcDoc={preview.renderedHtml}
-                className="w-full flex-1 border-none"
-                sandbox="allow-same-origin"
-                title="rendered preview"
-              />
-            )}
-
-            {preview.type === "rendered" && showSource && (
-              sourceHighlightHtml ? (
-                <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0">
-                  <code
-                    className="hljs block p-4 min-h-full"
-                    dangerouslySetInnerHTML={{ __html: sourceHighlightHtml }}
-                  />
-                </pre>
-              ) : (
-                <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
-                  {preview.content}
-                </pre>
-              )
-            )}
-
-            {preview.type === "text" && (
-              preview.highlightedHtml ? (
-                <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0">
-                  <code
-                    className="hljs block p-4 min-h-full"
-                    dangerouslySetInnerHTML={{ __html: preview.highlightedHtml }}
-                  />
-                </pre>
-              ) : (
-                <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
-                  {preview.content}
-                </pre>
-              )
-            )}
-
-          </div>
-
-          <div className="px-4 py-2 border-t border-border-color shrink-0 flex justify-between items-center">
-            <span className="text-xs text-text-secondary font-mono truncate">{filePath}</span>
-            <span className="text-xs text-text-secondary shrink-0 ml-4">
-              Press{" "}
-              <kbd className="px-1 py-0.5 bg-bg-secondary border border-border-color rounded text-xs">
-                Space
-              </kbd>
-              {" "}or{" "}
-              <kbd className="px-1 py-0.5 bg-bg-secondary border border-border-color rounded text-xs">
-                Esc
-              </kbd>
-              {" "}to close
-            </span>
-          </div>
+          <QuickPreviewHeader
+            preview={preview}
+            fileName={fileName}
+            isRendered={isRendered}
+            canToggleSource={canToggleSource}
+            showSource={showSource}
+            onToggleSource={() => setShowSource((value) => !value)}
+            onClose={closeDialog}
+          />
+          <QuickPreviewBody
+            preview={preview}
+            previewStatus={previewStatus}
+            fileName={fileName}
+            showSource={showSource}
+            sourceHighlightHtml={sourceHighlightHtml}
+          />
+          <QuickPreviewFooter filePath={filePath} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

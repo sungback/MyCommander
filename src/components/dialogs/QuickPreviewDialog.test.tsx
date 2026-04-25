@@ -1,20 +1,23 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogStore } from "../../store/dialogStore";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
 
-const { mockLoadPreviewForPath } = vi.hoisted(() => ({
+const { mockLoadPreviewForPath, mockLoadSourceHighlightHtml } = vi.hoisted(() => ({
   mockLoadPreviewForPath: vi.fn(),
+  mockLoadSourceHighlightHtml: vi.fn(),
 }));
 
 vi.mock("./quickPreviewLoader", () => ({
   getFileName: (path: string) => path.split(/[\\/]/).pop() ?? path,
   loadPreviewForPath: mockLoadPreviewForPath,
-  loadSourceHighlightHtml: vi.fn(),
+  loadSourceHighlightHtml: mockLoadSourceHighlightHtml,
 }));
 
 describe("QuickPreviewDialog status messages", () => {
   beforeEach(() => {
+    mockLoadPreviewForPath.mockReset();
+    mockLoadSourceHighlightHtml.mockReset();
     useDialogStore.setState(useDialogStore.getInitialState());
     useDialogStore.getState().openPreviewDialog({
       panelId: "left",
@@ -52,5 +55,28 @@ describe("QuickPreviewDialog status messages", () => {
     ).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it("keeps rendered preview source toggling available", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "rendered",
+      content: "# Title",
+      renderedHtml: "<h1>Title</h1>",
+      renderExt: "markdown",
+    });
+    mockLoadSourceHighlightHtml.mockResolvedValue(
+      '<span class="hljs-section"># Title</span>'
+    );
+
+    render(<QuickPreviewDialog />);
+
+    expect(await screen.findByTitle("소스 보기")).toBeInTheDocument();
+    expect(screen.getByTitle("rendered preview")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("소스 보기"));
+
+    expect(await screen.findByTitle("렌더링 보기")).toBeInTheDocument();
+    expect(mockLoadSourceHighlightHtml).toHaveBeenCalledWith("# Title", "markdown");
+    expect(screen.getByText("# Title")).toBeInTheDocument();
   });
 });
