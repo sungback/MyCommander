@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FileEntry, PanelState, ViewMode, PanelId } from "../types/file";
+import { FileEntry, PanelState, ViewMode, PanelId, SortField } from "../types/file";
 import { ThemePreference } from "../types/theme";
 import { coalescePanelPath, getPathDirectoryName } from "../utils/path";
 import { readPersistedPanelState } from "./persistence";
@@ -47,13 +47,43 @@ interface AppState {
   setCursor: (panel: PanelId, index: number) => void;
   refreshPanel: (panel: PanelId) => void;
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
-  setSort: (panel: PanelId, field: string) => void;
+  setSort: (panel: PanelId, field: SortField) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   invalidateEntrySizes: (paths: string[]) => void;
   swapPanels: () => void;
 }
 
 const getPanelKey = (panel: PanelId) => (panel === "left" ? "leftPanel" : "rightPanel");
+
+const getPanelsAfterUpdate = (
+  state: AppState,
+  panel: PanelId,
+  nextPanelState: PanelState
+) => ({
+  leftPanel: panel === "left" ? nextPanelState : state.leftPanel,
+  rightPanel: panel === "right" ? nextPanelState : state.rightPanel,
+});
+
+const persistPanelUpdate = (
+  state: AppState,
+  panel: PanelId,
+  nextPanelState: PanelState
+) => {
+  const { leftPanel, rightPanel } = getPanelsAfterUpdate(
+    state,
+    panel,
+    nextPanelState
+  );
+
+  persistVisiblePanelState(
+    leftPanel,
+    rightPanel,
+    state.activePanel,
+    state.showHiddenFiles,
+    state.themePreference,
+    state.panelViewModes
+  );
+};
 
 export const usePanelStore = create<AppState>((set) => {
   const persistedPanelState = readPersistedPanelState();
@@ -192,14 +222,7 @@ export const usePanelStore = create<AppState>((set) => {
           activeTabId: nextTab.id,
         });
 
-        persistVisiblePanelState(
-          panel === "left" ? nextPanelState : state.leftPanel,
-          panel === "right" ? nextPanelState : state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelUpdate(state, panel, nextPanelState);
 
         return {
           [panelKey]: nextPanelState,
@@ -220,14 +243,7 @@ export const usePanelStore = create<AppState>((set) => {
           activeTabId: tabId,
         });
 
-        persistVisiblePanelState(
-          panel === "left" ? nextPanelState : state.leftPanel,
-          panel === "right" ? nextPanelState : state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelUpdate(state, panel, nextPanelState);
 
         return {
           [panelKey]: nextPanelState,
@@ -260,14 +276,7 @@ export const usePanelStore = create<AppState>((set) => {
         activeTabId: nextActiveTabId,
       });
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference,
-        state.panelViewModes
-      );
+      persistPanelUpdate(state, panel, nextPanelState);
 
       return {
         [panelKey]: nextPanelState,
@@ -297,14 +306,7 @@ export const usePanelStore = create<AppState>((set) => {
         };
       });
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference,
-        state.panelViewModes
-      );
+      persistPanelUpdate(state, panel, nextPanelState);
 
       return {
         [panelKey]: nextPanelState,
@@ -478,21 +480,14 @@ export const usePanelStore = create<AppState>((set) => {
 
         return {
           ...tab,
-          sortField: field as any,
+          sortField: field,
           sortDirection: newDirection,
           files: sortEntries(tab.files, field, newDirection),
           cursorIndex: 0,
         };
       });
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference,
-        state.panelViewModes
-      );
+      persistPanelUpdate(state, panel, nextPanelState);
 
       return {
         [panelKey]: nextPanelState,
@@ -520,14 +515,7 @@ export const usePanelStore = create<AppState>((set) => {
         pendingCursorName: null,
       }));
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference,
-        state.panelViewModes
-      );
+      persistPanelUpdate(state, panel, nextPanelState);
 
       return { [panelKey]: nextPanelState };
     }),
@@ -553,14 +541,7 @@ export const usePanelStore = create<AppState>((set) => {
         pendingCursorName: null,
       }));
 
-      persistVisiblePanelState(
-        panel === "left" ? nextPanelState : state.leftPanel,
-        panel === "right" ? nextPanelState : state.rightPanel,
-        state.activePanel,
-        state.showHiddenFiles,
-        state.themePreference,
-        state.panelViewModes
-      );
+      persistPanelUpdate(state, panel, nextPanelState);
 
       return { [panelKey]: nextPanelState };
     }),
