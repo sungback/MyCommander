@@ -17,6 +17,22 @@ import {
   loadPreviewForPath,
   loadSourceHighlightHtml,
 } from "./quickPreviewLoader";
+import {
+  type PreviewStatusContent,
+  getPreviewStatusContent,
+} from "./quickPreviewStatus";
+
+const getStatusIcon = (status: PreviewStatusContent) => {
+  if (status.kind === "loading") {
+    return <Loader2 size={24} className="animate-spin" />;
+  }
+
+  if (status.kind === "unsupported") {
+    return <FileText size={24} />;
+  }
+
+  return <AlertCircle size={24} className="text-red-500" />;
+};
 
 export const QuickPreviewDialog: React.FC = () => {
   const { openDialog, dialogTarget, closeDialog } = useDialogStore();
@@ -82,6 +98,7 @@ export const QuickPreviewDialog: React.FC = () => {
 
   const isRendered = preview.type === "rendered";
   const canToggleSource = isRendered && Boolean(preview.content);
+  const previewStatus = getPreviewStatusContent(preview);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,10 +203,20 @@ export const QuickPreviewDialog: React.FC = () => {
           </div>
 
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {preview.type === "loading" && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3 text-text-secondary">
-                <Loader2 size={24} className="animate-spin" />
-                <p className="text-xs">Loading preview...</p>
+            {previewStatus && (
+              <div className="flex flex-col items-center justify-center h-64 gap-3 px-6 text-center text-text-secondary">
+                {getStatusIcon(previewStatus)}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-text-primary">
+                    {previewStatus.title}
+                  </p>
+                  <p className="text-xs">{previewStatus.description}</p>
+                </div>
+                {previewStatus.detail && (
+                  <p className="max-w-xs break-all font-mono text-xs text-red-400">
+                    {previewStatus.detail}
+                  </p>
+                )}
               </div>
             )}
 
@@ -264,25 +291,6 @@ export const QuickPreviewDialog: React.FC = () => {
               )
             )}
 
-            {preview.type === "unsupported" && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3 text-text-secondary">
-                <FileText size={24} />
-                <p className="text-sm font-medium text-text-primary">Preview not supported</p>
-                <p className="text-xs">This file type cannot be previewed.</p>
-              </div>
-            )}
-
-            {preview.type === "error" && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3 text-text-secondary">
-                <AlertCircle size={24} className="text-red-500" />
-                <p className="text-sm font-medium text-text-primary">Failed to load preview</p>
-                {preview.error && (
-                  <p className="text-xs font-mono text-red-400 max-w-xs text-center break-all">
-                    {preview.error}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="px-4 py-2 border-t border-border-color shrink-0 flex justify-between items-center">
