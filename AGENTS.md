@@ -62,23 +62,131 @@
 - 이 저장소는 Tauri v2 전용으로 다룹니다. 검증 없이 Tauri v1 관례를 적용하지 않습니다.
 - `CLAUDE.md`에 이미 안정적으로 정리된 프로젝트 배경은 이 문서에 중복 작성하지 말고 링크로 연결합니다.
 
+## 작업 흐름
+
+모든 코드 수정 작업은 다음 순서를 따릅니다.
+
+```
+Plan → Modify → Verify → Fix → Re-verify → Report → Commit
+```
+
+1. **Plan** — 관련 파일과 검증 명령을 확인하고, 변경 범위를 사용자 요청 최소치로 확정합니다.
+2. **Modify** — 확정된 범위 안에서만 코드를 수정합니다.
+3. **Verify** — 변경 범위에 맞는 검증 명령을 실행합니다.
+4. **Fix** — 검증 실패 시 로그를 읽고 원인을 수정합니다.
+5. **Re-verify** — 수정 후 동일 검증을 다시 실행합니다.
+6. **Report** — 아래 보고 템플릿에 따라 결과를 정리합니다.
+7. **Commit** — 사용자의 명시적 승인을 받은 뒤에만 커밋합니다.
+
+### 금지 사항
+
+- 테스트 생략 금지
+- 실패 로그 무시 금지
+- 검증 미통과 상태 커밋 금지
+- 사용자 승인 없는 커밋 금지
+- TypeScript 오류를 `any`로 임시 우회 금지
+- `// @ts-ignore` 남용 금지
+- Rust `unwrap()` / `expect()` 남용 금지
+- Rust clippy 경고 무시 금지
+- Tauri 권한 과다 허용 금지
+- React 컴포넌트 변경 시 TypeScript 타입·렌더링 영향 확인 생략 금지
+- Tauri command 변경 시 Rust 함수, invoke 호출부, 프런트엔드 타입을 함께 확인하지 않는 것 금지
+
 ## 검증
 
-- 프런트엔드 또는 타입 관련 변경:
-  - `./node_modules/.bin/tsc --noEmit`
-  - `npm run test`
-- Rust/Tauri 관련 변경:
-  - `cargo check --manifest-path src-tauri/Cargo.toml`
-  - `npm run test:rust`
-- 프런트엔드와 Rust 테스트를 한 번에:
-  - `npm run test:all`
-  - `npm run test:coverage` (커버리지 포함)
-- 필요한 경우 전체 프런트엔드 프로덕션 빌드:
-  - `npm run build`
-- 필요한 경우 전체 앱 수동 실행:
-  - `npm run tauri dev`
+패키지 매니저: `npm` (package-lock.json 기준).
+
+### 검증 명령 참조
+
+| 범위 | 명령 |
+|---|---|
+| Frontend typecheck | `npm run typecheck` |
+| Frontend test | `npm run test` |
+| Frontend build | `npm run build` |
+| **Frontend 전체** | **`npm run verify:frontend`** |
+| Rust fmt check | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` |
+| Rust clippy | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` |
+| Rust test | `npm run test:rust` |
+| **Rust/Tauri 전체** | **`npm run verify:rust`** |
+| **Frontend + Rust 전체** | **`npm run verify`** |
+| 릴리즈 포함 전체 | `npm run verify:release` (Tauri 빌드 포함, 느림) |
+
+> **ESLint:** 현재 미도입. 도입 전까지 `verify:frontend`에 포함되지 않습니다.
+
+### 변경 범위별 최소 검증 원칙
+
+- 프런트엔드 변경: `npm run verify:frontend`
+- Rust/Tauri 변경: `npm run verify:rust`
+- 양쪽 모두 변경: `npm run verify`
+- 릴리즈 준비: `npm run verify:release`
 
 수정한 파일 범위에 맞는 가장 작은 검증부터 실행하고, 무엇을 실행했는지와 무엇을 실행하지 못했는지를 답변에 분명히 적습니다.
+
+## 커밋 게이트
+
+커밋은 다음 조건을 **모두** 만족할 때만 허용합니다.
+
+- [ ] `npm run typecheck` 통과
+- [ ] `npm run test` 통과
+- [ ] `npm run build` 통과
+- [ ] `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 통과
+- [ ] `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` 통과
+- [ ] `npm run test:rust` 통과
+- [ ] 실패가 있었다면 수정 후 재검증 완료
+- [ ] 검증 결과 보고서 작성 완료
+- [ ] **사용자의 명시적 커밋 승인**
+
+다음 경우에는 커밋 금지:
+
+- 검증 미실행 또는 일부 생략
+- typecheck / test / build / clippy / fmt 중 하나라도 실패
+- 실패 로그 미확인
+- 사용자 승인 없음
+
+## 작업 완료 보고 템플릿
+
+모든 코드 변경 작업 완료 후 아래 형식으로 보고합니다.
+
+```markdown
+## 작업 요약
+
+- 변경 목적:
+- 주요 변경 파일:
+- 변경 범위:
+
+## 변경 상세
+
+- Frontend:
+- Rust/Tauri:
+- 설정/자동화:
+- 테스트:
+- 크로스플랫폼 고려사항: (macOS / Windows / Linux 영향 여부, 경로 구분자·파일명 인코딩·권한 차이 등)
+
+## 검증 결과
+
+| 항목 | 명령 | 결과 |
+|---|---|---|
+| Typecheck | `npm run typecheck` | ✅ / ❌ |
+| Frontend Test | `npm run test` | ✅ / ❌ |
+| Frontend Build | `npm run build` | ✅ / ❌ |
+| Rust Format | `cargo fmt -- --check` | ✅ / ❌ |
+| Rust Clippy | `cargo clippy -- -D warnings` | ✅ / ❌ |
+| Rust Test | `npm run test:rust` | ✅ / ❌ |
+| Tauri Build | `npm run verify:release` | 실행 여부 / ✅ / ❌ |
+
+## 실패 및 수정 내역
+
+- 최초 실패:
+- 실패 원인:
+- 수정 내용:
+- 재검증 결과:
+
+## 커밋 가능 여부
+
+- 커밋 가능 여부: Yes / No
+- 남은 위험:
+- 사용자 승인 필요 여부: Yes
+```
 
 ## 커밋 및 빌드 위생
 
@@ -86,6 +194,14 @@
 - `dist/`, `src-tauri/target/` 같은 빌드 산출물은 커밋하지 않습니다.
 - `src-tauri/target/`은 매우 커질 수 있으므로, 실제 정리가 필요할 때만 `cargo clean --manifest-path src-tauri/Cargo.toml`를 사용합니다.
 - 작업 트리가 더러운 상태일 수 있으므로, 사용자의 무관한 변경은 되돌리지 않습니다.
+
+## Git Hook (Lefthook)
+
+`lefthook.yml`을 통해 pre-commit과 pre-push 게이트가 설정되어 있습니다.
+초기 설치 시 `npm install` 후 `npx lefthook install`을 실행합니다.
+
+- **pre-commit:** `typecheck` + `test` (빠른 검증)
+- **pre-push:** `verify` (전체 검증)
 
 ## 릴리즈 / 태그 절차
 
