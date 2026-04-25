@@ -1,18 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
-import {
-  type PreviewState,
-  getFileName,
-  loadPreviewForPath,
-  loadSourceHighlightHtml,
-} from "./quickPreviewLoader";
+import { getFileName } from "./quickPreviewLoader";
 import { getPreviewStatusContent } from "./quickPreviewStatus";
 import {
   QuickPreviewBody,
   QuickPreviewFooter,
   QuickPreviewHeader,
 } from "./QuickPreviewDialogViews";
+import { useQuickPreviewState } from "./useQuickPreviewState";
 
 export const QuickPreviewDialog: React.FC = () => {
   const { openDialog, dialogTarget, closeDialog } = useDialogStore();
@@ -20,9 +16,14 @@ export const QuickPreviewDialog: React.FC = () => {
   const filePath = dialogTarget?.path ?? "";
   const fileName = getFileName(filePath);
 
-  const [preview, setPreview] = useState<PreviewState>({ type: "loading" });
-  const [showSource, setShowSource] = useState(false);
-  const [sourceHighlightHtml, setSourceHighlightHtml] = useState<string | null>(null);
+  const {
+    preview,
+    showSource,
+    sourceHighlightHtml,
+    isRendered,
+    canToggleSource,
+    toggleSource,
+  } = useQuickPreviewState({ isOpen, filePath });
   const lastTargetPanelRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -30,32 +31,6 @@ export const QuickPreviewDialog: React.FC = () => {
       lastTargetPanelRef.current = dialogTarget.panelId;
     }
   }, [dialogTarget]);
-
-  useEffect(() => {
-    setShowSource(false);
-    setSourceHighlightHtml(null);
-  }, [filePath]);
-
-  const loadPreview = useCallback(async (path: string) => {
-    setPreview({ type: "loading" });
-
-    try {
-      const nextPreview = await loadPreviewForPath(path);
-      setPreview(nextPreview);
-    } catch (error) {
-      console.error("QuickPreview: failed to load file", error);
-      setPreview({
-        type: "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen && filePath) {
-      void loadPreview(filePath);
-    }
-  }, [isOpen, filePath, loadPreview]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -76,37 +51,7 @@ export const QuickPreviewDialog: React.FC = () => {
     };
   }, [isOpen, closeDialog]);
 
-  const isRendered = preview.type === "rendered";
-  const canToggleSource = isRendered && Boolean(preview.content);
   const previewStatus = getPreviewStatusContent(preview);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!canToggleSource || !showSource || !preview.content) {
-      setSourceHighlightHtml(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void loadSourceHighlightHtml(preview.content, preview.renderExt ?? "")
-      .then((html) => {
-        if (!cancelled) {
-          setSourceHighlightHtml(html);
-        }
-      })
-      .catch((error) => {
-        console.error("QuickPreview: failed to highlight preview source", error);
-        if (!cancelled) {
-          setSourceHighlightHtml(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canToggleSource, showSource, preview.content, preview.renderExt]);
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
@@ -137,7 +82,7 @@ export const QuickPreviewDialog: React.FC = () => {
             isRendered={isRendered}
             canToggleSource={canToggleSource}
             showSource={showSource}
-            onToggleSource={() => setShowSource((value) => !value)}
+            onToggleSource={toggleSource}
             onClose={closeDialog}
           />
           <QuickPreviewBody
