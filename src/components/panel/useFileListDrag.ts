@@ -8,6 +8,7 @@ import { useDragStore } from "../../store/dragStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { coalescePanelPath } from "../../utils/path";
 import { showTransientToast } from "../../store/toastStore";
+import { getExternalDropPaths } from "./fileListExternalDrop";
 import {
   clearSharedDropTargetForPanel,
   resetSharedDragState,
@@ -19,13 +20,7 @@ import {
   getBlockedDropReason,
   resolveSamePanelBackgroundDropTarget,
 } from "./fileListDragRules";
-
-export interface VisibleEntryRow {
-  entry: FileEntry;
-  depth: number;
-  isExpanded: boolean;
-  canExpand: boolean;
-}
+import type { VisibleEntryRow } from "./fileListRows";
 
 const DRAG_THRESHOLD_PX = 6;
 let _cachedDragIcon: string | null = null;
@@ -497,11 +492,8 @@ export const useFileListDrag = ({
       return;
     }
 
-    const externalFiles = Array.from(e.dataTransfer.files);
-    if (externalFiles.length > 0) {
-      const paths = externalFiles
-        .map((f) => (f as any).path as string)
-        .filter(Boolean);
+    if (e.dataTransfer.files.length > 0) {
+      const paths = getExternalDropPaths(e.dataTransfer.files);
       if (paths.length > 0) {
         try {
           await invoke("copy_files", {

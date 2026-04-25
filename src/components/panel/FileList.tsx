@@ -6,11 +6,11 @@ import { useFileSystem } from "../../hooks/useFileSystem";
 import { useGitStatus } from "../../hooks/useGitStatus";
 import { usePanelStore } from "../../store/panelStore";
 import { useClipboardStore } from "../../store/clipboardStore";
-import { sortEntries } from "../../utils/panelHelpers";
 import { useDialogStore } from "../../store/dialogStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
-import { useFileListDrag, VisibleEntryRow } from "./useFileListDrag";
+import { useFileListDrag } from "./useFileListDrag";
+import { getVisibleRows, isSelectableEntry } from "./fileListRows";
 
 interface FileListProps {
   currentPath: string;
@@ -25,58 +25,6 @@ interface FileListProps {
   onEnter: (entry: FileEntry) => void;
   setCursorIndex: (idx: number) => void;
 }
-
-const isSelectableEntry = (entry: FileEntry) => entry.name !== "..";
-
-const getVisibleRows = (
-  entries: FileEntry[],
-  expandedPaths: Set<string>,
-  childEntriesByPath: Record<string, FileEntry[]>,
-  sizeCache: Record<string, number>,
-  sortField: string,
-  sortDirection: "asc" | "desc",
-  depth = 0
-): VisibleEntryRow[] => {
-  const rows: VisibleEntryRow[] = [];
-
-  for (const entry of entries) {
-    const canExpand = entry.kind === "directory" && entry.name !== "..";
-    const isExpanded = canExpand && expandedPaths.has(entry.path);
-
-    const cachedSize = sizeCache[entry.path.normalize("NFC")];
-    const resolvedEntry =
-      cachedSize !== undefined ? { ...entry, size: cachedSize } : entry;
-
-    rows.push({ entry: resolvedEntry, depth, canExpand, isExpanded });
-
-    if (!isExpanded) continue;
-
-    const children = childEntriesByPath[entry.path] ?? [];
-    // Apply sizeCache to children before sorting so that dynamically updated sizes sort properly
-    const resolvedChildren = children.map(child => {
-      const cSize = sizeCache[child.path.normalize("NFC")];
-      return cSize !== undefined ? { ...child, size: cSize } : child;
-    });
-
-    // Sort children
-    const filteredChildren = resolvedChildren.filter((child) => child.name !== "..");
-    const sortedChildren = sortEntries(filteredChildren, sortField, sortDirection);
-
-    rows.push(
-      ...getVisibleRows(
-        sortedChildren,
-        expandedPaths,
-        childEntriesByPath,
-        sizeCache,
-        sortField,
-        sortDirection,
-        depth + 1
-      )
-    );
-  }
-
-  return rows;
-};
 
 export const FileList: React.FC<FileListProps> = ({
   currentPath,
@@ -145,14 +93,14 @@ export const FileList: React.FC<FileListProps> = ({
     return undefined;
   };
 
-  const visibleRows = getVisibleRows(
-    files,
+  const visibleRows = getVisibleRows({
+    entries: files,
     expandedPaths,
     childEntriesByPath,
     sizeCache,
-    sortField as string,
-    sortDirection as "asc" | "desc"
-  );
+    sortField,
+    sortDirection,
+  });
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
   const settingsFontSize = useSettingsStore((s) => s.fontSize);
   const rowHeight = Math.max(24, settingsFontSize * 2);
