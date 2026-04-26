@@ -189,7 +189,7 @@ async fn execute_job(
             let affected_directories = unique_directories(
                 path_parent(path)
                     .into_iter()
-                    .chain(path_parent(&archive_path).into_iter()),
+                    .chain(path_parent(&archive_path)),
             );
 
             Ok(JobResult {

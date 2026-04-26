@@ -6,6 +6,9 @@ pub async fn start_native_drag<R: Runtime>(
     _window: tauri::Window<R>,
     paths: Vec<String>,
 ) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    let _ = paths;
+
     #[cfg(target_os = "macos")]
     #[allow(deprecated)]
     {
