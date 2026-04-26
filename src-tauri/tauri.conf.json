@@ -15,7 +15,8 @@
         "title": "MyCommander",
         "width": 1120,
         "height": 720,
-        "dragDropEnabled": true
+        "dragDropEnabled": true,
+        "devtools": true
       }
     ],
     "security": {
