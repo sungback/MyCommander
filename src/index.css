@@ -168,6 +168,11 @@ body,
   height: 100%;
 }
 
+#root.renderer-recovery-pulse {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 body {
   margin: 0;
   background-color: var(--bg-primary);

@@ -1,11 +1,14 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import { usePanelStore } from './store/panelStore';
 import { useDialogStore } from './store/dialogStore';
 import App from './App';
 
 const mockSyncOtherPanelToCurrentPath = vi.fn();
 const mockListJobs = vi.fn();
+const mockWindowShow = vi.fn().mockResolvedValue(undefined);
+const mockOnFocusChanged = vi.fn().mockResolvedValue(() => {});
+const mockWebviewShow = vi.fn().mockResolvedValue(undefined);
 const listenHandlers = new Map<string, () => void>();
 
 // ── Tauri IPC / event mocks ───────────────────────────────────────────────────
@@ -19,6 +22,17 @@ vi.mock('@tauri-apps/api/event', () => ({
     return () => {
       listenHandlers.delete(eventName);
     };
+  }),
+}));
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    show: mockWindowShow,
+    onFocusChanged: mockOnFocusChanged,
+  }),
+}));
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({
+    show: mockWebviewShow,
   }),
 }));
 
@@ -167,5 +181,21 @@ describe('App — Tab 키 패널 전환', () => {
     await Promise.resolve();
 
     expect(useDialogStore.getState().openDialog).toBe('progress');
+  });
+
+  it('macOS 장시간 대기 후 포커스 복귀 시 렌더러 표면 복구를 요청', async () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+
+    render(<App />, { container: root });
+
+    fireEvent.focus(window);
+
+    await waitFor(() => {
+      expect(root).toHaveAttribute('data-renderer-recovery-at');
+    });
+    expect(mockWindowShow).toHaveBeenCalledTimes(1);
+    expect(mockWebviewShow).toHaveBeenCalledTimes(1);
   });
 });

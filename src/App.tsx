@@ -23,6 +23,7 @@ import { useDirectoryWatch } from "./hooks/useDirectoryWatch";
 import { useSettingsStore } from "./store/settingsStore";
 import { buildFontFamilyStack } from "./constants/fontOptions";
 import { useJobQueue } from "./hooks/useJobQueue";
+import { useRendererRecovery } from "./hooks/useRendererRecovery";
 
 type PanelId = "left" | "right";
 
@@ -79,6 +80,7 @@ function App() {
   useKeyboard();
   useDirectoryWatch();
   useJobQueue();
+  useRendererRecovery();
 
   // Global Keyboard listener for Tab
   useEffect(() => {

@@ -1,7 +1,7 @@
 mod commands;
 
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Emitter, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 const FILE_MENU_ID: &str = "file";
 const NEW_FOLDER_MENU_ITEM_ID: &str = "new_folder";
@@ -16,6 +16,7 @@ const LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID: &str = "left_view_mode_brief";
 const LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID: &str = "left_view_mode_detailed";
 const RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID: &str = "right_view_mode_brief";
 const RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID: &str = "right_view_mode_detailed";
+const RECOVER_RENDERER_MENU_ITEM_ID: &str = "recover_renderer";
 const THEME_MENU_ID: &str = "theme";
 const THEME_AUTO_MENU_ITEM_ID: &str = "theme_auto";
 const THEME_LIGHT_MENU_ITEM_ID: &str = "theme_light";
@@ -157,6 +158,13 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[&theme_auto, &theme_light, &theme_dark],
     )?;
+    let recover_renderer = MenuItem::with_id(
+        app,
+        RECOVER_RENDERER_MENU_ITEM_ID,
+        "화면 복구",
+        true,
+        Some("CmdOrCtrl+Shift+R"),
+    )?;
 
     let window_menu = Submenu::with_items(
         app,
@@ -285,6 +293,8 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                     &show_hidden_files,
                     &theme_menu,
                     &PredefinedMenuItem::separator(app)?,
+                    &recover_renderer,
+                    &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::fullscreen(app, None)?,
                 ],
             )?,
@@ -332,6 +342,11 @@ pub fn run() {
                 }
                 SWAP_PANELS_MENU_ITEM_ID => {
                     let _ = app.emit("swap-panels-requested", ());
+                }
+                RECOVER_RENDERER_MENU_ITEM_ID => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.reload();
+                    }
                 }
                 commands::system::menu::CONTEXT_INFO_MENU_ITEM_ID => {
                     let _ = app.emit("context-menu-action", "info");
@@ -445,7 +460,6 @@ pub fn run() {
         .manage(commands::jobs::JobEngineState::default())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
-            use tauri::Manager;
             use tauri_plugin_window_state::{StateFlags, WindowExt};
             if let Some(window) = app.get_webview_window("main") {
                 let flags = StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED;
