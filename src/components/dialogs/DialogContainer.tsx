@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
+import type { FileType } from "../../types/file";
 import { getPathDirectoryName, joinPath } from "../../utils/path";
 import { BaseDialog } from "./BaseDialog";
 import { CopyConflictDialog } from "./CopyConflictDialog";
@@ -19,6 +20,35 @@ import {
 } from "./dialogTargetPath";
 import { useCopyMoveFlow } from "./useCopyMoveFlow";
 import { useDialogInfo } from "./useDialogInfo";
+
+export const getRenameSelectionEnd = (name: string, kind: FileType = "file") => {
+  if (!name) {
+    return 0;
+  }
+
+  if (kind === "directory") {
+    return name.length;
+  }
+
+  if (!name.includes(".")) {
+    return name.length;
+  }
+
+  if (name.startsWith(".") && name.indexOf(".", 1) === -1) {
+    return name.length;
+  }
+
+  const extensionIndex = name.lastIndexOf(".");
+  if (extensionIndex <= 0) {
+    return name.length;
+  }
+
+  return extensionIndex;
+};
+
+const selectRenameText = (input: HTMLInputElement, kind: FileType = "file") => {
+  input.setSelectionRange(0, getRenameSelectionEnd(input.value, kind));
+};
 
 export const DialogContainer: React.FC = () => {
   const {
@@ -40,6 +70,8 @@ export const DialogContainer: React.FC = () => {
   const fs = useFileSystem();
 
   const [inputValue, setInputValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const appliedRenameSelectionKeyRef = useRef<string | null>(null);
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
   const dragCopyTargetPath = getDragCopyTargetPath(
@@ -97,7 +129,7 @@ export const DialogContainer: React.FC = () => {
     closeDialog,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openDialog === "copy" && dragCopyRequest) {
       setInputValue(dragCopyTargetPath);
     } else if (openDialog === "copy" || openDialog === "move") {
@@ -118,6 +150,31 @@ export const DialogContainer: React.FC = () => {
     openDialog,
     targetPanel.currentPath,
   ]);
+
+  useEffect(() => {
+    if (openDialog !== "rename" || !dialogTarget) {
+      appliedRenameSelectionKeyRef.current = null;
+    }
+  }, [openDialog, dialogTarget]);
+
+  useEffect(() => {
+    if (openDialog !== "rename" || !dialogTarget || inputValue !== getPathBaseName(dialogTarget.path)) {
+      return;
+    }
+
+    const input = renameInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    const selectionKey = dialogTarget.path;
+    const timeoutId = window.setTimeout(() => {
+      selectRenameText(input, dialogTarget.entry?.kind);
+      appliedRenameSelectionKeyRef.current = selectionKey;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dialogTarget, inputValue, openDialog]);
 
   const updateInputValue = (value: string) => {
     setInputValue(value);
@@ -256,6 +313,7 @@ export const DialogContainer: React.FC = () => {
         isOpen={openDialog === "rename"}
         onClose={closeDialog}
         onSubmit={handleRename}
+        onOpenAutoFocus={(event) => event.preventDefault()}
         title="Rename"
         submitLabel={isSubmitting ? "Renaming..." : "Rename"}
         submitAutoFocus={false}
@@ -267,6 +325,13 @@ export const DialogContainer: React.FC = () => {
         </p>
         <input
           autoFocus
+          ref={renameInputRef}
+          onFocus={(e) => {
+            if (appliedRenameSelectionKeyRef.current !== dialogTarget?.path) {
+              selectRenameText(e.target, dialogTarget?.entry?.kind);
+              appliedRenameSelectionKeyRef.current = dialogTarget?.path ?? null;
+            }
+          }}
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}

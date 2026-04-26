@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DialogContainer } from "./DialogContainer";
+import { DialogContainer, getRenameSelectionEnd } from "./DialogContainer";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { useClipboardStore } from "../../store/clipboardStore";
@@ -202,6 +202,138 @@ describe("DialogContainer", () => {
     });
     expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
     expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("computes the rename selection range for regular files", () => {
+    expect(getRenameSelectionEnd("abc.txt")).toBe(3);
+    expect(getRenameSelectionEnd("archive.tar.gz")).toBe("archive.tar".length);
+  });
+
+  it("computes the rename selection range for files without extensions", () => {
+    expect(getRenameSelectionEnd("README")).toBe("README".length);
+  });
+
+  it("computes the rename selection range for dotfiles", () => {
+    expect(getRenameSelectionEnd(".gitignore")).toBe(".gitignore".length);
+  });
+
+  it("selects the full name for directories even when they contain dots", () => {
+    expect(getRenameSelectionEnd("project.assets", "directory")).toBe("project.assets".length);
+  });
+
+  it("preselects the basename when the rename dialog opens", async () => {
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "rename",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/abc.txt",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+
+    await waitFor(() => {
+      expect(input.value).toBe("abc.txt");
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(3);
+      expect(input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)).toBe("abc");
+    });
+  });
+
+  it("keeps the basename selected after deferred focus work runs", async () => {
+    const focusSpy = vi
+      .spyOn(HTMLInputElement.prototype, "focus")
+      .mockImplementation(function focusWithDeferredCursorMove(this: HTMLInputElement) {
+        setTimeout(() => {
+          this.setSelectionRange(this.value.length, this.value.length);
+        }, 0);
+      });
+
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "rename",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/abc.txt",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+
+    try {
+      await waitFor(() => {
+        expect(input.value).toBe("abc.txt");
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      await waitFor(() => {
+        expect(input.selectionStart).toBe(0);
+        expect(input.selectionEnd).toBe(3);
+        expect(input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)).toBe("abc");
+      });
+    } finally {
+      focusSpy.mockRestore();
+    }
+  });
+
+  it("prevents Radix autofocus from selecting the whole filename", async () => {
+    const selectSpy = vi.spyOn(HTMLInputElement.prototype, "select");
+
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "rename",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/abc.txt",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+
+    try {
+      await waitFor(() => {
+        expect(input.value).toBe("abc.txt");
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(selectSpy).not.toHaveBeenCalled();
+      expect(input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0)).toBe("abc");
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  it("preselects the full dotted directory name when the rename dialog opens", async () => {
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "rename",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/project.assets",
+        entry: {
+          name: "project.assets",
+          path: "/home/user/project.assets",
+          kind: "directory",
+        },
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+
+    await waitFor(() => {
+      expect(input.value).toBe("project.assets");
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe("project.assets".length);
+    });
   });
 
   it("submits a delete job and switches to the progress dialog", async () => {

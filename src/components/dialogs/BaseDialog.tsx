@@ -1,6 +1,8 @@
 import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof Dialog.Content>;
+
 interface BaseDialogProps {
   title: string;
   isOpen: boolean;
@@ -11,6 +13,7 @@ interface BaseDialogProps {
   errorMessage?: string | null;
   isSubmitting?: boolean;
   submitAutoFocus?: boolean;
+  onOpenAutoFocus?: DialogContentProps["onOpenAutoFocus"];
 }
 
 export const BaseDialog: React.FC<BaseDialogProps> = ({
@@ -23,11 +26,15 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
   errorMessage = null,
   isSubmitting = false,
   submitAutoFocus = true,
+  onOpenAutoFocus,
 }) => (
   <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
-      <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[450px] z-50 p-4 focus:outline-none text-text-primary">
+      <Dialog.Content
+        onOpenAutoFocus={onOpenAutoFocus}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[450px] z-50 p-4 focus:outline-none text-text-primary"
+      >
         <form
           onSubmit={(event) => {
             event.preventDefault();
