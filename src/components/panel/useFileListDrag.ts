@@ -24,6 +24,7 @@ import {
   resolveSamePanelDropIntent,
   resolveSamePanelBackgroundDropTarget,
 } from "./fileListDragRules";
+import { findFileEntryElement } from "./fileEntryElement";
 import type { VisibleEntryRow } from "./fileListRows";
 
 const DRAG_THRESHOLD_PX = 6;
@@ -180,9 +181,9 @@ export const useFileListDrag = ({
           sharedDragState.hoveredPanelPath = accessPath || currentPath;
         }
 
-        const rowElement = document
-          .elementFromPoint(e.clientX, e.clientY)
-          ?.closest("[data-entry-path]") as HTMLElement | null;
+        const rowElement = findFileEntryElement(
+          document.elementFromPoint(e.clientX, e.clientY)
+        );
         const rowPath =
           rowElement && containerRef.current.contains(rowElement)
             ? rowElement.dataset.entryPath ?? null

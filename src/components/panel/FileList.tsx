@@ -11,6 +11,7 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
 import { useFileListDrag } from "./useFileListDrag";
 import { getVisibleRows, isSelectableEntry } from "./fileListRows";
+import { getFileEntryDataAttributes } from "./fileEntryElement";
 
 interface FileListProps {
   currentPath: string;
@@ -468,11 +469,7 @@ export const FileList: React.FC<FileListProps> = ({
             <div
               key={`${entry.path}:${row.depth}`}
               className="absolute top-0 left-0 w-full"
-              data-entry-index={virtualItem.index}
-              data-entry-path={entry.path}
-              data-entry-name={entry.name}
-              data-entry-kind={entry.kind}
-              data-entry-is-hidden={entry.isHidden ? "true" : "false"}
+              {...getFileEntryDataAttributes(entry, virtualItem.index)}
               style={{
                 height: `${virtualItem.size}px`,
                 transform: `translateY(${virtualItem.start}px)`,

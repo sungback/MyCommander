@@ -11,7 +11,12 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { coalescePanelPath, getParentPath } from "../../utils/path";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
-import { FileEntry, FileType } from "../../types/file";
+import { FileEntry } from "../../types/file";
+import {
+  findFileEntryElement,
+  getFileEntryIndex,
+  readFileEntryFromElement,
+} from "./fileEntryElement";
 
 interface FilePanelProps {
   id: "left" | "right";
@@ -247,11 +252,9 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
 
       setActivePanel(id);
 
-      const entryElement = target.closest<HTMLElement>("[data-entry-path]");
+      const entryElement = findFileEntryElement(target);
       const entryPath = entryElement?.dataset.entryPath ?? null;
-      const entryIndex = entryElement?.dataset.entryIndex
-        ? Number(entryElement.dataset.entryIndex)
-        : null;
+      const entryIndex = getFileEntryIndex(entryElement);
 
       if (entryPath) {
         if (entryIndex !== null && Number.isFinite(entryIndex)) {
@@ -269,17 +272,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           (entry) => entry.path.normalize("NFC") === entryPath.normalize("NFC")
         ) ?? null;
 
-        if (!targetEntry && entryElement) {
-          const kind = entryElement.dataset.entryKind as FileType;
-          if (kind) {
-            targetEntry = {
-              name: entryElement.dataset.entryName || "",
-              path: entryPath,
-              kind,
-              isHidden: entryElement.dataset.entryIsHidden === "true"
-            };
-          }
-        }
+        targetEntry = targetEntry ?? readFileEntryFromElement(entryElement);
       }
 
       openContextMenu({
