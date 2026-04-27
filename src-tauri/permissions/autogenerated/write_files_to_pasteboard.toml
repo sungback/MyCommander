@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-write-files-to-pasteboard"
+description = "Enables the write_files_to_pasteboard command without any pre-configured scope."
+commands.allow = ["write_files_to_pasteboard"]
+
+[[permission]]
+identifier = "deny-write-files-to-pasteboard"
+description = "Denies the write_files_to_pasteboard command without any pre-configured scope."
+commands.deny = ["write_files_to_pasteboard"]

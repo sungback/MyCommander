@@ -507,7 +507,6 @@ pub fn run() {
             commands::fs::metadata::read_file_content,
             commands::search_commands::search_files,
             commands::fs::metadata::get_dir_size,
-            commands::drag_commands::start_native_drag,
             commands::drag_commands::write_files_to_pasteboard,
             commands::git_commands::get_git_status,
             commands::sync_commands::compare_directories,

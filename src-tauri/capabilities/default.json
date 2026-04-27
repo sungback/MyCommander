@@ -15,6 +15,7 @@
     "shell:default",
     "allow-get-drives",
     "allow-get-home-dir",
+    "allow-resolve-path",
     "allow-get-available-space",
     "allow-open-in-terminal",
     "allow-open-in-editor",
@@ -48,6 +49,7 @@
     "allow-get-dir-size",
     "allow-compare-directories",
     "allow-sync-watched-directories",
+    "allow-write-files-to-pasteboard",
     "allow-get-git-status",
     "drag:default",
     "window-state:default"
