@@ -1,6 +1,7 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usePanelStore } from "../../store/panelStore";
+import { FileEntry } from "../../types/file";
 import { FilePanel } from "./FilePanel";
 
 const mockListDirectory = vi.fn();
@@ -10,7 +11,11 @@ const mockGetDirSize = vi.fn();
 const mockOpenFile = vi.fn();
 const mockShowContextMenu = vi.fn();
 const mockOpenContextMenu = vi.fn();
-let lastFileListProps: { onEnter: (entry: unknown) => Promise<void> | void } | null = null;
+let lastFileListProps: {
+  files: FileEntry[];
+  onEnter: (entry: FileEntry) => Promise<void> | void;
+} | null = null;
+let mockExtraFileListRows: FileEntry[] = [];
 const mockFileSystem = {
   listDirectory: mockListDirectory,
   getHomeDir: mockGetHomeDir,
@@ -52,9 +57,28 @@ vi.mock("./TabBar", () => ({
 }));
 
 vi.mock("./FileList", () => ({
-  FileList: (props: { onEnter: (entry: unknown) => Promise<void> | void }) => {
+  FileList: (props: {
+    files: FileEntry[];
+    onEnter: (entry: FileEntry) => Promise<void> | void;
+  }) => {
     lastFileListProps = props;
-    return <div data-testid="file-list" />;
+    return (
+      <div data-testid="file-list">
+        {[...props.files, ...mockExtraFileListRows].map((entry, index) => (
+          <div
+            key={entry.path}
+            data-testid={`file-row-${entry.name}`}
+            data-entry-index={index}
+            data-entry-path={entry.path}
+            data-entry-name={entry.name}
+            data-entry-kind={entry.kind}
+            data-entry-is-hidden={entry.isHidden ? "true" : "false"}
+          >
+            {entry.name}
+          </div>
+        ))}
+      </div>
+    );
   },
 }));
 
@@ -95,14 +119,108 @@ describe("FilePanel", () => {
   beforeEach(() => {
     usePanelStore.setState(usePanelStore.getInitialState());
     lastFileListProps = null;
+    mockExtraFileListRows = [];
     mockListDirectory.mockReset();
     mockGetHomeDir.mockReset();
     mockResolvePath.mockReset();
     mockResolvePath.mockImplementation(async (path: string) => path);
     mockGetDirSize.mockReset();
     mockOpenFile.mockReset();
+    mockShowContextMenu.mockReset();
+    mockShowContextMenu.mockResolvedValue(undefined);
     mockOpenContextMenu.mockReset();
     alertSpy.mockClear();
+  });
+
+  it("uses DOM metadata for context menus on expanded child entries", async () => {
+    const rootEntry: FileEntry = {
+      name: "Project",
+      path: "/home/user/Project",
+      kind: "directory",
+      size: null,
+    };
+    const expandedChild: FileEntry = {
+      name: "nested.txt",
+      path: "/home/user/Project/nested.txt",
+      kind: "file",
+    };
+
+    mockExtraFileListRows = [expandedChild];
+    mockListDirectory.mockResolvedValue([rootEntry]);
+    mockGetDirSize.mockResolvedValue(0);
+
+    setLeftPanelPath("/home/user");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("file-row-nested.txt")).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("file-row-nested.txt"), {
+      clientX: 12,
+      clientY: 34,
+    });
+
+    expect(mockOpenContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        panelId: "left",
+        targetPath: "/home/user/Project/nested.txt",
+        targetEntry: expect.objectContaining({
+          name: "nested.txt",
+          path: "/home/user/Project/nested.txt",
+          kind: "file",
+        }),
+        x: 12,
+        y: 34,
+      })
+    );
+    expect(mockShowContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasTargetItem: true,
+        canRename: true,
+        canCreateZip: false,
+        canExtractZip: false,
+      })
+    );
+  });
+
+  it("does not keep stale multi-selection capabilities when right-clicking an unselected file", async () => {
+    const entries: FileEntry[] = [
+      { name: "alpha.txt", path: "/home/user/alpha.txt", kind: "file" },
+      { name: "bravo.txt", path: "/home/user/bravo.txt", kind: "file" },
+      { name: "target.txt", path: "/home/user/target.txt", kind: "file" },
+    ];
+
+    mockListDirectory.mockResolvedValue(entries);
+
+    setLeftPanelPath("/home/user");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("file-row-target.txt")).toBeInTheDocument();
+    });
+
+    act(() => {
+      usePanelStore
+        .getState()
+        .setSelection("left", ["/home/user/alpha.txt", "/home/user/bravo.txt"]);
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("file-row-target.txt"), {
+      clientX: 1,
+      clientY: 2,
+    });
+
+    expect(Array.from(usePanelStore.getState().leftPanel.selectedItems)).toEqual([
+      "/home/user/target.txt",
+    ]);
+    expect(mockShowContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasTargetItem: true,
+        canRename: true,
+        canCreateZip: false,
+      })
+    );
   });
 
   it("retries with the resolved path when a symlinked folder load fails", async () => {

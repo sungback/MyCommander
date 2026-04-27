@@ -29,6 +29,17 @@ interface BackgroundSizeScheduler {
   queuedPaths: Set<string>;
 }
 
+const getContextMenuSelectionCount = (
+  selectedItems: Set<string>,
+  targetPath: string | null
+) => {
+  if (!targetPath) {
+    return selectedItems.size;
+  }
+
+  return selectedItems.has(targetPath) ? selectedItems.size : 1;
+};
+
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const lastLoadedPathRef = useRef<string | null>(null);
@@ -254,13 +265,16 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       const entryElement = findFileEntryElement(target);
       const entryPath = entryElement?.dataset.entryPath ?? null;
       const entryIndex = getFileEntryIndex(entryElement);
+      const targetWasSelected = entryPath
+        ? panelState.selectedItems.has(entryPath)
+        : false;
 
       if (entryPath) {
         if (entryIndex !== null && Number.isFinite(entryIndex)) {
           setCursor(id, entryIndex);
         }
 
-        if (!panelState.selectedItems.has(entryPath)) {
+        if (!targetWasSelected) {
           selectOnly(id, entryPath);
         }
       }
@@ -282,7 +296,10 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         y: event.clientY,
       });
 
-      const selectedCount = panelState.selectedItems.size;
+      const selectedCount = getContextMenuSelectionCount(
+        panelState.selectedItems,
+        entryPath
+      );
       const canCreateZip = Boolean(
         targetEntry && targetEntry.name !== ".." &&
         (targetEntry.kind === "directory" || selectedCount > 1)
@@ -310,7 +327,16 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     return () => {
       panelElement.removeEventListener("contextmenu", handleContextMenu, true);
     };
-  }, [fs, id, openContextMenu, panelState.selectedItems, selectOnly, setActivePanel, setCursor]);
+  }, [
+    fs,
+    id,
+    openContextMenu,
+    panelState.files,
+    panelState.selectedItems,
+    selectOnly,
+    setActivePanel,
+    setCursor,
+  ]);
 
   const handleEnter = async (entry: any) => {
     const openDirectoryEntry = async (targetPath: string) => {
