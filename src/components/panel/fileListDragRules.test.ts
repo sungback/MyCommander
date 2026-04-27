@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getBlockedDropReason,
   getPanelIdFromElement,
   resolveCrossPanelDropIntent,
   resolveMouseUpTargetPanel,
@@ -86,6 +87,19 @@ describe("fileListDragRules", () => {
       targetPath: "/source/folder/child",
       blockedReason: "blocked",
     });
+  });
+
+  it("blocks drops onto equivalent source paths after path normalization", () => {
+    expect(
+      getBlockedDropReason(
+        {
+          sourcePanel: "left",
+          paths: ["C:\\Users\\Back\\Project"],
+          directoryPaths: [],
+        },
+        "c:/users/back/project"
+      )
+    ).toBe("자기 자신에게는 복사할 수 없습니다.");
   });
 
   it("falls back to panel paths and computes cross-panel nested blocks", () => {

@@ -68,7 +68,7 @@ export const getBlockedDropReason = (
     return null;
   }
 
-  if (activeDragInfo.paths.includes(targetPath)) {
+  if (activeDragInfo.paths.some((sourcePath) => arePathsEquivalent(sourcePath, targetPath))) {
     return "자기 자신에게는 복사할 수 없습니다.";
   }
 
