@@ -1,4 +1,5 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import {
   MAX_NOTEBOOK_BYTES,
   type MarkdownRendererModule,
@@ -233,7 +234,10 @@ export const loadPreviewForPath = async (
   options: QuickPreviewLoaderOptions = {}
 ): Promise<PreviewState> => {
   const extension = getExtension(path);
-  const invokeImpl = options.invokeImpl ?? invoke;
+  const readFileContent = (filePath: string) =>
+    options.invokeImpl
+      ? options.invokeImpl<string>("read_file_content", { path: filePath })
+      : useFileSystem().readFileContent(filePath);
   const convertFileSrcImpl = options.convertFileSrcImpl ?? convertFileSrc;
   const fetchImpl = options.fetchImpl ?? fetch;
   const loadTextHighlighter = options.loadTextHighlighter ?? defaultLoadTextHighlighter;
@@ -313,7 +317,7 @@ export const loadPreviewForPath = async (
   }
 
   if (RENDER_EXTENSIONS.has(extension)) {
-    const content = await invokeImpl<string>("read_file_content", { path });
+    const content = await readFileContent(path);
 
     if (extension === "md" || extension === "markdown") {
       const renderer = await loadMarkdownRenderer();
@@ -334,7 +338,7 @@ export const loadPreviewForPath = async (
   }
 
   if (TEXT_EXTENSIONS.has(extension) || extension === "") {
-    const content = await invokeImpl<string>("read_file_content", { path });
+    const content = await readFileContent(path);
     const highlighter = await loadTextHighlighter();
     const highlighted = await highlighter.highlightText(content, extension);
 

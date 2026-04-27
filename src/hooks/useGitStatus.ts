@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useGitStatusStore, GitStatus } from "../store/gitStatusStore";
+import { useFileSystem } from "./useFileSystem";
 
 export const useGitStatus = (path: string | undefined, refreshKey?: number) => {
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const prevRefreshKeyRef = useRef(refreshKey);
+  const fs = useFileSystem();
 
   useEffect(() => {
     if (!path) {
@@ -30,9 +31,7 @@ export const useGitStatus = (path: string | undefined, refreshKey?: number) => {
     const fetchGitStatus = async () => {
       setIsLoading(true);
       try {
-        const result = await invoke<GitStatus | null>("get_git_status", {
-          path,
-        });
+        const result = await fs.getGitStatus(path);
 
         if (result) {
           useGitStatusStore.getState().setStatus(path, result);
@@ -49,7 +48,7 @@ export const useGitStatus = (path: string | undefined, refreshKey?: number) => {
     };
 
     void fetchGitStatus();
-  }, [path, refreshKey]);
+  }, [fs, path, refreshKey]);
 
   return { gitStatus, isLoading };
 };

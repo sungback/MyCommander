@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -66,7 +65,7 @@ export const useFileListDrag = ({
   visibleRows,
   containerRef,
 }: UseFileListDragProps) => {
-  const { checkCopyConflicts, submitJob } = useFileSystem();
+  const { checkCopyConflicts, copyFiles, submitJob } = useFileSystem();
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const setDragInfo = useDragStore((s) => s.setDragInfo);
   const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
@@ -442,6 +441,7 @@ export const useFileListDrag = ({
     };
   }, [
     checkCopyConflicts,
+    copyFiles,
     accessPath,
     currentPath,
     openDragCopyDialog,
@@ -510,10 +510,7 @@ export const useFileListDrag = ({
       const paths = getExternalDropPaths(e.dataTransfer.files);
       if (paths.length > 0) {
         try {
-          await invoke("copy_files", {
-            source_paths: paths,
-            target_path: accessPath,
-          });
+          await copyFiles(paths, accessPath);
         } catch (error) {
           console.error("Failed to copy external files:", error);
         }

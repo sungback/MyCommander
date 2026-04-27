@@ -455,6 +455,96 @@ describe('useFileSystem', () => {
     });
   });
 
+  describe('writeFilesToPasteboard', () => {
+    it('invokes write_files_to_pasteboard with paths and operation', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().writeFilesToPasteboard(['/home/user/a.txt'], 'copy');
+      expect(mockInvoke).toHaveBeenCalledWith('write_files_to_pasteboard', {
+        paths: ['/home/user/a.txt'],
+        operation: 'copy',
+      });
+    });
+  });
+
+  describe('setShowHiddenMenuChecked', () => {
+    it('invokes set_show_hidden_menu_checked with checked state', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().setShowHiddenMenuChecked(true);
+      expect(mockInvoke).toHaveBeenCalledWith('set_show_hidden_menu_checked', {
+        checked: true,
+      });
+    });
+  });
+
+  describe('setThemeMenuSelection', () => {
+    it('invokes set_theme_menu_selection with the theme preference', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().setThemeMenuSelection('dark');
+      expect(mockInvoke).toHaveBeenCalledWith('set_theme_menu_selection', {
+        theme: 'dark',
+      });
+    });
+  });
+
+  describe('setViewModeMenuSelection', () => {
+    it('invokes set_view_mode_menu_selection with both panel modes', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().setViewModeMenuSelection('brief', 'detailed');
+      expect(mockInvoke).toHaveBeenCalledWith('set_view_mode_menu_selection', {
+        leftMode: 'brief',
+        rightMode: 'detailed',
+      });
+    });
+  });
+
+  describe('showContextMenu', () => {
+    it('maps the context menu request to snake_case for Tauri', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      await useFileSystem().showContextMenu({
+        x: 10,
+        y: 20,
+        hasTargetItem: true,
+        canRename: true,
+        canCreateZip: false,
+        canExtractZip: true,
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('show_context_menu', {
+        request: {
+          x: 10,
+          y: 20,
+          has_target_item: true,
+          can_rename: true,
+          can_create_zip: false,
+          can_extract_zip: true,
+        },
+      });
+    });
+  });
+
+  describe('getGitStatus', () => {
+    it('invokes get_git_status with the target path', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        branch: 'main',
+        modified: [],
+        added: [],
+        deleted: [],
+        untracked: [],
+      });
+
+      const result = await useFileSystem().getGitStatus('/repo');
+
+      expect(mockInvoke).toHaveBeenCalledWith('get_git_status', { path: '/repo' });
+      expect(result).toEqual({
+        branch: 'main',
+        modified: [],
+        added: [],
+        deleted: [],
+        untracked: [],
+      });
+    });
+  });
+
   // ─── searchFiles ───────────────────────────────────────────────────────────
   describe('searchFiles', () => {
     it('invokes search_files with snake_case args and a channel', async () => {

@@ -47,6 +47,9 @@ vi.mock('./hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     listJobs: mockListJobs,
     syncWatchedDirectories: vi.fn().mockResolvedValue(undefined),
+    setShowHiddenMenuChecked: vi.fn().mockResolvedValue(undefined),
+    setThemeMenuSelection: vi.fn().mockResolvedValue(undefined),
+    setViewModeMenuSelection: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 

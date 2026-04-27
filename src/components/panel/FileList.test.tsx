@@ -64,6 +64,7 @@ const {
 vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     checkCopyConflicts: mockCheckCopyConflicts,
+    copyFiles: vi.fn().mockResolvedValue([]),
     submitJob: mockSubmitJob,
     getDirSize: mockGetDirSize,
     listDirectory: mockListDirectory,

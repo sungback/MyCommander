@@ -8,6 +8,7 @@ const mockGetHomeDir = vi.fn();
 const mockResolvePath = vi.fn();
 const mockGetDirSize = vi.fn();
 const mockOpenFile = vi.fn();
+const mockShowContextMenu = vi.fn();
 const mockOpenContextMenu = vi.fn();
 let lastFileListProps: { onEnter: (entry: unknown) => Promise<void> | void } | null = null;
 const mockFileSystem = {
@@ -16,6 +17,7 @@ const mockFileSystem = {
   resolvePath: mockResolvePath,
   getDirSize: mockGetDirSize,
   openFile: mockOpenFile,
+  showContextMenu: mockShowContextMenu,
 };
 
 vi.mock("@tauri-apps/api/core", () => ({

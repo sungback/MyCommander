@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { StatusBar } from "./components/layout/StatusBar";
 import { DualPanel } from "./components/panel/DualPanel";
 import { usePanelStore } from "./store/panelStore";
 import { useKeyboard } from "./hooks/useKeyboard";
+import { useFileSystem } from "./hooks/useFileSystem";
 import { DialogContainer } from "./components/dialogs/DialogContainer";
 import { ProgressDialog } from "./components/dialogs/ProgressDialog";
 import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
@@ -75,6 +75,7 @@ function App() {
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openMultiRenameDialog = useDialogStore((s) => s.openMultiRenameDialog);
   const { syncOtherPanelToCurrentPath } = useAppCommands();
+  const fs = useFileSystem();
 
   // Initialize global shortcuts
   useKeyboard();
@@ -307,8 +308,8 @@ function App() {
     //       return;
     //     }
 
-    void invoke("set_show_hidden_menu_checked", { checked: showHiddenFiles });
-  }, [showHiddenFiles]);
+    void fs.setShowHiddenMenuChecked(showHiddenFiles);
+  }, [fs, showHiddenFiles]);
 
   useEffect(() => {
     let timeoutId: number | undefined;
@@ -347,15 +348,12 @@ function App() {
     //       return;
     //     }
 
-    void invoke("set_theme_menu_selection", { theme: themePreference });
-  }, [themePreference]);
+    void fs.setThemeMenuSelection(themePreference);
+  }, [fs, themePreference]);
 
   useEffect(() => {
-    void invoke("set_view_mode_menu_selection", {
-      leftMode: panelViewModes.left,
-      rightMode: panelViewModes.right,
-    });
-  }, [panelViewModes.left, panelViewModes.right]);
+    void fs.setViewModeMenuSelection(panelViewModes.left, panelViewModes.right);
+  }, [fs, panelViewModes.left, panelViewModes.right]);
 
   const settings = useSettingsStore();
 

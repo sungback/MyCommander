@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -294,15 +293,13 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
         targetEntry.name.toLowerCase().endsWith(".zip")
       );
 
-      void invoke("show_context_menu", {
-        request: {
-          x: event.clientX,
-          y: event.clientY,
-          has_target_item: entryPath !== null,
-          can_rename: Boolean(targetEntry && targetEntry.name !== ".."),
-          can_create_zip: canCreateZip,
-          can_extract_zip: canExtractZip,
-        },
+      void fs.showContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        hasTargetItem: entryPath !== null,
+        canRename: Boolean(targetEntry && targetEntry.name !== ".."),
+        canCreateZip,
+        canExtractZip,
       }).catch((error) => {
         console.error("Failed to show context menu:", error);
         window.alert(getErrorMessage(error, "컨텍스트 메뉴를 열지 못했습니다."));
@@ -313,7 +310,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     return () => {
       panelElement.removeEventListener("contextmenu", handleContextMenu, true);
     };
-  }, [id, openContextMenu, panelState.selectedItems, selectOnly, setActivePanel, setCursor]);
+  }, [fs, id, openContextMenu, panelState.selectedItems, selectOnly, setActivePanel, setCursor]);
 
   const handleEnter = async (entry: any) => {
     const openDirectoryEntry = async (targetPath: string) => {
