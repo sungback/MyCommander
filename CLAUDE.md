@@ -59,6 +59,8 @@
 - **더블클릭 진입:** 일반 디렉터리든 symlink든 실제 경로 접근 가능 여부를 먼저 확인 후 표시 경로로 상태를 갱신.
 - **확장 트리 메타데이터:** `FileList.tsx`의 확장된 하위 폴더 항목 정보는 전역 상태가 아닌 DOM 속성(`data-entry-*`)에 저장. 컨텍스트 메뉴 등에서 하위 항목 처리 시 DOM에서 재구성 필요.
 - **`panelStore` 경로 이중 구조:** `currentPath`(UI/히스토리 표시용) / `resolvedPath`(실제 파일시스템 접근용). 경로 비교·접근은 `resolvedPath ?? currentPath` 패턴 우선.
+- **프런트엔드 Tauri IPC 경계:** 프런트엔드의 직접 `invoke()` 호출은 `src/hooks/tauriCommands/` 하위 명령 클라이언트에만 둡니다. 컴포넌트와 일반 훅은 `useFileSystem()` facade를 통해 Tauri 명령을 호출합니다.
+- **탭-패널 상태 동기화:** 활성 탭 상태를 패널 상단 상태로 반영하는 계약은 `src/utils/panelHelpers.ts`의 `syncPanelWithActiveTab`이 담당합니다. `panelRefresh` 같은 갱신 경로에서 별도 동기화 복사본을 만들지 않습니다.
 
 ---
 
@@ -72,7 +74,7 @@ src/
     layout/      # 상태바, 컨텍스트 메뉴, 하단 액션
     panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록 + drag helper modules
   features/      # 기능 단위 로직 (예: multiRename)
-  hooks/         # Tauri 명령 래퍼 및 키보드 훅
+  hooks/         # Tauri 명령 facade, tauriCommands 하위 명령 클라이언트, 키보드 훅
   constants/     # 앱 전역 상수 (폰트 옵션 등)
   store/         # Zustand 스토어 + 패널 영속화/새로고침 보조 로직
   types/         # 파일/테마/동기화 타입 정의
