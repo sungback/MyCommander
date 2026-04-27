@@ -1,5 +1,6 @@
 import { usePanelStore } from "./panelStore";
 import { PanelState, PanelTabState } from "../types/file";
+import { syncPanelWithActiveTab } from "../utils/panelHelpers";
 import {
   coalescePanelPath,
   getPathDirectoryName,
@@ -19,32 +20,6 @@ const getNormalizedPanelPath = (path?: string | null) => {
   return normalizePathForComparison(path);
 };
 
-const syncPanelWithActiveTab = (panelState: PanelState, tabs: PanelTabState[]): PanelState => {
-  const activeTab =
-    tabs.find((tab) => tab.id === panelState.activeTabId) ??
-    tabs[0] ?? {
-      ...panelState,
-      id: panelState.activeTabId,
-    };
-
-  return {
-    ...panelState,
-    tabs,
-    activeTabId: activeTab.id,
-    currentPath: activeTab.currentPath,
-    resolvedPath: coalescePanelPath(activeTab.resolvedPath, activeTab.currentPath),
-    history: activeTab.history,
-    historyIndex: activeTab.historyIndex,
-    files: activeTab.files,
-    selectedItems: activeTab.selectedItems,
-    cursorIndex: activeTab.cursorIndex,
-    sortField: activeTab.sortField,
-    sortDirection: activeTab.sortDirection,
-    lastUpdated: activeTab.lastUpdated,
-    pendingCursorName: activeTab.pendingCursorName,
-  };
-};
-
 const updatePanelTabs = (
   panelState: PanelState,
   updater: (tab: PanelTabState) => PanelTabState
@@ -59,7 +34,7 @@ const updatePanelTabs = (
     return nextTab;
   });
 
-  return changed ? syncPanelWithActiveTab(panelState, tabs) : panelState;
+  return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;
 };
 
 export const refreshPanelsForDirectories = (directories: string[]) => {

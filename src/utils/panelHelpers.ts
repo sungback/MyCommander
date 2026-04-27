@@ -99,6 +99,7 @@ export const syncPanelWithActiveTab = (panelState: PanelState): PanelState => {
     sortField: activeTab.sortField,
     sortDirection: activeTab.sortDirection,
     lastUpdated: activeTab.lastUpdated,
+    pendingCursorName: activeTab.pendingCursorName,
   };
 };
 

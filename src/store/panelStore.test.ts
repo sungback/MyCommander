@@ -393,6 +393,18 @@ describe("panelStore — refreshPanel", () => {
 
     expect(usePanelStore.getState().leftPanel.cursorIndex).toBe(2);
   });
+
+  it("keeps the panel-level pending cursor name in sync with the active tab", () => {
+    usePanelStore.getState().setPendingCursorName("left", "archive.zip");
+
+    const state = usePanelStore.getState();
+    const activeTab = state.leftPanel.tabs.find(
+      (tab) => tab.id === state.leftPanel.activeTabId
+    );
+
+    expect(activeTab?.pendingCursorName).toBe("archive.zip");
+    expect(state.leftPanel.pendingCursorName).toBe("archive.zip");
+  });
 });
 
 describe("panelStore — settings", () => {
