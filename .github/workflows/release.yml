@@ -50,6 +50,9 @@ jobs:
       - name: 공통 JS 환경 준비
         uses: ./.github/actions/setup-js
 
+      - name: 릴리즈 버전/태그 검증
+        run: npm run verify:release-version
+
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@stable
         with:

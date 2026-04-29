@@ -186,17 +186,20 @@ src-tauri/
 
 ### 버전 업데이트
 
-프로젝트 루트의 [`version-sync.cjs`](./version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`에 동기화합니다. 일반적인 릴리스 흐름은 다음과 같습니다.
+프로젝트 루트의 [`version-sync.cjs`](./version-sync.cjs)가 `package.json` 버전을 `src-tauri/tauri.conf.json`과 `src-tauri/Cargo.toml`에 동기화합니다. 자동 커밋/자동 태그를 피하기 위해 버전 업데이트는 `--no-git-tag-version`을 사용합니다.
 
 ```bash
-git add -A
-git commit -m "release: prepare next version"
-npm version <new-version>   # 예: 1.1.22
+npm version <patch|minor|major> --no-git-tag-version
+npm run verify:release-version
+npm run verify:release
+git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+git commit -m "release: prepare v<new-version>"
+git tag -a v<new-version> -m "v<new-version>"
 git push origin main
 git push origin v<new-version>
 ```
 
-`npm version`은 로컬 버전 파일과 Git 태그를 만들지만 원격 push는 하지 않습니다. 필요하면 다음 스크립트로 브랜치와 태그를 함께 push합니다.
+`npm run verify:release-version`은 `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, 릴리스 태그 이름이 서로 일치하는지 확인합니다. 필요하면 다음 스크립트로 브랜치와 현재 태그를 함께 push합니다.
 
 ```bash
 npm run release:push

@@ -1,35 +1,46 @@
 const fs = require('fs');
 const path = require('path');
 
-/**
- * 이 스크립트는 package.json의 버전을 src-tauri/tauri.conf.json에 동기화합니다.
- * npm version 명령어 실행 시 자동으로 호출되도록 설정되었습니다.
- */
+const rootDir = __dirname;
+
+const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const replaceCargoPackageVersion = (cargoToml, newVersion) => {
+  const packageVersionPattern = /^(\[package\][\s\S]*?^version\s*=\s*")([^"]+)(")/m;
+
+  if (!packageVersionPattern.test(cargoToml)) {
+    throw new Error('Could not find [package] version in src-tauri/Cargo.toml');
+  }
+
+  return cargoToml.replace(packageVersionPattern, `$1${newVersion}$3`);
+};
 
 try {
-  // 1. package.json에서 새 버전 읽기
-  const pkgPath = path.join(__dirname, 'package.json');
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const pkgPath = path.join(rootDir, 'package.json');
+  const pkg = readJson(pkgPath);
   const newVersion = pkg.version;
 
-  // 2. tauri.conf.json 경로 설정
-  const tauriConfPath = path.join(__dirname, 'src-tauri', 'tauri.conf.json');
-  
+  const tauriConfPath = path.join(rootDir, 'src-tauri', 'tauri.conf.json');
   if (!fs.existsSync(tauriConfPath)) {
-    console.error('❌ src-tauri/tauri.conf.json 파일을 찾을 수 없습니다.');
+    console.error('src-tauri/tauri.conf.json not found.');
     process.exit(1);
   }
 
-  const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
-
-  // 3. 버전 업데이트 (Tauri v2 기준 top-level version)
+  const tauriConf = readJson(tauriConfPath);
   tauriConf.version = newVersion;
-
-  // 4. 파일 저장
   fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
-  
-  console.log(`✅ Tauri version successfully synced to ${newVersion}`);
+
+  const cargoTomlPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
+  if (!fs.existsSync(cargoTomlPath)) {
+    console.error('src-tauri/Cargo.toml not found.');
+    process.exit(1);
+  }
+
+  const cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
+  fs.writeFileSync(cargoTomlPath, replaceCargoPackageVersion(cargoToml, newVersion));
+
+  console.log(`Release versions synced to ${newVersion}`);
 } catch (error) {
-  console.error('❌ 버전 동기화 중 오류 발생:', error);
+  console.error('Version sync failed:', error);
   process.exit(1);
 }

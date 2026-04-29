@@ -12,7 +12,6 @@
     "fs:allow-desktop-read-recursive",
     "fs:allow-desktop-write-recursive",
     "dialog:default",
-    "shell:default",
     "allow-get-drives",
     "allow-get-home-dir",
     "allow-resolve-path",

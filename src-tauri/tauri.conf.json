@@ -15,18 +15,137 @@
         "title": "MyCommander",
         "width": 1120,
         "height": 720,
-        "dragDropEnabled": true,
-        "devtools": true
+        "dragDropEnabled": true
       }
     ],
     "security": {
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "**"
+        "scope": {
+          "allow": [
+            "$HOME/**",
+            "$DESKTOP/**",
+            "$DOCUMENT/**",
+            "$DOWNLOAD/**",
+            "$PICTURE/**",
+            "$VIDEO/**",
+            "$AUDIO/**",
+            "$TEMP/**",
+            "/Volumes/**"
+          ],
+          "deny": [
+            "$HOME/.ssh/**",
+            "$HOME/.gnupg/**",
+            "$HOME/.aws/**",
+            "$HOME/.kube/**",
+            "$HOME/Library/Keychains/**"
+          ],
+          "requireLiteralLeadingDot": true
+        }
+      },
+      "csp": {
+        "default-src": [
+          "'self'"
+        ],
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost"
+        ],
+        "img-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "data:"
+        ],
+        "media-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost"
+        ],
+        "frame-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "data:",
+          "blob:",
+          "about:"
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'"
+        ],
+        "font-src": [
+          "'self'",
+          "data:"
+        ],
+        "script-src": [
+          "'self'"
+        ],
+        "object-src": [
+          "'none'"
+        ],
+        "base-uri": [
+          "'none'"
+        ],
+        "form-action": [
+          "'none'"
         ]
       },
-      "csp": null
+      "devCsp": {
+        "default-src": [
+          "'self'"
+        ],
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "http://127.0.0.1:*",
+          "http://localhost:*",
+          "ws://127.0.0.1:*",
+          "ws://localhost:*"
+        ],
+        "img-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "data:"
+        ],
+        "media-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost"
+        ],
+        "frame-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "data:",
+          "blob:",
+          "about:"
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'"
+        ],
+        "font-src": [
+          "'self'",
+          "data:"
+        ],
+        "script-src": [
+          "'self'",
+          "'unsafe-eval'"
+        ],
+        "object-src": [
+          "'none'"
+        ],
+        "base-uri": [
+          "'none'"
+        ],
+        "form-action": [
+          "'none'"
+        ]
+      }
     }
   },
   "bundle": {
