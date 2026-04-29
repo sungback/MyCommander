@@ -42,8 +42,7 @@
 ### 운영 지침
 
 - 명시적 요청이 없다면 100KB 이상의 대용량 파일은 건너뜁니다.
-- 세션이 길어지면 `/cost` 실행을 제안합니다.
-- 완료 선언 전 반드시 범위에 맞는 테스트를 실행합니다.
+- 코드 동작에 영향을 주는 변경은 완료 선언 전 반드시 범위에 맞는 테스트를 실행합니다.
 - 사용자의 지침은 항상 이 문서보다 우선합니다.
 
 ## 작업 방식
@@ -62,6 +61,27 @@
 - 이 저장소는 Tauri v2 전용으로 다룹니다. 검증 없이 Tauri v1 관례를 적용하지 않습니다.
 - `CLAUDE.md`에 이미 안정적으로 정리된 프로젝트 배경은 이 문서에 중복 작성하지 말고 링크로 연결합니다.
 
+### 코드 작성 품질 원칙
+
+코드를 작성할 때 다음 원칙을 따릅니다.
+
+1. 하나의 함수나 컴포넌트가 여러 책임을 갖지 않도록, 역할별 함수와 모듈로 작게 캡슐화합니다.
+2. 공개 API, 복잡한 도메인 로직, 테스트만으로 의도가 드러나기 어려운 주요 함수와 클래스에는 언어별 표준 문서 주석을 작성합니다.
+3. 함수 인자와 반환값은 가능한 한 명확한 타입으로 표현하며, TypeScript의 `any`나 과도한 타입 단언으로 오류를 우회하지 않습니다.
+4. 새 로직은 테스트 가능한 경계를 갖도록 작성하고, 변경 범위에 맞는 실행 가능한 테스트를 함께 추가하거나 갱신합니다.
+
+사용자가 독립 실행형 코드 예시나 전체 코드 산출물을 요청한 경우, 응답은 다음 순서를 따릅니다.
+
+`전체 코드 → 사용 방법 → 테스트 코드 → 구조 설명 → 주의사항`
+
+### 위험 변경 체크리스트
+
+- 의존성, 빌드 도구, 린트/테스트 설정, Tauri 설정을 변경할 때는 변경 이유, 기존 의존성이나 표준 API로 해결할 수 없었던 이유, lockfile 변경 여부, 추가 검증 명령을 보고합니다.
+- Zustand store 변경 시 selector, persistence/migration, mock, 기존 테스트 영향을 함께 확인합니다.
+- 삭제, 이동, 이름 변경, 덮어쓰기, 압축 해제, 동기화 로직 변경은 손실 가능 작업으로 취급하고, 경로·권한·실패 복구 동작을 검증합니다.
+- 파일 작업 로직에서 표시 경로(`currentPath`)와 실제 파일시스템 경로(`resolvedPath`)를 혼용하지 않으며, symlink/CloudStorage 경로 영향을 함께 검토합니다.
+- Tauri command/IPC 경계를 변경할 때는 Rust 함수, `invoke_handler!`, 권한/capability, 프런트엔드 타입과 호출부를 함께 확인합니다.
+
 ## 작업 흐름
 
 모든 코드 수정 작업은 다음 순서를 따릅니다.
@@ -78,9 +98,28 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 6. **Report** — 아래 보고 템플릿에 따라 결과를 정리합니다.
 7. **Commit** — 사용자의 명시적 승인을 받은 뒤에만 커밋합니다.
 
+### 테스트 우선 원칙
+
+새 기능, 버그 수정, 복잡한 도메인 로직 변경은 가능하면 테스트를 먼저 작성하거나 갱신한 뒤 구현합니다.
+
+- 버그 수정은 재발을 막는 회귀 테스트를 우선 추가합니다.
+- 새 로직은 테스트 가능한 작은 함수, 훅, 모듈 단위로 분리합니다.
+- Zustand store, Tauri command/IPC, 파일 작업, 경로 변환, symlink/CloudStorage, 삭제·이동·덮어쓰기·동기화 로직 변경은 테스트 우선 또는 테스트 동시 갱신 대상으로 취급합니다.
+- 테스트를 먼저 작성하기 어려운 UI 배치, 문서, 설정, 단순 타입 정리 작업은 예외로 둘 수 있습니다.
+- 예외를 둔 경우에는 최종 보고에 이유와 대체 검증 방법을 명시합니다.
+- 사용자가 TDD를 명시적으로 요청한 작업은 `Red → Green → Refactor` 순서를 엄격히 따릅니다.
+
+### 하네스 체크포인트
+
+- 작업 시작 전 `git status --short`로 현재 변경 상태를 확인합니다.
+- 완료 보고 전 `git status --short`, `git diff --check`, `git diff --stat`으로 변경 범위와 공백 오류를 확인합니다.
+- staged 상태라면 `git diff --cached --stat`과 필요한 범위의 `git diff --cached -- <path>`를 확인합니다.
+- 검증 실패 시 실패 명령, 핵심 실패 메시지, 원인 파일 또는 영역, 수정 내용, 재실행한 검증 명령과 결과를 보고합니다.
+- dev server, Tauri dev, watch 테스트처럼 장기 실행 명령을 시작한 경우 PID, 포트, 로그 위치를 기록하고, 완료 전 종료 여부 또는 계속 실행 중임을 보고합니다.
+
 ### 금지 사항
 
-- 테스트 생략 금지
+- 코드 동작에 영향을 주는 변경의 테스트 생략 금지
 - 실패 로그 무시 금지
 - 검증 미통과 상태 커밋 금지
 - 사용자 승인 없는 커밋 금지
@@ -122,9 +161,11 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 
 수정한 파일 범위에 맞는 가장 작은 검증부터 실행하고, 무엇을 실행했는지와 무엇을 실행하지 못했는지를 답변에 분명히 적습니다.
 
+문서, 주석, AGENTS/README/CLAUDE 같은 작업 규칙만 변경한 경우에는 런타임 테스트를 생략할 수 있습니다. 이때는 테스트를 실행하지 않은 이유를 최종 보고에 명시합니다.
+
 ## 커밋 게이트
 
-커밋은 다음 조건을 **모두** 만족할 때만 허용합니다.
+코드 동작에 영향을 주는 변경의 커밋은 다음 조건을 **모두** 만족할 때만 허용합니다.
 
 - [ ] `npm run typecheck` 통과
 - [ ] `npm run test` 통과
@@ -136,16 +177,25 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 - [ ] 검증 결과 보고서 작성 완료
 - [ ] **사용자의 명시적 커밋 승인**
 
+문서, 주석, 작업 규칙만 변경한 경우에는 전체 런타임 검증 대신 다음 최소 게이트를 적용할 수 있습니다.
+
+- [ ] `git diff --check` 통과
+- [ ] `git status --short`로 변경 파일 확인
+- [ ] `git diff --stat` 또는 `git diff --cached --stat`으로 변경 범위 확인
+- [ ] 런타임 테스트 생략 사유 보고
+- [ ] **사용자의 명시적 커밋 승인**
+
 다음 경우에는 커밋 금지:
 
-- 검증 미실행 또는 일부 생략
-- typecheck / test / build / clippy / fmt 중 하나라도 실패
+- 변경 범위에 필요한 검증 미실행 또는 일부 생략
+- 코드 동작 변경에서 typecheck / test / build / clippy / fmt 중 하나라도 실패
 - 실패 로그 미확인
 - 사용자 승인 없음
 
 ## 작업 완료 보고 템플릿
 
-모든 코드 변경 작업 완료 후 아래 형식으로 보고합니다.
+실질적인 코드 변경 또는 검증을 수행한 경우 아래 형식으로 보고합니다.
+문서, 주석, 작업 규칙만 변경한 경우에는 축약 보고할 수 있으며, 테스트를 실행하지 않은 이유를 명시합니다.
 
 ```markdown
 ## 작업 요약
@@ -169,8 +219,8 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 | Typecheck | `npm run typecheck` | ✅ / ❌ |
 | Frontend Test | `npm run test` | ✅ / ❌ |
 | Frontend Build | `npm run build` | ✅ / ❌ |
-| Rust Format | `cargo fmt -- --check` | ✅ / ❌ |
-| Rust Clippy | `cargo clippy -- -D warnings` | ✅ / ❌ |
+| Rust Format | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | ✅ / ❌ |
+| Rust Clippy | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` | ✅ / ❌ |
 | Rust Test | `npm run test:rust` | ✅ / ❌ |
 | Tauri Build | `npm run verify:release` | 실행 여부 / ✅ / ❌ |
 
@@ -188,12 +238,23 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 - 사용자 승인 필요 여부: Yes
 ```
 
+문서-only 또는 작업 규칙-only 변경은 아래 축약 보고를 사용할 수 있습니다.
+
+```markdown
+- 변경 파일:
+- 변경 요약:
+- 검증:
+- 테스트 생략 사유:
+- 커밋 가능 여부:
+```
+
 ## 커밋 및 빌드 위생
 
 - 커밋 메시지는 영어로 작성합니다.
 - `dist/`, `src-tauri/target/` 같은 빌드 산출물은 커밋하지 않습니다.
 - `src-tauri/target/`은 매우 커질 수 있으므로, 실제 정리가 필요할 때만 `cargo clean --manifest-path src-tauri/Cargo.toml`를 사용합니다.
 - 작업 트리가 더러운 상태일 수 있으므로, 사용자의 무관한 변경은 되돌리지 않습니다.
+- 완료 보고 전 `git diff` 기준으로 변경 범위가 요청과 일치하는지 확인하고, 빌드 산출물이나 무관한 파일이 포함되지 않았는지 점검합니다.
 
 ## Git Hook (Lefthook)
 
@@ -206,10 +267,9 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 ## 릴리즈 / 태그 절차
 
 - 릴리즈 작업은 **기능 변경 커밋**과 **버전/태그 커밋**을 분리합니다.
-- 태그나 릴리즈를 만들기 전에는 최소 `npm run test:all` 을 실행합니다. 프런트엔드 번들, 배포 산출물, Tauri 패키징 영향이 있으면 `npm run build` 도 추가합니다.
+- 릴리즈 전 기본 검증은 `npm run verify:release` 입니다. 빠른 사전 확인이 필요할 때만 `npm run test:all`을 사용할 수 있습니다.
 - 버전 업데이트는 기본적으로 `npm version <patch|minor|major> --no-git-tag-version` 을 사용합니다. 자동 커밋/자동 태그를 피하고, `version-sync.cjs` 로 `src-tauri/tauri.conf.json` 동기화를 함께 처리하기 위함입니다.
 - 버전 커밋에는 `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json` 만 포함합니다.
-- 릴리즈 커밋 메시지도 Lore 규칙을 따르며 영어로 작성합니다.
 - 태그는 항상 annotated tag 형식 `v<version>` 으로 생성합니다.
 - 푸시 순서는 `git push origin main` 다음 태그 푸시를 기본으로 합니다. 필요 시 `npm run release:push` 를 사용할 수 있습니다.
 - 기존 릴리즈 태그를 재사용하거나 다른 커밋으로 이동시키지 않습니다.
