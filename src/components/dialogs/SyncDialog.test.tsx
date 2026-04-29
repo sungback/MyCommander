@@ -99,6 +99,51 @@ describe("SyncDialog", () => {
     });
   });
 
+  it("keeps the dialog open and reports failed sync items", async () => {
+    mockCompareDirectories.mockResolvedValue([
+      {
+        relPath: "docs/report.md",
+        leftPath: "/left/docs/report.md",
+        rightPath: "/right/docs/report.md",
+        leftKind: "file",
+        rightKind: "file",
+        status: "LeftNewer",
+        direction: "toRight",
+      },
+      {
+        relPath: "docs/fail.md",
+        leftPath: "/left/docs/fail.md",
+        rightPath: "/right/docs/fail.md",
+        leftKind: "file",
+        rightKind: "file",
+        status: "LeftNewer",
+        direction: "toRight",
+      },
+    ]);
+    mockCopyFiles
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Permission denied"));
+
+    render(<SyncDialog />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+
+    await screen.findByText("Found 2 item(s) to compare");
+
+    fireEvent.click(screen.getByRole("button", { name: "Synchronize" }));
+
+    await waitFor(() => {
+      expect(mockCopyFiles).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockRefreshPanel).toHaveBeenCalledWith("left");
+    expect(mockRefreshPanel).toHaveBeenCalledWith("right");
+    expect(mockCloseDialog).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/1 item failed to synchronize: docs\/fail\.md \(Permission denied\)\./)
+    ).toBeInTheDocument();
+  });
+
   it("collapses redundant child items when an entire missing directory is synchronized", async () => {
     mockCompareDirectories.mockResolvedValue([
       {

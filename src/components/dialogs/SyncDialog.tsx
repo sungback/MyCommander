@@ -10,6 +10,25 @@ import { coalescePanelPath } from "../../utils/path";
 import { buildSyncExecutionOperations } from "../../features/syncExecution";
 
 type SyncStage = "paths" | "analyzing" | "results" | "executing";
+type SyncExecutionFailure = {
+  relPath: string;
+  message: string;
+};
+
+const MAX_FAILURES_TO_SHOW = 3;
+
+const formatSyncExecutionFailures = (failures: SyncExecutionFailure[]): string => {
+  const visibleFailures = failures.slice(0, MAX_FAILURES_TO_SHOW);
+  const failureDetails = visibleFailures
+    .map((failure) => `${failure.relPath} (${failure.message})`)
+    .join(", ");
+  const hiddenFailureCount = failures.length - visibleFailures.length;
+  const hiddenFailureSuffix = hiddenFailureCount > 0 ? `, and ${hiddenFailureCount} more` : "";
+  const itemLabel = failures.length === 1 ? "item" : "items";
+
+  return `${failures.length} ${itemLabel} failed to synchronize: ${failureDetails}${hiddenFailureSuffix}.`;
+};
+
 const getPanelAccessPath = (panel: PanelState) =>
   coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
@@ -103,21 +122,31 @@ export const SyncDialog: React.FC = () => {
 
     try {
       let completed = 0;
+      const failures: SyncExecutionFailure[] = [];
 
       for (const operation of operations) {
         try {
           await fs.copyFiles([operation.sourcePath], operation.targetPath);
         } catch (itemError) {
           console.error(`Failed to sync ${operation.relPath}:`, itemError);
-          // Continue with next item even if one fails
+          failures.push({
+            relPath: operation.relPath,
+            message: getErrorMessage(itemError, "Unknown error"),
+          });
         }
         completed++;
         setExecutionProgress({ done: completed, total: operations.length });
       }
 
-      // Refresh both panels
       refreshPanel("left");
       refreshPanel("right");
+
+      if (failures.length > 0) {
+        setError(formatSyncExecutionFailures(failures));
+        setStage("results");
+        return;
+      }
+
       closeDialog();
     } catch (e) {
       console.error(e);

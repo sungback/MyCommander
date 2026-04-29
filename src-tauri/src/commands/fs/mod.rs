@@ -19,7 +19,7 @@ mod tests {
     use super::metadata::{compute_path_size, decode_preview_bytes, is_hidden_entry};
     use super::operations::{
         apply_batch_rename_operations, collapse_nested_paths, collect_delete_progress_targets,
-        move_files_with_cancel_and_progress, BatchRenameOperation,
+        create_file, move_files_with_cancel_and_progress, rename_file, BatchRenameOperation,
     };
     use super::shared::{compact_command_output, indicates_invalid_zip_message};
     use encoding_rs::EUC_KR;
@@ -103,6 +103,46 @@ mod tests {
                 invalid_target.display()
             ))
         );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn create_file_rejects_existing_file_without_truncating() {
+        let tmp = create_test_dir("create_file_existing");
+        fs::create_dir_all(&tmp).unwrap();
+
+        let existing = tmp.join("notes.txt");
+        fs::write(&existing, b"keep me").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(create_file(existing.to_string_lossy().to_string()));
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&existing).unwrap(), b"keep me");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn rename_file_rejects_existing_target_without_overwriting() {
+        let tmp = create_test_dir("rename_existing_target");
+        fs::create_dir_all(&tmp).unwrap();
+
+        let source = tmp.join("source.txt");
+        let target = tmp.join("target.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&target, b"target").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(rename_file(
+            source.to_string_lossy().to_string(),
+            target.to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"target");
 
         let _ = fs::remove_dir_all(&tmp);
     }

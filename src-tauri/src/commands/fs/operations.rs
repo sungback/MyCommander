@@ -2,7 +2,8 @@ use super::shared::{is_operation_cancelled, ProgressPayload};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -32,9 +33,7 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_file(path: String) -> Result<(), String> {
-    fs::File::create(&path)
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    create_new_file(Path::new(&path))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -78,7 +77,12 @@ where
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
-    fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
+    let old_path = PathBuf::from(old_path);
+    let new_path = PathBuf::from(new_path);
+
+    tokio::task::spawn_blocking(move || rename_file_without_overwrite(&old_path, &new_path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -308,6 +312,59 @@ fn ensure_move_destination_valid(
     }
 
     Ok(())
+}
+
+fn create_new_file(path: &Path) -> Result<(), String> {
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map(|_| ())
+        .map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                format!("Target path already exists: {}", path.display())
+            } else {
+                error.to_string()
+            }
+        })
+}
+
+fn rename_file_without_overwrite(old_path: &Path, new_path: &Path) -> Result<(), String> {
+    fs::symlink_metadata(old_path).map_err(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            format!("Source path does not exist: {}", old_path.display())
+        } else {
+            error.to_string()
+        }
+    })?;
+
+    match fs::symlink_metadata(new_path) {
+        Ok(_) => {
+            if !paths_refer_to_same_entry(old_path, new_path) {
+                return Err(format!(
+                    "Target path already exists: {}",
+                    new_path.display()
+                ));
+            }
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
+
+    if old_path == new_path {
+        return Ok(());
+    }
+
+    fs::rename(old_path, new_path).map_err(|e| e.to_string())
+}
+
+fn paths_refer_to_same_entry(left: &Path, right: &Path) -> bool {
+    left == right
+        || left
+            .canonicalize()
+            .ok()
+            .zip(right.canonicalize().ok())
+            .is_some_and(|(left, right)| left == right)
 }
 
 pub(crate) fn apply_batch_rename_operations(
