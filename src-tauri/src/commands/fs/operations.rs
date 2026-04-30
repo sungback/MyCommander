@@ -235,7 +235,7 @@ where
 
         ensure_move_destination_valid(src, &dest, &file_name_str)?;
 
-        fs::rename(src, &dest).map_err(|e| e.to_string())?;
+        move_path_to_destination(src, &dest)?;
         emit_progress(ProgressPayload {
             operation: "move".to_string(),
             current: (index + 1) as u64,
@@ -245,6 +245,66 @@ where
         });
     }
     Ok(())
+}
+
+fn move_path_to_destination(source: &Path, destination: &Path) -> Result<(), String> {
+    move_path_to_destination_with_rename(source, destination, |source, destination| {
+        fs::rename(source, destination)
+    })
+}
+
+fn move_path_to_destination_with_rename<F>(
+    source: &Path,
+    destination: &Path,
+    rename: F,
+) -> Result<(), String>
+where
+    F: Fn(&Path, &Path) -> std::io::Result<()>,
+{
+    match rename(source, destination) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::CrossesDevices => {
+            move_path_across_filesystems(source, destination)
+        }
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn move_path_across_filesystems(source: &Path, destination: &Path) -> Result<(), String> {
+    let source_link_metadata = fs::symlink_metadata(source).map_err(|e| e.to_string())?;
+    if source_link_metadata.file_type().is_symlink() {
+        return Err(format!(
+            "Cross-volume move of symbolic links is not supported: {}",
+            source.display()
+        ));
+    }
+
+    let temporary_destination = get_temporary_move_path(destination)?;
+    copy_path_to_destination(source, &temporary_destination)?;
+
+    if destination.exists() {
+        let _ = remove_path(&temporary_destination);
+        return Err(format!(
+            "Target path already exists: {}",
+            destination.display()
+        ));
+    }
+
+    if let Err(error) = fs::rename(&temporary_destination, destination) {
+        let _ = remove_path(&temporary_destination);
+        return Err(error.to_string());
+    }
+
+    remove_path(source)
+}
+
+fn remove_path(path: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    if metadata.is_dir() {
+        fs::remove_dir_all(path).map_err(|e| e.to_string())
+    } else {
+        fs::remove_file(path).map_err(|e| e.to_string())
+    }
 }
 
 fn resolve_move_destination(
@@ -471,6 +531,40 @@ fn get_temporary_rename_path(path: &Path, index: usize) -> Result<PathBuf, Strin
     Err(format!(
         "Could not create a temporary rename path for {}",
         path.display()
+    ))
+}
+
+fn get_temporary_move_path(destination: &Path) -> Result<PathBuf, String> {
+    let parent = destination.parent().ok_or_else(|| {
+        format!(
+            "Could not find parent directory for {}",
+            destination.display()
+        )
+    })?;
+    let file_name = destination
+        .file_name()
+        .ok_or_else(|| {
+            format!(
+                "Could not determine file name for {}",
+                destination.display()
+            )
+        })?
+        .to_string_lossy();
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+
+    for attempt in 0..1000usize {
+        let candidate = parent.join(format!(".__mycommander_move_{seed}_{attempt}_{file_name}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "Could not create a temporary move path for {}",
+        destination.display()
     ))
 }
 
@@ -820,4 +914,69 @@ pub async fn check_copy_conflicts(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn create_test_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("mycommander_operations_{name}_{suffix}"))
+    }
+
+    #[test]
+    fn move_path_falls_back_when_rename_crosses_filesystems() {
+        let tmp = create_test_dir("cross_filesystem_file_move");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("notes.txt");
+        let target = target_dir.join("notes.txt");
+        fs::write(&source, b"hello").unwrap();
+
+        let result = move_path_to_destination_with_rename(&source, &target, |_source, _target| {
+            Err(std::io::Error::new(
+                ErrorKind::CrossesDevices,
+                "cross-device link",
+            ))
+        });
+
+        assert!(result.is_ok());
+        assert!(!source.exists());
+        assert_eq!(fs::read(&target).unwrap(), b"hello");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_path_cross_filesystem_fallback_handles_directories() {
+        let tmp = create_test_dir("cross_filesystem_directory_move");
+        let source = tmp.join("source");
+        let target = tmp.join("target");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::write(source.join("nested").join("notes.txt"), b"hello").unwrap();
+
+        let result = move_path_to_destination_with_rename(&source, &target, |_source, _target| {
+            Err(std::io::Error::new(
+                ErrorKind::CrossesDevices,
+                "cross-device link",
+            ))
+        });
+
+        assert!(result.is_ok());
+        assert!(!source.exists());
+        assert_eq!(
+            fs::read(target.join("nested").join("notes.txt")).unwrap(),
+            b"hello"
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }
