@@ -7,6 +7,7 @@ import type { SearchEvent, SearchResult } from "../../hooks/useFileSystem";
 
 const {
   mockSearchFiles,
+  mockCheckCopyConflicts,
   mockCopyFiles,
   mockMoveFiles,
   mockDeleteFiles,
@@ -14,6 +15,7 @@ const {
   mockRefreshPanelsForEntryPaths,
 } = vi.hoisted(() => ({
   mockSearchFiles: vi.fn(),
+  mockCheckCopyConflicts: vi.fn(),
   mockCopyFiles: vi.fn(),
   mockMoveFiles: vi.fn(),
   mockDeleteFiles: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("re-resizable", () => ({
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     searchFiles: mockSearchFiles,
+    checkCopyConflicts: mockCheckCopyConflicts,
     copyFiles: mockCopyFiles,
     moveFiles: mockMoveFiles,
     deleteFiles: mockDeleteFiles,
@@ -71,6 +74,7 @@ describe("SearchPreviewDialogs", () => {
       },
     }));
     mockSearchFiles.mockReset();
+    mockCheckCopyConflicts.mockReset();
     mockCopyFiles.mockReset();
     mockMoveFiles.mockReset();
     mockDeleteFiles.mockReset();
@@ -85,6 +89,7 @@ describe("SearchPreviewDialogs", () => {
         emitSearchEvents(onEvent);
       }
     );
+    mockCheckCopyConflicts.mockResolvedValue([]);
   });
 
   it("passes advanced search options to searchFiles", async () => {
@@ -204,8 +209,54 @@ describe("SearchPreviewDialogs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() => {
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ["/home/user/notes.txt"],
+        "/target"
+      );
       expect(mockCopyFiles).toHaveBeenCalledWith(["/home/user/notes.txt"], "/target");
     });
+  });
+
+  it("does not copy selected search results when the target has conflicts", async () => {
+    mockCheckCopyConflicts.mockResolvedValue(["notes.txt"]);
+    mockSearchFiles.mockImplementation(
+      async (
+        _startPath: string,
+        _options: unknown,
+        onEvent: (event: SearchEvent) => void
+      ) => {
+        emitSearchEvents(onEvent, [
+          { name: "notes.txt", path: "/home/user/notes.txt", size: 1024, is_dir: false },
+        ]);
+      }
+    );
+
+    render(<SearchPreviewDialogs />);
+
+    fireEvent.change(screen.getByPlaceholderText("Find files..."), {
+      target: { value: "notes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("/home/user/notes.txt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy Selected" }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("/target")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Copy target has conflicting item name(s): notes.txt")
+      ).toBeInTheDocument();
+    });
+    expect(mockCopyFiles).not.toHaveBeenCalled();
   });
 
   it("moves selected search results using the target panel path", async () => {
@@ -333,6 +384,10 @@ describe("SearchPreviewDialogs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() => {
+      expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
+        ["/home/user/notes.txt"],
+        "/Users/back/Library/CloudStorage/Dropbox/Archive"
+      );
       expect(mockCopyFiles).toHaveBeenCalledWith(
         ["/home/user/notes.txt"],
         "/Users/back/Library/CloudStorage/Dropbox/Archive"

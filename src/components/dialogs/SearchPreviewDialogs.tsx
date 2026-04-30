@@ -34,6 +34,12 @@ import {
 const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
 const DEFAULT_DIALOG_SIZE = { width: 700, height: 560 };
 
+const formatCopyConflictError = (conflicts: string[]) => {
+  const preview = conflicts.slice(0, 3).join(", ");
+  const suffix = conflicts.length > 3 ? ` and ${conflicts.length - 3} more` : "";
+  return `Copy target has conflicting item name(s): ${preview}${suffix}`;
+};
+
 export const SearchPreviewDialogs: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
   const fs = useFileSystem();
@@ -224,16 +230,18 @@ export const SearchPreviewDialogs: React.FC = () => {
       setIsApplyingSearchOperation(true);
       setSearchOperationError(null);
 
+      const selectedPaths = selectedResults.map((result) => result.path);
+
       if (searchOperation === "copy") {
-        await fs.copyFiles(
-          selectedResults.map((result) => result.path),
-          resolvedTarget
-        );
+        const conflicts = await fs.checkCopyConflicts(selectedPaths, resolvedTarget);
+        if (conflicts.length > 0) {
+          setSearchOperationError(formatCopyConflictError(conflicts));
+          return;
+        }
+
+        await fs.copyFiles(selectedPaths, resolvedTarget);
       } else {
-        await fs.moveFiles(
-          selectedResults.map((result) => result.path),
-          resolvedTarget
-        );
+        await fs.moveFiles(selectedPaths, resolvedTarget);
         removeResultsFromList(selectedResults);
         setSelectedSearchPaths(new Set());
       }

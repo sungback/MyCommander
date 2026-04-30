@@ -891,29 +891,55 @@ pub async fn check_copy_conflicts(
     source_paths: Vec<String>,
     target_path: String,
 ) -> Result<Vec<String>, String> {
-    tokio::task::spawn_blocking(move || {
-        let target = Path::new(&target_path);
-        let mut conflicts = Vec::new();
+    tokio::task::spawn_blocking(move || collect_copy_conflicts(&source_paths, &target_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        for source in &source_paths {
-            let src = Path::new(source);
-            let file_name = src
-                .file_name()
-                .ok_or_else(|| format!("Invalid path: {source}"))?;
-            let destination = if target.is_dir() {
-                target.join(file_name)
-            } else {
-                target.to_path_buf()
-            };
-            if destination.exists() {
-                conflicts.push(file_name.to_string_lossy().to_string());
+fn collect_copy_conflicts(
+    source_paths: &[String],
+    target_path: &str,
+) -> Result<Vec<String>, String> {
+    let target = Path::new(target_path);
+    let multiple_sources = source_paths.len() > 1;
+    let mut seen_destinations = HashSet::new();
+    let mut seen_conflict_names = HashSet::new();
+    let mut conflicts = Vec::new();
+
+    for source in source_paths {
+        let src = Path::new(source);
+        let file_name = src
+            .file_name()
+            .ok_or_else(|| format!("Invalid path: {source}"))?;
+        let destination =
+            resolve_copy_conflict_destination(target, target_path, file_name, multiple_sources);
+        if destination.exists() || !seen_destinations.insert(destination) {
+            let conflict_name = file_name.to_string_lossy().to_string();
+            if seen_conflict_names.insert(conflict_name.clone()) {
+                conflicts.push(conflict_name);
             }
         }
+    }
 
-        Ok(conflicts)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    Ok(conflicts)
+}
+
+fn resolve_copy_conflict_destination(
+    target: &Path,
+    target_path: &str,
+    file_name: &std::ffi::OsStr,
+    multiple_sources: bool,
+) -> PathBuf {
+    if multiple_sources
+        || target.is_dir()
+        || target_path.ends_with(std::path::MAIN_SEPARATOR)
+        || target_path.ends_with('/')
+        || target_path.ends_with('\\')
+    {
+        target.join(file_name)
+    } else {
+        target.to_path_buf()
+    }
 }
 
 #[cfg(test)]
@@ -976,6 +1002,64 @@ mod tests {
             fs::read(target.join("nested").join("notes.txt")).unwrap(),
             b"hello"
         );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn copy_conflicts_include_duplicate_batch_destinations() {
+        let tmp = create_test_dir("copy_duplicate_destinations");
+        let first_dir = tmp.join("first");
+        let second_dir = tmp.join("second");
+        let target = tmp.join("target");
+        fs::create_dir_all(&first_dir).unwrap();
+        fs::create_dir_all(&second_dir).unwrap();
+        fs::create_dir_all(&target).unwrap();
+
+        let first = first_dir.join("notes.txt");
+        let second = second_dir.join("notes.txt");
+        fs::write(&first, b"first").unwrap();
+        fs::write(&second, b"second").unwrap();
+
+        let result = collect_copy_conflicts(
+            &[
+                first.to_string_lossy().to_string(),
+                second.to_string_lossy().to_string(),
+            ],
+            &target.to_string_lossy(),
+        )
+        .unwrap();
+
+        assert_eq!(result, vec!["notes.txt"]);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn copy_conflicts_use_directory_semantics_for_multiple_sources() {
+        let tmp = create_test_dir("copy_multiple_missing_target");
+        let first_dir = tmp.join("first");
+        let second_dir = tmp.join("second");
+        let target = tmp.join("new-target");
+        fs::create_dir_all(&first_dir).unwrap();
+        fs::create_dir_all(&second_dir).unwrap();
+
+        let first = first_dir.join("notes.txt");
+        let second = second_dir.join("notes.txt");
+        fs::write(&first, b"first").unwrap();
+        fs::write(&second, b"second").unwrap();
+
+        let result = collect_copy_conflicts(
+            &[
+                first.to_string_lossy().to_string(),
+                second.to_string_lossy().to_string(),
+            ],
+            &target.to_string_lossy(),
+        )
+        .unwrap();
+
+        assert_eq!(result, vec!["notes.txt"]);
+        assert!(!target.exists());
 
         let _ = fs::remove_dir_all(&tmp);
     }
