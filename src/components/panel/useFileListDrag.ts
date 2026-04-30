@@ -65,7 +65,7 @@ export const useFileListDrag = ({
   visibleRows,
   containerRef,
 }: UseFileListDragProps) => {
-  const { checkCopyConflicts, copyFiles, submitJob } = useFileSystem();
+  const { checkCopyConflicts, submitJob } = useFileSystem();
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const setDragInfo = useDragStore((s) => s.setDragInfo);
   const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
@@ -441,7 +441,6 @@ export const useFileListDrag = ({
     };
   }, [
     checkCopyConflicts,
-    copyFiles,
     accessPath,
     currentPath,
     openDragCopyDialog,
@@ -510,7 +509,7 @@ export const useFileListDrag = ({
       const paths = getExternalDropPaths(e.dataTransfer.files);
       if (paths.length > 0) {
         try {
-          await copyFiles(paths, accessPath);
+          await handleDraggedCopy(paths, accessPath, panelId);
         } catch (error) {
           console.error("Failed to copy external files:", error);
         }

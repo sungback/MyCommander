@@ -299,6 +299,11 @@ fn ensure_move_destination_valid(
         if source_canonical == destination_canonical {
             return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
         }
+
+        return Err(format!(
+            "Target path already exists: {}",
+            destination.display()
+        ));
     }
 
     if source.is_dir() {

@@ -108,6 +108,68 @@ mod tests {
     }
 
     #[test]
+    fn move_single_path_rejects_existing_target_without_overwriting() {
+        let tmp = create_test_dir("move_existing_target");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("source.txt");
+        let target = target_dir.join("target.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&target, b"target").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            move_files_with_cancel_and_progress(
+                vec![source.to_string_lossy().to_string()],
+                target.to_string_lossy().to_string(),
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"target");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_into_directory_rejects_existing_child_without_overwriting() {
+        let tmp = create_test_dir("move_existing_child");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("notes.txt");
+        let target = target_dir.join("notes.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&target, b"target").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            move_files_with_cancel_and_progress(
+                vec![source.to_string_lossy().to_string()],
+                target_dir.to_string_lossy().to_string(),
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"target");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn create_file_rejects_existing_file_without_truncating() {
         let tmp = create_test_dir("create_file_existing");
         fs::create_dir_all(&tmp).unwrap();
