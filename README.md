@@ -206,6 +206,7 @@ npm run release:push
 ```
 
 릴리스 GitHub Actions는 `v*` 형식의 태그 push 또는 수동 실행(`workflow_dispatch`)으로 시작됩니다. 과거 `app-v*` 태그는 legacy 호환용으로만 유지하며, 새 릴리스에서는 `v*` 태그만 사용합니다.
+Actions는 빌드 산출물을 먼저 draft release에 업로드한 뒤 `scripts/verify-release-assets.sh`로 파일 digest, 패키지 형식, macOS universal bundle, codesign, notarization, Gatekeeper 검증을 통과한 경우에만 release를 공개합니다.
 
 ## 문제 해결
 

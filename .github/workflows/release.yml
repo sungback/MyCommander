@@ -106,7 +106,7 @@ jobs:
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
           echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
 
-      - name: Tauri 앱 빌드 및 GitHub Release 배포
+      - name: Tauri 앱 빌드 및 GitHub Release draft 업로드
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ env.RELEASE_TOKEN }}
@@ -121,6 +121,63 @@ jobs:
           tagName: v__VERSION__
           releaseName: "MyCommander v__VERSION__"
           releaseBody: "자동으로 빌드된 MyCommander 설치 파일(윈도우, 맥, 리눅스)입니다."
-          releaseDraft: false
+          # Publish only after the uploaded release assets pass smoke tests.
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  verify-release-assets:
+    name: 릴리즈 산출물 스모크 테스트
+    needs: publish-tauri
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: 릴리즈 태그 계산
+        id: release
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: 릴리즈 버전/태그 검증
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: npm run verify:release-version -- --tag "$RELEASE_TAG"
+
+      - name: 릴리즈 산출물 검증
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          REQUIRE_DRAFT_RELEASE: "1"
+        run: bash scripts/verify-release-assets.sh
+
+  publish-release:
+    name: 검증된 릴리즈 공개
+    needs: verify-release-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: 릴리즈 태그 계산
+        id: release
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Release 공개
+        run: gh release edit "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false
