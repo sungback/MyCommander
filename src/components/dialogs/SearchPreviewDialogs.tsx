@@ -1,25 +1,13 @@
 import React, { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Resizable } from "re-resizable";
-import {
-  getErrorMessage,
-  type SearchResult,
-  useFileSystem,
-} from "../../hooks/useFileSystem";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import type { SearchOptions } from "../../types/search";
 import { SearchOperationDialog } from "./SearchOperationDialog";
-import {
-  SearchOptionsFields,
-  type SearchOptionChange,
-} from "./SearchOptionsFields";
+import { SearchOptionsFields } from "./SearchOptionsFields";
 import { SearchResultsPanel } from "./SearchResultsPanel";
-import { createDefaultSearchOptions } from "./searchOptions";
-import {
-  filterRemovedSearchResults,
-  getPanelAccessPath,
-} from "./searchPreviewOperations";
+import { useSearchExecution } from "./useSearchExecution";
 import { useSearchResultOperations } from "./useSearchResultOperations";
 import { useSearchResultSelection } from "./useSearchResultSelection";
 
@@ -36,11 +24,23 @@ export const SearchPreviewDialogs: React.FC = () => {
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
 
-  const [searchOptions, setSearchOptions] = useState<SearchOptions>(
-    createDefaultSearchOptions
-  );
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const {
+    searchOptions,
+    showAdvancedOptions,
+    searchResults,
+    isSearching,
+    searchProgress,
+    searchError,
+    setSearchError,
+    resetSearchExecution,
+    updateSearchOption,
+    toggleAdvancedOptions,
+    removeResultsFromList,
+    handleSearch,
+  } = useSearchExecution({
+    activePanel,
+    fs,
+  });
   const {
     selectedSearchPaths,
     clearSearchSelection,
@@ -48,9 +48,6 @@ export const SearchPreviewDialogs: React.FC = () => {
     toggleSearchResultSelection,
     getSelectedSearchResults,
   } = useSearchResultSelection(searchResults);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchProgress, setSearchProgress] = useState("");
-  const [searchError, setSearchError] = useState<string | null>(null);
   const [dialogSize, setDialogSize] = useState<{ width: number; height: number }>(
     () => {
       try {
@@ -62,48 +59,6 @@ export const SearchPreviewDialogs: React.FC = () => {
       return DEFAULT_DIALOG_SIZE;
     }
   );
-
-  const handleSearch = async () => {
-    const query = searchOptions.query.trim();
-    if (!query) return;
-
-    setIsSearching(true);
-    setSearchResults([]);
-    clearSearchSelection();
-    setSearchError(null);
-    setSearchProgress("");
-
-    try {
-      await fs.searchFiles(
-        getPanelAccessPath(activePanel),
-        {
-          ...searchOptions,
-          query,
-        },
-        (event) => {
-          if (event.type === "ResultBatch") {
-            setSearchResults((current) => [...current, ...event.payload]);
-          } else if (event.type === "Progress") {
-            setSearchProgress(event.payload.current_dir);
-          } else if (event.type === "Finished") {
-            setIsSearching(false);
-            setSearchProgress("");
-          }
-        }
-      );
-    } catch (error) {
-      console.error(error);
-      setSearchError(getErrorMessage(error, "Search failed."));
-      setIsSearching(false);
-      setSearchProgress("");
-    }
-  };
-
-  const removeResultsFromList = (removedResults: SearchResult[]) => {
-    setSearchResults((current) =>
-      filterRemovedSearchResults(current, removedResults)
-    );
-  };
 
   const {
     isDeletingSearchResults,
@@ -129,22 +84,10 @@ export const SearchPreviewDialogs: React.FC = () => {
 
   useEffect(() => {
     if (openDialog !== "search") {
-      setSearchOptions(createDefaultSearchOptions());
-      setShowAdvancedOptions(false);
-      setSearchError(null);
-      setSearchResults([]);
-      clearSearchSelection();
+      resetSearchExecution();
       resetSearchOperation();
-      setSearchProgress("");
     }
-  }, [clearSearchSelection, openDialog, resetSearchOperation]);
-
-  const updateSearchOption: SearchOptionChange = (key, value) => {
-    setSearchOptions((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  };
+  }, [openDialog, resetSearchExecution, resetSearchOperation]);
 
   return (
     <>
@@ -216,7 +159,7 @@ export const SearchPreviewDialogs: React.FC = () => {
                       updateSearchOption("query", event.target.value)
                     }
                     onKeyDown={(event) =>
-                      event.key === "Enter" && void handleSearch()
+                      event.key === "Enter" && void handleSearch(clearSearchSelection)
                     }
                     placeholder="Find files..."
                     className="flex-1 bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color"
@@ -224,7 +167,7 @@ export const SearchPreviewDialogs: React.FC = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowAdvancedOptions((current) => !current)}
+                    onClick={toggleAdvancedOptions}
                     className="px-3 py-1.5 text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color"
                     aria-expanded={showAdvancedOptions}
                   >
@@ -232,7 +175,7 @@ export const SearchPreviewDialogs: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleSearch()}
+                    onClick={() => void handleSearch(clearSearchSelection)}
                     disabled={isSearching}
                     className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-selected hover:opacity-90 rounded border border-transparent focus:outline-none focus:ring-1 focus:ring-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
                   >
