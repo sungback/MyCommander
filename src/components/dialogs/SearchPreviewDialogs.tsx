@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Resizable } from "re-resizable";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -8,6 +8,7 @@ import { SearchOperationDialog } from "./SearchOperationDialog";
 import { SearchOptionsFields } from "./SearchOptionsFields";
 import { SearchResultsPanel } from "./SearchResultsPanel";
 import { useSearchExecution } from "./useSearchExecution";
+import { usePersistentDialogSize } from "./usePersistentDialogSize";
 import { useSearchResultOperations } from "./useSearchResultOperations";
 import { useSearchResultSelection } from "./useSearchResultSelection";
 
@@ -48,16 +49,9 @@ export const SearchPreviewDialogs: React.FC = () => {
     toggleSearchResultSelection,
     getSelectedSearchResults,
   } = useSearchResultSelection(searchResults);
-  const [dialogSize, setDialogSize] = useState<{ width: number; height: number }>(
-    () => {
-      try {
-        const saved = localStorage.getItem(SEARCH_DIALOG_SIZE_KEY);
-        if (saved) return JSON.parse(saved) as { width: number; height: number };
-      } catch {
-        // ignore storage parse failure
-      }
-      return DEFAULT_DIALOG_SIZE;
-    }
+  const { dialogSize, resizeDialog } = usePersistentDialogSize(
+    SEARCH_DIALOG_SIZE_KEY,
+    DEFAULT_DIALOG_SIZE
   );
 
   const {
@@ -112,19 +106,7 @@ export const SearchPreviewDialogs: React.FC = () => {
                 bottomLeft: false,
               }}
               onResizeStop={(_event, _direction, _ref, delta) => {
-                const newSize = {
-                  width: dialogSize.width + delta.width,
-                  height: dialogSize.height + delta.height,
-                };
-                setDialogSize(newSize);
-                try {
-                  localStorage.setItem(
-                    SEARCH_DIALOG_SIZE_KEY,
-                    JSON.stringify(newSize)
-                  );
-                } catch {
-                  // ignore storage failure
-                }
+                resizeDialog(delta);
               }}
               handleComponent={{
                 bottomRight: (
