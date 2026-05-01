@@ -842,7 +842,12 @@ fn copy_path_to_destination(
             ));
         }
 
-        copy_directory_recursive(source, destination, overwrite)?;
+        if let Err(error) = copy_directory_recursive(source, destination, overwrite) {
+            if !overwrite {
+                let _ = remove_path(destination);
+            }
+            return Err(error);
+        }
         return Ok(());
     }
 
@@ -1121,6 +1126,25 @@ mod tests {
             })
             .count();
         assert_eq!(temp_entries, 0);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_copy_cleans_new_destination_when_recursive_copy_fails() {
+        let tmp = create_test_dir("directory_copy_failure_cleanup");
+        let source = tmp.join("source");
+        let target = tmp.join("target").join("source");
+        fs::create_dir_all(source.join("real_dir")).unwrap();
+        fs::write(source.join("notes.txt"), b"hello").unwrap();
+        std::os::unix::fs::symlink(source.join("real_dir"), source.join("dir_link")).unwrap();
+
+        let result = copy_path_to_destination(&source, &target, false);
+
+        assert!(result.is_err());
+        assert!(source.exists());
+        assert!(!target.exists());
 
         let _ = fs::remove_dir_all(&tmp);
     }
