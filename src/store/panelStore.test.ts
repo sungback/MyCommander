@@ -120,6 +120,46 @@ describe("panelStore — setPath", () => {
   });
 });
 
+describe("panelStore — history navigation", () => {
+  it("goBack and goForward restore display paths and reset transient panel state", () => {
+    const {
+      goBack,
+      goForward,
+      setCursor,
+      setPath,
+      setPendingCursorName,
+      setResolvedPath,
+      toggleSelection,
+    } = usePanelStore.getState();
+
+    setPath("left", "/first");
+    setResolvedPath("left", "/resolved/first");
+    setPath("left", "/second");
+    setResolvedPath("left", "/resolved/second");
+    setCursor("left", 4);
+    toggleSelection("left", "/second/item.txt");
+    setPendingCursorName("left", "item.txt");
+
+    goBack("left");
+
+    let panel = usePanelStore.getState().leftPanel;
+    expect(panel.currentPath).toBe("/first");
+    expect(panel.resolvedPath).toBe("/first");
+    expect(panel.cursorIndex).toBe(0);
+    expect(panel.selectedItems.size).toBe(0);
+    expect(panel.pendingCursorName).toBeNull();
+
+    goForward("left");
+
+    panel = usePanelStore.getState().leftPanel;
+    expect(panel.currentPath).toBe("/second");
+    expect(panel.resolvedPath).toBe("/second");
+    expect(panel.cursorIndex).toBe(0);
+    expect(panel.selectedItems.size).toBe(0);
+    expect(panel.pendingCursorName).toBeNull();
+  });
+});
+
 describe("panelStore — selection", () => {
   it("toggleSelection adds and removes paths", () => {
     const { toggleSelection } = usePanelStore.getState();
