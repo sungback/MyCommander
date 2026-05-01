@@ -157,6 +157,7 @@ where
                 &target_path,
                 keep_both,
                 overwrite,
+                cancel_flag.as_deref(),
             )?;
             emit_progress(ProgressPayload {
                 operation: "copy".to_string(),
@@ -183,7 +184,13 @@ where
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source.clone());
-            let saved = copy_path_into_dir(Path::new(source), target_root, keep_both, overwrite)?;
+            let saved = copy_path_into_dir(
+                Path::new(source),
+                target_root,
+                keep_both,
+                overwrite,
+                cancel_flag.as_deref(),
+            )?;
             saved_names.push(saved);
             emit_progress(ProgressPayload {
                 operation: "copy".to_string(),
@@ -245,7 +252,7 @@ where
 
         ensure_move_destination_valid(src, &dest, &file_name_str)?;
 
-        move_path_to_destination(src, &dest)?;
+        move_path_to_destination(src, &dest, cancel_flag.as_deref())?;
         emit_progress(ProgressPayload {
             operation: "move".to_string(),
             current: (index + 1) as u64,
@@ -257,16 +264,24 @@ where
     Ok(())
 }
 
-fn move_path_to_destination(source: &Path, destination: &Path) -> Result<(), String> {
-    move_path_to_destination_with_rename(source, destination, |source, destination| {
-        fs::rename(source, destination)
-    })
+fn move_path_to_destination(
+    source: &Path,
+    destination: &Path,
+    cancel_flag: Option<&AtomicBool>,
+) -> Result<(), String> {
+    move_path_to_destination_with_rename(
+        source,
+        destination,
+        |source, destination| fs::rename(source, destination),
+        cancel_flag,
+    )
 }
 
 fn move_path_to_destination_with_rename<F>(
     source: &Path,
     destination: &Path,
     rename: F,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<(), String>
 where
     F: Fn(&Path, &Path) -> std::io::Result<()>,
@@ -274,13 +289,17 @@ where
     match rename(source, destination) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == ErrorKind::CrossesDevices => {
-            move_path_across_filesystems(source, destination)
+            move_path_across_filesystems(source, destination, cancel_flag)
         }
         Err(error) => Err(error.to_string()),
     }
 }
 
-fn move_path_across_filesystems(source: &Path, destination: &Path) -> Result<(), String> {
+fn move_path_across_filesystems(
+    source: &Path,
+    destination: &Path,
+    cancel_flag: Option<&AtomicBool>,
+) -> Result<(), String> {
     let source_link_metadata = fs::symlink_metadata(source).map_err(|e| e.to_string())?;
     if source_link_metadata.file_type().is_symlink() {
         return Err(format!(
@@ -290,7 +309,8 @@ fn move_path_across_filesystems(source: &Path, destination: &Path) -> Result<(),
     }
 
     let temporary_destination = get_temporary_move_path(destination)?;
-    if let Err(error) = copy_path_to_destination(source, &temporary_destination, false) {
+    if let Err(error) = copy_path_to_destination(source, &temporary_destination, false, cancel_flag)
+    {
         let _ = remove_path(&temporary_destination);
         return Err(error);
     }
@@ -702,11 +722,12 @@ fn copy_single_path(
     target_path: &str,
     keep_both: bool,
     overwrite: bool,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<String, String> {
     let target = Path::new(target_path);
 
     if target.exists() && target.is_dir() {
-        return copy_path_into_dir(source, target, keep_both, overwrite);
+        return copy_path_into_dir(source, target, keep_both, overwrite, cancel_flag);
     }
 
     if target_path.ends_with(std::path::MAIN_SEPARATOR)
@@ -714,10 +735,10 @@ fn copy_single_path(
         || target_path.ends_with('\\')
     {
         fs::create_dir_all(target).map_err(|e| e.to_string())?;
-        return copy_path_into_dir(source, target, keep_both, overwrite);
+        return copy_path_into_dir(source, target, keep_both, overwrite, cancel_flag);
     }
 
-    copy_path_to_destination(source, target, overwrite)?;
+    copy_path_to_destination(source, target, overwrite, cancel_flag)?;
     Ok(target
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -778,6 +799,7 @@ fn copy_path_into_dir(
     target_dir: &Path,
     keep_both: bool,
     overwrite: bool,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<String, String> {
     let file_name = source
         .file_name()
@@ -796,7 +818,7 @@ fn copy_path_into_dir(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    copy_path_to_destination(source, &destination, overwrite)?;
+    copy_path_to_destination(source, &destination, overwrite, cancel_flag)?;
     Ok(saved_name)
 }
 
@@ -804,6 +826,7 @@ fn copy_path_to_destination(
     source: &Path,
     destination: &Path,
     overwrite: bool,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<(), String> {
     let source_metadata = fs::metadata(source).map_err(|e| e.to_string())?;
     let source_link_metadata = fs::symlink_metadata(source).map_err(|e| e.to_string())?;
@@ -842,7 +865,7 @@ fn copy_path_to_destination(
             ));
         }
 
-        if let Err(error) = copy_directory_recursive(source, destination, overwrite) {
+        if let Err(error) = copy_directory_recursive(source, destination, overwrite, cancel_flag) {
             if !overwrite {
                 let _ = remove_path(destination);
             }
@@ -851,13 +874,14 @@ fn copy_path_to_destination(
         return Ok(());
     }
 
-    copy_file_to_destination(source, destination, overwrite)
+    copy_file_to_destination(source, destination, overwrite, cancel_flag)
 }
 
 fn copy_directory_recursive(
     source: &Path,
     destination: &Path,
     overwrite: bool,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<(), String> {
     use walkdir::WalkDir;
 
@@ -877,6 +901,10 @@ fn copy_directory_recursive(
     }
 
     for entry in WalkDir::new(source) {
+        if is_operation_cancelled(cancel_flag) {
+            return Err("Operation cancelled.".to_string());
+        }
+
         let entry = entry.map_err(|e| e.to_string())?;
         let entry_path = entry.path();
         let relative_path = entry_path.strip_prefix(source).map_err(|e| e.to_string())?;
@@ -902,7 +930,7 @@ fn copy_directory_recursive(
             }
         }
 
-        copy_file_to_destination(entry_path, &destination_path, overwrite)?;
+        copy_file_to_destination(entry_path, &destination_path, overwrite, cancel_flag)?;
     }
 
     Ok(())
@@ -912,7 +940,12 @@ fn copy_file_to_destination(
     source: &Path,
     destination: &Path,
     overwrite: bool,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<(), String> {
+    if is_operation_cancelled(cancel_flag) {
+        return Err("Operation cancelled.".to_string());
+    }
+
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -1032,6 +1065,7 @@ fn resolve_copy_conflict_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn create_test_dir(name: &str) -> PathBuf {
@@ -1054,12 +1088,17 @@ mod tests {
         let target = target_dir.join("notes.txt");
         fs::write(&source, b"hello").unwrap();
 
-        let result = move_path_to_destination_with_rename(&source, &target, |_source, _target| {
-            Err(std::io::Error::new(
-                ErrorKind::CrossesDevices,
-                "cross-device link",
-            ))
-        });
+        let result = move_path_to_destination_with_rename(
+            &source,
+            &target,
+            |_source, _target| {
+                Err(std::io::Error::new(
+                    ErrorKind::CrossesDevices,
+                    "cross-device link",
+                ))
+            },
+            None,
+        );
 
         assert!(result.is_ok());
         assert!(!source.exists());
@@ -1076,12 +1115,17 @@ mod tests {
         fs::create_dir_all(source.join("nested")).unwrap();
         fs::write(source.join("nested").join("notes.txt"), b"hello").unwrap();
 
-        let result = move_path_to_destination_with_rename(&source, &target, |_source, _target| {
-            Err(std::io::Error::new(
-                ErrorKind::CrossesDevices,
-                "cross-device link",
-            ))
-        });
+        let result = move_path_to_destination_with_rename(
+            &source,
+            &target,
+            |_source, _target| {
+                Err(std::io::Error::new(
+                    ErrorKind::CrossesDevices,
+                    "cross-device link",
+                ))
+            },
+            None,
+        );
 
         assert!(result.is_ok());
         assert!(!source.exists());
@@ -1105,12 +1149,17 @@ mod tests {
         fs::write(source.join("notes.txt"), b"hello").unwrap();
         std::os::unix::fs::symlink(source.join("real_dir"), source.join("dir_link")).unwrap();
 
-        let result = move_path_to_destination_with_rename(&source, &target, |_source, _target| {
-            Err(std::io::Error::new(
-                ErrorKind::CrossesDevices,
-                "cross-device link",
-            ))
-        });
+        let result = move_path_to_destination_with_rename(
+            &source,
+            &target,
+            |_source, _target| {
+                Err(std::io::Error::new(
+                    ErrorKind::CrossesDevices,
+                    "cross-device link",
+                ))
+            },
+            None,
+        );
 
         assert!(result.is_err());
         assert!(source.exists());
@@ -1140,11 +1189,30 @@ mod tests {
         fs::write(source.join("notes.txt"), b"hello").unwrap();
         std::os::unix::fs::symlink(source.join("real_dir"), source.join("dir_link")).unwrap();
 
-        let result = copy_path_to_destination(&source, &target, false);
+        let result = copy_path_to_destination(&source, &target, false, None);
 
         assert!(result.is_err());
         assert!(source.exists());
         assert!(!target.exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn directory_copy_cleans_new_destination_when_cancelled_during_recursive_copy() {
+        let tmp = create_test_dir("directory_copy_cancel_cleanup");
+        let source = tmp.join("source");
+        let target = tmp.join("target").join("source");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("notes.txt"), b"hello").unwrap();
+        let cancel_flag = AtomicBool::new(true);
+
+        let result = copy_path_to_destination(&source, &target, false, Some(&cancel_flag));
+
+        assert_eq!(result, Err("Operation cancelled.".to_string()));
+        assert!(source.exists());
+        assert!(!target.exists());
+        assert!(cancel_flag.load(Ordering::SeqCst));
 
         let _ = fs::remove_dir_all(&tmp);
     }
