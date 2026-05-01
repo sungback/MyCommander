@@ -84,11 +84,11 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const isDetailed = viewMode === "detailed";
   const rowTextClass = isSelectionRow ? "theme-selection-text" : visual.nameClassName;
   const secondaryTextClass = isSelectionRow ? "theme-selection-text" : "text-text-secondary";
-  const iconClassName = isSelectionRow ? "theme-selection-text" : visual.iconClassName;
-  const iconWrapperClassName = isSelectionRow
-    ? ""
+  const iconClassName = visual.iconClassName;
+  const iconWrapperClassName = showThumbnail
+    ? "theme-file-thumbnail-shell"
     : visual.iconWrapperClassName;
-  const badgeClassName = isSelectionRow ? "theme-selection-text" : visual.badgeClassName;
+  const badgeClassName = visual.badgeClassName;
 
   return (
     <div
@@ -140,11 +140,12 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
           {showThumbnail ? (
             <ThumbnailImg
               path={entry.path}
-              size={visual.iconSize ?? 16}
+              size={16}
               fallback={
                 <Icon
                   size={visual.iconSize}
                   className={iconClassName}
+                  strokeWidth={visual.iconStrokeWidth ?? 1.9}
                   fill={visual.iconFillOpacity ? "currentColor" : undefined}
                   fillOpacity={visual.iconFillOpacity}
                 />
@@ -154,6 +155,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
             <Icon
               size={visual.iconSize}
               className={iconClassName}
+              strokeWidth={visual.iconStrokeWidth ?? 1.9}
               fill={visual.iconFillOpacity ? "currentColor" : undefined}
               fillOpacity={visual.iconFillOpacity}
             />

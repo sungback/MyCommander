@@ -1,18 +1,23 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpToLine,
+  Archive,
+  AudioLines,
+  Database,
   Download,
   File,
-  FileArchive,
-  FileCode,
-  FileImage,
+  FileCode2,
+  FileSpreadsheet,
   FileText,
-  FileVideoCamera,
+  FileType2,
+  FileVideo2,
   FolderClosed,
   FolderOpen,
-  Music4,
+  Image,
   Package,
-  Settings2,
+  PackageOpen,
+  Presentation,
+  SlidersHorizontal,
 } from "lucide-react";
 import { FileEntry } from "../../types/file";
 
@@ -20,16 +25,16 @@ const DOCUMENT_EXTENSIONS = new Set([
   "txt",
   "md",
   "markdown",
-  "pdf",
   "doc",
   "docx",
-  "xls",
-  "xlsx",
-  "ppt",
-  "pptx",
   "rtf",
-  "csv",
+  "odt",
+  "pages",
 ]);
+const PDF_EXTENSIONS = new Set(["pdf"]);
+const SPREADSHEET_EXTENSIONS = new Set(["xls", "xlsx", "ods", "numbers"]);
+const PRESENTATION_EXTENSIONS = new Set(["ppt", "pptx", "odp", "key"]);
+const DATA_EXTENSIONS = new Set(["csv", "tsv", "parquet", "sqlite", "sqlite3", "db"]);
 const IMAGE_EXTENSIONS = new Set([
   "png",
   "jpg",
@@ -60,6 +65,7 @@ const CODE_EXTENSIONS = new Set([
   "mjs",
   "cjs",
   "json",
+  "jsonc",
   "rs",
   "py",
   "java",
@@ -109,11 +115,16 @@ export type EntryVisualGroup =
   | "folder-hidden"
   | "folder-app-bundle"
   | "file-document"
+  | "file-pdf"
+  | "file-spreadsheet"
+  | "file-presentation"
+  | "file-data"
   | "file-image"
   | "file-archive"
   | "file-code"
   | "file-config"
-  | "file-media"
+  | "file-audio"
+  | "file-video"
   | "file-installer"
   | "file-app"
   | "file-default";
@@ -121,11 +132,16 @@ export type EntryVisualGroup =
 type FileVisualGroup = Extract<
   EntryVisualGroup,
   | "file-document"
+  | "file-pdf"
+  | "file-spreadsheet"
+  | "file-presentation"
+  | "file-data"
   | "file-image"
   | "file-archive"
   | "file-code"
   | "file-config"
-  | "file-media"
+  | "file-audio"
+  | "file-video"
   | "file-installer"
   | "file-app"
   | "file-default"
@@ -138,6 +154,7 @@ export interface EntryVisual {
   iconClassName: string;
   iconWrapperClassName: string;
   iconFillOpacity?: number;
+  iconStrokeWidth?: number;
   nameClassName: string;
   nameWeightClassName: string;
   badgeIcon?: LucideIcon;
@@ -189,11 +206,12 @@ const getFileGroup = (entry: FileEntry): FileVisualGroup => {
     return "file-archive";
   }
 
-  if (
-    (extension !== null && AUDIO_EXTENSIONS.has(extension)) ||
-    (extension !== null && VIDEO_EXTENSIONS.has(extension))
-  ) {
-    return "file-media";
+  if (extension !== null && AUDIO_EXTENSIONS.has(extension)) {
+    return "file-audio";
+  }
+
+  if (extension !== null && VIDEO_EXTENSIONS.has(extension)) {
+    return "file-video";
   }
 
   if (extension !== null && INSTALLER_EXTENSIONS.has(extension)) {
@@ -210,6 +228,22 @@ const getFileGroup = (entry: FileEntry): FileVisualGroup => {
 
   if (extension !== null && CONFIG_EXTENSIONS.has(extension)) {
     return "file-config";
+  }
+
+  if (extension !== null && PDF_EXTENSIONS.has(extension)) {
+    return "file-pdf";
+  }
+
+  if (extension !== null && SPREADSHEET_EXTENSIONS.has(extension)) {
+    return "file-spreadsheet";
+  }
+
+  if (extension !== null && PRESENTATION_EXTENSIONS.has(extension)) {
+    return "file-presentation";
+  }
+
+  if (extension !== null && DATA_EXTENSIONS.has(extension)) {
+    return "file-data";
   }
 
   if (
@@ -229,61 +263,106 @@ const FILE_VISUALS: Record<
   "file-document": {
     group: "file-document",
     icon: FileText,
-    iconSize: 14,
+    iconSize: 12,
     iconClassName: "theme-file-document-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-document-plate",
     nameClassName: "theme-file-document-name",
+    nameWeightClassName: "font-medium",
+  },
+  "file-pdf": {
+    group: "file-pdf",
+    icon: FileType2,
+    iconSize: 12,
+    iconClassName: "theme-file-pdf-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-pdf-plate",
+    nameClassName: "theme-file-pdf-name",
+    nameWeightClassName: "font-medium",
+  },
+  "file-spreadsheet": {
+    group: "file-spreadsheet",
+    icon: FileSpreadsheet,
+    iconSize: 12,
+    iconClassName: "theme-file-spreadsheet-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-spreadsheet-plate",
+    nameClassName: "theme-file-spreadsheet-name",
+    nameWeightClassName: "font-medium",
+  },
+  "file-presentation": {
+    group: "file-presentation",
+    icon: Presentation,
+    iconSize: 12,
+    iconClassName: "theme-file-presentation-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-presentation-plate",
+    nameClassName: "theme-file-presentation-name",
+    nameWeightClassName: "font-medium",
+  },
+  "file-data": {
+    group: "file-data",
+    icon: Database,
+    iconSize: 12,
+    iconClassName: "theme-file-data-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-data-plate",
+    nameClassName: "theme-file-data-name",
     nameWeightClassName: "font-medium",
   },
   "file-image": {
     group: "file-image",
-    icon: FileImage,
-    iconSize: 14,
+    icon: Image,
+    iconSize: 12,
     iconClassName: "theme-file-image-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-image-plate",
     nameClassName: "theme-file-image-name",
     nameWeightClassName: "font-medium",
   },
   "file-archive": {
     group: "file-archive",
-    icon: FileArchive,
-    iconSize: 14,
+    icon: Archive,
+    iconSize: 12,
     iconClassName: "theme-file-archive-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-archive-plate",
     nameClassName: "theme-file-archive-name",
     nameWeightClassName: "font-medium",
   },
   "file-code": {
     group: "file-code",
-    icon: FileCode,
-    iconSize: 14,
+    icon: FileCode2,
+    iconSize: 12,
     iconClassName: "theme-file-code-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-code-plate",
     nameClassName: "theme-file-code-name",
     nameWeightClassName: "font-medium",
   },
   "file-config": {
     group: "file-config",
-    icon: Settings2,
-    iconSize: 14,
+    icon: SlidersHorizontal,
+    iconSize: 12,
     iconClassName: "theme-file-config-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-config-plate",
     nameClassName: "theme-file-config-name",
     nameWeightClassName: "font-medium",
   },
-  "file-media": {
-    group: "file-media",
-    icon: Music4,
-    iconSize: 14,
-    iconClassName: "theme-file-media-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
-    nameClassName: "theme-file-media-name",
+  "file-audio": {
+    group: "file-audio",
+    icon: AudioLines,
+    iconSize: 12,
+    iconClassName: "theme-file-audio-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-audio-plate",
+    nameClassName: "theme-file-audio-name",
+    nameWeightClassName: "font-medium",
+  },
+  "file-video": {
+    group: "file-video",
+    icon: FileVideo2,
+    iconSize: 12,
+    iconClassName: "theme-file-video-icon",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-video-plate",
+    nameClassName: "theme-file-video-name",
     nameWeightClassName: "font-medium",
   },
   "file-installer": {
     group: "file-installer",
-    icon: Package,
-    iconSize: 14,
+    icon: PackageOpen,
+    iconSize: 12,
     iconClassName: "theme-file-installer-icon",
     iconWrapperClassName: "theme-file-icon-plate theme-file-installer-plate",
     badgeIcon: Download,
@@ -294,7 +373,7 @@ const FILE_VISUALS: Record<
   "file-app": {
     group: "file-app",
     icon: Package,
-    iconSize: 14,
+    iconSize: 12,
     iconClassName: "theme-file-app-icon",
     iconWrapperClassName: "theme-file-icon-plate theme-file-app-plate",
     nameClassName: "theme-file-app-name",
@@ -303,9 +382,9 @@ const FILE_VISUALS: Record<
   "file-default": {
     group: "file-default",
     icon: File,
-    iconSize: 14,
+    iconSize: 12,
     iconClassName: "theme-file-default-icon",
-    iconWrapperClassName: "theme-file-icon-plate",
+    iconWrapperClassName: "theme-file-icon-plate theme-file-default-plate",
     nameClassName: "theme-file-default-name",
     nameWeightClassName: "",
   },
@@ -352,6 +431,7 @@ export const resolveEntryVisual = (
         iconClassName: "theme-folder-hidden-icon",
         iconWrapperClassName: "theme-folder-icon-shell",
         iconFillOpacity: 0.24,
+        iconStrokeWidth: 1.65,
         nameClassName: "theme-folder-hidden-name",
         nameWeightClassName: "font-semibold",
       };
@@ -364,7 +444,8 @@ export const resolveEntryVisual = (
         iconSize: 16,
         iconClassName: "theme-folder-open-icon",
         iconWrapperClassName: "theme-folder-icon-shell",
-        iconFillOpacity: 0.26,
+        iconFillOpacity: 0.78,
+        iconStrokeWidth: 1.65,
         nameClassName: "theme-folder-open-name",
         nameWeightClassName: "font-semibold",
       };
@@ -376,7 +457,8 @@ export const resolveEntryVisual = (
       iconSize: 16,
       iconClassName: "theme-folder-icon",
       iconWrapperClassName: "theme-folder-icon-shell",
-      iconFillOpacity: 0.22,
+      iconFillOpacity: 0.72,
+      iconStrokeWidth: 1.65,
       nameClassName: "theme-folder-name",
       nameWeightClassName: "font-semibold",
     };
@@ -384,16 +466,6 @@ export const resolveEntryVisual = (
 
   const group = getFileGroup(entry);
   const visual = FILE_VISUALS[group];
-
-  if (group === "file-media") {
-    const extension = getFileExtension(entry.name);
-    if (extension !== null && VIDEO_EXTENSIONS.has(extension)) {
-      return {
-        ...visual,
-        icon: FileVideoCamera,
-      };
-    }
-  }
 
   return visual;
 };
