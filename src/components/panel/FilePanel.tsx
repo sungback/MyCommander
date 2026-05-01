@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -8,42 +8,18 @@ import { DriveList } from "./DriveList";
 import { TabBar } from "./TabBar";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { coalescePanelPath, getParentPath } from "../../utils/path";
-import { useContextMenuStore } from "../../store/contextMenuStore";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
-import { FileEntry } from "../../types/file";
-import {
-  findFileEntryElement,
-  getFileEntryIndex,
-  readFileEntryFromElement,
-} from "./fileEntryElement";
+import type { FileEntry } from "../../types/file";
+import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import { useDirectoryLoader } from "./useDirectoryLoader";
+import { usePanelContextMenu } from "./usePanelContextMenu";
 
 interface FilePanelProps {
   id: "left" | "right";
 }
 
-const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
-
-interface BackgroundSizeScheduler {
-  activeCount: number;
-  queue: Array<{ path: string }>;
-  queuedPaths: Set<string>;
-}
-
-const getContextMenuSelectionCount = (
-  selectedItems: Set<string>,
-  targetPath: string | null
-) => {
-  if (!targetPath) {
-    return selectedItems.size;
-  }
-
-  return selectedItems.has(targetPath) ? selectedItems.size : 1;
-};
-
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
-  const lastLoadedPathRef = useRef<string | null>(null);
-  const lastResolvedPathRef = useRef<string | null>(null);
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
@@ -58,287 +34,40 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
-  const openContextMenu = useContextMenuStore((s) => s.openContextMenu);
   const fs = useFileSystem();
-  const backgroundSchedulerRef = useRef<BackgroundSizeScheduler>({
-    activeCount: 0,
-    queue: [],
-    queuedPaths: new Set(),
-  });
 
   const isActive = activePanelId === id;
 
-  useEffect(() => {
-    let cancelled = false;
-    let activePath = panelState.currentPath;
-    const startedFromRootPlaceholder = activePath === "/";
-
-    const getLeafName = (path: string) =>
-      path.replace(/[\\/]+$/, "").replace(/\\/g, "/").split("/").pop() || null;
-
-    const loadDir = async () => {
-      const resolveHomeDirectory = async () => {
-        const home = await fs.getHomeDir();
-        if (cancelled) {
-          return home;
-        }
-        activePath = home;
-        setPath(id, home);
-        return home;
-      };
-
-      const commitLoadedEntries = (
-        path: string,
-        resolvedPath: string,
-        entries: Parameters<typeof setFiles>[1]
-      ) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (path !== panelState.currentPath) {
-          setPath(id, path);
-        }
-        setResolvedPath(id, resolvedPath);
-        setFiles(id, entries);
-        lastLoadedPathRef.current = path;
-        lastResolvedPathRef.current = resolvedPath;
-      };
-
-      try {
-        // Only replace the generic root placeholder. Windows drive roots are real targets.
-        if (activePath === "/") {
-          activePath = await resolveHomeDirectory();
-        }
-
-        let accessPath = activePath;
-        try {
-          accessPath = await fs.resolvePath(activePath);
-        } catch (resolveError) {
-          console.warn(`Failed to resolve path for ${activePath}:`, resolveError);
-        }
-
-        const entries = await fs.listDirectory(accessPath, showHiddenFiles);
-        commitLoadedEntries(activePath, accessPath, entries);
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-        console.error("Failed loading dir: ", err);
-
-        const previousPath = lastLoadedPathRef.current;
-        const previousResolvedPath = lastResolvedPathRef.current;
-        if (previousPath && previousPath !== panelState.currentPath) {
-          setPath(id, previousPath, getLeafName(panelState.currentPath) ?? undefined);
-          if (previousResolvedPath) {
-            setResolvedPath(id, previousResolvedPath);
-          }
-        } else if (startedFromRootPlaceholder) {
-          try {
-            const home = await resolveHomeDirectory();
-            if (cancelled) {
-              return;
-            }
-
-            let resolvedHome = home;
-            try {
-              resolvedHome = await fs.resolvePath(home);
-            } catch (resolveHomeError) {
-              console.warn(`Failed to resolve home path for ${home}:`, resolveHomeError);
-            }
-
-            const entries = await fs.listDirectory(resolvedHome, showHiddenFiles);
-            commitLoadedEntries(home, resolvedHome, entries);
-          } catch (fallbackError) {
-            console.error("Failed loading fallback home dir: ", fallbackError);
-          }
-        }
-
-        window.alert(
-          getErrorMessage(err, `${panelState.currentPath} 폴더를 열지 못했습니다.`)
-        );
-      }
-    };
-
-    void loadDir();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    fs,
-    id,
-    panelState.activeTabId,
-    panelState.currentPath,
-    panelState.lastUpdated,
+  useDirectoryLoader({
+    activeTabId: panelState.activeTabId,
+    currentPath: panelState.currentPath,
+    lastUpdated: panelState.lastUpdated,
+    panelId: id,
     setFiles,
     setPath,
+    setResolvedPath,
     showHiddenFiles,
-  ]);
+  });
 
-  useEffect(() => {
-    backgroundSchedulerRef.current = {
-      activeCount: 0,
-      queue: [],
-      queuedPaths: new Set(),
-    };
-  }, [id, panelState.activeTabId, panelState.currentPath]);
+  useBackgroundDirSizes({
+    activeTabId: panelState.activeTabId,
+    currentPath: panelState.currentPath,
+    files: panelState.files,
+    panelId: id,
+    updateEntrySize,
+  });
 
-  useEffect(() => {
-    const scheduler = backgroundSchedulerRef.current;
-    const pendingDirectories = panelState.files.filter(
-      (entry) =>
-        entry.kind === "directory" &&
-        entry.name !== ".." &&
-        (entry.size === undefined || entry.size === null) &&
-        !scheduler.queuedPaths.has(entry.path)
-    );
-
-    if (pendingDirectories.length === 0) {
-      return;
-    }
-
-    const drainQueue = () => {
-      while (
-        scheduler.activeCount < MAX_BACKGROUND_DIR_SIZE_WORKERS &&
-        scheduler.queue.length > 0
-      ) {
-        const entry = scheduler.queue.shift();
-        if (!entry) {
-          return;
-        }
-
-        scheduler.activeCount += 1;
-
-        void fs
-          .getDirSize(entry.path)
-          .then((size) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            updateEntrySize(id, entry.path, size);
-          })
-          .catch((error) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            console.error(`Failed to calculate background dir size for ${entry.path}:`, error);
-          })
-          .finally(() => {
-            scheduler.queuedPaths.delete(entry.path);
-            scheduler.activeCount -= 1;
-
-            if (backgroundSchedulerRef.current === scheduler) {
-              drainQueue();
-            }
-          });
-      }
-    };
-
-    for (const entry of pendingDirectories) {
-      scheduler.queue.push({ path: entry.path });
-      scheduler.queuedPaths.add(entry.path);
-    }
-
-    drainQueue();
-  }, [fs, id, panelState.files, panelState.currentPath, updateEntrySize]);
-
-  useEffect(() => {
-    const panelElement = panelRef.current;
-    if (!panelElement) {
-      return;
-    }
-
-    const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-
-      setActivePanel(id);
-
-      const entryElement = findFileEntryElement(target);
-      const entryPath = entryElement?.dataset.entryPath ?? null;
-      const entryIndex = getFileEntryIndex(entryElement);
-      const targetWasSelected = entryPath
-        ? panelState.selectedItems.has(entryPath)
-        : false;
-
-      if (entryPath) {
-        if (entryIndex !== null && Number.isFinite(entryIndex)) {
-          setCursor(id, entryIndex);
-        }
-
-        if (!targetWasSelected) {
-          selectOnly(id, entryPath);
-        }
-      }
-
-      let targetEntry: FileEntry | null = null;
-      if (entryPath) {
-        targetEntry = panelState.files.find(
-          (entry) => entry.path.normalize("NFC") === entryPath.normalize("NFC")
-        ) ?? null;
-
-        targetEntry = targetEntry ?? readFileEntryFromElement(entryElement);
-      }
-
-      openContextMenu({
-        panelId: id,
-        targetPath: entryPath,
-        targetEntry,
-        x: event.clientX,
-        y: event.clientY,
-      });
-
-      const selectedCount = getContextMenuSelectionCount(
-        panelState.selectedItems,
-        entryPath
-      );
-      const canCreateZip = Boolean(
-        targetEntry && targetEntry.name !== ".." &&
-        (targetEntry.kind === "directory" || selectedCount > 1)
-      );
-      const canExtractZip = Boolean(
-        targetEntry &&
-        targetEntry.kind === "file" &&
-        targetEntry.name.toLowerCase().endsWith(".zip")
-      );
-
-      void fs.showContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        hasTargetItem: entryPath !== null,
-        canRename: Boolean(targetEntry && targetEntry.name !== ".."),
-        canCreateZip,
-        canExtractZip,
-      }).catch((error) => {
-        console.error("Failed to show context menu:", error);
-        window.alert(getErrorMessage(error, "컨텍스트 메뉴를 열지 못했습니다."));
-      });
-    };
-
-    panelElement.addEventListener("contextmenu", handleContextMenu, true);
-    return () => {
-      panelElement.removeEventListener("contextmenu", handleContextMenu, true);
-    };
-  }, [
-    fs,
-    id,
-    openContextMenu,
-    panelState.files,
-    panelState.selectedItems,
+  usePanelContextMenu({
+    files: panelState.files,
+    panelId: id,
+    panelRef,
     selectOnly,
+    selectedItems: panelState.selectedItems,
     setActivePanel,
     setCursor,
-  ]);
+  });
 
-  const handleEnter = async (entry: any) => {
+  const handleEnter = async (entry: FileEntry) => {
     const openDirectoryEntry = async (targetPath: string) => {
       let resolvedPath = targetPath;
 

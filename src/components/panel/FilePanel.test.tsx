@@ -223,6 +223,31 @@ describe("FilePanel", () => {
     );
   });
 
+  it("fills missing directory sizes in the background", async () => {
+    const entries: FileEntry[] = [
+      { name: "Documents", path: "/home/user/Documents", kind: "directory", size: null },
+      { name: "Downloads", path: "/home/user/Downloads", kind: "directory" },
+      { name: "notes.txt", path: "/home/user/notes.txt", kind: "file" },
+    ];
+
+    mockListDirectory.mockResolvedValue(entries);
+    mockGetDirSize.mockResolvedValue(42);
+
+    setLeftPanelPath("/home/user");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Documents");
+      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Downloads");
+    });
+
+    await waitFor(() => {
+      const files = usePanelStore.getState().leftPanel.files;
+      expect(files.find((entry) => entry.name === "Documents")?.size).toBe(42);
+      expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(42);
+    });
+  });
+
   it("retries with the resolved path when a symlinked folder load fails", async () => {
     const resolvedEntries = [
       { name: "..", path: "/Users/back/Library/CloudStorage", kind: "directory" as const },
