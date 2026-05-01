@@ -80,7 +80,6 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const visual = resolveEntryVisual(entry, { isExpanded });
   const showThumbnail = !isDir && THUMBNAIL_EXTENSIONS.has(getExt(entry.name));
   const Icon = visual.icon;
-  const BadgeIcon = visual.badgeIcon;
   const isDetailed = viewMode === "detailed";
   const rowTextClass = isSelectionRow ? "theme-selection-text" : visual.nameClassName;
   const secondaryTextClass = isSelectionRow ? "theme-selection-text" : "text-text-secondary";
@@ -88,7 +87,34 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const iconWrapperClassName = showThumbnail
     ? "theme-file-thumbnail-shell"
     : visual.iconWrapperClassName;
-  const badgeClassName = visual.badgeClassName;
+  const overlayClassName = visual.overlayClassName;
+  const extensionLabel = visual.extensionLabel;
+  const extensionLabelClassName = visual.extensionLabelClassName;
+  const renderIconContents = () => (
+    <>
+      <Icon
+        size={visual.iconSize}
+        className={iconClassName}
+        strokeWidth={visual.iconStrokeWidth ?? 1.9}
+        fill={visual.iconFillOpacity ? "currentColor" : undefined}
+        fillOpacity={visual.iconFillOpacity}
+      />
+      {extensionLabel ? (
+        <span
+          aria-hidden="true"
+          className={clsx("theme-tc-extension-label", extensionLabelClassName)}
+        >
+          {extensionLabel}
+        </span>
+      ) : null}
+      {overlayClassName ? (
+        <span
+          aria-hidden="true"
+          className={clsx("theme-tc-overlay", overlayClassName)}
+        />
+      ) : null}
+    </>
+  );
 
   return (
     <div
@@ -142,29 +168,14 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
               path={entry.path}
               size={16}
               fallback={
-                <Icon
-                  size={visual.iconSize}
-                  className={iconClassName}
-                  strokeWidth={visual.iconStrokeWidth ?? 1.9}
-                  fill={visual.iconFillOpacity ? "currentColor" : undefined}
-                  fillOpacity={visual.iconFillOpacity}
-                />
+                <span className={clsx("relative shrink-0", visual.iconWrapperClassName)}>
+                  {renderIconContents()}
+                </span>
               }
             />
           ) : (
-            <Icon
-              size={visual.iconSize}
-              className={iconClassName}
-              strokeWidth={visual.iconStrokeWidth ?? 1.9}
-              fill={visual.iconFillOpacity ? "currentColor" : undefined}
-              fillOpacity={visual.iconFillOpacity}
-            />
+            renderIconContents()
           )}
-          {BadgeIcon ? (
-            <span className={clsx("absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full", badgeClassName)}>
-              <BadgeIcon size={8} />
-            </span>
-          ) : null}
         </span>
         <span
           className={clsx("truncate", rowTextClass, {

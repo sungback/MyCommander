@@ -26,13 +26,38 @@ describe("FileItem", () => {
       />
     );
 
-    const iconPlate = container.querySelector(".theme-file-icon-plate");
+    const iconPlate = container.querySelector(".theme-tc-icon-slot");
     expect(iconPlate).not.toBeNull();
-    expect(iconPlate).toHaveClass("theme-file-document-plate");
+    expect(iconPlate).toHaveClass("theme-tc-slot-text-file");
+    expect(iconPlate).toHaveClass("theme-tc-type-document");
 
     const icon = iconPlate?.querySelector("svg");
     expect(icon).not.toBeNull();
-    expect(icon).toHaveClass("theme-file-document-icon");
+    expect(icon).toHaveClass("theme-tc-file-glyph-text");
     expect(icon).not.toHaveClass("theme-selection-text");
+
+    const label = iconPlate?.querySelector(".theme-tc-extension-label");
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent("MD");
+    expect(label).toHaveClass("theme-tc-ext-md");
+  });
+
+  it("renders hidden file overlays independently from row selection text", () => {
+    const { container } = render(
+      <FileItem
+        entry={{ ...createFile(".secret"), isHidden: true }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    const overlay = container.querySelector(".theme-tc-overlay-hidden");
+    expect(overlay).not.toBeNull();
+    expect(overlay).toHaveClass("theme-tc-overlay");
+
+    const label = container.querySelector(".theme-tc-extension-label");
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent("SEC");
   });
 });

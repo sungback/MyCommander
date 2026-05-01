@@ -251,145 +251,341 @@ body {
   color: var(--selection-text-color);
 }
 
-.theme-folder-icon-shell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.32));
-}
-
-.theme-folder-parent-icon-shell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  padding: 1px;
-  background: color-mix(in srgb, var(--folder-parent-color) 14%, transparent);
-}
-
-.theme-folder-app-bundle-icon-shell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  padding: 1px;
-  background: color-mix(in srgb, var(--folder-app-bundle-color) 12%, transparent);
-}
-
-.theme-file-icon-plate {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  min-width: 16px;
-  min-height: 16px;
-  overflow: hidden;
-  border-radius: 1px;
-  padding: 0;
-  background:
-    linear-gradient(
-      135deg,
-      var(--file-page-corner-color) 0 20%,
-      var(--file-page-border-color) 20% 22%,
-      var(--file-page-color) 22% 100%
-    );
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 0 0 1px color-mix(
-      in srgb,
-      var(--file-page-border-color) 86%,
-      black
-    ),
-    0 1px 0 rgba(0, 0, 0, 0.22);
-}
-
-.theme-file-icon-plate::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  bottom: 2px;
-  width: 8px;
-  height: 5px;
-  border: 1px solid color-mix(in srgb, var(--file-plate-color) 70%, black);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--file-plate-color) 75%, white) 0 28%,
-      var(--file-plate-color) 28% 100%
-    );
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.46),
-    1px 0 0 rgba(255, 255, 255, 0.4);
-}
-
-.theme-file-icon-plate > svg {
-  position: relative;
-  z-index: 1;
-  transform: translate(2px, -1px);
-}
-
+.theme-tc-folder-shell,
+.theme-tc-icon-slot,
 .theme-file-thumbnail-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 16px;
+  height: 16px;
   min-width: 16px;
   min-height: 16px;
 }
 
-.theme-file-default-plate {
-  --file-plate-color: var(--file-default-color);
+.theme-tc-folder-shell,
+.theme-tc-icon-slot {
+  position: relative;
 }
 
-.theme-file-document-plate {
-  --file-plate-color: var(--file-document-color);
+.theme-tc-folder-shell {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.34));
 }
 
-.theme-file-pdf-plate {
-  --file-plate-color: var(--file-pdf-color);
+.theme-tc-folder-parent-shell,
+.theme-tc-folder-app-shell {
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
-.theme-file-spreadsheet-plate {
-  --file-plate-color: var(--file-spreadsheet-color);
+.theme-tc-icon-slot {
+  --tc-file-accent: var(--file-default-color);
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--file-page-color);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px color-mix(
+      in srgb,
+      var(--file-page-border-color) 46%,
+      white
+    ),
+    0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
-.theme-file-presentation-plate {
-  --file-plate-color: var(--file-presentation-color);
+.theme-tc-slot-hidden-file {
+  filter: grayscale(0.55) opacity(0.72);
 }
 
-.theme-file-data-plate {
-  --file-plate-color: var(--file-data-color);
+.theme-tc-type-document,
+.theme-tc-type-code {
+  --tc-file-accent: var(--file-document-color);
 }
 
-.theme-file-image-plate {
-  --file-plate-color: var(--file-image-color);
+.theme-tc-type-config {
+  --tc-file-accent: var(--file-config-color);
 }
 
-.theme-file-archive-plate {
-  --file-plate-color: var(--file-archive-color);
+.theme-tc-type-spreadsheet {
+  --tc-file-accent: var(--file-spreadsheet-color);
 }
 
-.theme-file-code-plate {
-  --file-plate-color: var(--file-code-color);
+.theme-tc-type-presentation,
+.theme-tc-slot-archive-file {
+  --tc-file-accent: var(--file-archive-color);
 }
 
-.theme-file-config-plate {
-  --file-plate-color: var(--file-config-color);
+.theme-tc-type-data {
+  --tc-file-accent: var(--file-data-color);
 }
 
-.theme-file-audio-plate {
-  --file-plate-color: var(--file-audio-color);
+.theme-tc-type-image {
+  --tc-file-accent: var(--file-image-color);
 }
 
-.theme-file-video-plate {
-  --file-plate-color: var(--file-video-color);
+.theme-tc-type-media {
+  --tc-file-accent: var(--file-audio-color);
 }
 
-.theme-file-installer-plate {
-  --file-plate-color: var(--file-installer-color);
+.theme-tc-icon-slot > svg {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  transform: none;
 }
 
-.theme-file-app-plate {
-  --file-plate-color: var(--file-app-color);
+.theme-tc-file-glyph-standard,
+.theme-tc-file-glyph-associated,
+.theme-tc-file-glyph-hidden {
+  color: var(--file-default-color);
+}
+
+.theme-tc-file-glyph-text {
+  color: var(--file-document-color);
+}
+
+.theme-tc-file-glyph-archive,
+.theme-tc-file-glyph-program {
+  color: color-mix(in srgb, var(--tc-file-accent) 82%, black);
+}
+
+.theme-tc-overlay {
+  position: absolute;
+  z-index: 4;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--file-page-color);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.theme-tc-overlay-hidden {
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, #c8ccd2 0 45%, #6a7280 45% 100%);
+}
+
+.theme-tc-extension-label {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tc-ext-bg, var(--file-default-color));
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 8px;
+  text-align: center;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.theme-tc-ext-document {
+  --tc-ext-bg: #1d4ed8;
+}
+
+.theme-tc-ext-txt {
+  --tc-ext-bg: #374151;
+}
+
+.theme-tc-ext-md {
+  --tc-ext-bg: #111827;
+}
+
+.theme-tc-ext-doc {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-pdf {
+  --tc-ext-bg: #d71920;
+}
+
+.theme-tc-ext-xls {
+  --tc-ext-bg: #0f8a3b;
+}
+
+.theme-tc-ext-ppt {
+  --tc-ext-bg: #d97706;
+}
+
+.theme-tc-ext-data,
+.theme-tc-ext-csv {
+  --tc-ext-bg: #0891b2;
+}
+
+.theme-tc-ext-db,
+.theme-tc-ext-sql {
+  --tc-ext-bg: #0f766e;
+}
+
+.theme-tc-ext-image,
+.theme-tc-ext-jpg,
+.theme-tc-ext-webp {
+  --tc-ext-bg: #0284c7;
+}
+
+.theme-tc-ext-png {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-gif {
+  --tc-ext-bg: #c026d3;
+}
+
+.theme-tc-ext-svg {
+  --tc-ext-bg: #f97316;
+}
+
+.theme-tc-ext-archive,
+.theme-tc-ext-zip {
+  --tc-ext-bg: #ca8a04;
+}
+
+.theme-tc-ext-rar {
+  --tc-ext-bg: #7c3aed;
+}
+
+.theme-tc-ext-7z {
+  --tc-ext-bg: #92400e;
+}
+
+.theme-tc-ext-tar {
+  --tc-ext-bg: #a16207;
+}
+
+.theme-tc-ext-code,
+.theme-tc-ext-ts {
+  --tc-ext-bg: #3178c6;
+}
+
+.theme-tc-ext-js {
+  --tc-ext-bg: #b88700;
+}
+
+.theme-tc-ext-json {
+  --tc-ext-bg: #7c2d12;
+}
+
+.theme-tc-ext-py {
+  --tc-ext-bg: #3776ab;
+}
+
+.theme-tc-ext-rs {
+  --tc-ext-bg: #b7410e;
+}
+
+.theme-tc-ext-go {
+  --tc-ext-bg: #00add8;
+}
+
+.theme-tc-ext-java {
+  --tc-ext-bg: #b07219;
+}
+
+.theme-tc-ext-rb {
+  --tc-ext-bg: #cc342d;
+}
+
+.theme-tc-ext-php {
+  --tc-ext-bg: #4f5d95;
+}
+
+.theme-tc-ext-swift {
+  --tc-ext-bg: #f05138;
+}
+
+.theme-tc-ext-c {
+  --tc-ext-bg: #5555aa;
+}
+
+.theme-tc-ext-cs {
+  --tc-ext-bg: #178600;
+}
+
+.theme-tc-ext-html {
+  --tc-ext-bg: #e34c26;
+}
+
+.theme-tc-ext-css {
+  --tc-ext-bg: #563d7c;
+}
+
+.theme-tc-ext-shell {
+  --tc-ext-bg: #16a34a;
+}
+
+.theme-tc-ext-config {
+  --tc-ext-bg: #5b6572;
+}
+
+.theme-tc-ext-env {
+  --tc-ext-bg: #4b5563;
+}
+
+.theme-tc-ext-yaml {
+  --tc-ext-bg: #cb171e;
+}
+
+.theme-tc-ext-toml {
+  --tc-ext-bg: #8b5e34;
+}
+
+.theme-tc-ext-lock,
+.theme-tc-ext-bin {
+  --tc-ext-bg: #475569;
+}
+
+.theme-tc-ext-audio {
+  --tc-ext-bg: #7e22ce;
+}
+
+.theme-tc-ext-mp3 {
+  --tc-ext-bg: #9333ea;
+}
+
+.theme-tc-ext-video {
+  --tc-ext-bg: #3730a3;
+}
+
+.theme-tc-ext-mp4 {
+  --tc-ext-bg: #4f46e5;
+}
+
+.theme-tc-ext-program,
+.theme-tc-ext-app {
+  --tc-ext-bg: #b36b00;
+}
+
+.theme-tc-ext-mac {
+  --tc-ext-bg: #64748b;
+}
+
+.theme-tc-ext-win {
+  --tc-ext-bg: #0078d4;
+}
+
+.theme-tc-ext-linux {
+  --tc-ext-bg: #ca8a04;
+}
+
+.theme-tc-file-name {
+  color: var(--text-primary);
+}
+
+.theme-tc-folder-name {
+  color: var(--folder-name-color);
+}
+
+.theme-tc-hidden-name {
+  color: var(--hidden-text-color);
 }
 
 .theme-folder-icon {
@@ -430,124 +626,6 @@ body {
 
 .theme-folder-app-bundle-name {
   color: var(--folder-app-bundle-name-color);
-}
-
-.theme-file-default-icon {
-  color: var(--file-default-color);
-}
-
-.theme-file-default-name {
-  color: var(--file-default-name-color);
-}
-
-.theme-file-document-icon {
-  color: var(--file-document-color);
-}
-
-.theme-file-document-name {
-  color: var(--file-document-name-color);
-}
-
-.theme-file-pdf-icon {
-  color: var(--file-pdf-color);
-}
-
-.theme-file-pdf-name {
-  color: var(--file-pdf-name-color);
-}
-
-.theme-file-spreadsheet-icon {
-  color: var(--file-spreadsheet-color);
-}
-
-.theme-file-spreadsheet-name {
-  color: var(--file-spreadsheet-name-color);
-}
-
-.theme-file-presentation-icon {
-  color: var(--file-presentation-color);
-}
-
-.theme-file-presentation-name {
-  color: var(--file-presentation-name-color);
-}
-
-.theme-file-data-icon {
-  color: var(--file-data-color);
-}
-
-.theme-file-data-name {
-  color: var(--file-data-name-color);
-}
-
-.theme-file-image-icon {
-  color: var(--file-image-color);
-}
-
-.theme-file-image-name {
-  color: var(--file-image-name-color);
-}
-
-.theme-file-archive-icon {
-  color: var(--file-archive-color);
-}
-
-.theme-file-archive-name {
-  color: var(--file-archive-name-color);
-}
-
-.theme-file-code-icon {
-  color: var(--file-code-color);
-}
-
-.theme-file-code-name {
-  color: var(--file-code-name-color);
-}
-
-.theme-file-config-icon {
-  color: var(--file-config-color);
-}
-
-.theme-file-config-name {
-  color: var(--file-config-name-color);
-}
-
-.theme-file-audio-icon {
-  color: var(--file-audio-color);
-}
-
-.theme-file-audio-name {
-  color: var(--file-audio-name-color);
-}
-
-.theme-file-video-icon {
-  color: var(--file-video-color);
-}
-
-.theme-file-video-name {
-  color: var(--file-video-name-color);
-}
-
-.theme-file-installer-icon {
-  color: var(--file-installer-color);
-}
-
-.theme-file-installer-name {
-  color: var(--file-installer-name-color);
-}
-
-.theme-file-installer-badge {
-  color: var(--file-page-color);
-  background: var(--file-installer-color);
-  box-shadow: 0 0 0 1px var(--file-page-color);
-}
-
-.theme-file-app-icon {
-  color: var(--file-app-color);
-}
-
-.theme-file-app-name {
-  color: var(--file-app-name-color);
 }
 
 .theme-hidden-text {

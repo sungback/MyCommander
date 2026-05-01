@@ -2,17 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   Archive,
   ArrowUpToLine,
-  AudioLines,
-  Database,
-  Download,
-  FileCode2,
-  FileSpreadsheet,
-  FileType2,
-  FileVideo2,
-  Image,
-  PackageOpen,
-  Presentation,
-  SlidersHorizontal,
+  File,
+  FileText,
+  Package,
 } from "lucide-react";
 import { resolveEntryVisual, getFileExtension } from "./fileVisuals";
 import { FileEntry } from "../../types/file";
@@ -55,6 +47,8 @@ describe("resolveEntryVisual", () => {
 
     expect(closedFolder.group).toBe("folder");
     expect(openFolder.group).toBe("folder-open");
+    expect(closedFolder.slot).toBe("tc-folder-closed");
+    expect(openFolder.slot).toBe("tc-folder-open");
     expect(closedFolder.iconClassName).toBe("theme-folder-icon");
     expect(openFolder.iconClassName).toBe("theme-folder-open-icon");
   });
@@ -66,8 +60,11 @@ describe("resolveEntryVisual", () => {
     const parentFolder = resolveEntryVisual(createDirectory(".."));
 
     expect(hiddenFolder.group).toBe("folder-hidden");
-    expect(hiddenFolder.nameClassName).toBe("theme-folder-hidden-name");
+    expect(hiddenFolder.slot).toBe("tc-folder-hidden");
+    expect(hiddenFolder.overlayClassName).toBe("theme-tc-overlay-hidden");
+    expect(hiddenFolder.nameClassName).toBe("theme-tc-hidden-name");
     expect(parentFolder.group).toBe("folder-parent");
+    expect(parentFolder.slot).toBe("tc-folder-parent");
     expect(parentFolder.iconClassName).toBe("theme-folder-parent-icon");
     expect(parentFolder.icon).toBe(ArrowUpToLine);
   });
@@ -76,6 +73,7 @@ describe("resolveEntryVisual", () => {
     const appBundle = resolveEntryVisual(createDirectory("MyCommander.app"));
 
     expect(appBundle.group).toBe("folder-app-bundle");
+    expect(appBundle.slot).toBe("tc-folder-app");
     expect(appBundle.iconClassName).toBe("theme-folder-app-bundle-icon");
   });
 
@@ -97,44 +95,93 @@ describe("resolveEntryVisual", () => {
     expect(resolveEntryVisual(createFile("unknown.bin")).group).toBe("file-default");
   });
 
-  it("adds a download badge to installer files", () => {
+  it("uses Total Commander-style standard slots for file groups", () => {
+    expect(resolveEntryVisual(createFile("unknown.bin")).slot).toBe("tc-file-standard");
+    expect(resolveEntryVisual(createFile("notes.md")).slot).toBe("tc-file-text");
+    expect(resolveEntryVisual(createFile("main.ts")).slot).toBe("tc-file-text");
+    expect(resolveEntryVisual(createFile("backup.zip")).slot).toBe("tc-file-archive");
+    expect(resolveEntryVisual(createFile("installer.pkg")).slot).toBe("tc-file-program");
+    expect(resolveEntryVisual(createFile("manual.pdf")).slot).toBe("tc-file-associated");
+    expect(resolveEntryVisual(createFile("budget.xlsx")).slot).toBe("tc-file-associated");
+  });
+
+  it("adds short readable extension labels to file icons", () => {
+    expect(resolveEntryVisual(createFile("manual.pdf")).extensionLabel).toBe("PDF");
+    expect(resolveEntryVisual(createFile("budget.xlsx")).extensionLabel).toBe("XLS");
+    expect(resolveEntryVisual(createFile("talk.pptx")).extensionLabel).toBe("PPT");
+    expect(resolveEntryVisual(createFile("photo.jpeg")).extensionLabel).toBe("JPG");
+    expect(resolveEntryVisual(createFile("main.ts")).extensionLabel).toBe("TS");
+    expect(resolveEntryVisual(createFile("backup.tar.gz")).extensionLabel).toBe("TGZ");
+    expect(resolveEntryVisual(createFile("unknown.bin")).extensionLabel).toBe("BIN");
+  });
+
+  it("uses extension-specific label colors for readable file scanning", () => {
+    expect(resolveEntryVisual(createFile("manual.pdf")).extensionLabelClassName).toBe("theme-tc-ext-pdf");
+    expect(resolveEntryVisual(createFile("budget.xlsx")).extensionLabelClassName).toBe("theme-tc-ext-xls");
+    expect(resolveEntryVisual(createFile("main.ts")).extensionLabelClassName).toBe("theme-tc-ext-ts");
+    expect(resolveEntryVisual(createFile("script.js")).extensionLabelClassName).toBe("theme-tc-ext-js");
+    expect(resolveEntryVisual(createFile("photo.png")).extensionLabelClassName).toBe("theme-tc-ext-png");
+    expect(resolveEntryVisual(createFile("photo.jpeg")).extensionLabelClassName).toBe("theme-tc-ext-jpg");
+    expect(resolveEntryVisual(createFile("archive.zip")).extensionLabelClassName).toBe("theme-tc-ext-zip");
+    expect(resolveEntryVisual(createFile("backup.tar.gz")).extensionLabelClassName).toBe("theme-tc-ext-tar");
+    expect(resolveEntryVisual(createFile("movie.mp4")).extensionLabelClassName).toBe("theme-tc-ext-mp4");
+    expect(resolveEntryVisual(createFile("song.mp3")).extensionLabelClassName).toBe("theme-tc-ext-mp3");
+    expect(resolveEntryVisual(createFile("settings.yml")).extensionLabelClassName).toBe("theme-tc-ext-yaml");
+    expect(resolveEntryVisual(createFile("installer.dmg")).extensionLabelClassName).toBe("theme-tc-ext-mac");
+    expect(resolveEntryVisual(createFile("setup.exe")).extensionLabelClassName).toBe("theme-tc-ext-win");
+  });
+
+  it("uses the program slot for installer files", () => {
     const visual = resolveEntryVisual(createFile("installer.pkg"));
 
-    expect(visual.icon).toBe(PackageOpen);
-    expect(visual.badgeIcon).toBe(Download);
-    expect(visual.badgeClassName).toBe("theme-file-installer-badge");
+    expect(visual.icon).toBe(Package);
+    expect(visual.iconWrapperClassName).toContain("theme-tc-slot-program-file");
   });
 
   it("uses local icon metadata without bundled SVG markup", () => {
     const visual = resolveEntryVisual(createFile("main.ts"));
 
-    expect(visual.icon).toBe(FileCode2);
+    expect(visual.icon).toBe(FileText);
     expect("svgMarkup" in visual).toBe(false);
     expect("svgClassName" in visual).toBe(false);
   });
 
-  it("uses distinct silhouettes for richer file categories", () => {
-    expect(resolveEntryVisual(createFile("manual.pdf")).icon).toBe(FileType2);
-    expect(resolveEntryVisual(createFile("budget.xlsx")).icon).toBe(FileSpreadsheet);
-    expect(resolveEntryVisual(createFile("talk.pptx")).icon).toBe(Presentation);
-    expect(resolveEntryVisual(createFile("export.csv")).icon).toBe(Database);
-    expect(resolveEntryVisual(createFile("photo.jpg")).icon).toBe(Image);
+  it("maps richer file categories to compact associated-file markers", () => {
+    expect(resolveEntryVisual(createFile("manual.pdf")).icon).toBe(File);
+    expect(resolveEntryVisual(createFile("budget.xlsx")).iconWrapperClassName).toContain("theme-tc-type-spreadsheet");
+    expect(resolveEntryVisual(createFile("talk.pptx")).iconWrapperClassName).toContain("theme-tc-type-presentation");
+    expect(resolveEntryVisual(createFile("export.csv")).iconWrapperClassName).toContain("theme-tc-type-data");
+    expect(resolveEntryVisual(createFile("photo.jpg")).iconWrapperClassName).toContain("theme-tc-type-image");
     expect(resolveEntryVisual(createFile("backup.zip")).icon).toBe(Archive);
-    expect(resolveEntryVisual(createFile(".env")).icon).toBe(SlidersHorizontal);
+    expect(resolveEntryVisual(createFile(".env")).icon).toBe(FileText);
   });
 
-  it("uses a video icon for videos and an audio icon for audio", () => {
+  it("uses compact associated-file markers for videos and audio", () => {
     const videoVisual = resolveEntryVisual(createFile("movie.mp4"));
     const audioVisual = resolveEntryVisual(createFile("song.mp3"));
 
-    expect(videoVisual.icon).toBe(FileVideo2);
-    expect(audioVisual.icon).toBe(AudioLines);
+    expect(videoVisual.slot).toBe("tc-file-associated");
+    expect(audioVisual.slot).toBe("tc-file-associated");
+    expect(videoVisual.iconWrapperClassName).toContain("theme-tc-type-media");
+    expect(audioVisual.iconWrapperClassName).toContain("theme-tc-type-media");
+  });
+
+  it("uses a hidden file slot and overlay for hidden files", () => {
+    const visual = resolveEntryVisual(createFile(".secret", { isHidden: true }));
+
+    expect(visual.group).toBe("file-hidden");
+    expect(visual.slot).toBe("tc-file-hidden");
+    expect(visual.extensionLabel).toBe("SEC");
+    expect(visual.overlayClassName).toBe("theme-tc-overlay-hidden");
+    expect(visual.nameClassName).toBe("theme-tc-hidden-name");
   });
 
   it("treats readme-like files as documents even without an extension", () => {
     const visual = resolveEntryVisual(createFile("README"));
 
     expect(visual.group).toBe("file-document");
-    expect(visual.nameClassName).toBe("theme-file-document-name");
+    expect(visual.slot).toBe("tc-file-text");
+    expect(visual.extensionLabel).toBe("TXT");
+    expect(visual.nameClassName).toBe("theme-tc-file-name");
   });
 });
