@@ -126,7 +126,7 @@ export const SyncDialog: React.FC = () => {
 
       for (const operation of operations) {
         try {
-          await fs.copyFiles([operation.sourcePath], operation.targetPath);
+          await fs.copyFiles([operation.sourcePath], operation.targetPath, false, true);
         } catch (itemError) {
           console.error(`Failed to sync ${operation.relPath}:`, itemError);
           failures.push({

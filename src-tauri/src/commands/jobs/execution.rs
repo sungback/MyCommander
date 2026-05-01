@@ -84,6 +84,7 @@ async fn execute_job(
             source_paths,
             target_path,
             keep_both,
+            overwrite,
         } => {
             let progress_inner = inner.clone();
             let progress_app = app.clone();
@@ -92,6 +93,7 @@ async fn execute_job(
                 source_paths.clone(),
                 target_path.clone(),
                 *keep_both,
+                *overwrite,
                 Some(cancel_flag),
                 move |progress| {
                     emit_job_progress_update(
@@ -238,6 +240,7 @@ pub(crate) fn build_retry_submission(job: &InternalJobRecord) -> Result<JobSubmi
             source_paths,
             target_path,
             keep_both,
+            overwrite,
         } => {
             let remaining = source_paths
                 .iter()
@@ -252,6 +255,7 @@ pub(crate) fn build_retry_submission(job: &InternalJobRecord) -> Result<JobSubmi
                 source_paths: remaining,
                 target_path: target_path.clone(),
                 keep_both: *keep_both,
+                overwrite: *overwrite,
             })
         }
         JobSubmission::Move {

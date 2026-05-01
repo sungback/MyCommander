@@ -30,12 +30,14 @@ export const fileCommands = {
   copyFiles: async (
     sourcePaths: string[],
     targetPath: string,
-    keepBoth?: boolean
+    keepBoth?: boolean,
+    overwrite?: boolean
   ): Promise<string[]> => {
     return await invoke<string[]>("copy_files", {
       source_paths: sourcePaths,
       target_path: targetPath,
       keep_both: keepBoth ?? false,
+      overwrite: overwrite ?? false,
     });
   },
 

@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -98,8 +98,9 @@ pub async fn copy_files(
     source_paths: Vec<String>,
     target_path: String,
     keep_both: Option<bool>,
+    overwrite: Option<bool>,
 ) -> Result<Vec<String>, String> {
-    copy_files_with_cancel(app, source_paths, target_path, keep_both, None).await
+    copy_files_with_cancel(app, source_paths, target_path, keep_both, overwrite, None).await
 }
 
 pub async fn copy_files_with_cancel(
@@ -107,12 +108,14 @@ pub async fn copy_files_with_cancel(
     source_paths: Vec<String>,
     target_path: String,
     keep_both: Option<bool>,
+    overwrite: Option<bool>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<Vec<String>, String> {
     copy_files_with_cancel_and_progress(
         source_paths,
         target_path,
         keep_both,
+        overwrite,
         cancel_flag,
         move |payload| {
             let _ = app.emit("fs-progress", payload);
@@ -125,6 +128,7 @@ pub async fn copy_files_with_cancel_and_progress<F>(
     source_paths: Vec<String>,
     target_path: String,
     keep_both: Option<bool>,
+    overwrite: Option<bool>,
     cancel_flag: Option<Arc<AtomicBool>>,
     emit_progress: F,
 ) -> Result<Vec<String>, String>
@@ -132,6 +136,7 @@ where
     F: Fn(ProgressPayload) + Send + 'static,
 {
     let keep_both = keep_both.unwrap_or(false);
+    let overwrite = overwrite.unwrap_or(false);
     let total = source_paths.len() as u64;
     tokio::task::spawn_blocking(move || {
         if source_paths.is_empty() {
@@ -147,7 +152,12 @@ where
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source_paths[0].clone());
-            let saved = copy_single_path(Path::new(&source_paths[0]), &target_path, keep_both)?;
+            let saved = copy_single_path(
+                Path::new(&source_paths[0]),
+                &target_path,
+                keep_both,
+                overwrite,
+            )?;
             emit_progress(ProgressPayload {
                 operation: "copy".to_string(),
                 current: 1,
@@ -173,7 +183,7 @@ where
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| source.clone());
-            let saved = copy_path_into_dir(Path::new(source), target_root, keep_both)?;
+            let saved = copy_path_into_dir(Path::new(source), target_root, keep_both, overwrite)?;
             saved_names.push(saved);
             emit_progress(ProgressPayload {
                 operation: "copy".to_string(),
@@ -280,7 +290,7 @@ fn move_path_across_filesystems(source: &Path, destination: &Path) -> Result<(),
     }
 
     let temporary_destination = get_temporary_move_path(destination)?;
-    copy_path_to_destination(source, &temporary_destination)?;
+    copy_path_to_destination(source, &temporary_destination, false)?;
 
     if destination.exists() {
         let _ = remove_path(&temporary_destination);
@@ -684,11 +694,16 @@ fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     }
 }
 
-fn copy_single_path(source: &Path, target_path: &str, keep_both: bool) -> Result<String, String> {
+fn copy_single_path(
+    source: &Path,
+    target_path: &str,
+    keep_both: bool,
+    overwrite: bool,
+) -> Result<String, String> {
     let target = Path::new(target_path);
 
     if target.exists() && target.is_dir() {
-        return copy_path_into_dir(source, target, keep_both);
+        return copy_path_into_dir(source, target, keep_both, overwrite);
     }
 
     if target_path.ends_with(std::path::MAIN_SEPARATOR)
@@ -696,10 +711,10 @@ fn copy_single_path(source: &Path, target_path: &str, keep_both: bool) -> Result
         || target_path.ends_with('\\')
     {
         fs::create_dir_all(target).map_err(|e| e.to_string())?;
-        return copy_path_into_dir(source, target, keep_both);
+        return copy_path_into_dir(source, target, keep_both, overwrite);
     }
 
-    copy_path_to_destination(source, target)?;
+    copy_path_to_destination(source, target, overwrite)?;
     Ok(target
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -755,7 +770,12 @@ fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
     }
 }
 
-fn copy_path_into_dir(source: &Path, target_dir: &Path, keep_both: bool) -> Result<String, String> {
+fn copy_path_into_dir(
+    source: &Path,
+    target_dir: &Path,
+    keep_both: bool,
+    overwrite: bool,
+) -> Result<String, String> {
     let file_name = source
         .file_name()
         .ok_or_else(|| format!("Could not determine file name for {}", source.display()))?;
@@ -773,11 +793,15 @@ fn copy_path_into_dir(source: &Path, target_dir: &Path, keep_both: bool) -> Resu
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    copy_path_to_destination(source, &destination)?;
+    copy_path_to_destination(source, &destination, overwrite)?;
     Ok(saved_name)
 }
 
-fn copy_path_to_destination(source: &Path, destination: &Path) -> Result<(), String> {
+fn copy_path_to_destination(
+    source: &Path,
+    destination: &Path,
+    overwrite: bool,
+) -> Result<(), String> {
     let source_metadata = fs::metadata(source).map_err(|e| e.to_string())?;
     let source_link_metadata = fs::symlink_metadata(source).map_err(|e| e.to_string())?;
     let source_canonical = source.canonicalize().map_err(|e| e.to_string())?;
@@ -788,6 +812,13 @@ fn copy_path_to_destination(source: &Path, destination: &Path) -> Result<(), Str
             return Err(format!(
                 "Source and destination are the same: {}",
                 source.display()
+            ));
+        }
+
+        if !overwrite {
+            return Err(format!(
+                "Target path already exists: {}",
+                destination.display()
             ));
         }
     }
@@ -808,17 +839,34 @@ fn copy_path_to_destination(source: &Path, destination: &Path) -> Result<(), Str
             ));
         }
 
-        copy_directory_recursive(source, destination)?;
+        copy_directory_recursive(source, destination, overwrite)?;
         return Ok(());
     }
 
-    copy_file_to_destination(source, destination)
+    copy_file_to_destination(source, destination, overwrite)
 }
 
-fn copy_directory_recursive(source: &Path, destination: &Path) -> Result<(), String> {
+fn copy_directory_recursive(
+    source: &Path,
+    destination: &Path,
+    overwrite: bool,
+) -> Result<(), String> {
     use walkdir::WalkDir;
 
-    fs::create_dir_all(destination).map_err(|e| e.to_string())?;
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    if overwrite {
+        fs::create_dir_all(destination).map_err(|e| e.to_string())?;
+    } else {
+        fs::create_dir(destination).map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                format!("Target path already exists: {}", destination.display())
+            } else {
+                error.to_string()
+            }
+        })?;
+    }
 
     for entry in WalkDir::new(source) {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -846,18 +894,49 @@ fn copy_directory_recursive(source: &Path, destination: &Path) -> Result<(), Str
             }
         }
 
-        copy_file_to_destination(entry_path, &destination_path)?;
+        copy_file_to_destination(entry_path, &destination_path, overwrite)?;
     }
 
     Ok(())
 }
 
-fn copy_file_to_destination(source: &Path, destination: &Path) -> Result<(), String> {
+fn copy_file_to_destination(
+    source: &Path,
+    destination: &Path,
+    overwrite: bool,
+) -> Result<(), String> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    fs::copy(source, destination).map_err(|e| e.to_string())?;
+    if overwrite {
+        fs::copy(source, destination).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    copy_file_without_overwrite(source, destination)?;
+    Ok(())
+}
+
+fn copy_file_without_overwrite(source: &Path, destination: &Path) -> Result<(), String> {
+    let mut source_file = fs::File::open(source).map_err(|e| e.to_string())?;
+    let mut destination_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destination)
+        .map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                format!("Target path already exists: {}", destination.display())
+            } else {
+                error.to_string()
+            }
+        })?;
+
+    if let Err(error) = io::copy(&mut source_file, &mut destination_file) {
+        let _ = fs::remove_file(destination);
+        return Err(error.to_string());
+    }
+
     Ok(())
 }
 
@@ -1060,6 +1139,72 @@ mod tests {
 
         assert_eq!(result, vec!["notes.txt"]);
         assert!(!target.exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn copy_file_rejects_existing_target_without_overwrite() {
+        let tmp = create_test_dir("copy_existing_target");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("notes.txt");
+        let target = target_dir.join("notes.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&target, b"target").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            copy_files_with_cancel_and_progress(
+                vec![source.to_string_lossy().to_string()],
+                target.to_string_lossy().to_string(),
+                None,
+                None,
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"target");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn copy_file_overwrites_existing_target_when_explicit() {
+        let tmp = create_test_dir("copy_existing_target_with_overwrite");
+        let source_dir = tmp.join("source");
+        let target_dir = tmp.join("target");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+
+        let source = source_dir.join("notes.txt");
+        let target = target_dir.join("notes.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&target, b"target").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            copy_files_with_cancel_and_progress(
+                vec![source.to_string_lossy().to_string()],
+                target.to_string_lossy().to_string(),
+                None,
+                Some(true),
+                None,
+                |_| {},
+            )
+            .await
+        });
+
+        assert!(result.is_ok());
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        assert_eq!(fs::read(&target).unwrap(), b"source");
 
         let _ = fs::remove_dir_all(&tmp);
     }

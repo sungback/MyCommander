@@ -473,6 +473,7 @@ describe("DialogContainer", () => {
         sourcePaths: ["/source/file.txt"],
         targetPath: "/target",
         keepBoth: false,
+        overwrite: true,
       });
     });
     expect(useDialogStore.getState().openDialog).toBe("progress");
@@ -566,6 +567,7 @@ describe("DialogContainer", () => {
         sourcePaths: ["/source/file.txt"],
         targetPath: "/target",
         keepBoth: false,
+        overwrite: true,
       });
     });
   });

@@ -4,6 +4,7 @@ import { DialogType, DragCopyRequest } from "../../store/dialogStore";
 import { useFileSystem, getErrorMessage } from "../../hooks/useFileSystem";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
+import type { JobSubmission } from "../../types/job";
 import { resolveTargetPath } from "./dialogTargetPath";
 
 interface PendingCopy {
@@ -66,7 +67,8 @@ export const useCopyMoveFlow = ({
     isMove: boolean,
     paths: string[],
     targetPath: string,
-    keepBoth: boolean = false
+    keepBoth: boolean = false,
+    overwrite: boolean = false
   ) => {
     if (paths.length === 0 || targetPath.trim().length === 0) {
       throw new Error(
@@ -85,12 +87,16 @@ export const useCopyMoveFlow = ({
           targetDir: targetPath,
         });
       } else {
-        await fs.submitJob({
+        const copyJob: JobSubmission = {
           kind: "copy",
           sourcePaths: paths,
           targetPath,
           keepBoth,
-        });
+        };
+        if (overwrite) {
+          copyJob.overwrite = true;
+        }
+        await fs.submitJob(copyJob);
       }
 
       if (isPasteMode && clipboard?.operation === "cut") {
@@ -175,7 +181,7 @@ export const useCopyMoveFlow = ({
 
     try {
       setIsSubmitting(true);
-      await executeCopyMove(isMove, sourcePaths, targetPath);
+      await executeCopyMove(isMove, sourcePaths, targetPath, false, true);
     } catch (error) {
       console.error(error);
       setOperationError(

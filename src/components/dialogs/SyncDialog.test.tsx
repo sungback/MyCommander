@@ -94,7 +94,9 @@ describe("SyncDialog", () => {
     await waitFor(() => {
       expect(mockCopyFiles).toHaveBeenCalledWith(
         ["/left/docs/report.md"],
-        "/right/docs/report.md"
+        "/right/docs/report.md",
+        false,
+        true
       );
     });
   });
@@ -178,6 +180,6 @@ describe("SyncDialog", () => {
       expect(mockCopyFiles).toHaveBeenCalledTimes(1);
     });
 
-    expect(mockCopyFiles).toHaveBeenCalledWith(["/left/docs"], "/right/docs");
+    expect(mockCopyFiles).toHaveBeenCalledWith(["/left/docs"], "/right/docs", false, true);
   });
 });

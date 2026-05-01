@@ -78,6 +78,7 @@ pub enum JobSubmission {
         target_path: String,
         #[serde(alias = "keepBoth")]
         keep_both: Option<bool>,
+        overwrite: Option<bool>,
     },
     Move {
         #[serde(alias = "sourcePaths")]
@@ -140,6 +141,7 @@ mod tests {
                     source_paths: vec!["/tmp/a".into()],
                     target_path: "/tmp/b".into(),
                     keep_both: None,
+                    overwrite: None,
                 },
             },
         );
@@ -194,6 +196,7 @@ mod tests {
                     source_paths: vec!["/tmp/a".into()],
                     target_path: "/tmp/b".into(),
                     keep_both: None,
+                    overwrite: None,
                 },
             },
         );
@@ -302,6 +305,7 @@ mod tests {
                 ],
                 target_path: "/dest".into(),
                 keep_both: Some(false),
+                overwrite: Some(true),
             },
         };
 
@@ -312,10 +316,12 @@ mod tests {
                 source_paths,
                 target_path,
                 keep_both,
+                overwrite,
             } => {
                 assert_eq!(source_paths, vec!["/tmp/b.txt", "/tmp/c.txt"]);
                 assert_eq!(target_path, "/dest");
                 assert_eq!(keep_both, Some(false));
+                assert_eq!(overwrite, Some(true));
             }
             other => panic!("unexpected retry submission: {other:?}"),
         }
@@ -342,6 +348,7 @@ mod tests {
             "sourcePaths": ["/tmp/a.txt"],
             "targetPath": "/tmp/dest",
             "keepBoth": true,
+            "overwrite": true,
         }))
         .expect("camelCase copy payload should deserialize");
 
@@ -350,10 +357,12 @@ mod tests {
                 source_paths,
                 target_path,
                 keep_both,
+                overwrite,
             } => {
                 assert_eq!(source_paths, vec!["/tmp/a.txt"]);
                 assert_eq!(target_path, "/tmp/dest");
                 assert_eq!(keep_both, Some(true));
+                assert_eq!(overwrite, Some(true));
             }
             other => panic!("unexpected submission: {other:?}"),
         }

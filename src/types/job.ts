@@ -38,6 +38,7 @@ export type JobSubmission =
       sourcePaths: string[];
       targetPath: string;
       keepBoth?: boolean;
+      overwrite?: boolean;
     }
   | {
       kind: "move";

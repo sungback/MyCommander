@@ -188,6 +188,37 @@ describe('useFileSystem', () => {
       });
     });
 
+    it('passes overwrite through copy job submissions', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        id: 'job-overwrite',
+        kind: 'copy',
+        status: 'queued',
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+        error: null,
+        result: null,
+      });
+
+      await useFileSystem().submitJob({
+        kind: 'copy',
+        sourcePaths: ['/home/user/a.txt'],
+        targetPath: '/home/user/dest',
+        keepBoth: false,
+        overwrite: true,
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('submit_job', {
+        job: {
+          kind: 'copy',
+          source_paths: ['/home/user/a.txt'],
+          target_path: '/home/user/dest',
+          keep_both: false,
+          overwrite: true,
+        },
+      });
+    });
+
     it('invokes submit_job with a snake_case move payload for Tauri', async () => {
       mockInvoke.mockResolvedValueOnce({
         id: 'job-2',
@@ -334,6 +365,7 @@ describe('useFileSystem', () => {
         source_paths: ['/home/user/a.txt', '/home/user/b.txt'],
         target_path: '/home/user/dest',
         keep_both: false,
+        overwrite: false,
       });
     });
 
@@ -344,8 +376,20 @@ describe('useFileSystem', () => {
         source_paths: ['/home/user/a.txt'],
         target_path: '/home/user/dest',
         keep_both: true,
+        overwrite: false,
       });
       expect(result).toEqual(['a copy.txt']);
+    });
+
+    it('invokes copy_files with overwrite=true when specified', async () => {
+      mockInvoke.mockResolvedValueOnce(['a.txt']);
+      await useFileSystem().copyFiles(['/home/user/a.txt'], '/home/user/dest/a.txt', false, true);
+      expect(mockInvoke).toHaveBeenCalledWith('copy_files', {
+        source_paths: ['/home/user/a.txt'],
+        target_path: '/home/user/dest/a.txt',
+        keep_both: false,
+        overwrite: true,
+      });
     });
   });
 

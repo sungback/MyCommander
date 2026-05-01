@@ -7,6 +7,7 @@ type TauriJobSubmission =
       source_paths: string[];
       target_path: string;
       keep_both?: boolean;
+      overwrite?: boolean;
     }
   | {
       kind: "move";
@@ -37,6 +38,7 @@ const toTauriJobSubmission = (job: JobSubmission): TauriJobSubmission => {
         source_paths: job.sourcePaths,
         target_path: job.targetPath,
         keep_both: job.keepBoth,
+        overwrite: job.overwrite,
       };
     case "move":
       return {
