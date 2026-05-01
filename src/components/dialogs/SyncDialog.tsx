@@ -1,36 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
-import { PanelState } from "../../types/file";
-import { SyncItem, SyncStatus } from "../../types/sync";
+import { useFileSystem } from "../../hooks/useFileSystem";
+import type { SyncDirection } from "../../types/sync";
 import { Loader2 } from "lucide-react";
-import { coalescePanelPath } from "../../utils/path";
-import { buildSyncExecutionOperations } from "../../features/syncExecution";
-
-type SyncStage = "paths" | "analyzing" | "results" | "executing";
-type SyncExecutionFailure = {
-  relPath: string;
-  message: string;
-};
-
-const MAX_FAILURES_TO_SHOW = 3;
-
-const formatSyncExecutionFailures = (failures: SyncExecutionFailure[]): string => {
-  const visibleFailures = failures.slice(0, MAX_FAILURES_TO_SHOW);
-  const failureDetails = visibleFailures
-    .map((failure) => `${failure.relPath} (${failure.message})`)
-    .join(", ");
-  const hiddenFailureCount = failures.length - visibleFailures.length;
-  const hiddenFailureSuffix = hiddenFailureCount > 0 ? `, and ${hiddenFailureCount} more` : "";
-  const itemLabel = failures.length === 1 ? "item" : "items";
-
-  return `${failures.length} ${itemLabel} failed to synchronize: ${failureDetails}${hiddenFailureSuffix}.`;
-};
-
-const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
+import {
+  getStatusColor,
+  getStatusLabel,
+} from "./syncDialogHelpers";
+import { useSyncDialogState } from "./useSyncDialogState";
 
 export const SyncDialog: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -40,163 +19,31 @@ export const SyncDialog: React.FC = () => {
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
 
-  const [stage, setStage] = useState<SyncStage>("paths");
-  const [leftPath, setLeftPath] = useState(getPanelAccessPath(leftPanel));
-  const [rightPath, setRightPath] = useState(getPanelAccessPath(rightPanel));
-  const [syncItems, setSyncItems] = useState<SyncItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [executing, setExecuting] = useState(false);
-  const [executionProgress, setExecutionProgress] = useState({ done: 0, total: 0 });
-
-  // Update paths when dialog opens
-  useEffect(() => {
-    if (openDialog === "sync") {
-      setLeftPath(getPanelAccessPath(leftPanel));
-      setRightPath(getPanelAccessPath(rightPanel));
-      setStage("paths");
-      setError(null);
-      setSyncItems([]);
-      setExecuting(false);
-    }
-  }, [openDialog, leftPanel.currentPath, leftPanel.resolvedPath, rightPanel.currentPath, rightPanel.resolvedPath]);
-
-  const handleStartAnalysis = async () => {
-    if (!leftPath || !rightPath) {
-      setError("Both paths must be specified.");
-      return;
-    }
-
-    setStage("analyzing");
-    setError(null);
-
-    try {
-      const items = await fs.compareDirectories(leftPath, rightPath, showHiddenFiles);
-      setSyncItems(items);
-      setStage("results");
-    } catch (e) {
-      console.error(e);
-      setError(getErrorMessage(e, "Failed to analyze directories."));
-      setStage("paths");
-    }
-  };
-
-  const handleUpdateDirection = (index: number, newDirection: "toRight" | "toLeft" | "skip") => {
-    const updated = [...syncItems];
-    updated[index].direction = newDirection;
-    setSyncItems(updated);
-  };
-
-  const handleSelectAll = (targetDirection: "toRight" | "toLeft") => {
-    const updated = syncItems.map((item) => ({
-      ...item,
-      direction: item.direction === "skip" ? targetDirection : item.direction,
-    }));
-    setSyncItems(updated);
-  };
-
-  const handleExcludeSame = () => {
-    const updated = syncItems.map((item) => ({
-      ...item,
-      direction: item.status === "Same" && item.direction !== "skip" ? "skip" : item.direction,
-    }));
-    setSyncItems(updated);
-  };
-
-  const handleExecuteSync = async () => {
-    const itemsToSync = syncItems.filter((item) => item.direction !== "skip");
-    if (itemsToSync.length === 0) {
-      setError("No items to synchronize.");
-      return;
-    }
-
-    const operations = buildSyncExecutionOperations(syncItems, leftPath, rightPath);
-    if (operations.length === 0) {
-      setError("No actionable items to synchronize.");
-      return;
-    }
-
-    setStage("executing");
-    setExecuting(true);
-    setError(null);
-    setExecutionProgress({ done: 0, total: operations.length });
-
-    try {
-      let completed = 0;
-      const failures: SyncExecutionFailure[] = [];
-
-      for (const operation of operations) {
-        try {
-          await fs.copyFiles([operation.sourcePath], operation.targetPath, false, true);
-        } catch (itemError) {
-          console.error(`Failed to sync ${operation.relPath}:`, itemError);
-          failures.push({
-            relPath: operation.relPath,
-            message: getErrorMessage(itemError, "Unknown error"),
-          });
-        }
-        completed++;
-        setExecutionProgress({ done: completed, total: operations.length });
-      }
-
-      refreshPanel("left");
-      refreshPanel("right");
-
-      if (failures.length > 0) {
-        setError(formatSyncExecutionFailures(failures));
-        setStage("results");
-        return;
-      }
-
-      closeDialog();
-    } catch (e) {
-      console.error(e);
-      setError(getErrorMessage(e, "Sync operation failed."));
-      setStage("results");
-    } finally {
-      setExecuting(false);
-    }
-  };
-
-  const handleBack = () => {
-    if (stage === "results") {
-      setStage("paths");
-      setError(null);
-    }
-  };
-
-  const getStatusColor = (status: SyncStatus): string => {
-    switch (status) {
-      case "LeftOnly":
-        return "text-blue-400";
-      case "RightOnly":
-        return "text-green-400";
-      case "LeftNewer":
-        return "text-yellow-400";
-      case "RightNewer":
-        return "text-orange-400";
-      case "Same":
-        return "text-gray-400";
-      default:
-        return "text-text-secondary";
-    }
-  };
-
-  const getStatusLabel = (status: SyncStatus): string => {
-    switch (status) {
-      case "LeftOnly":
-        return "Left Only";
-      case "RightOnly":
-        return "Right Only";
-      case "LeftNewer":
-        return "Left Newer";
-      case "RightNewer":
-        return "Right Newer";
-      case "Same":
-        return "Same";
-      default:
-        return status;
-    }
-  };
+  const {
+    stage,
+    leftPath,
+    setLeftPath,
+    rightPath,
+    setRightPath,
+    syncItems,
+    error,
+    executing,
+    executionProgress,
+    handleStartAnalysis,
+    handleUpdateDirection,
+    handleSelectAll,
+    handleExcludeSame,
+    handleExecuteSync,
+    handleBack,
+  } = useSyncDialogState({
+    openDialog,
+    leftPanel,
+    rightPanel,
+    showHiddenFiles,
+    fs,
+    refreshPanel,
+    closeDialog,
+  });
 
   return (
     <Dialog.Root open={openDialog === "sync"} onOpenChange={(open) => !open && closeDialog()}>
@@ -307,7 +154,7 @@ export const SyncDialog: React.FC = () => {
                               onChange={(e) =>
                                 handleUpdateDirection(
                                   idx,
-                                  e.target.value as "toRight" | "toLeft" | "skip"
+                                  e.target.value as SyncDirection
                                 )
                               }
                               className="bg-bg-primary border border-border-color rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-accent-color"
