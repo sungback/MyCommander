@@ -74,6 +74,28 @@ describe("panelStore — setPanelViewMode", () => {
   });
 });
 
+describe("panelStore — swapPanels", () => {
+  it("preserves each panel's resolved access path when swapping display paths", () => {
+    const state = usePanelStore.getState();
+    state.setPath("left", "/Users/back/Dropbox");
+    state.setResolvedPath("left", "/Users/back/Library/CloudStorage/Dropbox");
+    state.setPath("right", "/Users/back/Documents");
+    state.setResolvedPath("right", "/Users/back/Library/Mobile Documents/Documents");
+
+    usePanelStore.getState().swapPanels();
+
+    const nextState = usePanelStore.getState();
+    expect(nextState.leftPanel.currentPath).toBe("/Users/back/Documents");
+    expect(nextState.leftPanel.resolvedPath).toBe(
+      "/Users/back/Library/Mobile Documents/Documents"
+    );
+    expect(nextState.rightPanel.currentPath).toBe("/Users/back/Dropbox");
+    expect(nextState.rightPanel.resolvedPath).toBe(
+      "/Users/back/Library/CloudStorage/Dropbox"
+    );
+  });
+});
+
 describe("panelStore — setPath", () => {
   it("changes current path", () => {
     const { setPath } = usePanelStore.getState();

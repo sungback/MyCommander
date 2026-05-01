@@ -113,6 +113,14 @@ export const usePanelStore = create<AppState>((set) => {
       set((state) => {
         const leftPath = state.leftPanel.currentPath;
         const rightPath = state.rightPanel.currentPath;
+        const leftResolvedPath = coalescePanelPath(
+          state.leftPanel.resolvedPath,
+          leftPath
+        );
+        const rightResolvedPath = coalescePanelPath(
+          state.rightPanel.resolvedPath,
+          rightPath
+        );
 
         if (leftPath === rightPath) return state;
 
@@ -120,7 +128,7 @@ export const usePanelStore = create<AppState>((set) => {
         const newLeft = updateActiveTab(state.leftPanel, (tab) => ({
           ...tab,
           currentPath: rightPath,
-          resolvedPath: rightPath,
+          resolvedPath: rightResolvedPath,
           cursorIndex: 0,
           selectedItems: new Set<string>(),
           lastUpdated: now,
@@ -128,7 +136,7 @@ export const usePanelStore = create<AppState>((set) => {
         const newRight = updateActiveTab(state.rightPanel, (tab) => ({
           ...tab,
           currentPath: leftPath,
-          resolvedPath: leftPath,
+          resolvedPath: leftResolvedPath,
           cursorIndex: 0,
           selectedItems: new Set<string>(),
           lastUpdated: now + 1,
