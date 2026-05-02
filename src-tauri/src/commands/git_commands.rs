@@ -1,5 +1,6 @@
 use serde::Serialize;
-use tokio::process::Command;
+use std::io;
+use std::process::{Command, Output};
 
 #[derive(Serialize, Debug, Clone)]
 pub struct GitStatus {
@@ -10,17 +11,49 @@ pub struct GitStatus {
     pub untracked: Vec<String>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn git_status_returns_none_when_git_cannot_start() {
+        let result =
+            get_git_status_with_runner("/repo", |_, _| Err(io::Error::other("git.exe failed")))
+                .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn background_git_source_hides_windows_process_errors() {
+        let source = include_str!("git_commands.rs");
+
+        assert!(source.contains("CREATE_NO_WINDOW"));
+        assert!(source.contains("SetThreadErrorMode"));
+        assert!(source.contains("SEM_NOGPFAULTERRORBOX"));
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_git_status(path: String) -> Result<Option<GitStatus>, String> {
-    // Check if path is a git repository
-    let root_output = Command::new("git")
-        .arg("-C")
-        .arg(&path)
-        .arg("rev-parse")
-        .arg("--show-toplevel")
-        .output()
+    tokio::task::spawn_blocking(move || get_git_status_for_path(&path))
         .await
-        .map_err(|e| format!("Failed to check git root: {}", e))?;
+        .map_err(|error| error.to_string())?
+}
+
+fn get_git_status_for_path(path: &str) -> Result<Option<GitStatus>, String> {
+    get_git_status_with_runner(path, run_background_git)
+}
+
+fn get_git_status_with_runner<F>(path: &str, mut run_git: F) -> Result<Option<GitStatus>, String>
+where
+    F: FnMut(&str, &[&str]) -> io::Result<Output>,
+{
+    let root_output = match run_git(path, &["rev-parse", "--show-toplevel"]) {
+        Ok(output) => output,
+        Err(_) => return Ok(None),
+    };
 
     if !root_output.status.success() {
         // Not a git repository
@@ -49,21 +82,13 @@ pub async fn get_git_status(path: String) -> Result<Option<GitStatus>, String> {
     };
 
     // Get git status with porcelain format
-    let status_output = Command::new("git")
-        .arg("-C")
-        .arg(&path)
-        .arg("status")
-        .arg("--porcelain")
-        .arg("--branch")
-        .output()
-        .await
-        .map_err(|e| format!("Failed to get git status: {}", e))?;
+    let status_output = match run_git(path, &["status", "--porcelain", "--branch"]) {
+        Ok(output) => output,
+        Err(_) => return Ok(None),
+    };
 
     if !status_output.status.success() {
-        return Err(format!(
-            "Git status failed: {}",
-            String::from_utf8_lossy(&status_output.stderr)
-        ));
+        return Ok(None);
     }
 
     let status_str = String::from_utf8_lossy(&status_output.stdout);
@@ -120,4 +145,81 @@ pub async fn get_git_status(path: String) -> Result<Option<GitStatus>, String> {
         deleted,
         untracked,
     }))
+}
+
+fn run_background_git(path: &str, args: &[&str]) -> io::Result<Output> {
+    let mut command = Command::new("git");
+    command.arg("-C").arg(path).args(args);
+    configure_background_command(&mut command);
+
+    let _error_mode_guard = WindowsThreadErrorModeGuard::suppress_process_error_dialogs();
+    command.output()
+}
+
+fn configure_background_command(command: &mut Command) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = command;
+    }
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsThreadErrorModeGuard {
+    previous_mode: Option<u32>,
+}
+
+#[cfg(target_os = "windows")]
+impl WindowsThreadErrorModeGuard {
+    fn suppress_process_error_dialogs() -> Self {
+        const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+        const SEM_NOGPFAULTERRORBOX: u32 = 0x0002;
+        const SEM_NOOPENFILEERRORBOX: u32 = 0x8000;
+
+        let mut previous_mode = 0;
+        let applied = unsafe {
+            SetThreadErrorMode(
+                SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX,
+                &mut previous_mode,
+            )
+        } != 0;
+
+        Self {
+            previous_mode: applied.then_some(previous_mode),
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WindowsThreadErrorModeGuard {
+    fn drop(&mut self) {
+        if let Some(previous_mode) = self.previous_mode {
+            unsafe {
+                SetThreadErrorMode(previous_mode, std::ptr::null_mut());
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+struct WindowsThreadErrorModeGuard;
+
+#[cfg(not(target_os = "windows"))]
+impl WindowsThreadErrorModeGuard {
+    fn suppress_process_error_dialogs() -> Self {
+        Self
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[link(name = "kernel32")]
+extern "system" {
+    fn SetThreadErrorMode(dw_new_mode: u32, lp_old_mode: *mut u32) -> i32;
 }

@@ -17,37 +17,67 @@ export const useGitStatus = (path: string | undefined, refreshKey?: number) => {
     // Invalidate cache when panel was refreshed (refreshKey changed)
     const refreshed = prevRefreshKeyRef.current !== refreshKey;
     prevRefreshKeyRef.current = refreshKey;
+    const store = useGitStatusStore.getState();
 
     if (!refreshed) {
-      // Try cache first
-      const cached = useGitStatusStore.getState().getStatus(path);
-      if (cached) {
-        setGitStatus(cached);
+      const cached = store.getCachedStatus(path);
+      if (cached.hit) {
+        setGitStatus(cached.data);
+        return;
+      }
+
+      if (store.hasFreshFailure(path)) {
+        setGitStatus(null);
         return;
       }
     }
 
-    // Fetch from backend
+    let cancelled = false;
+
     const fetchGitStatus = async () => {
       setIsLoading(true);
-      try {
-        const result = await fs.getGitStatus(path);
+      let request: Promise<GitStatus | null> | null = null;
 
-        if (result) {
-          useGitStatusStore.getState().setStatus(path, result);
+      try {
+        request = useGitStatusStore.getState().getInFlight(path);
+        if (!request) {
+          const getGitStatus = fs.getGitStatus;
+          if (typeof getGitStatus !== "function") {
+            useGitStatusStore.getState().setFailure(path);
+            return;
+          }
+
+          request = getGitStatus(path);
+          useGitStatusStore.getState().setInFlight(path, request);
+        }
+
+        const result = await request;
+
+        useGitStatusStore.getState().setStatus(path, result);
+        if (!cancelled) {
           setGitStatus(result);
-        } else {
-          setGitStatus(null);
         }
       } catch (error) {
         console.error("Failed to get git status:", error);
-        setGitStatus(null);
+        useGitStatusStore.getState().setFailure(path);
+        if (!cancelled) {
+          setGitStatus(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (request) {
+          useGitStatusStore.getState().clearInFlight(path, request);
+        }
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void fetchGitStatus();
+
+    return () => {
+      cancelled = true;
+    };
   }, [fs, path, refreshKey]);
 
   return { gitStatus, isLoading };
