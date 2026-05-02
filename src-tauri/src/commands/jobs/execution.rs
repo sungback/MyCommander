@@ -1,8 +1,10 @@
 use super::super::fs as fs_api;
+use super::paths::{
+    parent_directories, source_parent_and_target_directories, zip_directory_affected_directories,
+};
 use super::persistence::{now_ms, persist_job_engine_state};
 use super::state::{InternalJobRecord, JobEngineInner};
 use super::{JobProgress, JobRecord, JobResult, JobStatus, JobSubmission};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -52,26 +54,6 @@ pub(crate) fn public_records(inner: &JobEngineInner) -> Vec<JobRecord> {
     jobs
 }
 
-fn path_parent(path: &str) -> Option<String> {
-    Path::new(path)
-        .parent()
-        .map(|parent| parent.to_string_lossy().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-fn unique_directories(paths: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    let mut values = Vec::new();
-
-    for path in paths {
-        if seen.insert(path.clone()) {
-            values.push(path);
-        }
-    }
-
-    values
-}
-
 async fn execute_job(
     app: &AppHandle,
     inner: &Arc<Mutex<JobEngineInner>>,
@@ -106,12 +88,8 @@ async fn execute_job(
             )
             .await?;
 
-            let affected_directories = unique_directories(
-                source_paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_path.clone())),
-            );
+            let affected_directories =
+                source_parent_and_target_directories(source_paths, target_path);
 
             Ok(JobResult {
                 affected_directories,
@@ -142,12 +120,8 @@ async fn execute_job(
             )
             .await?;
 
-            let affected_directories = unique_directories(
-                source_paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_dir.clone())),
-            );
+            let affected_directories =
+                source_parent_and_target_directories(source_paths, target_dir);
 
             Ok(JobResult {
                 affected_directories,
@@ -175,8 +149,7 @@ async fn execute_job(
             )
             .await?;
 
-            let affected_directories =
-                unique_directories(paths.iter().filter_map(|path| path_parent(path)));
+            let affected_directories = parent_directories(paths);
 
             Ok(JobResult {
                 affected_directories,
@@ -188,11 +161,7 @@ async fn execute_job(
         JobSubmission::ZipDirectory { path } => {
             cancel_flag.store(false, Ordering::SeqCst);
             let archive_path = fs_api::create_zip(app.clone(), path.clone()).await?;
-            let affected_directories = unique_directories(
-                path_parent(path)
-                    .into_iter()
-                    .chain(path_parent(&archive_path)),
-            );
+            let affected_directories = zip_directory_affected_directories(path, &archive_path);
 
             Ok(JobResult {
                 affected_directories,
@@ -215,12 +184,7 @@ async fn execute_job(
             )
             .await?;
 
-            let affected_directories = unique_directories(
-                paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_dir.clone())),
-            );
+            let affected_directories = source_parent_and_target_directories(paths, target_dir);
 
             Ok(JobResult {
                 affected_directories,

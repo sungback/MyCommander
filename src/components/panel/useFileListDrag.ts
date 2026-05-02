@@ -1,13 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { FileEntry } from "../../types/file";
-import { useFileSystem } from "../../hooks/useFileSystem";
 import { usePanelStore } from "../../store/panelStore";
 import { useDragStore } from "../../store/dragStore";
-import { useDialogStore } from "../../store/dialogStore";
 import { coalescePanelPath } from "../../utils/path";
 import { showTransientToast } from "../../store/toastStore";
-import { getExternalDropPaths } from "./fileListExternalDrop";
 import {
   clearSharedDropTargetForPanel,
   resetSharedDragState,
@@ -15,7 +12,6 @@ import {
   sharedPanelPaths,
 } from "./fileListDragSharedState";
 import {
-  collapseNestedDirectoryPaths,
   getBlockedDropReason,
   getPanelIdFromElement,
   resolveCrossPanelDropIntent,
@@ -25,28 +21,12 @@ import {
 } from "./fileListDragRules";
 import { findFileEntryElement } from "./fileEntryElement";
 import type { VisibleEntryRow } from "./fileListRows";
+import { getDragIcon } from "./fileListDragIcon";
+import { useFileListDragActions } from "./useFileListDragActions";
+import { useExternalFileDrop } from "./useExternalFileDrop";
+import { useFileListDropUiState } from "./useFileListDropUiState";
 
 const DRAG_THRESHOLD_PX = 6;
-let _cachedDragIcon: string | null = null;
-const getDragIcon = (): string => {
-  if (_cachedDragIcon) return _cachedDragIcon;
-  const canvas = document.createElement("canvas");
-  canvas.width = 48;
-  canvas.height = 48;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-  ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(8, 4, 28, 40, 4);
-  else ctx.rect(8, 4, 28, 40);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillRect(14, 14, 16, 2);
-  ctx.fillRect(14, 20, 16, 2);
-  ctx.fillRect(14, 26, 10, 2);
-  _cachedDragIcon = canvas.toDataURL("image/png");
-  return _cachedDragIcon;
-};
 
 export interface UseFileListDragProps {
   panelId: "left" | "right";
@@ -65,23 +45,11 @@ export const useFileListDrag = ({
   visibleRows,
   containerRef,
 }: UseFileListDragProps) => {
-  const { checkCopyConflicts, submitJob } = useFileSystem();
-  const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const setDragInfo = useDragStore((s) => s.setDragInfo);
-  const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
-
-  const [dropUiState, setDropUiState] = useState<{
-    isPanelHovered: boolean;
-    dropTargetPath: string | null;
-    isDropAllowed: boolean;
-  }>({
-    isPanelHovered: false,
-    dropTargetPath: null,
-    isDropAllowed: false,
-  });
+  const { handleDraggedCopy, handleDraggedMove } = useFileListDragActions(panelId);
+  const { dropUiState, updateDropUiState } = useFileListDropUiState();
   const [isLocalDragActive, setIsLocalDragActive] = useState(false);
 
-  const dragCounterRef = useRef(0);
   const dragStateRef = useRef<{
     startX: number;
     startY: number;
@@ -89,70 +57,6 @@ export const useFileListDrag = ({
     dragging: boolean;
     nativeDragStarted: boolean;
   } | null>(null);
-
-  const handleDraggedCopy = async (
-    paths: string[],
-    targetPath: string,
-    targetPanelId: "left" | "right"
-  ) => {
-    const conflicts = await checkCopyConflicts(paths, targetPath);
-
-    if (conflicts.length > 0) {
-      setActivePanel(panelId);
-      openDragCopyDialog({
-        sourcePanelId: panelId,
-        targetPanelId,
-        sourcePaths: paths,
-        targetPath,
-      });
-      return false;
-    }
-
-    await submitJob({
-      kind: "copy",
-      sourcePaths: paths,
-      targetPath,
-    });
-    return true;
-  };
-
-  const handleDraggedMove = async (paths: string[], targetPath: string) => {
-    const collapsedPaths = collapseNestedDirectoryPaths(paths);
-    const conflicts = await checkCopyConflicts(collapsedPaths, targetPath);
-
-    if (conflicts.length > 0) {
-      showTransientToast("폴더를 이동하기 전에 이름 충돌을 해결해야 합니다.", {
-        durationMs: 1800,
-        tone: "warning",
-      });
-      return false;
-    }
-
-    await submitJob({
-      kind: "move",
-      sourcePaths: collapsedPaths,
-      targetDir: targetPath,
-    });
-    showTransientToast("선택한 폴더를 이동 대기열에 추가했습니다.", {
-      durationMs: 1800,
-      tone: "success",
-    });
-    return true;
-  };
-
-  const updateDropUiState = (nextState: typeof dropUiState) => {
-    setDropUiState((current) => {
-      if (
-        current.isPanelHovered === nextState.isPanelHovered &&
-        current.dropTargetPath === nextState.dropTargetPath &&
-        current.isDropAllowed === nextState.isDropAllowed
-      ) {
-        return current;
-      }
-
-      return nextState;
-    });
-  };
 
   useEffect(() => {
     sharedPanelPaths[panelId] = { accessPath, currentPath };
@@ -440,14 +344,12 @@ export const useFileListDrag = ({
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [
-    checkCopyConflicts,
     accessPath,
     currentPath,
-    openDragCopyDialog,
+    handleDraggedCopy,
+    handleDraggedMove,
     panelId,
-    setActivePanel,
     setDragInfo,
-    submitJob,
     visibleRows,
     containerRef,
   ]);
@@ -473,49 +375,12 @@ export const useFileListDrag = ({
     };
   };
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current++;
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "copy";
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current--;
-    if (dragCounterRef.current <= 0) {
-      dragCounterRef.current = 0;
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current = 0;
-
-    const activeDragInfo = useDragStore.getState().dragInfo;
-
-    if (activeDragInfo) {
-      return;
-    }
-
-    if (e.dataTransfer.files.length > 0) {
-      const paths = getExternalDropPaths(e.dataTransfer.files);
-      if (paths.length > 0) {
-        try {
-          await handleDraggedCopy(paths, accessPath, panelId);
-        } catch (error) {
-          console.error("Failed to copy external files:", error);
-        }
-      }
-    }
-  };
+  const { handleDragEnter, handleDragOver, handleDragLeave, handleDrop } =
+    useExternalFileDrop({
+      accessPath,
+      panelId,
+      handleDraggedCopy,
+    });
 
   return {
     dropUiState,

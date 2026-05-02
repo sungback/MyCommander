@@ -1,5 +1,6 @@
 pub(crate) mod commands;
 pub(crate) mod execution;
+mod paths;
 pub(crate) mod persistence;
 pub(crate) mod state;
 
