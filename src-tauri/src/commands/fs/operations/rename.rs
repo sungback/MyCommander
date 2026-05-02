@@ -64,7 +64,7 @@ fn rename_file_without_overwrite(old_path: &Path, new_path: &Path) -> Result<(),
         }
     })?;
 
-    match fs::symlink_metadata(new_path) {
+    let target_is_same_entry = match fs::symlink_metadata(new_path) {
         Ok(_) => {
             if !paths_refer_to_same_entry(old_path, new_path) {
                 return Err(format!(
@@ -72,16 +72,39 @@ fn rename_file_without_overwrite(old_path: &Path, new_path: &Path) -> Result<(),
                     new_path.display()
                 ));
             }
+            true
         }
-        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => false,
         Err(error) => return Err(error.to_string()),
-    }
+    };
 
     if old_path == new_path {
         return Ok(());
     }
 
+    if target_is_same_entry {
+        return rename_same_entry_through_temporary_path(old_path, new_path);
+    }
+
     fs::rename(old_path, new_path).map_err(|e| e.to_string())
+}
+
+fn rename_same_entry_through_temporary_path(
+    old_path: &Path,
+    new_path: &Path,
+) -> Result<(), String> {
+    let temp_path = get_temporary_rename_path(old_path, 0)?;
+
+    fs::rename(old_path, &temp_path).map_err(|e| e.to_string())?;
+    fs::rename(&temp_path, new_path).map_err(|error| {
+        let rollback_result = fs::rename(&temp_path, old_path);
+        match rollback_result {
+            Ok(()) => error.to_string(),
+            Err(rollback_error) => {
+                format!("{} (rollback failed: {})", error, rollback_error)
+            }
+        }
+    })
 }
 
 fn paths_refer_to_same_entry(left: &Path, right: &Path) -> bool {

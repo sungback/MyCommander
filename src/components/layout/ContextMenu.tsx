@@ -9,6 +9,10 @@ import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { writeClipboardText } from "../../utils/clipboard";
 import { coalescePanelPath } from "../../utils/path";
+import {
+  buildNfcRenameTargetPath,
+  hasDecomposedUnicodeFilename,
+} from "../../utils/unicodeFilename";
 import { showTransientToast } from "../../store/toastStore";
 
 const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string }) =>
@@ -159,6 +163,26 @@ export const ContextMenu: React.FC = () => {
               openRenameDialog({ panelId, path: targetPath, entry: targetEntry });
               closeContextMenu();
               return;
+            case "normalize-filename-nfc": {
+              if (
+                !targetPath ||
+                !targetEntry ||
+                targetEntry.name === ".." ||
+                !hasDecomposedUnicodeFilename(targetEntry.name)
+              ) {
+                return;
+              }
+
+              setActivePanel(panelId);
+              await fs.renameFile(
+                targetPath,
+                buildNfcRenameTargetPath(targetPath, targetEntry.name)
+              );
+              refreshPanel(panelId);
+              showTransientToast("파일명을 NFC로 변환했습니다.");
+              closeContextMenu();
+              return;
+            }
             case "refresh":
               refreshPanel(panelId);
               closeContextMenu();
@@ -194,6 +218,9 @@ export const ContextMenu: React.FC = () => {
               break;
             case "extract-zip":
               showTransientToast("압축 작업을 완료하지 못했습니다.", { tone: "error" });
+              break;
+            case "normalize-filename-nfc":
+              showTransientToast("파일명을 NFC로 변환하지 못했습니다.", { tone: "error" });
               break;
             default:
               showTransientToast("작업을 완료하지 못했습니다.", { tone: "error" });

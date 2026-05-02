@@ -65,6 +65,9 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) 
         commands::system::menu::CONTEXT_RENAME_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "rename");
         }
+        commands::system::menu::CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID => {
+            let _ = app.emit("context-menu-action", "normalize-filename-nfc");
+        }
         commands::system::menu::CONTEXT_DELETE_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "delete");
         }

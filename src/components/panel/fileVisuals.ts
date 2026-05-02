@@ -68,7 +68,7 @@ const isArchiveName = (name: string, extension: string | null) => {
 };
 
 const toShortLabel = (value: string) =>
-  value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 3);
+  value.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 3);
 
 const getExtensionLabel = (name: string, group: EntryVisualGroup) => {
   const lowerName = name.toLowerCase();
@@ -78,17 +78,17 @@ const getExtensionLabel = (name: string, group: EntryVisualGroup) => {
       lowerName.endsWith(suffix)
     )?.[1];
     if (archiveLabel) {
-      return archiveLabel;
+      return archiveLabel.toLowerCase();
     }
   }
 
   const extension = getFileExtension(name);
   if (extension !== null) {
-    return EXTENSION_LABEL_OVERRIDES[extension] ?? toShortLabel(extension);
+    return (EXTENSION_LABEL_OVERRIDES[extension] ?? toShortLabel(extension)).toLowerCase();
   }
 
   const nameStem = getNameStem(name);
-  return FILENAME_LABEL_OVERRIDES[nameStem] ?? "FILE";
+  return (FILENAME_LABEL_OVERRIDES[nameStem] ?? "FILE").toLowerCase();
 };
 
 const getGroupFallbackExtensionClassName = (group: EntryVisualGroup) => {

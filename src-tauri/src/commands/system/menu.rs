@@ -12,6 +12,7 @@ pub const CONTEXT_COPY_PATH_MENU_ITEM_ID: &str = "context_copy_path";
 pub const CONTEXT_COPY_MENU_ITEM_ID: &str = "context_copy";
 pub const CONTEXT_MOVE_MENU_ITEM_ID: &str = "context_move";
 pub const CONTEXT_RENAME_MENU_ITEM_ID: &str = "context_rename";
+pub const CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID: &str = "context_normalize_nfc";
 pub const CONTEXT_DELETE_MENU_ITEM_ID: &str = "context_delete";
 pub const CONTEXT_REFRESH_MENU_ITEM_ID: &str = "context_refresh";
 pub const CONTEXT_NEW_FOLDER_MENU_ITEM_ID: &str = "context_new_folder";
@@ -27,6 +28,7 @@ pub struct ShowContextMenuRequest {
     pub y: f64,
     pub has_target_item: bool,
     pub can_rename: bool,
+    pub can_normalize_filename: bool,
     pub can_create_zip: bool,
     pub can_extract_zip: bool,
 }
@@ -44,6 +46,7 @@ pub fn show_context_menu(window: Window, request: ShowContextMenuRequest) -> Res
         build_target_context_menu(
             &window,
             request.can_rename,
+            request.can_normalize_filename,
             request.can_create_zip,
             request.can_extract_zip,
         )?
@@ -62,6 +65,7 @@ pub fn show_context_menu(window: Window, request: ShowContextMenuRequest) -> Res
 fn build_target_context_menu(
     window: &Window,
     can_rename: bool,
+    can_normalize_filename: bool,
     can_create_zip: bool,
     can_extract_zip: bool,
 ) -> Result<Menu<tauri::Wry>, String> {
@@ -145,6 +149,14 @@ fn build_target_context_menu(
         None::<&str>,
     )
     .map_err(|error| error.to_string())?;
+    let normalize_nfc = MenuItem::with_id(
+        window,
+        CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID,
+        "파일명을 NFC로 변환",
+        can_normalize_filename,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
     let delete = MenuItem::with_id(
         window,
         CONTEXT_DELETE_MENU_ITEM_ID,
@@ -178,6 +190,7 @@ fn build_target_context_menu(
             &copy,
             &move_item,
             &rename,
+            &normalize_nfc,
             &delete,
             &refresh,
         ],

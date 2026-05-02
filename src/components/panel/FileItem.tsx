@@ -4,6 +4,7 @@ import { FileEntry, ViewMode } from "../../types/file";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { formatDate, formatSize } from "../../utils/format";
+import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
 import { resolveEntryVisual } from "./fileVisuals";
 
 const THUMBNAIL_EXTENSIONS = new Set([
@@ -78,6 +79,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const disclosureOffset = depth * 14;
   const isSelectionRow = Boolean(isSelected && !isCursor);
   const visual = resolveEntryVisual(entry, { isExpanded });
+  const filenameDisplay = getUnicodeFilenameDisplay(entry.name);
   const showThumbnail = !isDir && THUMBNAIL_EXTENSIONS.has(getExt(entry.name));
   const Icon = visual.icon;
   const isDetailed = viewMode === "detailed";
@@ -182,7 +184,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
             [visual.nameWeightClassName]: Boolean(visual.nameWeightClassName),
           })}
         >
-          {entry.name}
+          {filenameDisplay.displayName}
         </span>
         {gitMark && (
           <span className={clsx(

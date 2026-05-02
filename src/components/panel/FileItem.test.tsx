@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { FileItem } from "./FileItem";
 import type { FileEntry } from "../../types/file";
@@ -15,6 +15,21 @@ const createFile = (name: string): FileEntry => ({
 });
 
 describe("FileItem", () => {
+  it("renders decomposed Hangul filenames as visible compatibility jamo", () => {
+    const nfdName = "머신.txt".normalize("NFD");
+
+    render(
+      <FileItem
+        entry={createFile(nfdName)}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("ㅁㅓㅅㅣㄴ.txt")).toBeInTheDocument();
+  });
+
   it("preserves file icon color and plate on selected rows", () => {
     const { container } = render(
       <FileItem
@@ -38,7 +53,7 @@ describe("FileItem", () => {
 
     const label = iconPlate?.querySelector(".theme-tc-extension-label");
     expect(label).not.toBeNull();
-    expect(label).toHaveTextContent("MD");
+    expect(label).toHaveTextContent("md");
     expect(label).toHaveClass("theme-tc-ext-md");
   });
 
@@ -58,6 +73,6 @@ describe("FileItem", () => {
 
     const label = container.querySelector(".theme-tc-extension-label");
     expect(label).not.toBeNull();
-    expect(label).toHaveTextContent("SEC");
+    expect(label).toHaveTextContent("sec");
   });
 });

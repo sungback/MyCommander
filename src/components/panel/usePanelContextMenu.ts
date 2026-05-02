@@ -2,6 +2,7 @@ import { useEffect, type RefObject } from "react";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import type { FileEntry, PanelId } from "../../types/file";
+import { hasDecomposedUnicodeFilename } from "../../utils/unicodeFilename";
 import {
   findFileEntryElement,
   getFileEntryIndex,
@@ -127,6 +128,11 @@ export const usePanelContextMenu = ({
           y: event.clientY,
           hasTargetItem: entryPath !== null,
           canRename: Boolean(targetEntry && targetEntry.name !== ".."),
+          canNormalizeFilename: Boolean(
+            targetEntry &&
+              targetEntry.name !== ".." &&
+              hasDecomposedUnicodeFilename(targetEntry.name)
+          ),
           canCreateZip,
           canExtractZip,
         })

@@ -181,6 +181,29 @@ fn rename_file_rejects_existing_target_without_overwriting() {
 }
 
 #[test]
+fn rename_file_converts_decomposed_hangul_name_to_nfc() {
+    let tmp = create_test_dir("rename_nfd_to_nfc");
+    fs::create_dir_all(&tmp).unwrap();
+
+    let decomposed_name = "\u{1106}\u{1165}\u{1109}\u{1175}\u{11AB}.txt";
+    let nfc_name = "\u{BA38}\u{C2E0}.txt";
+    let source = tmp.join(decomposed_name);
+    let target = tmp.join(nfc_name);
+    fs::write(&source, b"source").unwrap();
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(rename_file(
+        source.to_string_lossy().to_string(),
+        target.to_string_lossy().to_string(),
+    ));
+
+    assert!(result.is_ok());
+    assert_eq!(fs::read(&target).unwrap(), b"source");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn collapse_nested_removes_children() {
     let paths = vec!["/a".to_string(), "/a/b".to_string(), "/a/b/c".to_string()];
     let result = collapse_nested_paths(paths);

@@ -12,6 +12,7 @@ const {
   mockRefreshPanel,
   mockSetActivePanel,
   mockSubmitJob,
+  mockRenameFile,
   mockOpenInTerminal,
   mockRevealItemInDir,
   mockWriteClipboardText,
@@ -26,6 +27,7 @@ const {
   mockRefreshPanel: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSubmitJob: vi.fn(),
+  mockRenameFile: vi.fn(),
   mockOpenInTerminal: vi.fn(),
   mockRevealItemInDir: vi.fn(),
   mockWriteClipboardText: vi.fn(),
@@ -55,6 +57,14 @@ const mockPanelState = {
       {
         name: "notes.txt",
         path: "/home/user/notes.txt",
+        kind: "file",
+        size: 12,
+        lastModified: null,
+        isHidden: false,
+      },
+      {
+        name: "머신.txt".normalize("NFD"),
+        path: `/home/user/${"머신.txt".normalize("NFD")}`,
         kind: "file",
         size: 12,
         lastModified: null,
@@ -95,6 +105,7 @@ vi.mock("../../store/toastStore", () => ({
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     openInTerminal: mockOpenInTerminal,
+    renameFile: mockRenameFile,
     submitJob: mockSubmitJob,
   }),
 }));
@@ -157,10 +168,12 @@ describe("ContextMenu", () => {
       result: null,
     });
     mockOpenInTerminal.mockResolvedValue(undefined);
+    mockRenameFile.mockResolvedValue(undefined);
     mockRevealItemInDir.mockResolvedValue(undefined);
     mockWriteClipboardText.mockResolvedValue(undefined);
     mockContextState.panelId = "left";
     mockContextState.targetPath = "/home/user/Documents";
+    mockPanelState.leftPanel.selectedItems = new Set<string>();
   });
 
   it("create-zip 액션을 처리한다", async () => {
@@ -222,5 +235,39 @@ describe("ContextMenu", () => {
 
     expect(mockWriteClipboardText).toHaveBeenCalledWith("/home/user/Documents");
     expect(mockShowTransientToast).toHaveBeenCalledWith("경로를 복사했습니다.");
+  });
+
+  it("NFD 파일명을 NFC로 변환한다", async () => {
+    const nfdName = "머신.txt".normalize("NFD");
+    mockContextState.targetPath = `/home/user/${nfdName}`;
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "normalize-filename-nfc" });
+
+    expect(mockRenameFile).toHaveBeenCalledWith(
+      `/home/user/${nfdName}`,
+      "/home/user/머신.txt"
+    );
+    expect(mockRefreshPanel).toHaveBeenCalledWith("left");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("파일명을 NFC로 변환했습니다.");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("NFC 변환 실패 시 오류 토스트를 표시한다", async () => {
+    const nfdName = "머신.txt".normalize("NFD");
+    mockContextState.targetPath = `/home/user/${nfdName}`;
+    mockRenameFile.mockRejectedValueOnce(new Error("rename failed"));
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "normalize-filename-nfc" });
+
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "파일명을 NFC로 변환하지 못했습니다.",
+      { tone: "error" }
+    );
   });
 });

@@ -65,6 +65,7 @@ describe('FilePanel', () => {
       expect.objectContaining({
         hasTargetItem: true,
         canRename: true,
+        canNormalizeFilename: false,
         canCreateZip: false,
         canExtractZip: false,
       })
@@ -105,7 +106,39 @@ describe('FilePanel', () => {
       expect.objectContaining({
         hasTargetItem: true,
         canRename: true,
+        canNormalizeFilename: false,
         canCreateZip: false,
+      })
+    );
+  });
+
+  it("enables NFC filename conversion for decomposed target names", async () => {
+    const nfdName = "머신.txt".normalize("NFD");
+    const entry: FileEntry = {
+      name: nfdName,
+      path: `/home/user/${nfdName}`,
+      kind: "file",
+    };
+
+    mockListDirectory.mockResolvedValue([entry]);
+
+    setLeftPanelPath("/home/user");
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`file-row-${nfdName}`)).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId(`file-row-${nfdName}`), {
+      clientX: 1,
+      clientY: 2,
+    });
+
+    expect(mockShowContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasTargetItem: true,
+        canRename: true,
+        canNormalizeFilename: true,
       })
     );
   });
