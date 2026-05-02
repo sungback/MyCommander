@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { FileEntry } from "../../types/file";
 import { usePanelStore } from "../../store/panelStore";
@@ -13,18 +13,27 @@ import {
 } from "./fileListDragSharedState";
 import {
   getBlockedDropReason,
+  getDraggedDirectoryPaths,
   getPanelIdFromElement,
+  hasPointerMovedBeyondThreshold,
   resolveCrossPanelDropIntent,
   resolveMouseUpTargetPanel,
   resolveSamePanelDropIntent,
   resolveSamePanelBackgroundDropTarget,
 } from "./fileListDragRules";
-import { findFileEntryElement } from "./fileEntryElement";
+import {
+  findVisibleEntryAtPointer,
+  isPointerInsideElement,
+  isPointerOutsideWindow,
+} from "./fileListDragPointer";
 import type { VisibleEntryRow } from "./fileListRows";
 import { getDragIcon } from "./fileListDragIcon";
 import { useFileListDragActions } from "./useFileListDragActions";
 import { useExternalFileDrop } from "./useExternalFileDrop";
-import { useFileListDropUiState } from "./useFileListDropUiState";
+import {
+  EMPTY_FILE_LIST_DROP_UI_STATE,
+  useFileListDropUiState,
+} from "./useFileListDropUiState";
 
 const DRAG_THRESHOLD_PX = 6;
 
@@ -58,6 +67,14 @@ export const useFileListDrag = ({
     nativeDragStarted: boolean;
   } | null>(null);
 
+  const resetDragInteraction = useCallback(() => {
+    setDragInfo(null);
+    resetSharedDragState();
+    dragStateRef.current = null;
+    setIsLocalDragActive(false);
+    updateDropUiState(EMPTY_FILE_LIST_DROP_UI_STATE);
+  }, [setDragInfo, updateDropUiState]);
+
   useEffect(() => {
     sharedPanelPaths[panelId] = { accessPath, currentPath };
 
@@ -70,30 +87,22 @@ export const useFileListDrag = ({
     const handleMouseMove = (e: MouseEvent) => {
       const state = dragStateRef.current;
       const activeDragInfo = useDragStore.getState().dragInfo;
+      const pointer = { clientX: e.clientX, clientY: e.clientY };
 
       if ((state?.dragging || activeDragInfo) && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const isOverContainer =
-          e.clientX >= rect.left &&
-          e.clientX <= rect.right &&
-          e.clientY >= rect.top &&
-          e.clientY <= rect.bottom;
+        const container = containerRef.current;
+        const isOverContainer = isPointerInsideElement(pointer, container);
 
         if (isOverContainer && activeDragInfo?.sourcePanel !== panelId) {
           sharedDragState.hoveredPanel = panelId;
           sharedDragState.hoveredPanelPath = accessPath || currentPath;
         }
 
-        const rowElement = findFileEntryElement(
-          document.elementFromPoint(e.clientX, e.clientY)
+        const { rowPath, targetEntry } = findVisibleEntryAtPointer(
+          pointer,
+          container,
+          visibleRows
         );
-        const rowPath =
-          rowElement && containerRef.current.contains(rowElement)
-            ? rowElement.dataset.entryPath ?? null
-            : null;
-        const targetEntry = rowPath
-          ? visibleRows.find((row) => row.entry.path === rowPath)?.entry ?? null
-          : null;
         const canAcceptDrop =
           Boolean(targetEntry) &&
           targetEntry?.kind === "directory" &&
@@ -162,13 +171,16 @@ export const useFileListDrag = ({
       if (!state || state.nativeDragStarted) return;
 
       if (!state.dragging) {
-        const dx = e.clientX - state.startX;
-        const dy = e.clientY - state.startY;
-        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
-          const directoryPaths = state.paths.filter((path) => {
-            const entry = visibleRows.find((row) => row.entry.path === path)?.entry;
-            return entry?.kind === "directory";
-          });
+        if (
+          hasPointerMovedBeyondThreshold({
+            startX: state.startX,
+            startY: state.startY,
+            currentX: pointer.clientX,
+            currentY: pointer.clientY,
+            thresholdPx: DRAG_THRESHOLD_PX,
+          })
+        ) {
+          const directoryPaths = getDraggedDirectoryPaths(state.paths, visibleRows);
           state.dragging = true;
           setDragInfo({ paths: state.paths, directoryPaths, sourcePanel: panelId });
           setIsLocalDragActive(true);
@@ -178,27 +190,13 @@ export const useFileListDrag = ({
         return;
       }
 
-      const outsideWindow =
-        e.clientX <= 0 ||
-        e.clientY <= 0 ||
-        e.clientX >= window.innerWidth ||
-        e.clientY >= window.innerHeight;
-
-      if (outsideWindow) {
+      if (isPointerOutsideWindow(pointer)) {
         state.nativeDragStarted = true;
         document.body.style.cursor = "";
 
         startDrag({ item: state.paths, icon: getDragIcon() })
           .then(() => {
-            setDragInfo(null);
-            resetSharedDragState();
-            dragStateRef.current = null;
-            setIsLocalDragActive(false);
-            updateDropUiState({
-              isPanelHovered: false,
-              dropTargetPath: null,
-              isDropAllowed: false,
-            });
+            resetDragInteraction();
           })
           .catch(console.error);
       }
@@ -244,15 +242,7 @@ export const useFileListDrag = ({
             isFolderOnlyMove,
           } = samePanelDropIntent;
 
-          setDragInfo(null);
-          resetSharedDragState();
-          dragStateRef.current = null;
-          setIsLocalDragActive(false);
-          updateDropUiState({
-            isPanelHovered: false,
-            dropTargetPath: null,
-            isDropAllowed: false,
-          });
+          resetDragInteraction();
 
           if (!isDropAllowed) {
             showTransientToast(blockedReason ?? "여기로는 복사할 수 없습니다.", {
@@ -326,15 +316,7 @@ export const useFileListDrag = ({
         }
       }
 
-      setDragInfo(null);
-      resetSharedDragState();
-      dragStateRef.current = null;
-      setIsLocalDragActive(false);
-      updateDropUiState({
-        isPanelHovered: false,
-        dropTargetPath: null,
-        isDropAllowed: false,
-      });
+      resetDragInteraction();
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -349,6 +331,7 @@ export const useFileListDrag = ({
     handleDraggedCopy,
     handleDraggedMove,
     panelId,
+    resetDragInteraction,
     setDragInfo,
     visibleRows,
     containerRef,

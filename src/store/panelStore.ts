@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import type { PanelId, PanelState } from "../types/file";
 import { readPersistedPanelState } from "./persistence";
 import {
-  persistVisiblePanelState,
   restorePersistedPanelState,
 } from "../utils/panelHelpers";
 import {
@@ -27,45 +25,16 @@ import {
   togglePanelSelection,
   updateEntrySizeAcrossPanels,
 } from "./panelStoreReducers";
-import type { PanelViewModes } from "./panelStoreReducers";
+import {
+  persistPanelUpdate,
+  persistPanelVisibilityState,
+  resolvePersistedPanelViewModes,
+} from "./panelStorePersistence";
 import type { AppState } from "./panelStoreTypes";
-
-const getPanelsAfterUpdate = (
-  state: AppState,
-  panel: PanelId,
-  nextPanelState: PanelState
-) => ({
-  leftPanel: panel === "left" ? nextPanelState : state.leftPanel,
-  rightPanel: panel === "right" ? nextPanelState : state.rightPanel,
-});
-
-const persistPanelUpdate = (
-  state: AppState,
-  panel: PanelId,
-  nextPanelState: PanelState
-) => {
-  const { leftPanel, rightPanel } = getPanelsAfterUpdate(
-    state,
-    panel,
-    nextPanelState
-  );
-
-  persistVisiblePanelState(
-    leftPanel,
-    rightPanel,
-    state.activePanel,
-    state.showHiddenFiles,
-    state.themePreference,
-    state.panelViewModes
-  );
-};
 
 export const usePanelStore = create<AppState>((set) => {
   const persistedPanelState = readPersistedPanelState();
-  const panelViewModes: PanelViewModes = {
-    left: persistedPanelState.leftViewMode ?? persistedPanelState.viewMode ?? "detailed",
-    right: persistedPanelState.rightViewMode ?? persistedPanelState.viewMode ?? "detailed",
-  };
+  const panelViewModes = resolvePersistedPanelViewModes(persistedPanelState);
 
   return {
     leftPanel: restorePersistedPanelState(
@@ -94,54 +63,26 @@ export const usePanelStore = create<AppState>((set) => {
 
         if (!swappedPanels) return state;
 
-        persistVisiblePanelState(
-          swappedPanels.leftPanel,
-          swappedPanels.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          swappedPanels.panelViewModes
-        );
+        persistPanelVisibilityState(state, swappedPanels);
 
         return swappedPanels;
       }),
 
     setActivePanel: (activePanel) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { activePanel });
         return { activePanel };
       }),
 
     setShowHiddenFiles: (showHiddenFiles) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { showHiddenFiles });
         return { showHiddenFiles };
       }),
 
     setThemePreference: (themePreference) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { themePreference });
         return { themePreference };
       }),
 
@@ -151,14 +92,9 @@ export const usePanelStore = create<AppState>((set) => {
           ...state.panelViewModes,
           [panel]: viewMode,
         };
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          nextPanelViewModes
-        );
+        persistPanelVisibilityState(state, {
+          panelViewModes: nextPanelViewModes,
+        });
         return { panelViewModes: nextPanelViewModes };
       }),
 

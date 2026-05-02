@@ -2,15 +2,21 @@ use super::path_utils::{normalize_target_path, remove_path};
 use crate::commands::fs::shared::{is_operation_cancelled, ProgressPayload};
 use std::fs::{self, OpenOptions};
 use std::io::{self, ErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tauri::Emitter;
 
 #[path = "copy_conflicts.rs"]
 mod copy_conflicts;
+#[path = "copy_naming.rs"]
+mod copy_naming;
+#[path = "copy_progress.rs"]
+mod copy_progress;
 
 pub(crate) use copy_conflicts::collect_copy_conflicts;
+use copy_naming::make_copy_name;
+use copy_progress::{emit_copy_progress, file_name_for_progress};
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn copy_files(
@@ -57,10 +63,7 @@ where
         }
 
         if source_paths.len() == 1 {
-            let file_name = Path::new(&source_paths[0])
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| source_paths[0].clone());
+            let file_name = file_name_for_progress(&source_paths[0]);
             let saved = copy_single_path(
                 Path::new(&source_paths[0]),
                 &target_path,
@@ -68,13 +71,7 @@ where
                 overwrite,
                 cancel_flag.as_deref(),
             )?;
-            emit_progress(ProgressPayload {
-                operation: "copy".to_string(),
-                current: 1,
-                total,
-                current_file: file_name,
-                unit: "items".to_string(),
-            });
+            emit_copy_progress(&emit_progress, 1, total, file_name);
             return Ok(vec![saved]);
         }
 
@@ -89,10 +86,7 @@ where
             if is_operation_cancelled(cancel_flag.as_deref()) {
                 return Err("Operation cancelled.".to_string());
             }
-            let file_name = Path::new(source)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| source.clone());
+            let file_name = file_name_for_progress(source);
             let saved = copy_path_into_dir(
                 Path::new(source),
                 target_root,
@@ -101,13 +95,7 @@ where
                 cancel_flag.as_deref(),
             )?;
             saved_names.push(saved);
-            emit_progress(ProgressPayload {
-                operation: "copy".to_string(),
-                current: (index + 1) as u64,
-                total,
-                current_file: file_name,
-                unit: "items".to_string(),
-            });
+            emit_copy_progress(&emit_progress, (index + 1) as u64, total, file_name);
         }
         Ok(saved_names)
     })
@@ -141,55 +129,6 @@ fn copy_single_path(
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default())
-}
-
-fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
-    let file_name = source
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-
-    let (stem, ext_with_dot) = if source.is_dir() {
-        (file_name.as_str().to_string(), String::new())
-    } else {
-        match source.extension() {
-            Some(ext) => {
-                let ext_str = ext.to_string_lossy().to_string();
-                let stem_str = source
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                (stem_str, format!(".{ext_str}"))
-            }
-            None => (file_name.clone(), String::new()),
-        }
-    };
-
-    let base_stem = {
-        let copy_n_re = regex::Regex::new(r"^(.*) copy(?: (\d+))?$").unwrap();
-        if let Some(caps) = copy_n_re.captures(&stem) {
-            caps.get(1)
-                .map(|m| m.as_str().to_string())
-                .unwrap_or(stem.clone())
-        } else {
-            stem.clone()
-        }
-    };
-
-    let first_candidate = target_dir.join(format!("{base_stem} copy{ext_with_dot}"));
-    if !first_candidate.exists() {
-        return first_candidate;
-    }
-    let mut n = 2u32;
-    loop {
-        let candidate = target_dir.join(format!("{base_stem} copy {n}{ext_with_dot}"));
-        if !candidate.exists() {
-            return candidate;
-        }
-        n += 1;
-    }
 }
 
 fn copy_path_into_dir(

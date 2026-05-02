@@ -1,136 +1,23 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { usePanelStore } from "../../store/panelStore";
-import { FileEntry } from "../../types/file";
-import { FilePanel } from "./FilePanel";
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import {
+  alertSpy,
+  lastFileListProps,
+  mockGetDirSize,
+  mockListDirectory,
+  mockOpenContextMenu,
+  mockResolvePath,
+  mockShowContextMenu,
+  registerFilePanelTestLifecycle,
+  setLeftPanelPath,
+  setMockExtraFileListRows,
+} from './FilePanel.test-harness';
+import { FilePanel } from './FilePanel';
+import { usePanelStore } from '../../store/panelStore';
+import type { FileEntry } from '../../types/file';
 
-const mockListDirectory = vi.fn();
-const mockGetHomeDir = vi.fn();
-const mockResolvePath = vi.fn();
-const mockGetDirSize = vi.fn();
-const mockOpenFile = vi.fn();
-const mockShowContextMenu = vi.fn();
-const mockOpenContextMenu = vi.fn();
-let lastFileListProps: {
-  files: FileEntry[];
-  onEnter: (entry: FileEntry) => Promise<void> | void;
-} | null = null;
-let mockExtraFileListRows: FileEntry[] = [];
-const mockFileSystem = {
-  listDirectory: mockListDirectory,
-  getHomeDir: mockGetHomeDir,
-  resolvePath: mockResolvePath,
-  getDirSize: mockGetDirSize,
-  openFile: mockOpenFile,
-  showContextMenu: mockShowContextMenu,
-};
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("../../hooks/useFileSystem", () => ({
-  useFileSystem: () => mockFileSystem,
-  getErrorMessage: (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
-}));
-
-vi.mock("../../store/contextMenuStore", () => ({
-  useContextMenuStore: (selector: (state: { openContextMenu: typeof mockOpenContextMenu }) => unknown) =>
-    selector({ openContextMenu: mockOpenContextMenu }),
-}));
-
-vi.mock("./AddressBar", () => ({
-  AddressBar: () => <div data-testid="address-bar" />,
-}));
-
-vi.mock("./ColumnHeader", () => ({
-  ColumnHeader: () => <div data-testid="column-header" />,
-}));
-
-vi.mock("./DriveList", () => ({
-  DriveList: () => <div data-testid="drive-list" />,
-}));
-
-vi.mock("./TabBar", () => ({
-  TabBar: () => <div data-testid="tab-bar" />,
-}));
-
-vi.mock("./FileList", () => ({
-  FileList: (props: {
-    files: FileEntry[];
-    onEnter: (entry: FileEntry) => Promise<void> | void;
-  }) => {
-    lastFileListProps = props;
-    return (
-      <div data-testid="file-list">
-        {[...props.files, ...mockExtraFileListRows].map((entry, index) => (
-          <div
-            key={entry.path}
-            data-testid={`file-row-${entry.name}`}
-            data-entry-index={index}
-            data-entry-path={entry.path}
-            data-entry-name={entry.name}
-            data-entry-kind={entry.kind}
-            data-entry-is-hidden={entry.isHidden ? "true" : "false"}
-          >
-            {entry.name}
-          </div>
-        ))}
-      </div>
-    );
-  },
-}));
-
-vi.mock("./archiveEnter", () => ({
-  enterArchiveEntry: vi.fn(),
-  isArchiveEntry: vi.fn(() => false),
-  isZipArchiveEntry: vi.fn(() => false),
-}));
-
-const setLeftPanelPath = (path: string) => {
-  usePanelStore.setState((state) => ({
-    ...state,
-    leftPanel: {
-      ...state.leftPanel,
-      currentPath: path,
-      files: [],
-      tabs: state.leftPanel.tabs.map((tab) =>
-        tab.id === state.leftPanel.activeTabId
-          ? {
-              ...tab,
-              currentPath: path,
-              history: [path],
-              historyIndex: 0,
-              files: [],
-              selectedItems: new Set<string>(),
-              pendingCursorName: null,
-            }
-          : tab
-      ),
-    },
-    activePanel: "left",
-  }));
-};
-
-describe("FilePanel", () => {
-  const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
-  beforeEach(() => {
-    usePanelStore.setState(usePanelStore.getInitialState());
-    lastFileListProps = null;
-    mockExtraFileListRows = [];
-    mockListDirectory.mockReset();
-    mockGetHomeDir.mockReset();
-    mockResolvePath.mockReset();
-    mockResolvePath.mockImplementation(async (path: string) => path);
-    mockGetDirSize.mockReset();
-    mockOpenFile.mockReset();
-    mockShowContextMenu.mockReset();
-    mockShowContextMenu.mockResolvedValue(undefined);
-    mockOpenContextMenu.mockReset();
-    alertSpy.mockClear();
-  });
+describe('FilePanel', () => {
+  registerFilePanelTestLifecycle();
 
   it("uses DOM metadata for context menus on expanded child entries", async () => {
     const rootEntry: FileEntry = {
@@ -145,7 +32,7 @@ describe("FilePanel", () => {
       kind: "file",
     };
 
-    mockExtraFileListRows = [expandedChild];
+    setMockExtraFileListRows([expandedChild]);
     mockListDirectory.mockResolvedValue([rootEntry]);
     mockGetDirSize.mockResolvedValue(0);
 
