@@ -4,8 +4,22 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export const RENDERER_RECOVERY_CLASS = "renderer-recovery-pulse";
 export const RENDERER_RECOVERY_ATTR = "data-renderer-recovery-at";
+export const RENDERER_RECOVERY_RELOAD_ATTR = "data-renderer-recovery-reload-at";
 export const RENDERER_RECOVERY_STALE_MS = 2 * 60 * 1000;
+export const RENDERER_RECOVERY_RELOAD_DELAY_MS = 1500;
+export const RENDERER_RECOVERY_RELOAD_COOLDOWN_MS = 60 * 1000;
 const RENDERER_RECOVERY_CHECK_MS = 30 * 1000;
+const RENDERER_RECOVERY_RELOAD_STORAGE_KEY = "mycommander:renderer-recovery-reload-at";
+
+type RendererReload = () => void;
+
+let rendererReload: RendererReload = () => {
+  window.location.reload();
+};
+
+export const setRendererRecoveryReloadForTests = (reload?: RendererReload) => {
+  rendererReload = reload ?? (() => window.location.reload());
+};
 
 const isDocumentVisible = () => document.visibilityState !== "hidden";
 
@@ -34,6 +48,45 @@ const restoreNativeSurface = async () => {
     await Promise.allSettled([appWindow.show(), webview.show()]);
   } catch {
     // The Tauri globals are unavailable in browser-only tests and previews.
+  }
+};
+
+const readLastRendererReloadAt = () => {
+  try {
+    const stored = window.sessionStorage.getItem(RENDERER_RECOVERY_RELOAD_STORAGE_KEY);
+    return stored ? Number(stored) || 0 : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const markRendererReloadRequested = (requestedAt: number) => {
+  const root = document.getElementById("root");
+  root?.setAttribute(RENDERER_RECOVERY_RELOAD_ATTR, String(requestedAt));
+
+  try {
+    window.sessionStorage.setItem(
+      RENDERER_RECOVERY_RELOAD_STORAGE_KEY,
+      String(requestedAt),
+    );
+  } catch {
+    // Session storage can be unavailable in browser-only previews.
+  }
+};
+
+const canAutoReloadRenderer = (now: number) => {
+  const lastReloadAt = readLastRendererReloadAt();
+  return now - lastReloadAt >= RENDERER_RECOVERY_RELOAD_COOLDOWN_MS;
+};
+
+export const reloadRendererSurface = () => {
+  const requestedAt = Date.now();
+  markRendererReloadRequested(requestedAt);
+
+  try {
+    rendererReload();
+  } catch {
+    // The fallback is best-effort; keep the app usable if reload is blocked.
   }
 };
 
@@ -68,11 +121,32 @@ export function useRendererRecovery() {
   useEffect(() => {
     let lastTickAt = Date.now();
     let recoveryFrameId: number | undefined;
+    let recoveryReloadTimeoutId: number | undefined;
     let unlistenNativeFocus: (() => void) | undefined;
+    let pendingStaleRecovery = false;
     let isDisposed = false;
 
-    const scheduleRecovery = () => {
-      if (!isDocumentVisible() || recoveryFrameId !== undefined) {
+    const scheduleRendererReload = () => {
+      if (recoveryReloadTimeoutId !== undefined || !canAutoReloadRenderer(Date.now())) {
+        return;
+      }
+
+      recoveryReloadTimeoutId = window.setTimeout(() => {
+        recoveryReloadTimeoutId = undefined;
+        reloadRendererSurface();
+      }, RENDERER_RECOVERY_RELOAD_DELAY_MS);
+    };
+
+    const scheduleRecovery = ({ allowReload = false } = {}) => {
+      if (!isDocumentVisible()) {
+        return;
+      }
+
+      if (recoveryFrameId !== undefined) {
+        if (allowReload) {
+          scheduleRendererReload();
+        }
+
         return;
       }
 
@@ -80,11 +154,18 @@ export function useRendererRecovery() {
         recoveryFrameId = undefined;
         recoverRendererSurface();
       });
+
+      if (allowReload) {
+        scheduleRendererReload();
+      }
     };
 
     const handleForeground = () => {
-      lastTickAt = Date.now();
-      scheduleRecovery();
+      const now = Date.now();
+      const wasStale = pendingStaleRecovery || now - lastTickAt >= RENDERER_RECOVERY_STALE_MS;
+      pendingStaleRecovery = false;
+      lastTickAt = now;
+      scheduleRecovery({ allowReload: wasStale });
     };
 
     const handleVisibilityChange = () => {
@@ -99,7 +180,8 @@ export function useRendererRecovery() {
       lastTickAt = now;
 
       if (elapsed >= RENDERER_RECOVERY_STALE_MS) {
-        scheduleRecovery();
+        pendingStaleRecovery = !isDocumentVisible();
+        scheduleRecovery({ allowReload: true });
       }
     }, RENDERER_RECOVERY_CHECK_MS);
 
@@ -134,6 +216,10 @@ export function useRendererRecovery() {
 
       if (recoveryFrameId !== undefined) {
         cancelFrame(recoveryFrameId);
+      }
+
+      if (recoveryReloadTimeoutId !== undefined) {
+        window.clearTimeout(recoveryReloadTimeoutId);
       }
 
       window.clearInterval(intervalId);

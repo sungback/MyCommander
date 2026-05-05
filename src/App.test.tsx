@@ -1,7 +1,13 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { usePanelStore } from './store/panelStore';
 import { useDialogStore } from './store/dialogStore';
+import {
+  RENDERER_RECOVERY_RELOAD_ATTR,
+  RENDERER_RECOVERY_RELOAD_DELAY_MS,
+  RENDERER_RECOVERY_STALE_MS,
+  setRendererRecoveryReloadForTests,
+} from './hooks/useRendererRecovery';
 import App from './App';
 
 const mockSyncOtherPanelToCurrentPath = vi.fn();
@@ -68,12 +74,23 @@ vi.mock('./components/layout/ContextMenu',       () => ({ ContextMenu:        ()
 // ── 테스트 ────────────────────────────────────────────────────────────────────
 describe('App — Tab 키 패널 전환', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     usePanelStore.setState(usePanelStore.getInitialState());
     useDialogStore.setState(useDialogStore.getInitialState());
     listenHandlers.clear();
     mockSyncOtherPanelToCurrentPath.mockReset();
     mockListJobs.mockReset();
+    mockWindowShow.mockClear();
+    mockOnFocusChanged.mockClear();
+    mockWebviewShow.mockClear();
     mockListJobs.mockResolvedValue([]);
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setRendererRecoveryReloadForTests();
+    window.sessionStorage.clear();
   });
 
   it('초기 activePanel은 left', () => {
@@ -200,5 +217,27 @@ describe('App — Tab 키 패널 전환', () => {
     });
     expect(mockWindowShow).toHaveBeenCalledTimes(1);
     expect(mockWebviewShow).toHaveBeenCalledTimes(1);
+  });
+
+  it('macOS 잠자기 복귀처럼 타이머가 오래 멈추면 reload fallback을 예약', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+
+    const reloadRenderer = vi.fn();
+    setRendererRecoveryReloadForTests(reloadRenderer);
+
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+
+    render(<App />, { container: root });
+
+    vi.setSystemTime(RENDERER_RECOVERY_STALE_MS + 1);
+    fireEvent.focus(window);
+
+    await vi.advanceTimersByTimeAsync(RENDERER_RECOVERY_RELOAD_DELAY_MS);
+
+    expect(reloadRenderer).toHaveBeenCalledTimes(1);
+    expect(root).toHaveAttribute(RENDERER_RECOVERY_RELOAD_ATTR);
   });
 });
