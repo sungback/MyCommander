@@ -36,13 +36,13 @@
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "lucide-react": "^1.7.0",
-    "marked": "^18.0.0",
+    "marked": "^18.0.3",
     "re-resizable": "^6.11.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-resizable-panels": "^4.7.6",
+    "read-excel-file": "^9.0.9",
     "tailwind-merge": "^3.5.0",
-    "xlsx": "^0.18.5",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

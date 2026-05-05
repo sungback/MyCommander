@@ -1,6 +1,9 @@
-use super::super::metadata::{decode_preview_bytes, is_hidden_entry};
+use super::super::metadata::{
+    decode_preview_bytes, is_hidden_entry, path_matches_denied_home_path,
+};
 use encoding_rs::EUC_KR;
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn hidden_entry_dot_prefix() {
@@ -65,4 +68,40 @@ fn hidden_entry_dot_and_dotdot_are_not_hidden() {
     let metadata = fs::metadata(&dir).unwrap();
     assert!(!is_hidden_entry(".", &metadata));
     assert!(!is_hidden_entry("..", &metadata));
+}
+
+#[test]
+fn preview_read_policy_blocks_sensitive_home_paths() {
+    let home = Path::new("/Users/example");
+
+    assert!(path_matches_denied_home_path(
+        Path::new("/Users/example/.ssh/config"),
+        home
+    ));
+    assert!(path_matches_denied_home_path(
+        Path::new("/Users/example/.aws/credentials"),
+        home
+    ));
+    assert!(path_matches_denied_home_path(
+        Path::new("/Users/example/Library/Keychains/login.keychain-db"),
+        home
+    ));
+}
+
+#[test]
+fn preview_read_policy_allows_similar_but_non_denied_paths() {
+    let home = Path::new("/Users/example");
+
+    assert!(!path_matches_denied_home_path(
+        Path::new("/Users/example/Documents/.ssh-notes/config.txt"),
+        home
+    ));
+    assert!(!path_matches_denied_home_path(
+        Path::new("/Users/example/Library/Logs/app.log"),
+        home
+    ));
+    assert!(!path_matches_denied_home_path(
+        Path::new("/Users/other/.ssh/config"),
+        home
+    ));
 }

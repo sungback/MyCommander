@@ -43,7 +43,7 @@
 | Backend | Rust, Tauri custom commands |
 | UI | Radix UI Dialog, Lucide React, `react-resizable-panels` |
 | Virtualized List | `@tanstack/react-virtual` |
-| Preview Helpers | `highlight.js`, `marked`, `xlsx`, `jszip` |
+| Preview Helpers | `highlight.js`, `marked`, `read-excel-file`, `jszip` |
 | Utilities | `date-fns`, `clsx`, `tailwind-merge` |
 | Testing | Vitest, Testing Library |
 
