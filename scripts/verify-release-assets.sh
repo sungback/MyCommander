@@ -25,6 +25,8 @@ smoke_dir="${RELEASE_SMOKE_DIR:-$(mktemp -d)}"
 release_json="${RELEASE_JSON:-$smoke_dir/release.json}"
 download_assets="${DOWNLOAD_RELEASE_ASSETS:-1}"
 require_draft="${REQUIRE_DRAFT_RELEASE:-1}"
+github_retry_attempts="${GITHUB_RELEASE_RETRY_ATTEMPTS:-6}"
+github_retry_delay_seconds="${GITHUB_RELEASE_RETRY_DELAY_SECONDS:-10}"
 
 required_assets=(
   "MyCommander-${version}-1.x86_64.rpm"
@@ -52,18 +54,85 @@ require_command xcrun
 
 mkdir -p "$smoke_dir"
 
+retry_github_command() {
+  local description="$1"
+  shift
+
+  local attempt=1
+  local delay="$github_retry_delay_seconds"
+
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    if (( attempt >= github_retry_attempts )); then
+      fail "$description failed after $attempt attempts"
+    fi
+
+    echo "$description failed on attempt $attempt/$github_retry_attempts; retrying in ${delay}s" >&2
+    sleep "$delay"
+
+    attempt=$((attempt + 1))
+    if (( delay < 60 )); then
+      delay=$((delay * 2))
+      if (( delay > 60 )); then
+        delay=60
+      fi
+    fi
+  done
+}
+
+fetch_release_json() {
+  local tmp_json="$release_json.tmp"
+
+  fetch_release_json_once() {
+    gh release view "$release_tag" \
+      --repo "$repo" \
+      --json assets,isDraft,isPrerelease,name,publishedAt,tagName,targetCommitish,url \
+      > "$tmp_json"
+  }
+
+  retry_github_command "fetch release metadata for $release_tag" \
+    fetch_release_json_once
+
+  mv "$tmp_json" "$release_json"
+}
+
+download_release_asset() {
+  local asset="$1"
+
+  download_release_asset_once() {
+    gh release download "$release_tag" \
+      --repo "$repo" \
+      --dir "$smoke_dir" \
+      --clobber \
+      --pattern "$asset" \
+      && [[ -f "$smoke_dir/$asset" ]]
+  }
+
+  retry_github_command "download release asset $asset" \
+    download_release_asset_once
+}
+
 if [[ "$download_assets" == "1" ]]; then
-  gh release view "$release_tag" \
-    --repo "$repo" \
-    --json assets,isDraft,isPrerelease,name,publishedAt,tagName,targetCommitish,url \
-    > "$release_json"
+  fetch_release_json
 
   if [[ "$require_draft" == "1" ]]; then
     [[ "$(jq -r '.isDraft' "$release_json")" == "true" ]] \
       || fail "$release_tag must remain draft until smoke tests pass"
   fi
 
-  gh release download "$release_tag" --repo "$repo" --dir "$smoke_dir" --clobber
+  for asset in "${required_assets[@]}"; do
+    download_release_asset "$asset"
+  done
+
+  fetch_release_json
+
+  if [[ "$require_draft" == "1" ]]; then
+    [[ "$(jq -r '.isDraft' "$release_json")" == "true" ]] \
+      || fail "$release_tag must remain draft until smoke tests pass"
+  fi
 fi
 
 [[ -f "$release_json" ]] || fail "release metadata not found: $release_json"
