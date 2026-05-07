@@ -25,6 +25,7 @@ smoke_dir="${RELEASE_SMOKE_DIR:-$(mktemp -d)}"
 release_json="${RELEASE_JSON:-$smoke_dir/release.json}"
 download_assets="${DOWNLOAD_RELEASE_ASSETS:-1}"
 require_draft="${REQUIRE_DRAFT_RELEASE:-1}"
+verify_asset_contents="${VERIFY_RELEASE_ASSET_CONTENTS:-1}"
 github_retry_attempts="${GITHUB_RELEASE_RETRY_ATTEMPTS:-6}"
 github_retry_delay_seconds="${GITHUB_RELEASE_RETRY_DELAY_SECONDS:-10}"
 
@@ -39,18 +40,24 @@ required_assets=(
 )
 
 require_command awk
-require_command codesign
-require_command file
-require_command gh
-require_command grep
-require_command hdiutil
 require_command jq
-require_command lipo
-require_command plutil
 require_command shasum
-require_command spctl
-require_command tar
-require_command xcrun
+
+if [[ "$download_assets" == "1" ]]; then
+  require_command gh
+fi
+
+if [[ "$verify_asset_contents" == "1" ]]; then
+  require_command codesign
+  require_command file
+  require_command grep
+  require_command hdiutil
+  require_command lipo
+  require_command plutil
+  require_command spctl
+  require_command tar
+  require_command xcrun
+fi
 
 mkdir -p "$smoke_dir"
 
@@ -115,27 +122,27 @@ download_release_asset() {
     download_release_asset_once
 }
 
-if [[ "$download_assets" == "1" ]]; then
-  fetch_release_json
-
+assert_release_is_draft() {
   if [[ "$require_draft" == "1" ]]; then
     [[ "$(jq -r '.isDraft' "$release_json")" == "true" ]] \
       || fail "$release_tag must remain draft until smoke tests pass"
   fi
+}
+
+if [[ "$download_assets" == "1" ]]; then
+  fetch_release_json
+
+  assert_release_is_draft
 
   for asset in "${required_assets[@]}"; do
     download_release_asset "$asset"
   done
 
   fetch_release_json
-
-  if [[ "$require_draft" == "1" ]]; then
-    [[ "$(jq -r '.isDraft' "$release_json")" == "true" ]] \
-      || fail "$release_tag must remain draft until smoke tests pass"
-  fi
 fi
 
 [[ -f "$release_json" ]] || fail "release metadata not found: $release_json"
+assert_release_is_draft
 
 asset_count="$(jq '.assets | length' "$release_json")"
 [[ "$asset_count" == "${#required_assets[@]}" ]] \
@@ -155,6 +162,11 @@ while IFS=$'\t' read -r name digest; do
   actual="$(shasum -a 256 "$smoke_dir/$name" | awk '{print $1}')"
   [[ "$actual" == "$expected" ]] || fail "sha256 mismatch for $name"
 done < <(jq -r '.assets[] | [.name, (.digest // "")] | @tsv' "$release_json")
+
+if [[ "$verify_asset_contents" != "1" ]]; then
+  echo "Release asset metadata and digest checks passed for $release_tag"
+  exit 0
+fi
 
 file "$smoke_dir/MyCommander-${version}-1.x86_64.rpm" | grep -q "RPM" \
   || fail "rpm asset does not look like an RPM package"
