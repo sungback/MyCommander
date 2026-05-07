@@ -106,13 +106,13 @@ describe("resolveEntryVisual", () => {
   });
 
   it("adds short readable extension labels to file icons", () => {
-    expect(resolveEntryVisual(createFile("manual.pdf")).extensionLabel).toBe("PDF");
-    expect(resolveEntryVisual(createFile("budget.xlsx")).extensionLabel).toBe("XLS");
-    expect(resolveEntryVisual(createFile("talk.pptx")).extensionLabel).toBe("PPT");
-    expect(resolveEntryVisual(createFile("photo.jpeg")).extensionLabel).toBe("JPG");
-    expect(resolveEntryVisual(createFile("main.ts")).extensionLabel).toBe("TS");
-    expect(resolveEntryVisual(createFile("backup.tar.gz")).extensionLabel).toBe("TGZ");
-    expect(resolveEntryVisual(createFile("unknown.bin")).extensionLabel).toBe("BIN");
+    expect(resolveEntryVisual(createFile("manual.pdf")).extensionLabel).toBe("pdf");
+    expect(resolveEntryVisual(createFile("budget.xlsx")).extensionLabel).toBe("xls");
+    expect(resolveEntryVisual(createFile("talk.pptx")).extensionLabel).toBe("ppt");
+    expect(resolveEntryVisual(createFile("photo.jpeg")).extensionLabel).toBe("jpg");
+    expect(resolveEntryVisual(createFile("main.ts")).extensionLabel).toBe("ts");
+    expect(resolveEntryVisual(createFile("backup.tar.gz")).extensionLabel).toBe("tgz");
+    expect(resolveEntryVisual(createFile("unknown.bin")).extensionLabel).toBe("bin");
   });
 
   it("uses extension-specific label colors for readable file scanning", () => {
@@ -171,7 +171,7 @@ describe("resolveEntryVisual", () => {
 
     expect(visual.group).toBe("file-hidden");
     expect(visual.slot).toBe("tc-file-hidden");
-    expect(visual.extensionLabel).toBe("SEC");
+    expect(visual.extensionLabel).toBe("sec");
     expect(visual.overlayClassName).toBe("theme-tc-overlay-hidden");
     expect(visual.nameClassName).toBe("theme-tc-hidden-name");
   });
@@ -181,7 +181,7 @@ describe("resolveEntryVisual", () => {
 
     expect(visual.group).toBe("file-document");
     expect(visual.slot).toBe("tc-file-text");
-    expect(visual.extensionLabel).toBe("TXT");
+    expect(visual.extensionLabel).toBe("txt");
     expect(visual.nameClassName).toBe("theme-tc-file-name");
   });
 });

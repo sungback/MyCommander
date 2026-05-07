@@ -5,21 +5,29 @@ import {
   XlsxRendererModule,
 } from "./shared";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import type { Row, Sheet } from "read-excel-file/browser";
+
+const MAX_ROWS = 500;
+
+const formatCellValue = (value: unknown): string => {
+  if (value instanceof Date) {
+    return value.toLocaleString();
+  }
+
+  return String(value ?? "");
+};
 
 const buildXlsxHtml = async (filePath: string): Promise<string> => {
-  const XLSX = await import("xlsx");
+  const { default: readExcelFile } = await import("read-excel-file/browser");
   const theme = getPreviewTheme();
-  const maxRows = 500;
 
   const url = convertFileSrc(filePath);
   const buffer = await fetch(url).then((response) => response.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheets = await readExcelFile(buffer);
 
-  const sheetsHtml = workbook.SheetNames.map((sheetName) => {
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: "" });
-    const truncated = rows.length > maxRows;
-    const displayRows = rows.slice(0, maxRows) as unknown[][];
+  const sheetsHtml = sheets.map(({ sheet: sheetName, data: rows }: Sheet) => {
+    const truncated = rows.length > MAX_ROWS;
+    const displayRows = rows.slice(0, MAX_ROWS);
 
     if (displayRows.length === 0) {
       return `<div class="sheet-block">
@@ -33,7 +41,7 @@ const buildXlsxHtml = async (filePath: string): Promise<string> => {
     const dataRows = displayRows.slice(1);
 
     const theadHtml = `<thead><tr>${headerRow
-      .map((cell) => `<th>${escapeHtml(String(cell ?? ""))}</th>`)
+      .map((cell) => `<th>${escapeHtml(formatCellValue(cell))}</th>`)
       .join("")}</tr></thead>`;
 
     const tbodyHtml = `<tbody>${dataRows
@@ -42,13 +50,13 @@ const buildXlsxHtml = async (filePath: string): Promise<string> => {
           `<tr class="${rowIndex % 2 === 1 ? "even" : ""}">${Array.from(
             { length: maxCols },
             (_, columnIndex) =>
-              `<td>${escapeHtml(String((row as unknown[])[columnIndex] ?? ""))}</td>`
+              `<td>${escapeHtml(formatCellValue((row as Row)[columnIndex]))}</td>`
           ).join("")}</tr>`
       )
       .join("")}</tbody>`;
 
     const note = truncated
-      ? `<div class="truncate-note">처음 ${maxRows}행만 표시됩니다 (전체 ${rows.length}행)</div>`
+      ? `<div class="truncate-note">처음 ${MAX_ROWS}행만 표시됩니다 (전체 ${rows.length}행)</div>`
       : "";
 
     return `<div class="sheet-block">

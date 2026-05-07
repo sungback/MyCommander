@@ -83,13 +83,50 @@ fn emit_filesystem_changed(app: &AppHandle, event: Event) {
         return;
     }
 
-    let (directories, paths) = collect_changed_directories_and_paths(&event.paths);
+    let filtered_paths: Vec<PathBuf> = event
+        .paths
+        .iter()
+        .filter(|path| !should_ignore_noisy_metadata_event_path(path, &event.kind))
+        .cloned()
+        .collect();
+    let (directories, paths) = collect_changed_directories_and_paths(&filtered_paths);
     if directories.is_empty() && paths.is_empty() {
         return;
     }
 
     let payload = FileSystemChangedPayload { directories, paths };
     let _ = app.emit("filesystem-changed", payload);
+}
+
+fn should_ignore_noisy_metadata_event_path(path: &Path, event_kind: &EventKind) -> bool {
+    if is_vcs_metadata_descendant(path) {
+        return true;
+    }
+
+    is_vcs_metadata_directory(path)
+        && !matches!(event_kind, EventKind::Create(_) | EventKind::Remove(_))
+}
+
+fn is_vcs_metadata_descendant(path: &Path) -> bool {
+    let mut inside_vcs_metadata = false;
+
+    for component in path.components() {
+        if inside_vcs_metadata {
+            return true;
+        }
+
+        inside_vcs_metadata = is_vcs_metadata_name(component.as_os_str());
+    }
+
+    false
+}
+
+fn is_vcs_metadata_directory(path: &Path) -> bool {
+    path.file_name().map(is_vcs_metadata_name).unwrap_or(false)
+}
+
+fn is_vcs_metadata_name(name: &std::ffi::OsStr) -> bool {
+    name.to_string_lossy().eq_ignore_ascii_case(".git")
 }
 
 fn collect_watchable_paths(paths: Vec<String>) -> HashSet<PathBuf> {
@@ -144,7 +181,12 @@ fn path_to_string(path: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_changed_directories_and_paths, collect_watchable_paths};
+    use super::{
+        collect_changed_directories_and_paths, collect_watchable_paths,
+        should_ignore_noisy_metadata_event_path,
+    };
+    use notify::event::{CreateKind, DataChange, ModifyKind, RemoveKind};
+    use notify::EventKind;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -185,5 +227,41 @@ mod tests {
         assert!(paths.contains(&changed_file.to_string_lossy().to_string()));
         assert!(directories.contains(&changed_file.to_string_lossy().to_string()));
         assert!(directories.contains(&base.to_string_lossy().to_string()));
+    }
+
+    #[test]
+    fn noisy_metadata_filter_ignores_git_internal_changes() {
+        let internal_file = PathBuf::from("/tmp/mycommander/.git/index.lock");
+        let internal_dir = PathBuf::from("/tmp/mycommander/.git/objects");
+        let git_dir = PathBuf::from("/tmp/mycommander/.git");
+        let gitignore = PathBuf::from("/tmp/mycommander/.gitignore");
+        let modify = EventKind::Modify(ModifyKind::Data(DataChange::Any));
+
+        assert!(should_ignore_noisy_metadata_event_path(
+            &internal_file,
+            &modify
+        ));
+        assert!(should_ignore_noisy_metadata_event_path(
+            &internal_dir,
+            &modify
+        ));
+        assert!(should_ignore_noisy_metadata_event_path(&git_dir, &modify));
+        assert!(!should_ignore_noisy_metadata_event_path(
+            &gitignore, &modify
+        ));
+    }
+
+    #[test]
+    fn noisy_metadata_filter_keeps_git_directory_lifecycle_changes() {
+        let git_dir = PathBuf::from("/tmp/mycommander/.git");
+
+        assert!(!should_ignore_noisy_metadata_event_path(
+            &git_dir,
+            &EventKind::Create(CreateKind::Folder)
+        ));
+        assert!(!should_ignore_noisy_metadata_event_path(
+            &git_dir,
+            &EventKind::Remove(RemoveKind::Folder)
+        ));
     }
 }

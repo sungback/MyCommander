@@ -180,14 +180,14 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
 
     {preview.type === "rendered" && showSource && (
       sourceHighlightHtml ? (
-        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0">
+        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0 select-text">
           <code
-            className="hljs block p-4 min-h-full"
+            className="hljs block p-4 min-h-full select-text"
             dangerouslySetInnerHTML={{ __html: sourceHighlightHtml }}
           />
         </pre>
       ) : (
-        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
+        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
           {preview.content}
         </pre>
       )
@@ -195,14 +195,14 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
 
     {preview.type === "text" && (
       preview.highlightedHtml ? (
-        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0">
+        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0 select-text">
           <code
-            className="hljs block p-4 min-h-full"
+            className="hljs block p-4 min-h-full select-text"
             dangerouslySetInnerHTML={{ __html: preview.highlightedHtml }}
           />
         </pre>
       ) : (
-        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed">
+        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
           {preview.content}
         </pre>
       )

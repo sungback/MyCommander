@@ -1,96 +1,22 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SearchPreviewDialogs } from "./SearchPreviewDialogs";
-import { useDialogStore } from "../../store/dialogStore";
-import { usePanelStore } from "../../store/panelStore";
-import type { SearchEvent, SearchResult } from "../../hooks/useFileSystem";
-
-const {
-  mockSearchFiles,
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import {
+  emitSearchEvents,
   mockCheckCopyConflicts,
   mockCopyFiles,
-  mockMoveFiles,
   mockDeleteFiles,
+  mockMoveFiles,
   mockRefreshPanelsForDirectories,
   mockRefreshPanelsForEntryPaths,
-} = vi.hoisted(() => ({
-  mockSearchFiles: vi.fn(),
-  mockCheckCopyConflicts: vi.fn(),
-  mockCopyFiles: vi.fn(),
-  mockMoveFiles: vi.fn(),
-  mockDeleteFiles: vi.fn(),
-  mockRefreshPanelsForDirectories: vi.fn(),
-  mockRefreshPanelsForEntryPaths: vi.fn(),
-}));
+  mockSearchFiles,
+  registerSearchPreviewDialogsTestLifecycle,
+} from './SearchPreviewDialogs.test-harness';
+import { SearchPreviewDialogs } from './SearchPreviewDialogs';
+import { usePanelStore } from '../../store/panelStore';
+import type { SearchEvent } from './SearchPreviewDialogs.test-harness';
 
-vi.mock("re-resizable", () => ({
-  Resizable: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock("../../hooks/useFileSystem", () => ({
-  useFileSystem: () => ({
-    searchFiles: mockSearchFiles,
-    checkCopyConflicts: mockCheckCopyConflicts,
-    copyFiles: mockCopyFiles,
-    moveFiles: mockMoveFiles,
-    deleteFiles: mockDeleteFiles,
-  }),
-  getErrorMessage: (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
-}));
-
-vi.mock("../../store/panelRefresh", () => ({
-  refreshPanelsForDirectories: mockRefreshPanelsForDirectories,
-  refreshPanelsForEntryPaths: mockRefreshPanelsForEntryPaths,
-}));
-
-const emitSearchEvents = (
-  onEvent: (event: SearchEvent) => void,
-  results: SearchResult[] = []
-) => {
-  if (results.length > 0) {
-    onEvent({ type: "ResultBatch", payload: results });
-  }
-  onEvent({ type: "Finished", payload: { total_matches: results.length } });
-};
-
-describe("SearchPreviewDialogs", () => {
-  beforeEach(() => {
-    useDialogStore.setState(useDialogStore.getInitialState());
-    usePanelStore.setState(usePanelStore.getInitialState());
-    useDialogStore.getState().setOpenDialog("search");
-    usePanelStore.setState((state) => ({
-      ...state,
-      activePanel: "left",
-      leftPanel: {
-        ...state.leftPanel,
-        currentPath: "/home/user",
-        resolvedPath: "/home/user",
-      },
-      rightPanel: {
-        ...state.rightPanel,
-        currentPath: "/target",
-        resolvedPath: "/target",
-      },
-    }));
-    mockSearchFiles.mockReset();
-    mockCheckCopyConflicts.mockReset();
-    mockCopyFiles.mockReset();
-    mockMoveFiles.mockReset();
-    mockDeleteFiles.mockReset();
-    mockRefreshPanelsForDirectories.mockReset();
-    mockRefreshPanelsForEntryPaths.mockReset();
-    mockSearchFiles.mockImplementation(
-      async (
-        _startPath: string,
-        _options: unknown,
-        onEvent: (event: SearchEvent) => void
-      ) => {
-        emitSearchEvents(onEvent);
-      }
-    );
-    mockCheckCopyConflicts.mockResolvedValue([]);
-  });
+describe('SearchPreviewDialogs', () => {
+  registerSearchPreviewDialogsTestLifecycle();
 
   it("passes advanced search options to searchFiles", async () => {
     render(<SearchPreviewDialogs />);

@@ -138,6 +138,24 @@ describe("loadPreviewForPath", () => {
     });
   });
 
+  it("does not preview legacy xls files with the xlsx renderer", async () => {
+    const loadXlsxRenderer = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/legacy.xls", {
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer,
+    });
+
+    expect(loadXlsxRenderer).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: "unsupported",
+    });
+  });
+
   it("loads the docx renderer only for docx previews", async () => {
     const renderDocx = vi.fn().mockResolvedValue("<html><body>docx</body></html>");
     const loadDocxRenderer = vi.fn().mockResolvedValue({ renderDocx });

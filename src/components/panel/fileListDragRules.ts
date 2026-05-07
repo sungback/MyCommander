@@ -1,6 +1,7 @@
 import { DragInfo } from "../../store/dragStore";
 import { arePathsEquivalent, getPathDirectoryName, isSameOrNestedPath } from "../../utils/path";
 import { PanelId } from "../../types/file";
+import type { VisibleEntryRow } from "./fileListRows";
 
 export const collapseNestedDirectoryPaths = (paths: string[]) => {
   const collapsed: string[] = [];
@@ -25,6 +26,36 @@ export const collapseNestedDirectoryPaths = (paths: string[]) => {
 export const isSamePanelBackgroundNoOp = (paths: string[], targetPath: string) =>
   paths.length > 0 &&
   paths.every((path) => arePathsEquivalent(getPathDirectoryName(path), targetPath));
+
+interface HasPointerMovedBeyondThresholdArgs {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  thresholdPx: number;
+}
+
+export const hasPointerMovedBeyondThreshold = ({
+  startX,
+  startY,
+  currentX,
+  currentY,
+  thresholdPx,
+}: HasPointerMovedBeyondThresholdArgs) => {
+  const dx = currentX - startX;
+  const dy = currentY - startY;
+
+  return Math.sqrt(dx * dx + dy * dy) > thresholdPx;
+};
+
+export const getDraggedDirectoryPaths = (
+  paths: string[],
+  visibleRows: VisibleEntryRow[]
+) =>
+  paths.filter((path) => {
+    const entry = visibleRows.find((row) => row.entry.path === path)?.entry;
+    return entry?.kind === "directory";
+  });
 
 interface ResolveSamePanelBackgroundDropTargetArgs {
   isOverContainer: boolean;

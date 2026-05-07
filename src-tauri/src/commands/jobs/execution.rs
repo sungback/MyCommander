@@ -1,11 +1,17 @@
 use super::super::fs as fs_api;
 use super::persistence::{now_ms, persist_job_engine_state};
-use super::state::{InternalJobRecord, JobEngineInner};
+use super::state::JobEngineInner;
 use super::{JobProgress, JobRecord, JobResult, JobStatus, JobSubmission};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
+
+#[path = "execution_retry.rs"]
+mod execution_retry;
+#[path = "execution_runner.rs"]
+mod execution_runner;
+
+pub(crate) use execution_retry::build_retry_submission;
 
 pub(crate) fn emit_job_update(app: &AppHandle, record: &JobRecord) {
     let _ = app.emit("job-updated", record);
@@ -52,26 +58,6 @@ pub(crate) fn public_records(inner: &JobEngineInner) -> Vec<JobRecord> {
     jobs
 }
 
-fn path_parent(path: &str) -> Option<String> {
-    Path::new(path)
-        .parent()
-        .map(|parent| parent.to_string_lossy().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-fn unique_directories(paths: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    let mut values = Vec::new();
-
-    for path in paths {
-        if seen.insert(path.clone()) {
-            values.push(path);
-        }
-    }
-
-    values
-}
-
 async fn execute_job(
     app: &AppHandle,
     inner: &Arc<Mutex<JobEngineInner>>,
@@ -79,231 +65,7 @@ async fn execute_job(
     submission: &JobSubmission,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<JobResult, String> {
-    match submission {
-        JobSubmission::Copy {
-            source_paths,
-            target_path,
-            keep_both,
-            overwrite,
-        } => {
-            let progress_inner = inner.clone();
-            let progress_app = app.clone();
-            let progress_job_id = job_id.to_string();
-            let saved_names = fs_api::copy_files_with_cancel_and_progress(
-                source_paths.clone(),
-                target_path.clone(),
-                *keep_both,
-                *overwrite,
-                Some(cancel_flag),
-                move |progress| {
-                    emit_job_progress_update(
-                        &progress_app,
-                        &progress_inner,
-                        &progress_job_id,
-                        &progress,
-                    );
-                },
-            )
-            .await?;
-
-            let affected_directories = unique_directories(
-                source_paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_path.clone())),
-            );
-
-            Ok(JobResult {
-                affected_directories,
-                affected_entry_paths: source_paths.clone(),
-                archive_path: None,
-                saved_names,
-            })
-        }
-        JobSubmission::Move {
-            source_paths,
-            target_dir,
-        } => {
-            let progress_inner = inner.clone();
-            let progress_app = app.clone();
-            let progress_job_id = job_id.to_string();
-            fs_api::move_files_with_cancel_and_progress(
-                source_paths.clone(),
-                target_dir.clone(),
-                Some(cancel_flag),
-                move |progress| {
-                    emit_job_progress_update(
-                        &progress_app,
-                        &progress_inner,
-                        &progress_job_id,
-                        &progress,
-                    );
-                },
-            )
-            .await?;
-
-            let affected_directories = unique_directories(
-                source_paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_dir.clone())),
-            );
-
-            Ok(JobResult {
-                affected_directories,
-                affected_entry_paths: source_paths.clone(),
-                archive_path: None,
-                saved_names: Vec::new(),
-            })
-        }
-        JobSubmission::Delete { paths, permanent } => {
-            let progress_inner = inner.clone();
-            let progress_app = app.clone();
-            let progress_job_id = job_id.to_string();
-            fs_api::delete_files_with_cancel_and_progress(
-                paths.clone(),
-                permanent.unwrap_or(false),
-                Some(cancel_flag),
-                move |progress| {
-                    emit_job_progress_update(
-                        &progress_app,
-                        &progress_inner,
-                        &progress_job_id,
-                        &progress,
-                    );
-                },
-            )
-            .await?;
-
-            let affected_directories =
-                unique_directories(paths.iter().filter_map(|path| path_parent(path)));
-
-            Ok(JobResult {
-                affected_directories,
-                affected_entry_paths: paths.clone(),
-                archive_path: None,
-                saved_names: Vec::new(),
-            })
-        }
-        JobSubmission::ZipDirectory { path } => {
-            cancel_flag.store(false, Ordering::SeqCst);
-            let archive_path = fs_api::create_zip(app.clone(), path.clone()).await?;
-            let affected_directories = unique_directories(
-                path_parent(path)
-                    .into_iter()
-                    .chain(path_parent(&archive_path)),
-            );
-
-            Ok(JobResult {
-                affected_directories,
-                affected_entry_paths: vec![path.clone()],
-                archive_path: Some(archive_path),
-                saved_names: Vec::new(),
-            })
-        }
-        JobSubmission::ZipSelection {
-            paths,
-            target_dir,
-            archive_name,
-        } => {
-            cancel_flag.store(false, Ordering::SeqCst);
-            let archive_path = fs_api::create_zip_from_paths(
-                app.clone(),
-                paths.clone(),
-                target_dir.clone(),
-                archive_name.clone(),
-            )
-            .await?;
-
-            let affected_directories = unique_directories(
-                paths
-                    .iter()
-                    .filter_map(|path| path_parent(path))
-                    .chain(std::iter::once(target_dir.clone())),
-            );
-
-            Ok(JobResult {
-                affected_directories,
-                affected_entry_paths: paths.clone(),
-                archive_path: Some(archive_path),
-                saved_names: Vec::new(),
-            })
-        }
-    }
-}
-
-pub(crate) fn build_retry_submission(job: &InternalJobRecord) -> Result<JobSubmission, String> {
-    let completed_items = usize::try_from(job.record.progress.current).unwrap_or(usize::MAX);
-
-    match &job.submission {
-        JobSubmission::Copy {
-            source_paths,
-            target_path,
-            keep_both,
-            overwrite,
-        } => {
-            let remaining = source_paths
-                .iter()
-                .skip(completed_items)
-                .cloned()
-                .collect::<Vec<String>>();
-            if remaining.is_empty() {
-                return Err("No remaining items to retry.".to_string());
-            }
-
-            Ok(JobSubmission::Copy {
-                source_paths: remaining,
-                target_path: target_path.clone(),
-                keep_both: *keep_both,
-                overwrite: *overwrite,
-            })
-        }
-        JobSubmission::Move {
-            source_paths,
-            target_dir,
-        } => {
-            let remaining = source_paths
-                .iter()
-                .skip(completed_items)
-                .cloned()
-                .collect::<Vec<String>>();
-            if remaining.is_empty() {
-                return Err("No remaining items to retry.".to_string());
-            }
-
-            Ok(JobSubmission::Move {
-                source_paths: remaining,
-                target_dir: target_dir.clone(),
-            })
-        }
-        JobSubmission::Delete { paths, permanent } => {
-            let remaining = paths
-                .iter()
-                .skip(completed_items)
-                .cloned()
-                .collect::<Vec<String>>();
-            if remaining.is_empty() {
-                return Err("No remaining items to retry.".to_string());
-            }
-
-            Ok(JobSubmission::Delete {
-                paths: remaining,
-                permanent: *permanent,
-            })
-        }
-        JobSubmission::ZipDirectory { path } => {
-            Ok(JobSubmission::ZipDirectory { path: path.clone() })
-        }
-        JobSubmission::ZipSelection {
-            paths,
-            target_dir,
-            archive_name,
-        } => Ok(JobSubmission::ZipSelection {
-            paths: paths.clone(),
-            target_dir: target_dir.clone(),
-            archive_name: archive_name.clone(),
-        }),
-    }
+    execution_runner::execute_job(app, inner, job_id, submission, cancel_flag).await
 }
 
 pub(crate) fn schedule_next_job(app: AppHandle, inner: Arc<Mutex<JobEngineInner>>) {

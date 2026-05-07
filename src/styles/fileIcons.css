@@ -1,0 +1,384 @@
+.theme-selection-text {
+  color: var(--selection-text-color);
+}
+
+.theme-tc-folder-shell,
+.theme-tc-icon-slot,
+.theme-file-thumbnail-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+}
+
+.theme-tc-folder-shell,
+.theme-tc-icon-slot {
+  position: relative;
+}
+
+.theme-tc-folder-shell {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.34));
+}
+
+.theme-tc-folder-parent-shell,
+.theme-tc-folder-app-shell {
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.theme-tc-icon-slot {
+  --tc-file-accent: var(--file-default-color);
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--file-page-color);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px color-mix(
+      in srgb,
+      var(--file-page-border-color) 46%,
+      white
+    ),
+    0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.theme-tc-slot-hidden-file {
+  filter: grayscale(0.55) opacity(0.72);
+}
+
+.theme-tc-type-document,
+.theme-tc-type-code {
+  --tc-file-accent: var(--file-document-color);
+}
+
+.theme-tc-type-config {
+  --tc-file-accent: var(--file-config-color);
+}
+
+.theme-tc-type-spreadsheet {
+  --tc-file-accent: var(--file-spreadsheet-color);
+}
+
+.theme-tc-type-presentation,
+.theme-tc-slot-archive-file {
+  --tc-file-accent: var(--file-archive-color);
+}
+
+.theme-tc-type-data {
+  --tc-file-accent: var(--file-data-color);
+}
+
+.theme-tc-type-image {
+  --tc-file-accent: var(--file-image-color);
+}
+
+.theme-tc-type-media {
+  --tc-file-accent: var(--file-audio-color);
+}
+
+.theme-tc-icon-slot > svg {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  transform: none;
+}
+
+.theme-tc-file-glyph-standard,
+.theme-tc-file-glyph-associated,
+.theme-tc-file-glyph-hidden {
+  color: var(--file-default-color);
+}
+
+.theme-tc-file-glyph-text {
+  color: var(--file-document-color);
+}
+
+.theme-tc-file-glyph-archive,
+.theme-tc-file-glyph-program {
+  color: color-mix(in srgb, var(--tc-file-accent) 82%, black);
+}
+
+.theme-tc-overlay {
+  position: absolute;
+  z-index: 4;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--file-page-color);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.theme-tc-overlay-hidden {
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, #c8ccd2 0 45%, #6a7280 45% 100%);
+}
+
+.theme-tc-extension-label {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tc-ext-bg, var(--file-default-color));
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 8px;
+  text-align: center;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.theme-tc-ext-document {
+  --tc-ext-bg: #1d4ed8;
+}
+
+.theme-tc-ext-txt {
+  --tc-ext-bg: #374151;
+}
+
+.theme-tc-ext-md {
+  --tc-ext-bg: #111827;
+}
+
+.theme-tc-ext-doc {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-pdf {
+  --tc-ext-bg: #d71920;
+}
+
+.theme-tc-ext-xls {
+  --tc-ext-bg: #0f8a3b;
+}
+
+.theme-tc-ext-ppt {
+  --tc-ext-bg: #d97706;
+}
+
+.theme-tc-ext-data,
+.theme-tc-ext-csv {
+  --tc-ext-bg: #0891b2;
+}
+
+.theme-tc-ext-db,
+.theme-tc-ext-sql {
+  --tc-ext-bg: #0f766e;
+}
+
+.theme-tc-ext-image,
+.theme-tc-ext-jpg,
+.theme-tc-ext-webp {
+  --tc-ext-bg: #0284c7;
+}
+
+.theme-tc-ext-png {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-gif {
+  --tc-ext-bg: #c026d3;
+}
+
+.theme-tc-ext-svg {
+  --tc-ext-bg: #f97316;
+}
+
+.theme-tc-ext-archive,
+.theme-tc-ext-zip {
+  --tc-ext-bg: #ca8a04;
+}
+
+.theme-tc-ext-rar {
+  --tc-ext-bg: #7c3aed;
+}
+
+.theme-tc-ext-7z {
+  --tc-ext-bg: #92400e;
+}
+
+.theme-tc-ext-tar {
+  --tc-ext-bg: #a16207;
+}
+
+.theme-tc-ext-code,
+.theme-tc-ext-ts {
+  --tc-ext-bg: #3178c6;
+}
+
+.theme-tc-ext-js {
+  --tc-ext-bg: #b88700;
+}
+
+.theme-tc-ext-json {
+  --tc-ext-bg: #7c2d12;
+}
+
+.theme-tc-ext-py {
+  --tc-ext-bg: #3776ab;
+}
+
+.theme-tc-ext-rs {
+  --tc-ext-bg: #b7410e;
+}
+
+.theme-tc-ext-go {
+  --tc-ext-bg: #00add8;
+}
+
+.theme-tc-ext-java {
+  --tc-ext-bg: #b07219;
+}
+
+.theme-tc-ext-rb {
+  --tc-ext-bg: #cc342d;
+}
+
+.theme-tc-ext-php {
+  --tc-ext-bg: #4f5d95;
+}
+
+.theme-tc-ext-swift {
+  --tc-ext-bg: #f05138;
+}
+
+.theme-tc-ext-c {
+  --tc-ext-bg: #5555aa;
+}
+
+.theme-tc-ext-cs {
+  --tc-ext-bg: #178600;
+}
+
+.theme-tc-ext-html {
+  --tc-ext-bg: #e34c26;
+}
+
+.theme-tc-ext-css {
+  --tc-ext-bg: #563d7c;
+}
+
+.theme-tc-ext-shell {
+  --tc-ext-bg: #16a34a;
+}
+
+.theme-tc-ext-config {
+  --tc-ext-bg: #5b6572;
+}
+
+.theme-tc-ext-env {
+  --tc-ext-bg: #4b5563;
+}
+
+.theme-tc-ext-yaml {
+  --tc-ext-bg: #cb171e;
+}
+
+.theme-tc-ext-toml {
+  --tc-ext-bg: #8b5e34;
+}
+
+.theme-tc-ext-lock,
+.theme-tc-ext-bin {
+  --tc-ext-bg: #475569;
+}
+
+.theme-tc-ext-audio {
+  --tc-ext-bg: #7e22ce;
+}
+
+.theme-tc-ext-mp3 {
+  --tc-ext-bg: #9333ea;
+}
+
+.theme-tc-ext-video {
+  --tc-ext-bg: #3730a3;
+}
+
+.theme-tc-ext-mp4 {
+  --tc-ext-bg: #4f46e5;
+}
+
+.theme-tc-ext-program,
+.theme-tc-ext-app {
+  --tc-ext-bg: #b36b00;
+}
+
+.theme-tc-ext-mac {
+  --tc-ext-bg: #64748b;
+}
+
+.theme-tc-ext-win {
+  --tc-ext-bg: #0078d4;
+}
+
+.theme-tc-ext-linux {
+  --tc-ext-bg: #ca8a04;
+}
+
+.theme-tc-file-name {
+  color: var(--text-primary);
+}
+
+.theme-tc-folder-name {
+  color: var(--folder-name-color);
+}
+
+.theme-tc-hidden-name {
+  color: var(--hidden-text-color);
+}
+
+.theme-folder-icon {
+  color: var(--folder-color);
+}
+
+.theme-folder-open-icon {
+  color: var(--folder-open-color);
+}
+
+.theme-folder-hidden-icon {
+  color: var(--folder-hidden-color);
+}
+
+.theme-folder-parent-icon {
+  color: var(--folder-parent-color);
+}
+
+.theme-folder-app-bundle-icon {
+  color: var(--folder-app-bundle-color);
+}
+
+.theme-folder-name {
+  color: var(--folder-name-color);
+}
+
+.theme-folder-open-name {
+  color: var(--folder-open-name-color);
+}
+
+.theme-folder-hidden-name {
+  color: var(--folder-hidden-name-color);
+}
+
+.theme-folder-parent-name {
+  color: var(--folder-parent-name-color);
+}
+
+.theme-folder-app-bundle-name {
+  color: var(--folder-app-bundle-name-color);
+}
+
+.theme-hidden-text {
+  color: var(--hidden-text-color);
+}

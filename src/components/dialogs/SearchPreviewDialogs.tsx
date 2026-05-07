@@ -1,44 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Resizable } from "re-resizable";
-import {
-  getErrorMessage,
-  type SearchResult,
-  useFileSystem,
-} from "../../hooks/useFileSystem";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import { useDialogStore } from "../../store/dialogStore";
-import {
-  refreshPanelsForDirectories,
-  refreshPanelsForEntryPaths,
-} from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
-import type { SearchOptions } from "../../types/search";
-import { getPathDirectoryName } from "../../utils/path";
-import {
-  SearchOperationDialog,
-  type SearchOperation,
-} from "./SearchOperationDialog";
-import {
-  SearchOptionsFields,
-  type SearchOptionChange,
-} from "./SearchOptionsFields";
+import { SearchOperationDialog } from "./SearchOperationDialog";
+import { SearchOptionsFields } from "./SearchOptionsFields";
+import { SearchQueryBar } from "./SearchQueryBar";
 import { SearchResultsPanel } from "./SearchResultsPanel";
-import { createDefaultSearchOptions } from "./searchOptions";
-import {
-  collapseSearchResults,
-  filterRemovedSearchResults,
-  getPanelAccessPath,
-  resolveSearchOperationTarget,
-} from "./searchPreviewOperations";
+import { useSearchExecution } from "./useSearchExecution";
+import { usePersistentDialogSize } from "./usePersistentDialogSize";
+import { useSearchResultOperations } from "./useSearchResultOperations";
+import { useSearchResultSelection } from "./useSearchResultSelection";
 
 const SEARCH_DIALOG_SIZE_KEY = "mycommander:search-dialog-size";
 const DEFAULT_DIALOG_SIZE = { width: 700, height: 560 };
-
-const formatCopyConflictError = (conflicts: string[]) => {
-  const preview = conflicts.slice(0, 3).join(", ");
-  const suffix = conflicts.length > 3 ? ` and ${conflicts.length - 3} more` : "";
-  return `Copy target has conflicting item name(s): ${preview}${suffix}`;
-};
 
 export const SearchPreviewDialogs: React.FC = () => {
   const { openDialog, closeDialog } = useDialogStore();
@@ -50,235 +26,63 @@ export const SearchPreviewDialogs: React.FC = () => {
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
 
-  const [searchOptions, setSearchOptions] = useState<SearchOptions>(
-    createDefaultSearchOptions
+  const {
+    searchOptions,
+    showAdvancedOptions,
+    searchResults,
+    isSearching,
+    searchProgress,
+    searchError,
+    setSearchError,
+    resetSearchExecution,
+    updateSearchOption,
+    toggleAdvancedOptions,
+    removeResultsFromList,
+    handleSearch,
+  } = useSearchExecution({
+    activePanel,
+    fs,
+  });
+  const {
+    selectedSearchPaths,
+    clearSearchSelection,
+    selectAllSearchResults,
+    toggleSearchResultSelection,
+    getSelectedSearchResults,
+  } = useSearchResultSelection(searchResults);
+  const { dialogSize, resizeDialog } = usePersistentDialogSize(
+    SEARCH_DIALOG_SIZE_KEY,
+    DEFAULT_DIALOG_SIZE
   );
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [selectedSearchPaths, setSelectedSearchPaths] = useState<Set<string>>(
-    new Set()
-  );
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchProgress, setSearchProgress] = useState("");
-  const [isDeletingSearchResults, setIsDeletingSearchResults] = useState(false);
-  const [searchOperation, setSearchOperation] = useState<SearchOperation | null>(
-    null
-  );
-  const [searchOperationTarget, setSearchOperationTarget] = useState("");
-  const [isApplyingSearchOperation, setIsApplyingSearchOperation] =
-    useState(false);
-  const [searchOperationError, setSearchOperationError] = useState<string | null>(
-    null
-  );
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [dialogSize, setDialogSize] = useState<{ width: number; height: number }>(
-    () => {
-      try {
-        const saved = localStorage.getItem(SEARCH_DIALOG_SIZE_KEY);
-        if (saved) return JSON.parse(saved) as { width: number; height: number };
-      } catch {
-        // ignore storage parse failure
-      }
-      return DEFAULT_DIALOG_SIZE;
-    }
-  );
+
+  const {
+    isDeletingSearchResults,
+    searchOperation,
+    searchOperationTarget,
+    isApplyingSearchOperation,
+    searchOperationError,
+    resetSearchOperation,
+    openSearchOperationDialog,
+    closeSearchOperationDialog,
+    handleDeleteSearchResults,
+    handleSearchOperation,
+    updateSearchOperationTarget,
+  } = useSearchResultOperations({
+    selectedCount: selectedSearchPaths.size,
+    getSelectedSearchResults,
+    clearSearchSelection,
+    removeResultsFromList,
+    targetPanel,
+    fs,
+    setSearchError,
+  });
 
   useEffect(() => {
     if (openDialog !== "search") {
-      setSearchOptions(createDefaultSearchOptions());
-      setShowAdvancedOptions(false);
-      setSearchError(null);
-      setSearchResults([]);
-      setSelectedSearchPaths(new Set());
-      setSearchOperation(null);
-      setSearchOperationTarget("");
-      setSearchOperationError(null);
-      setSearchProgress("");
+      resetSearchExecution();
+      resetSearchOperation();
     }
-  }, [openDialog]);
-
-  const handleSearch = async () => {
-    const query = searchOptions.query.trim();
-    if (!query) return;
-
-    setIsSearching(true);
-    setSearchResults([]);
-    setSelectedSearchPaths(new Set());
-    setSearchError(null);
-    setSearchProgress("");
-
-    try {
-      await fs.searchFiles(
-        getPanelAccessPath(activePanel),
-        {
-          ...searchOptions,
-          query,
-        },
-        (event) => {
-          if (event.type === "ResultBatch") {
-            setSearchResults((current) => [...current, ...event.payload]);
-          } else if (event.type === "Progress") {
-            setSearchProgress(event.payload.current_dir);
-          } else if (event.type === "Finished") {
-            setIsSearching(false);
-            setSearchProgress("");
-          }
-        }
-      );
-    } catch (error) {
-      console.error(error);
-      setSearchError(getErrorMessage(error, "Search failed."));
-      setIsSearching(false);
-      setSearchProgress("");
-    }
-  };
-
-  const toggleSearchResultSelection = (path: string) => {
-    setSelectedSearchPaths((current) => {
-      const next = new Set(current);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  };
-
-  const handleSelectAllSearchResults = () => {
-    setSelectedSearchPaths(new Set(searchResults.map((result) => result.path)));
-  };
-
-  const handleClearSearchSelection = () => {
-    setSelectedSearchPaths(new Set());
-  };
-
-  const getSelectedSearchResults = () =>
-    searchResults.filter((result) => selectedSearchPaths.has(result.path));
-
-  const removeResultsFromList = (removedResults: SearchResult[]) => {
-    setSearchResults((current) =>
-      filterRemovedSearchResults(current, removedResults)
-    );
-  };
-
-  const openSearchOperationDialog = (operation: SearchOperation) => {
-    if (selectedSearchPaths.size === 0) {
-      return;
-    }
-
-    setSearchOperation(operation);
-    setSearchOperationTarget(targetPanel.currentPath);
-    setSearchOperationError(null);
-  };
-
-  const closeSearchOperationDialog = () => {
-    if (isApplyingSearchOperation) {
-      return;
-    }
-
-    setSearchOperation(null);
-    setSearchOperationTarget("");
-    setSearchOperationError(null);
-  };
-
-  const handleDeleteSearchResults = async () => {
-    const selectedResults = collapseSearchResults(getSelectedSearchResults());
-
-    if (selectedResults.length === 0) {
-      return;
-    }
-
-    try {
-      setIsDeletingSearchResults(true);
-      setSearchError(null);
-      await fs.deleteFiles(
-        selectedResults.map((result) => result.path),
-        false
-      );
-
-      removeResultsFromList(selectedResults);
-      setSelectedSearchPaths(new Set());
-      refreshPanelsForEntryPaths(selectedResults.map((result) => result.path));
-    } catch (error) {
-      console.error(error);
-      setSearchError(
-        getErrorMessage(error, "Failed to delete selected search results.")
-      );
-    } finally {
-      setIsDeletingSearchResults(false);
-    }
-  };
-
-  const handleSearchOperation = async () => {
-    if (!searchOperation) {
-      return;
-    }
-
-    const selectedResults = collapseSearchResults(getSelectedSearchResults());
-    const trimmedTarget = searchOperationTarget.trim();
-    if (selectedResults.length === 0 || !trimmedTarget) {
-      return;
-    }
-
-    const resolvedTarget = resolveSearchOperationTarget(
-      trimmedTarget,
-      targetPanel
-    );
-
-    try {
-      setIsApplyingSearchOperation(true);
-      setSearchOperationError(null);
-
-      const selectedPaths = selectedResults.map((result) => result.path);
-
-      if (searchOperation === "copy") {
-        const conflicts = await fs.checkCopyConflicts(selectedPaths, resolvedTarget);
-        if (conflicts.length > 0) {
-          setSearchOperationError(formatCopyConflictError(conflicts));
-          return;
-        }
-
-        await fs.copyFiles(selectedPaths, resolvedTarget);
-      } else {
-        await fs.moveFiles(selectedPaths, resolvedTarget);
-        removeResultsFromList(selectedResults);
-        setSelectedSearchPaths(new Set());
-      }
-
-      refreshPanelsForDirectories([
-        resolvedTarget,
-        ...selectedResults.map((result) => getPathDirectoryName(result.path)),
-      ]);
-      closeSearchOperationDialog();
-    } catch (error) {
-      console.error(error);
-      setSearchOperationError(
-        getErrorMessage(
-          error,
-          searchOperation === "copy"
-            ? "Failed to copy selected search results."
-            : "Failed to move selected search results."
-        )
-      );
-    } finally {
-      setIsApplyingSearchOperation(false);
-    }
-  };
-
-  const updateSearchOption: SearchOptionChange = (key, value) => {
-    setSearchOptions((current) => ({
-      ...current,
-      [key]: value,
-    }));
-  };
-
-  const updateSearchOperationTarget = (target: string) => {
-    setSearchOperationTarget(target);
-    if (searchOperationError) {
-      setSearchOperationError(null);
-    }
-  };
+  }, [openDialog, resetSearchExecution, resetSearchOperation]);
 
   return (
     <>
@@ -303,19 +107,7 @@ export const SearchPreviewDialogs: React.FC = () => {
                 bottomLeft: false,
               }}
               onResizeStop={(_event, _direction, _ref, delta) => {
-                const newSize = {
-                  width: dialogSize.width + delta.width,
-                  height: dialogSize.height + delta.height,
-                };
-                setDialogSize(newSize);
-                try {
-                  localStorage.setItem(
-                    SEARCH_DIALOG_SIZE_KEY,
-                    JSON.stringify(newSize)
-                  );
-                } catch {
-                  // ignore storage failure
-                }
+                resizeDialog(delta);
               }}
               handleComponent={{
                 bottomRight: (
@@ -340,39 +132,14 @@ export const SearchPreviewDialogs: React.FC = () => {
                   Search in {activePanel.currentPath}
                 </Dialog.Title>
 
-                <div className="flex gap-2 mb-3">
-                  <input
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    value={searchOptions.query}
-                    onChange={(event) =>
-                      updateSearchOption("query", event.target.value)
-                    }
-                    onKeyDown={(event) =>
-                      event.key === "Enter" && void handleSearch()
-                    }
-                    placeholder="Find files..."
-                    className="flex-1 bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvancedOptions((current) => !current)}
-                    className="px-3 py-1.5 text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color"
-                    aria-expanded={showAdvancedOptions}
-                  >
-                    Advanced
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSearch()}
-                    disabled={isSearching}
-                    className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-selected hover:opacity-90 rounded border border-transparent focus:outline-none focus:ring-1 focus:ring-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSearching ? "Searching..." : "Search"}
-                  </button>
-                </div>
+                <SearchQueryBar
+                  query={searchOptions.query}
+                  showAdvancedOptions={showAdvancedOptions}
+                  isSearching={isSearching}
+                  onQueryChange={(query) => updateSearchOption("query", query)}
+                  onToggleAdvancedOptions={toggleAdvancedOptions}
+                  onSearch={() => void handleSearch(clearSearchSelection)}
+                />
 
                 {showAdvancedOptions ? (
                   <SearchOptionsFields
@@ -389,8 +156,8 @@ export const SearchPreviewDialogs: React.FC = () => {
                   isDeletingSearchResults={isDeletingSearchResults}
                   searchProgress={searchProgress}
                   searchError={searchError}
-                  onSelectAll={handleSelectAllSearchResults}
-                  onClearSelection={handleClearSearchSelection}
+                  onSelectAll={selectAllSearchResults}
+                  onClearSelection={clearSearchSelection}
                   onOpenOperation={openSearchOperationDialog}
                   onDelete={() => void handleDeleteSearchResults()}
                   onToggleSelection={toggleSearchResultSelection}

@@ -77,7 +77,7 @@ const NOTEBOOK_EXTENSIONS = new Set(["ipynb"]);
 const PDF_EXTENSIONS = new Set(["pdf"]);
 const PPTX_EXTENSIONS = new Set(["pptx"]);
 const HWPX_EXTENSIONS = new Set(["hwpx"]);
-const XLSX_EXTENSIONS = new Set(["xlsx", "xls"]);
+const XLSX_EXTENSIONS = new Set(["xlsx"]);
 const DOCX_EXTENSIONS = new Set(["docx"]);
 
 const TEXT_EXTENSIONS = new Set([

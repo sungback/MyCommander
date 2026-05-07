@@ -77,6 +77,37 @@ describe("QuickPreviewDialog status messages", () => {
 
     expect(await screen.findByTitle("렌더링 보기")).toBeInTheDocument();
     expect(mockLoadSourceHighlightHtml).toHaveBeenCalledWith("# Title", "markdown");
-    expect(screen.getByText("# Title")).toBeInTheDocument();
+    const sourceText = screen.getByText("# Title");
+    expect(sourceText).toBeInTheDocument();
+    expect(sourceText.closest("pre")).toHaveClass("select-text");
+    expect(sourceText.closest("code")).toHaveClass("select-text");
+  });
+
+  it("allows selecting plain text preview contents for copy", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "text",
+      content: "copyable text",
+    });
+
+    render(<QuickPreviewDialog />);
+
+    expect((await screen.findByText("copyable text")).closest("pre")).toHaveClass(
+      "select-text"
+    );
+  });
+
+  it("allows selecting highlighted text preview contents for copy", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "text",
+      content: "const answer = 42;",
+      language: "ts",
+      highlightedHtml: '<span class="hljs-keyword">const</span> answer = 42;',
+    });
+
+    render(<QuickPreviewDialog />);
+
+    const highlightedText = await screen.findByText("const");
+    expect(highlightedText.closest("pre")).toHaveClass("select-text");
+    expect(highlightedText.closest("code")).toHaveClass("select-text");
   });
 });

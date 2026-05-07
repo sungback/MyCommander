@@ -1,96 +1,40 @@
 import { create } from "zustand";
-import { FileEntry, PanelState, ViewMode, PanelId, SortField } from "../types/file";
-import { ThemePreference } from "../types/theme";
-import { coalescePanelPath, getPathDirectoryName } from "../utils/path";
 import { readPersistedPanelState } from "./persistence";
 import {
-  applyCachedSizes,
-  cloneTabState,
-  defaultTabState,
-  normalizePathKey,
-  persistVisiblePanelState,
   restorePersistedPanelState,
-  sortEntries,
-  syncPanelWithActiveTab,
-  updateActiveTab,
-  updatePanelEntrySize,
 } from "../utils/panelHelpers";
-
-type PanelViewModes = Record<PanelId, ViewMode>;
-
-
-interface AppState {
-  leftPanel: PanelState;
-  rightPanel: PanelState;
-  sizeCache: Record<string, number>;
-  activePanel: PanelId;
-  showHiddenFiles: boolean;
-  themePreference: ThemePreference;
-  panelViewModes: PanelViewModes;
-  setActivePanel: (panel: PanelId) => void;
-  setShowHiddenFiles: (show: boolean) => void;
-  setThemePreference: (themePreference: ThemePreference) => void;
-  setPanelViewMode: (panel: PanelId, viewMode: ViewMode) => void;
-  addTab: (panel: PanelId) => void;
-  activateTab: (panel: PanelId, tabId: string) => void;
-  closeTab: (panel: PanelId, tabId: string) => void;
-  setPath: (panel: PanelId, path: string, pendingCursorName?: string) => void;
-  setResolvedPath: (panel: PanelId, path: string) => void;
-  goBack: (panel: PanelId) => void;
-  goForward: (panel: PanelId) => void;
-  setFiles: (panel: PanelId, files: FileEntry[]) => void;
-  setSelection: (panel: PanelId, paths: string[]) => void;
-  setPendingCursorName: (panel: PanelId, name: string | null) => void;
-  toggleSelection: (panel: PanelId, path: string) => void;
-  selectOnly: (panel: PanelId, path: string | null) => void;
-  clearSelection: (panel: PanelId) => void;
-  setCursor: (panel: PanelId, index: number) => void;
-  refreshPanel: (panel: PanelId) => void;
-  bumpExpandedChildrenVersion: (panel: PanelId) => void;
-  setSort: (panel: PanelId, field: SortField) => void;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
-  invalidateEntrySizes: (paths: string[]) => void;
-  swapPanels: () => void;
-}
-
-const getPanelKey = (panel: PanelId) => (panel === "left" ? "leftPanel" : "rightPanel");
-
-const getPanelsAfterUpdate = (
-  state: AppState,
-  panel: PanelId,
-  nextPanelState: PanelState
-) => ({
-  leftPanel: panel === "left" ? nextPanelState : state.leftPanel,
-  rightPanel: panel === "right" ? nextPanelState : state.rightPanel,
-});
-
-const persistPanelUpdate = (
-  state: AppState,
-  panel: PanelId,
-  nextPanelState: PanelState
-) => {
-  const { leftPanel, rightPanel } = getPanelsAfterUpdate(
-    state,
-    panel,
-    nextPanelState
-  );
-
-  persistVisiblePanelState(
-    leftPanel,
-    rightPanel,
-    state.activePanel,
-    state.showHiddenFiles,
-    state.themePreference,
-    state.panelViewModes
-  );
-};
+import {
+  activatePanelTab,
+  addTabToPanel,
+  bumpPanelExpandedChildrenVersion,
+  clearPanelSelection,
+  closePanelTab,
+  getPanelKey,
+  invalidateEntrySizesAcrossPanels,
+  navigatePanelHistory,
+  refreshPanelState,
+  selectOnlyInPanel,
+  setPanelCursor,
+  setPanelFiles,
+  setPanelPath,
+  setPanelPendingCursorName,
+  setPanelResolvedPath,
+  setPanelSelection,
+  sortPanelByField,
+  swapPanelLocations,
+  togglePanelSelection,
+  updateEntrySizeAcrossPanels,
+} from "./panelStoreReducers";
+import {
+  persistPanelUpdate,
+  persistPanelVisibilityState,
+  resolvePersistedPanelViewModes,
+} from "./panelStorePersistence";
+import type { AppState } from "./panelStoreTypes";
 
 export const usePanelStore = create<AppState>((set) => {
   const persistedPanelState = readPersistedPanelState();
-  const panelViewModes: PanelViewModes = {
-    left: persistedPanelState.leftViewMode ?? persistedPanelState.viewMode ?? "detailed",
-    right: persistedPanelState.rightViewMode ?? persistedPanelState.viewMode ?? "detailed",
-  };
+  const panelViewModes = resolvePersistedPanelViewModes(persistedPanelState);
 
   return {
     leftPanel: restorePersistedPanelState(
@@ -111,81 +55,34 @@ export const usePanelStore = create<AppState>((set) => {
 
     swapPanels: () =>
       set((state) => {
-        const leftPath = state.leftPanel.currentPath;
-        const rightPath = state.rightPanel.currentPath;
-
-        if (leftPath === rightPath) return state;
-
-        const now = Date.now();
-        const newLeft = updateActiveTab(state.leftPanel, (tab) => ({
-          ...tab,
-          currentPath: rightPath,
-          resolvedPath: rightPath,
-          cursorIndex: 0,
-          selectedItems: new Set<string>(),
-          lastUpdated: now,
-        }));
-        const newRight = updateActiveTab(state.rightPanel, (tab) => ({
-          ...tab,
-          currentPath: leftPath,
-          resolvedPath: leftPath,
-          cursorIndex: 0,
-          selectedItems: new Set<string>(),
-          lastUpdated: now + 1,
-        }));
-        const newViewModes: PanelViewModes = {
-          left: state.panelViewModes.right,
-          right: state.panelViewModes.left,
-        };
-
-        persistVisiblePanelState(
-          newLeft,
-          newRight,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          newViewModes
+        const swappedPanels = swapPanelLocations(
+          state.leftPanel,
+          state.rightPanel,
+          state.panelViewModes
         );
 
-        return { leftPanel: newLeft, rightPanel: newRight, panelViewModes: newViewModes };
+        if (!swappedPanels) return state;
+
+        persistPanelVisibilityState(state, swappedPanels);
+
+        return swappedPanels;
       }),
 
     setActivePanel: (activePanel) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { activePanel });
         return { activePanel };
       }),
 
     setShowHiddenFiles: (showHiddenFiles) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          showHiddenFiles,
-          state.themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { showHiddenFiles });
         return { showHiddenFiles };
       }),
 
     setThemePreference: (themePreference) =>
       set((state) => {
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          themePreference,
-          state.panelViewModes
-        );
+        persistPanelVisibilityState(state, { themePreference });
         return { themePreference };
       }),
 
@@ -195,32 +92,16 @@ export const usePanelStore = create<AppState>((set) => {
           ...state.panelViewModes,
           [panel]: viewMode,
         };
-        persistVisiblePanelState(
-          state.leftPanel,
-          state.rightPanel,
-          state.activePanel,
-          state.showHiddenFiles,
-          state.themePreference,
-          nextPanelViewModes
-        );
+        persistPanelVisibilityState(state, {
+          panelViewModes: nextPanelViewModes,
+        });
         return { panelViewModes: nextPanelViewModes };
       }),
 
     addTab: (panel) =>
       set((state) => {
         const panelKey = getPanelKey(panel);
-        const currentPanel = state[panelKey];
-        const activeTab =
-          currentPanel.tabs.find((tab) => tab.id === currentPanel.activeTabId) ??
-          currentPanel.tabs[0];
-        const nextTab = activeTab
-          ? cloneTabState(activeTab)
-          : defaultTabState(currentPanel.currentPath);
-        const nextPanelState = syncPanelWithActiveTab({
-          ...currentPanel,
-          tabs: [...currentPanel.tabs, nextTab],
-          activeTabId: nextTab.id,
-        });
+        const nextPanelState = addTabToPanel(state[panelKey]);
 
         persistPanelUpdate(state, panel, nextPanelState);
 
@@ -232,16 +113,10 @@ export const usePanelStore = create<AppState>((set) => {
     activateTab: (panel, tabId) =>
       set((state) => {
         const panelKey = getPanelKey(panel);
-        const currentPanel = state[panelKey];
-
-        if (!currentPanel.tabs.some((tab) => tab.id === tabId)) {
+        const nextPanelState = activatePanelTab(state[panelKey], tabId);
+        if (!nextPanelState) {
           return {};
         }
-
-        const nextPanelState = syncPanelWithActiveTab({
-          ...currentPanel,
-          activeTabId: tabId,
-        });
 
         persistPanelUpdate(state, panel, nextPanelState);
 
@@ -250,386 +125,204 @@ export const usePanelStore = create<AppState>((set) => {
         };
       }),
 
-  closeTab: (panel, tabId) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const currentPanel = state[panelKey];
-
-      if (currentPanel.tabs.length <= 1) {
-        return {};
-      }
-
-      const tabIndex = currentPanel.tabs.findIndex((tab) => tab.id === tabId);
-      if (tabIndex === -1) {
-        return {};
-      }
-
-      const remainingTabs = currentPanel.tabs.filter((tab) => tab.id !== tabId);
-      const nextActiveTabId =
-        currentPanel.activeTabId === tabId
-          ? (remainingTabs[tabIndex] ?? remainingTabs[tabIndex - 1]).id
-          : currentPanel.activeTabId;
-
-      const nextPanelState = syncPanelWithActiveTab({
-        ...currentPanel,
-        tabs: remainingTabs,
-        activeTabId: nextActiveTabId,
-      });
-
-      persistPanelUpdate(state, panel, nextPanelState);
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setPath: (panel, path, pendingCursorName) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        if (tab.currentPath === path) return tab;
-
-        // Truncate any forward history, then append new path (cap at 100)
-        const prevEntries =
-          tab.historyIndex >= 0 ? tab.history.slice(0, tab.historyIndex + 1) : [];
-        const base = prevEntries.length === 0 ? [tab.currentPath] : prevEntries;
-        const newHistory = [...base, path].slice(-100);
-        return {
-          ...tab,
-          currentPath: path,
-          resolvedPath: path,
-          history: newHistory,
-          historyIndex: newHistory.length - 1,
-          cursorIndex: 0,
-          selectedItems: new Set<string>(),
-          pendingCursorName: pendingCursorName ?? null,
-        };
-      });
-
-      persistPanelUpdate(state, panel, nextPanelState);
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setResolvedPath: (panel, path) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        if (coalescePanelPath(tab.resolvedPath, tab.currentPath) === path) {
-          return tab;
+    closeTab: (panel, tabId) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = closePanelTab(state[panelKey], tabId);
+        if (!nextPanelState) {
+          return {};
         }
 
-        return {
-          ...tab,
-          resolvedPath: coalescePanelPath(path, tab.currentPath),
-        };
-      });
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setFiles: (panel, files) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        const filesWithCachedSizes = applyCachedSizes(files, state.sizeCache);
-        const sortedFiles = sortEntries(filesWithCachedSizes, tab.sortField, tab.sortDirection);
-
-        let cursorIndex = tab.cursorIndex;
-        if (tab.pendingCursorName) {
-          const idx = sortedFiles.findIndex((f) => f.name === tab.pendingCursorName);
-          if (idx !== -1) cursorIndex = idx;
-        }
+        persistPanelUpdate(state, panel, nextPanelState);
 
         return {
-          ...tab,
-          files: sortedFiles,
-          cursorIndex,
-          pendingCursorName: null,
+          [panelKey]: nextPanelState,
         };
-      });
+      }),
 
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
+    setPath: (panel, path, pendingCursorName) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelPath(
+          state[panelKey],
+          path,
+          pendingCursorName
+        );
 
-  setSelection: (panel, paths) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        selectedItems: new Set(paths),
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setPendingCursorName: (panel, name) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        pendingCursorName: name,
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  toggleSelection: (panel, path) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        const newSelection = new Set(tab.selectedItems);
-        if (newSelection.has(path)) {
-          newSelection.delete(path);
-        } else {
-          newSelection.add(path);
-        }
+        persistPanelUpdate(state, panel, nextPanelState);
 
         return {
-          ...tab,
-          selectedItems: newSelection,
+          [panelKey]: nextPanelState,
         };
-      });
+      }),
 
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  selectOnly: (panel, path) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        selectedItems: path ? new Set([path]) : new Set(),
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  clearSelection: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        selectedItems: new Set(),
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setCursor: (panel, cursorIndex) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        cursorIndex,
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  refreshPanel: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        lastUpdated: Date.now(),
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  bumpExpandedChildrenVersion: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => ({
-        ...tab,
-        expandedChildrenVersion: tab.expandedChildrenVersion + 1,
-      }));
-
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
-
-  setSort: (panel, field) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const nextPanelState = updateActiveTab(state[panelKey], (tab) => {
-        const newDirection =
-          tab.sortField === field && tab.sortDirection === "asc" ? "desc" : "asc";
+    setResolvedPath: (panel, path) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelResolvedPath(state[panelKey], path);
 
         return {
-          ...tab,
-          sortField: field,
-          sortDirection: newDirection,
-          files: sortEntries(tab.files, field, newDirection),
-          cursorIndex: 0,
+          [panelKey]: nextPanelState,
         };
-      });
+      }),
 
-      persistPanelUpdate(state, panel, nextPanelState);
+    setFiles: (panel, files) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelFiles(
+          state[panelKey],
+          files,
+          state.sizeCache
+        );
 
-      return {
-        [panelKey]: nextPanelState,
-      };
-    }),
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-  goBack: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const currentPanel = state[panelKey];
-      const activeTab = currentPanel.tabs.find((t) => t.id === currentPanel.activeTabId);
-      if (!activeTab || activeTab.historyIndex <= 0) return state;
+    setSelection: (panel, paths) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelSelection(state[panelKey], paths);
 
-      const newIndex = activeTab.historyIndex - 1;
-      const newPath = activeTab.history[newIndex];
-      if (!newPath) return state;
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      const nextPanelState = updateActiveTab(currentPanel, (tab) => ({
-        ...tab,
-        currentPath: newPath,
-        resolvedPath: newPath,
-        historyIndex: newIndex,
-        cursorIndex: 0,
-        selectedItems: new Set<string>(),
-        pendingCursorName: null,
-      }));
+    setPendingCursorName: (panel, name) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelPendingCursorName(state[panelKey], name);
 
-      persistPanelUpdate(state, panel, nextPanelState);
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      return { [panelKey]: nextPanelState };
-    }),
+    toggleSelection: (panel, path) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = togglePanelSelection(state[panelKey], path);
 
-  goForward: (panel) =>
-    set((state) => {
-      const panelKey = getPanelKey(panel);
-      const currentPanel = state[panelKey];
-      const activeTab = currentPanel.tabs.find((t) => t.id === currentPanel.activeTabId);
-      if (!activeTab || activeTab.historyIndex >= activeTab.history.length - 1) return state;
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      const newIndex = activeTab.historyIndex + 1;
-      const newPath = activeTab.history[newIndex];
-      if (!newPath) return state;
+    selectOnly: (panel, path) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = selectOnlyInPanel(state[panelKey], path);
 
-      const nextPanelState = updateActiveTab(currentPanel, (tab) => ({
-        ...tab,
-        currentPath: newPath,
-        resolvedPath: newPath,
-        historyIndex: newIndex,
-        cursorIndex: 0,
-        selectedItems: new Set<string>(),
-        pendingCursorName: null,
-      }));
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      persistPanelUpdate(state, panel, nextPanelState);
+    clearSelection: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = clearPanelSelection(state[panelKey]);
 
-      return { [panelKey]: nextPanelState };
-    }),
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-  updateEntrySize: (_panel, path, size) =>
-    set((state) => {
-      const normPath = normalizePathKey(path);
+    setCursor: (panel, cursorIndex) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = setPanelCursor(state[panelKey], cursorIndex);
 
-      return {
-        sizeCache: {
-          ...state.sizeCache,
-          [normPath]: size,
-        },
-        leftPanel: updatePanelEntrySize(state.leftPanel, normPath, size),
-        rightPanel: updatePanelEntrySize(state.rightPanel, normPath, size),
-      };
-    }),
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-  invalidateEntrySizes: (paths) =>
-    set((state) => {
-      const pathsToInvalidate = new Set<string>();
+    refreshPanel: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = refreshPanelState(state[panelKey]);
 
-      for (const path of paths) {
-        if (!path) continue;
-        const norm = normalizePathKey(path);
-        pathsToInvalidate.add(norm);
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-        let current = path;
-        let parent = getPathDirectoryName(current);
-        while (parent && parent !== current) {
-          pathsToInvalidate.add(normalizePathKey(parent));
-          current = parent;
-          parent = getPathDirectoryName(current);
-        }
-      }
+    bumpExpandedChildrenVersion: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = bumpPanelExpandedChildrenVersion(state[panelKey]);
 
-      if (pathsToInvalidate.size === 0) return state;
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-      let changedSizeCache = false;
-      const nextSizeCache = { ...state.sizeCache };
+    setSort: (panel, field) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = sortPanelByField(state[panelKey], field);
 
-      for (const path of pathsToInvalidate) {
-        if (nextSizeCache[path] !== undefined) {
-          delete nextSizeCache[path];
-          changedSizeCache = true;
-        }
-      }
+        persistPanelUpdate(state, panel, nextPanelState);
 
-      const removeSizesFromPanel = (panelState: PanelState): PanelState => {
-        let panelChanged = false;
-        const tabs = panelState.tabs.map((tab) => {
-          let tabChanged = false;
-          const files = tab.files.map((entry) => {
-            if (
-              entry.kind === "directory" &&
-              pathsToInvalidate.has(normalizePathKey(entry.path)) &&
-              entry.size !== undefined
-            ) {
-              tabChanged = true;
-              panelChanged = true;
-              return { ...entry, size: undefined };
-            }
-            return entry;
-          });
-          return tabChanged ? { ...tab, files } : tab;
-        });
+        return {
+          [panelKey]: nextPanelState,
+        };
+      }),
 
-        return panelChanged
-          ? syncPanelWithActiveTab({ ...panelState, tabs })
-          : panelState;
-      };
+    goBack: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = navigatePanelHistory(state[panelKey], -1);
+        if (!nextPanelState) return state;
 
-      const nextLeft = removeSizesFromPanel(state.leftPanel);
-      const nextRight = removeSizesFromPanel(state.rightPanel);
+        persistPanelUpdate(state, panel, nextPanelState);
 
-      if (
-        !changedSizeCache &&
-        nextLeft === state.leftPanel &&
-        nextRight === state.rightPanel
-      ) {
-        return state;
-      }
+        return { [panelKey]: nextPanelState };
+      }),
 
-      return {
-        sizeCache: nextSizeCache,
-        leftPanel: nextLeft,
-        rightPanel: nextRight,
-      };
-    }),
+    goForward: (panel) =>
+      set((state) => {
+        const panelKey = getPanelKey(panel);
+        const nextPanelState = navigatePanelHistory(state[panelKey], 1);
+        if (!nextPanelState) return state;
+
+        persistPanelUpdate(state, panel, nextPanelState);
+
+        return { [panelKey]: nextPanelState };
+      }),
+
+    updateEntrySize: (_panel, path, size) =>
+      set((state) => {
+        const nextPanels = updateEntrySizeAcrossPanels(
+          state.leftPanel,
+          state.rightPanel,
+          path,
+          size
+        );
+
+        return {
+          sizeCache: {
+            ...state.sizeCache,
+            [nextPanels.normalizedPath]: size,
+          },
+          leftPanel: nextPanels.leftPanel,
+          rightPanel: nextPanels.rightPanel,
+        };
+      }),
+
+    invalidateEntrySizes: (paths) =>
+      set((state) => {
+        return (
+          invalidateEntrySizesAcrossPanels(
+            state.leftPanel,
+            state.rightPanel,
+            state.sizeCache,
+            paths
+          ) ?? state
+        );
+      }),
   };
 });

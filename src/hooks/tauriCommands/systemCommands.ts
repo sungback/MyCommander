@@ -16,6 +16,7 @@ export interface ShowContextMenuRequest {
   y: number;
   hasTargetItem: boolean;
   canRename: boolean;
+  canNormalizeFilename: boolean;
   canCreateZip: boolean;
   canExtractZip: boolean;
 }
@@ -101,6 +102,7 @@ export const systemCommands = {
         y: request.y,
         has_target_item: request.hasTargetItem,
         can_rename: request.canRename,
+        can_normalize_filename: request.canNormalizeFilename,
         can_create_zip: request.canCreateZip,
         can_extract_zip: request.canExtractZip,
       },

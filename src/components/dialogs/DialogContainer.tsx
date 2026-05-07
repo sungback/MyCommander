@@ -1,11 +1,8 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
+import React from "react";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
-import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
-import type { FileType } from "../../types/file";
-import { getPathDirectoryName, joinPath } from "../../utils/path";
 import { BaseDialog } from "./BaseDialog";
 import { CopyConflictDialog } from "./CopyConflictDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
@@ -13,42 +10,15 @@ import { QuickPreviewDialog } from "./QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import {
   getDragCopyTargetPath,
-  getPanelAccessPath,
-  getPathBaseName,
   getSelectedItemsText,
   getSelectedPaths,
 } from "./dialogTargetPath";
+import { useBasicFileOperationHandlers } from "./useBasicFileOperationHandlers";
 import { useCopyMoveFlow } from "./useCopyMoveFlow";
 import { useDialogInfo } from "./useDialogInfo";
+import { useDialogInputState } from "./useDialogInputState";
 
-export const getRenameSelectionEnd = (name: string, kind: FileType = "file") => {
-  if (!name) {
-    return 0;
-  }
-
-  if (kind === "directory") {
-    return name.length;
-  }
-
-  if (!name.includes(".")) {
-    return name.length;
-  }
-
-  if (name.startsWith(".") && name.indexOf(".", 1) === -1) {
-    return name.length;
-  }
-
-  const extensionIndex = name.lastIndexOf(".");
-  if (extensionIndex <= 0) {
-    return name.length;
-  }
-
-  return extensionIndex;
-};
-
-const selectRenameText = (input: HTMLInputElement, kind: FileType = "file") => {
-  input.setSelectionRange(0, getRenameSelectionEnd(input.value, kind));
-};
+export { getRenameSelectionEnd } from "./useDialogInputState";
 
 export const DialogContainer: React.FC = () => {
   const {
@@ -69,9 +39,6 @@ export const DialogContainer: React.FC = () => {
 
   const fs = useFileSystem();
 
-  const [inputValue, setInputValue] = useState("");
-  const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const appliedRenameSelectionKeyRef = useRef<string | null>(null);
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const targetPanel = activePanelId === "left" ? rightPanel : leftPanel;
   const dragCopyTargetPath = getDragCopyTargetPath(
@@ -103,6 +70,21 @@ export const DialogContainer: React.FC = () => {
   });
 
   const {
+    inputValue,
+    setInputValue,
+    renameInputRef,
+    handleRenameInputFocus,
+  } = useDialogInputState({
+    openDialog,
+    dialogTarget,
+    dragCopyRequest,
+    dragCopyTargetPath,
+    isPasteMode,
+    activePanel,
+    targetPanel,
+  });
+
+  const {
     operationError,
     setOperationError,
     isSubmitting,
@@ -129,53 +111,6 @@ export const DialogContainer: React.FC = () => {
     closeDialog,
   });
 
-  useLayoutEffect(() => {
-    if (openDialog === "copy" && dragCopyRequest) {
-      setInputValue(dragCopyTargetPath);
-    } else if (openDialog === "copy" || openDialog === "move") {
-      setInputValue(isPasteMode ? activePanel.currentPath : targetPanel.currentPath);
-    } else if (openDialog === "mkdir" || openDialog === "newfile") {
-      setInputValue("");
-    } else if (openDialog === "rename" && dialogTarget) {
-      setInputValue(getPathBaseName(dialogTarget.path));
-    } else {
-      setInputValue("");
-    }
-  }, [
-    activePanel.currentPath,
-    dialogTarget,
-    dragCopyRequest,
-    dragCopyTargetPath,
-    isPasteMode,
-    openDialog,
-    targetPanel.currentPath,
-  ]);
-
-  useEffect(() => {
-    if (openDialog !== "rename" || !dialogTarget) {
-      appliedRenameSelectionKeyRef.current = null;
-    }
-  }, [openDialog, dialogTarget]);
-
-  useEffect(() => {
-    if (openDialog !== "rename" || !dialogTarget || inputValue !== getPathBaseName(dialogTarget.path)) {
-      return;
-    }
-
-    const input = renameInputRef.current;
-    if (!input) {
-      return;
-    }
-
-    const selectionKey = dialogTarget.path;
-    const timeoutId = window.setTimeout(() => {
-      selectRenameText(input, dialogTarget.entry?.kind);
-      appliedRenameSelectionKeyRef.current = selectionKey;
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [dialogTarget, inputValue, openDialog]);
-
   const updateInputValue = (value: string) => {
     setInputValue(value);
     if (operationError) {
@@ -183,83 +118,22 @@ export const DialogContainer: React.FC = () => {
     }
   };
 
-  const handleMkdir = async () => {
-    if (!inputValue) return;
-    try {
-      setIsSubmitting(true);
-      setOperationError(null);
-      const fullPath = joinPath(getPanelAccessPath(activePanel), inputValue);
-      await fs.createDirectory(fullPath);
-      closeDialog();
-      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
-    } catch (e) {
-      console.error(e);
-      setOperationError(getErrorMessage(e, "Failed to create directory."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleNewFile = async () => {
-    if (!inputValue) return;
-    try {
-      setIsSubmitting(true);
-      setOperationError(null);
-      const fullPath = joinPath(getPanelAccessPath(activePanel), inputValue);
-      await fs.createFile(fullPath);
-      closeDialog();
-      refreshPanelsForDirectories([getPanelAccessPath(activePanel)]);
-    } catch (e) {
-      console.error(e);
-      setOperationError(getErrorMessage(e, "Failed to create file."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRename = async () => {
-    if (!dialogTarget || !inputValue.trim()) {
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setOperationError(null);
-      const sourcePath = dialogTarget.path;
-      const targetName = inputValue.trim();
-      const parentPath = getPathDirectoryName(sourcePath);
-      const fullPath = parentPath ? joinPath(parentPath, targetName) : targetName;
-      await fs.renameFile(sourcePath, fullPath);
-      closeDialog();
-      refreshPanelsForDirectories([parentPath]);
-    } catch (e) {
-      console.error(e);
-      setOperationError(getErrorMessage(e, "Failed to rename the selected item."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedPaths.length === 0) return;
-    const deleteTargets = [...selectedPaths];
-    try {
-      setIsSubmitting(true);
-      setOperationError(null);
-      await fs.submitJob({
-        kind: "delete",
-        paths: deleteTargets,
-        permanent: false,
-      });
-      setOpenDialog("progress");
-    } catch (e) {
-      console.error(e);
-      setOpenDialog("delete");
-      setOperationError(getErrorMessage(e, "Failed to delete selected items."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const {
+    handleMkdir,
+    handleNewFile,
+    handleRename,
+    handleDelete,
+  } = useBasicFileOperationHandlers({
+    activePanel,
+    dialogTarget,
+    inputValue,
+    selectedPaths,
+    fs,
+    closeDialog,
+    setOpenDialog,
+    setIsSubmitting,
+    setOperationError,
+  });
 
   return (
     <>
@@ -326,12 +200,7 @@ export const DialogContainer: React.FC = () => {
         <input
           autoFocus
           ref={renameInputRef}
-          onFocus={(e) => {
-            if (appliedRenameSelectionKeyRef.current !== dialogTarget?.path) {
-              selectRenameText(e.target, dialogTarget?.entry?.kind);
-              appliedRenameSelectionKeyRef.current = dialogTarget?.path ?? null;
-            }
-          }}
+          onFocus={(e) => handleRenameInputFocus(e.target)}
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}

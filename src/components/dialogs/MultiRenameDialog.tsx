@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import {
   buildMultiRenamePreview,
-  defaultMultiRenameOptions,
   getBatchRenameOperations,
   MultiRenameCaseMode,
 } from "../../features/multiRename";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
+import { useMultiRenameForm } from "./useMultiRenameForm";
 
 const CASE_MODE_OPTIONS: Array<{ value: MultiRenameCaseMode; label: string }> = [
   { value: "keep", label: "그대로" },
@@ -21,48 +21,27 @@ export const MultiRenameDialog: React.FC = () => {
   const { openDialog, multiRenameSession, closeDialog } = useDialogStore();
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const fs = useFileSystem();
-
-  const [nameMask, setNameMask] = useState(defaultMultiRenameOptions.nameMask);
-  const [extensionMask, setExtensionMask] = useState(defaultMultiRenameOptions.extensionMask);
-  const [searchText, setSearchText] = useState(defaultMultiRenameOptions.searchText);
-  const [replaceText, setReplaceText] = useState(defaultMultiRenameOptions.replaceText);
-  const [caseMode, setCaseMode] = useState<MultiRenameCaseMode>(
-    defaultMultiRenameOptions.caseMode
-  );
-  const [counterStart, setCounterStart] = useState(defaultMultiRenameOptions.counterStart);
-  const [counterStep, setCounterStep] = useState(defaultMultiRenameOptions.counterStep);
-  const [counterPadding, setCounterPadding] = useState(defaultMultiRenameOptions.counterPadding);
-  const [operationError, setOperationError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    options,
+    operationError,
+    isSubmitting,
+    resetForm,
+    updateOption,
+    setOperationError,
+    clearOperationError,
+    setIsSubmitting,
+  } = useMultiRenameForm();
 
   useEffect(() => {
     if (openDialog !== "multirename") {
       return;
     }
 
-    setNameMask(defaultMultiRenameOptions.nameMask);
-    setExtensionMask(defaultMultiRenameOptions.extensionMask);
-    setSearchText(defaultMultiRenameOptions.searchText);
-    setReplaceText(defaultMultiRenameOptions.replaceText);
-    setCaseMode(defaultMultiRenameOptions.caseMode);
-    setCounterStart(defaultMultiRenameOptions.counterStart);
-    setCounterStep(defaultMultiRenameOptions.counterStep);
-    setCounterPadding(defaultMultiRenameOptions.counterPadding);
-    setOperationError(null);
-    setIsSubmitting(false);
-  }, [openDialog, multiRenameSession]);
+    resetForm();
+  }, [openDialog, multiRenameSession, resetForm]);
 
   const previewRows = multiRenameSession
-    ? buildMultiRenamePreview(multiRenameSession, {
-        nameMask,
-        extensionMask,
-        searchText,
-        replaceText,
-        caseMode,
-        counterStart,
-        counterStep,
-        counterPadding,
-      })
+    ? buildMultiRenamePreview(multiRenameSession, options)
     : [];
   const hasErrors = previewRows.some((row) => row.error !== null);
   const operations = getBatchRenameOperations(previewRows);
@@ -104,11 +83,11 @@ export const MultiRenameDialog: React.FC = () => {
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  value={nameMask}
+                  value={options.nameMask}
                   onChange={(event) => {
-                    setNameMask(event.target.value);
+                    updateOption("nameMask", event.target.value);
                     if (operationError) {
-                      setOperationError(null);
+                      clearOperationError();
                     }
                   }}
                   className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
@@ -121,11 +100,11 @@ export const MultiRenameDialog: React.FC = () => {
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  value={extensionMask}
+                  value={options.extensionMask}
                   onChange={(event) => {
-                    setExtensionMask(event.target.value);
+                    updateOption("extensionMask", event.target.value);
                     if (operationError) {
-                      setOperationError(null);
+                      clearOperationError();
                     }
                   }}
                   className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
@@ -139,8 +118,8 @@ export const MultiRenameDialog: React.FC = () => {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    value={searchText}
-                    onChange={(event) => setSearchText(event.target.value)}
+                    value={options.searchText}
+                    onChange={(event) => updateOption("searchText", event.target.value)}
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                   />
                 </label>
@@ -150,8 +129,8 @@ export const MultiRenameDialog: React.FC = () => {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    value={replaceText}
-                    onChange={(event) => setReplaceText(event.target.value)}
+                    value={options.replaceText}
+                    onChange={(event) => updateOption("replaceText", event.target.value)}
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                   />
                 </label>
@@ -162,8 +141,10 @@ export const MultiRenameDialog: React.FC = () => {
               <label className="block text-sm">
                 <span className="mb-1 block text-xs text-text-secondary">대소문자 변환</span>
                 <select
-                  value={caseMode}
-                  onChange={(event) => setCaseMode(event.target.value as MultiRenameCaseMode)}
+                  value={options.caseMode}
+                  onChange={(event) =>
+                    updateOption("caseMode", event.target.value as MultiRenameCaseMode)
+                  }
                   className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                 >
                   {CASE_MODE_OPTIONS.map((option) => (
@@ -179,8 +160,10 @@ export const MultiRenameDialog: React.FC = () => {
                   <span className="mb-1 block text-xs text-text-secondary">카운터 시작</span>
                   <input
                     type="number"
-                    value={counterStart}
-                    onChange={(event) => setCounterStart(Number(event.target.value) || 0)}
+                    value={options.counterStart}
+                    onChange={(event) =>
+                      updateOption("counterStart", Number(event.target.value) || 0)
+                    }
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                   />
                 </label>
@@ -188,8 +171,10 @@ export const MultiRenameDialog: React.FC = () => {
                   <span className="mb-1 block text-xs text-text-secondary">증가값</span>
                   <input
                     type="number"
-                    value={counterStep}
-                    onChange={(event) => setCounterStep(Number(event.target.value) || 0)}
+                    value={options.counterStep}
+                    onChange={(event) =>
+                      updateOption("counterStep", Number(event.target.value) || 0)
+                    }
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                   />
                 </label>
@@ -198,8 +183,13 @@ export const MultiRenameDialog: React.FC = () => {
                   <input
                     type="number"
                     min={0}
-                    value={counterPadding}
-                    onChange={(event) => setCounterPadding(Math.max(0, Number(event.target.value) || 0))}
+                    value={options.counterPadding}
+                    onChange={(event) =>
+                      updateOption(
+                        "counterPadding",
+                        Math.max(0, Number(event.target.value) || 0)
+                      )
+                    }
                     className="w-full rounded border border-border-color bg-bg-primary px-2 py-1.5 text-sm focus:border-accent-color focus:outline-none"
                   />
                 </label>

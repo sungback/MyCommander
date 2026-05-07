@@ -40,7 +40,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - R script (`.R`)
 - Markdown 렌더링
 - HTML 렌더링
-- Excel (`.xlsx`, `.xls`)
+- Excel (`.xlsx`)
 - Word (`.docx`)
 - Jupyter Notebook (`.ipynb`)
 - PowerPoint (`.pptx`)

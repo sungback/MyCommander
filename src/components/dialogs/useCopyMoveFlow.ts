@@ -5,13 +5,14 @@ import { useFileSystem, getErrorMessage } from "../../hooks/useFileSystem";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
 import type { JobSubmission } from "../../types/job";
+import {
+  COPY_MOVE_MISSING_TARGET_MESSAGE,
+  filterNonConflictingSourcePaths,
+  getCopyMoveFailureMessage,
+  resolveConflictAction,
+  type PendingCopy,
+} from "./copyMoveConflict";
 import { resolveTargetPath } from "./dialogTargetPath";
-
-interface PendingCopy {
-  isMove: boolean;
-  allPaths: string[];
-  targetPath: string;
-}
 
 interface UseCopyMoveFlowArgs {
   openDialog: DialogType;
@@ -61,6 +62,12 @@ export const useCopyMoveFlow = ({
   const clearConflictState = () => {
     setConflictFiles([]);
     setPendingCopy(null);
+  };
+
+  const setCopyMoveError = (error: unknown, isMove: boolean) => {
+    setOperationError(
+      getErrorMessage(error, getCopyMoveFailureMessage(isMove))
+    );
   };
 
   const executeCopyMove = async (
@@ -151,47 +158,35 @@ export const useCopyMoveFlow = ({
       await executeCopyMove(isMove, selectedPaths, targetPath);
     } catch (error) {
       console.error(error);
-      setOperationError(
-        getErrorMessage(
-          error,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
+      setCopyMoveError(error, isMove);
       setIsSubmitting(false);
     }
   };
 
   const handleOverwriteAll = async () => {
-    const sourcePaths =
-      pendingCopy?.allPaths && pendingCopy.allPaths.length > 0
-        ? pendingCopy.allPaths
-        : dragCopyRequest?.sourcePaths ?? [];
-    const targetPath =
-      pendingCopy?.targetPath?.trim().length
-        ? pendingCopy.targetPath
-        : dragCopyTargetPath;
-    const isMove = pendingCopy?.isMove ?? false;
+    const conflictAction = resolveConflictAction({
+      pendingCopy,
+      dragCopyRequest,
+      dragCopyTargetPath,
+    });
 
-    if (sourcePaths.length === 0 || targetPath.trim().length === 0) {
-      setOperationError("복사할 파일 또는 대상 경로를 확인할 수 없습니다.");
+    if (!conflictAction) {
+      setOperationError(COPY_MOVE_MISSING_TARGET_MESSAGE);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await executeCopyMove(isMove, sourcePaths, targetPath, false, true);
+      await executeCopyMove(
+        conflictAction.isMove,
+        conflictAction.sourcePaths,
+        conflictAction.targetPath,
+        false,
+        true
+      );
     } catch (error) {
       console.error(error);
-      setOperationError(
-        getErrorMessage(
-          error,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
+      setCopyMoveError(error, conflictAction.isMove);
     } finally {
       setIsSubmitting(false);
       clearConflictState();
@@ -199,42 +194,35 @@ export const useCopyMoveFlow = ({
   };
 
   const handleSkipExisting = async () => {
-    const sourcePaths =
-      pendingCopy?.allPaths && pendingCopy.allPaths.length > 0
-        ? pendingCopy.allPaths
-        : dragCopyRequest?.sourcePaths ?? [];
-    const targetPath =
-      pendingCopy?.targetPath?.trim().length
-        ? pendingCopy.targetPath
-        : dragCopyTargetPath;
-    const isMove = pendingCopy?.isMove ?? false;
+    const conflictAction = resolveConflictAction({
+      pendingCopy,
+      dragCopyRequest,
+      dragCopyTargetPath,
+    });
 
-    if (sourcePaths.length === 0 || targetPath.trim().length === 0) {
-      setOperationError("복사할 파일 또는 대상 경로를 확인할 수 없습니다.");
+    if (!conflictAction) {
+      setOperationError(COPY_MOVE_MISSING_TARGET_MESSAGE);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const nonConflicting = sourcePaths.filter((path) => {
-        const baseName = path.split(/[\\/]/).pop() || "";
-        return !conflictFiles.includes(baseName);
-      });
+      const nonConflicting = filterNonConflictingSourcePaths(
+        conflictAction.sourcePaths,
+        conflictFiles
+      );
       if (nonConflicting.length > 0) {
-        await executeCopyMove(isMove, nonConflicting, targetPath);
+        await executeCopyMove(
+          conflictAction.isMove,
+          nonConflicting,
+          conflictAction.targetPath
+        );
       } else {
         closeDialog();
       }
     } catch (error) {
       console.error(error);
-      setOperationError(
-        getErrorMessage(
-          error,
-          isMove
-            ? "Failed to move selected items."
-            : "Failed to copy selected items."
-        )
-      );
+      setCopyMoveError(error, conflictAction.isMove);
     } finally {
       setIsSubmitting(false);
       clearConflictState();

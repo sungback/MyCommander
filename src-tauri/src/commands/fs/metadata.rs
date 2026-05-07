@@ -2,7 +2,7 @@ use encoding_rs::EUC_KR;
 use serde::Serialize;
 use std::fs;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 #[cfg(target_os = "macos")]
@@ -130,6 +130,7 @@ pub(crate) fn is_hidden_entry(file_name: &str, metadata: &fs::Metadata) -> bool 
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn read_file_content(path: String) -> Result<String, String> {
+    let path = validate_preview_read_path(Path::new(&path))?;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
 
     let mut buffer = Vec::new();
@@ -138,6 +139,60 @@ pub async fn read_file_content(path: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     Ok(decode_preview_bytes(&buffer))
+}
+
+fn validate_preview_read_path(path: &Path) -> Result<PathBuf, String> {
+    let resolved_path = path.canonicalize().map_err(|e| e.to_string())?;
+
+    if is_asset_denied_home_path(&resolved_path) {
+        return Err(format!(
+            "Preview access is not allowed for {}",
+            resolved_path.display()
+        ));
+    }
+
+    Ok(resolved_path)
+}
+
+fn is_asset_denied_home_path(path: &Path) -> bool {
+    let Some(home_dir) = dirs::home_dir() else {
+        return false;
+    };
+
+    if path_matches_denied_home_path(path, &home_dir) {
+        return true;
+    }
+
+    home_dir
+        .canonicalize()
+        .ok()
+        .is_some_and(|home_dir| path_matches_denied_home_path(path, &home_dir))
+}
+
+pub(crate) fn path_matches_denied_home_path(path: &Path, home_dir: &Path) -> bool {
+    let Ok(relative_path) = path.strip_prefix(home_dir) else {
+        return false;
+    };
+    let components = relative_path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>();
+
+    if components.is_empty() {
+        return false;
+    }
+
+    let first = components[0].as_ref();
+    if [".ssh", ".gnupg", ".aws", ".kube"]
+        .iter()
+        .any(|name| first.eq_ignore_ascii_case(name))
+    {
+        return true;
+    }
+
+    components.len() >= 2
+        && first.eq_ignore_ascii_case("Library")
+        && components[1].eq_ignore_ascii_case("Keychains")
 }
 
 pub(crate) fn decode_preview_bytes(bytes: &[u8]) -> String {
