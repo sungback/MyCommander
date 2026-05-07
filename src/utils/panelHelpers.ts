@@ -1,4 +1,4 @@
-import { FileEntry, PanelId, PanelState, PanelTabState } from "../types/file";
+import { FileEntry, PanelId, PanelState, PanelTabState, SortField } from "../types/file";
 import { ThemePreference } from "../types/theme";
 import { coalescePanelPath } from "./path";
 import {
@@ -9,13 +9,13 @@ import {
 
 export const sortEntries = (
   entries: FileEntry[],
-  field: string,
+  field: SortField,
   direction: "asc" | "desc"
 ): FileEntry[] => {
   const dirs = entries.filter((e) => e.kind === "directory");
   const files = entries.filter((e) => e.kind !== "directory");
 
-  const compare = (a: any, b: any) => {
+  const compare = (a: string | number, b: string | number) => {
     if (a === b) return 0;
     const res = a < b ? -1 : 1;
     return direction === "asc" ? res : -res;
