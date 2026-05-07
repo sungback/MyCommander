@@ -34,7 +34,7 @@ pub fn run() {
             commands::system::launch::open_file,
             commands::system::launch::run_shell_command,
             commands::system::menu::quit_app,
-            commands::system::menu::show_context_menu,
+            commands::system::context_menu::show_context_menu,
             commands::system::menu::set_show_hidden_menu_checked,
             commands::system::menu::set_theme_menu_selection,
             commands::system::menu::set_view_mode_menu_selection,

@@ -7,7 +7,13 @@ use super::app_menu::{
     SWAP_PANELS_MENU_ITEM_ID, TARGET_EQUALS_SOURCE_MENU_ITEM_ID, THEME_AUTO_MENU_ITEM_ID,
     THEME_DARK_MENU_ITEM_ID, THEME_LIGHT_MENU_ITEM_ID, VIEW_MENU_ID,
 };
-use crate::commands;
+use crate::commands::system::context_menu::{
+    CONTEXT_COPY_MENU_ITEM_ID, CONTEXT_COPY_PATH_MENU_ITEM_ID, CONTEXT_CREATE_ZIP_MENU_ITEM_ID,
+    CONTEXT_DELETE_MENU_ITEM_ID, CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID, CONTEXT_INFO_MENU_ITEM_ID,
+    CONTEXT_MOVE_MENU_ITEM_ID, CONTEXT_NEW_FILE_MENU_ITEM_ID, CONTEXT_NEW_FOLDER_MENU_ITEM_ID,
+    CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID, CONTEXT_REFRESH_MENU_ITEM_ID, CONTEXT_RENAME_MENU_ITEM_ID,
+    CONTEXT_REVEAL_MENU_ITEM_ID, CONTEXT_SEARCH_MENU_ITEM_ID, CONTEXT_TERMINAL_MENU_ITEM_ID,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) {
@@ -38,49 +44,49 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) 
                 let _ = window.reload();
             }
         }
-        commands::system::menu::CONTEXT_INFO_MENU_ITEM_ID => {
+        CONTEXT_INFO_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "info");
         }
-        commands::system::menu::CONTEXT_REVEAL_MENU_ITEM_ID => {
+        CONTEXT_REVEAL_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "reveal");
         }
-        commands::system::menu::CONTEXT_TERMINAL_MENU_ITEM_ID => {
+        CONTEXT_TERMINAL_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "terminal");
         }
-        commands::system::menu::CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
+        CONTEXT_CREATE_ZIP_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "create-zip");
         }
-        commands::system::menu::CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID => {
+        CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "extract-zip");
         }
-        commands::system::menu::CONTEXT_COPY_PATH_MENU_ITEM_ID => {
+        CONTEXT_COPY_PATH_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "copy-path");
         }
-        commands::system::menu::CONTEXT_COPY_MENU_ITEM_ID => {
+        CONTEXT_COPY_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "copy");
         }
-        commands::system::menu::CONTEXT_MOVE_MENU_ITEM_ID => {
+        CONTEXT_MOVE_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "move");
         }
-        commands::system::menu::CONTEXT_RENAME_MENU_ITEM_ID => {
+        CONTEXT_RENAME_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "rename");
         }
-        commands::system::menu::CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID => {
+        CONTEXT_NORMALIZE_NFC_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "normalize-filename-nfc");
         }
-        commands::system::menu::CONTEXT_DELETE_MENU_ITEM_ID => {
+        CONTEXT_DELETE_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "delete");
         }
-        commands::system::menu::CONTEXT_REFRESH_MENU_ITEM_ID => {
+        CONTEXT_REFRESH_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "refresh");
         }
-        commands::system::menu::CONTEXT_NEW_FOLDER_MENU_ITEM_ID => {
+        CONTEXT_NEW_FOLDER_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "mkdir");
         }
-        commands::system::menu::CONTEXT_NEW_FILE_MENU_ITEM_ID => {
+        CONTEXT_NEW_FILE_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "newfile");
         }
-        commands::system::menu::CONTEXT_SEARCH_MENU_ITEM_ID => {
+        CONTEXT_SEARCH_MENU_ITEM_ID => {
             let _ = app.emit("context-menu-action", "search");
         }
         _ => {}
