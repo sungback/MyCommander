@@ -6,30 +6,24 @@ import { useDragStore } from "../../store/dragStore";
 import { coalescePanelPath } from "../../utils/path";
 import { showTransientToast } from "../../store/toastStore";
 import {
-  clearSharedDropTargetForPanel,
   resetSharedDragState,
   sharedDragState,
   sharedPanelPaths,
 } from "./fileListDragSharedState";
 import {
-  getBlockedDropReason,
   getDraggedDirectoryPaths,
   getPanelIdFromElement,
   hasPointerMovedBeyondThreshold,
   resolveCrossPanelDropIntent,
   resolveMouseUpTargetPanel,
   resolveSamePanelDropIntent,
-  resolveSamePanelBackgroundDropTarget,
 } from "./fileListDragRules";
-import {
-  findVisibleEntryAtPointer,
-  isPointerInsideElement,
-  isPointerOutsideWindow,
-} from "./fileListDragPointer";
+import { isPointerOutsideWindow } from "./fileListDragPointer";
 import type { VisibleEntryRow } from "./fileListRows";
 import { getDragIcon } from "./fileListDragIcon";
 import { useFileListDragActions } from "./useFileListDragActions";
 import { useExternalFileDrop } from "./useExternalFileDrop";
+import { updateFileListDragHover } from "./fileListDragHover";
 import {
   EMPTY_FILE_LIST_DROP_UI_STATE,
   useFileListDropUiState,
@@ -90,82 +84,16 @@ export const useFileListDrag = ({
       const pointer = { clientX: e.clientX, clientY: e.clientY };
 
       if ((state?.dragging || activeDragInfo) && containerRef.current) {
-        const container = containerRef.current;
-        const isOverContainer = isPointerInsideElement(pointer, container);
-
-        if (isOverContainer && activeDragInfo?.sourcePanel !== panelId) {
-          sharedDragState.hoveredPanel = panelId;
-          sharedDragState.hoveredPanelPath = accessPath || currentPath;
-        }
-
-        const { rowPath, targetEntry } = findVisibleEntryAtPointer(
+        updateFileListDragHover({
           pointer,
-          container,
-          visibleRows
-        );
-        const canAcceptDrop =
-          Boolean(targetEntry) &&
-          targetEntry?.kind === "directory" &&
-          targetEntry.name !== ".." &&
-          Boolean(activeDragInfo);
-        const samePanelBackgroundDropTarget = resolveSamePanelBackgroundDropTarget({
-          isOverContainer,
-          rowPath,
+          container: containerRef.current,
+          visibleRows,
           activeDragInfo,
           panelId,
           accessPath,
+          currentPath,
+          updateDropUiState,
         });
-
-        if (samePanelBackgroundDropTarget) {
-          sharedDragState.dropTargetPath = samePanelBackgroundDropTarget;
-          sharedDragState.isDropAllowed = true;
-          sharedDragState.blockedReason = null;
-          updateDropUiState({
-            isPanelHovered: true,
-            dropTargetPath: samePanelBackgroundDropTarget,
-            isDropAllowed: true,
-          });
-        } else if (isOverContainer && canAcceptDrop && activeDragInfo) {
-          const blockedReason = getBlockedDropReason(activeDragInfo, targetEntry!.path);
-          const isDropAllowed = blockedReason === null;
-
-          sharedDragState.dropTargetPath = targetEntry!.path;
-          sharedDragState.isDropAllowed = isDropAllowed;
-          sharedDragState.blockedReason = blockedReason;
-          updateDropUiState({
-            isPanelHovered: true,
-            dropTargetPath: targetEntry!.path,
-            isDropAllowed,
-          });
-        } else {
-          if (
-            activeDragInfo?.sourcePanel === panelId &&
-            (sharedDragState.hoveredPanel === null || sharedDragState.hoveredPanel === panelId)
-          ) {
-            sharedDragState.dropTargetPath = null;
-            sharedDragState.isDropAllowed = false;
-            sharedDragState.blockedReason = null;
-          } else if (sharedDragState.hoveredPanel === panelId) {
-            sharedDragState.dropTargetPath = null;
-            sharedDragState.isDropAllowed = false;
-            sharedDragState.blockedReason = null;
-          }
-
-          if (!isOverContainer) {
-            clearSharedDropTargetForPanel(panelId);
-            updateDropUiState({
-              isPanelHovered: false,
-              dropTargetPath: null,
-              isDropAllowed: false,
-            });
-          } else {
-            updateDropUiState({
-              isPanelHovered: true,
-              dropTargetPath: null,
-              isDropAllowed: false,
-            });
-          }
-        }
       }
 
       if (!state || state.nativeDragStarted) return;
