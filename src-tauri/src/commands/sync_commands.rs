@@ -1,3 +1,4 @@
+use super::fs::metadata::is_hidden_entry;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
@@ -36,30 +37,6 @@ struct FileInfo {
     last_modified: Option<u64>,
     size: u64,
     kind: SyncEntryKind,
-}
-
-fn is_hidden_sync_entry(file_name: &str, metadata: &fs::Metadata) -> bool {
-    if file_name == "." || file_name == ".." {
-        return false;
-    }
-
-    if file_name.starts_with('.') {
-        return true;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::os::macos::fs::MetadataExt;
-
-        const UF_HIDDEN: u32 = 0x0000_8000;
-        metadata.st_flags() & UF_HIDDEN != 0
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = metadata;
-        false
-    }
 }
 
 fn normalize_relative_path(path: &str) -> String {
@@ -122,7 +99,7 @@ fn scan_directory(dir_path: &str, show_hidden: bool) -> Result<HashMap<String, F
             .map(|name| name.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        if !show_hidden && is_hidden_sync_entry(&file_name, &metadata) {
+        if !show_hidden && is_hidden_entry(&file_name, &metadata) {
             if entry.file_type().is_dir() {
                 entries.skip_current_dir();
             }
