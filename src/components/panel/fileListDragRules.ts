@@ -139,7 +139,7 @@ export const resolveMouseUpTargetPanel = ({
     ? hoveredPanelFromPointer
     : null);
 
-interface SamePanelDropIntent {
+export interface SamePanelDropIntent {
   targetPath: string;
   isDropAllowed: boolean;
   blockedReason: string | null;
@@ -181,7 +181,7 @@ export const resolveSamePanelDropIntent = ({
   };
 };
 
-interface CrossPanelDropIntent {
+export interface CrossPanelDropIntent {
   targetPanel: PanelId;
   targetPath: string;
   blockedReason: string | null;

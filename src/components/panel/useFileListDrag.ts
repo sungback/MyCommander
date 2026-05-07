@@ -4,7 +4,6 @@ import { FileEntry } from "../../types/file";
 import { usePanelStore } from "../../store/panelStore";
 import { useDragStore } from "../../store/dragStore";
 import { coalescePanelPath } from "../../utils/path";
-import { showTransientToast } from "../../store/toastStore";
 import {
   resetSharedDragState,
   sharedDragState,
@@ -28,6 +27,10 @@ import {
   EMPTY_FILE_LIST_DROP_UI_STATE,
   useFileListDropUiState,
 } from "./useFileListDropUiState";
+import {
+  runCrossPanelDropAction,
+  runSamePanelDropAction,
+} from "./fileListDragDropActions";
 
 const DRAG_THRESHOLD_PX = 6;
 
@@ -163,37 +166,14 @@ export const useFileListDrag = ({
         });
 
         if (samePanelDropIntent) {
-          const {
-            targetPath,
-            isDropAllowed,
-            blockedReason,
-            isFolderOnlyMove,
-          } = samePanelDropIntent;
-
           resetDragInteraction();
-
-          if (!isDropAllowed) {
-            showTransientToast(blockedReason ?? "여기로는 복사할 수 없습니다.", {
-              durationMs: 1800,
-              tone: "warning",
-            });
-            return;
-          }
-
-          const dragAction = isFolderOnlyMove
-            ? handleDraggedMove(state.paths, targetPath)
-            : handleDraggedCopy(state.paths, targetPath, panelId);
-
-          void dragAction
-            .catch((error) => {
-              console.error("Failed to process dragged files:", error);
-              showTransientToast(
-                isFolderOnlyMove
-                  ? "폴더를 이동하지 못했습니다."
-                  : "파일을 복사하지 못했습니다.",
-                { durationMs: 1800, tone: "error" }
-              );
-            });
+          runSamePanelDropAction({
+            paths: state.paths,
+            panelId,
+            intent: samePanelDropIntent,
+            handleDraggedCopy,
+            handleDraggedMove,
+          });
           return;
         }
 
@@ -221,25 +201,15 @@ export const useFileListDrag = ({
           });
 
           if (crossPanelDropIntent) {
-            if (crossPanelDropIntent.blockedReason) {
-              showTransientToast(crossPanelDropIntent.blockedReason, {
-                durationMs: 1800,
-                tone: "warning",
-              });
+            const result = runCrossPanelDropAction({
+              paths: state.paths,
+              intent: crossPanelDropIntent,
+              handleDraggedCopy,
+            });
+
+            if (result === "blocked") {
               return;
             }
-
-            void handleDraggedCopy(
-              state.paths,
-              crossPanelDropIntent.targetPath,
-              crossPanelDropIntent.targetPanel
-            ).catch((error) => {
-              console.error("Failed to copy dragged files:", error);
-              showTransientToast("파일을 복사하지 못했습니다.", {
-                durationMs: 1800,
-                tone: "error",
-              });
-            });
           }
         }
       }

@@ -193,6 +193,31 @@ describe('useFileSystem', () => {
         show_hidden: true,
       });
     });
+
+    it('maps each backend sync status to the default direction', async () => {
+      mockInvoke.mockResolvedValueOnce(
+        ['LeftOnly', 'RightOnly', 'LeftNewer', 'RightNewer', 'Same'].map(
+          (status) => ({
+            rel_path: `${status}.txt`,
+            left_path: `/left/${status}.txt`,
+            right_path: `/right/${status}.txt`,
+            left_kind: 'file',
+            right_kind: 'file',
+            status,
+          })
+        )
+      );
+
+      const result = await useFileSystem().compareDirectories('/left', '/right');
+
+      expect(result.map((item) => [item.status, item.direction])).toEqual([
+        ['LeftOnly', 'toRight'],
+        ['RightOnly', 'toLeft'],
+        ['LeftNewer', 'toRight'],
+        ['RightNewer', 'toLeft'],
+        ['Same', 'skip'],
+      ]);
+    });
   });
 
   // ─── syncWatchedDirectories ────────────────────────────────────────────────

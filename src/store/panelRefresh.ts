@@ -1,5 +1,5 @@
 import { usePanelStore } from "./panelStore";
-import { PanelState, PanelTabState } from "../types/file";
+import type { PanelState, PanelTabState } from "../types/file";
 import { syncPanelWithActiveTab } from "../utils/panelHelpers";
 import {
   coalescePanelPath,
@@ -9,8 +9,16 @@ import {
 } from "../utils/path";
 
 type PanelId = "left" | "right";
+type PanelKey = `${PanelId}Panel`;
+type PanelStoreSnapshot = ReturnType<typeof usePanelStore.getState>;
 
 const PANEL_IDS: PanelId[] = ["left", "right"];
+
+const getPanelKey = (panelId: PanelId): PanelKey =>
+  panelId === "left" ? "leftPanel" : "rightPanel";
+
+const getPanelState = (state: PanelStoreSnapshot, panelId: PanelId): PanelState =>
+  panelId === "left" ? state.leftPanel : state.rightPanel;
 
 const getNormalizedPanelPath = (path?: string | null) => {
   if (typeof path !== "string" || path.length === 0) {
@@ -37,6 +45,28 @@ const updatePanelTabs = (
   return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;
 };
 
+const updateTabsAcrossPanels = (
+  state: PanelStoreSnapshot,
+  updater: (tab: PanelTabState) => PanelTabState
+) => {
+  let changed = false;
+  const nextPanels = {} as Partial<Record<PanelKey, PanelState>>;
+
+  for (const panelId of PANEL_IDS) {
+    const panel = getPanelState(state, panelId);
+    const nextPanel = updatePanelTabs(panel, updater);
+
+    if (nextPanel !== panel) {
+      nextPanels[getPanelKey(panelId)] = nextPanel;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    usePanelStore.setState(nextPanels);
+  }
+};
+
 export const refreshPanelsForDirectories = (directories: string[]) => {
   const normalizedDirectories = new Set(
     directories
@@ -52,56 +82,44 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
   state.invalidateEntrySizes(directories);
 
   const now = Date.now();
-  let changed = false;
-  const nextPanels = {} as Partial<Record<`${PanelId}Panel`, PanelState>>;
-  const setState = Reflect.get(usePanelStore, "setState");
+  updateTabsAcrossPanels(state, (tab) => {
+    const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
+    const normalizedCurrentPath = getNormalizedPanelPath(tabPath);
 
-  for (const panelId of PANEL_IDS) {
-    const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-
-    const nextPanel = updatePanelTabs(panel, (tab) => {
-      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
-      const normalizedCurrentPath = getNormalizedPanelPath(tabPath);
-
-      if (!normalizedCurrentPath) {
-        return tab;
-      }
-
-      let nextLastUpdated = tab.lastUpdated;
-      let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
-
-      if (normalizedDirectories.has(normalizedCurrentPath)) {
-        nextLastUpdated = now;
-      }
-
-      const nestedPrefix = normalizedCurrentPath.endsWith("/")
-        ? normalizedCurrentPath
-        : `${normalizedCurrentPath}/`;
-      const hasNestedChange = [...normalizedDirectories].some((d) => d.startsWith(nestedPrefix));
-      if (hasNestedChange) {
-        nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
-      }
-
-      if (nextLastUpdated === tab.lastUpdated && nextExpandedChildrenVersion === tab.expandedChildrenVersion) {
-        return tab;
-      }
-
-      return {
-        ...tab,
-        lastUpdated: nextLastUpdated,
-        expandedChildrenVersion: nextExpandedChildrenVersion,
-      };
-    });
-
-    if (nextPanel !== panel) {
-      nextPanels[panelId === "left" ? "leftPanel" : "rightPanel"] = nextPanel;
-      changed = true;
+    if (!normalizedCurrentPath) {
+      return tab;
     }
-  }
 
-  if (changed && typeof setState === "function") {
-    setState(nextPanels);
-  }
+    let nextLastUpdated = tab.lastUpdated;
+    let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
+
+    if (normalizedDirectories.has(normalizedCurrentPath)) {
+      nextLastUpdated = now;
+    }
+
+    const nestedPrefix = normalizedCurrentPath.endsWith("/")
+      ? normalizedCurrentPath
+      : `${normalizedCurrentPath}/`;
+    const hasNestedChange = [...normalizedDirectories].some((directory) =>
+      directory.startsWith(nestedPrefix)
+    );
+    if (hasNestedChange) {
+      nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
+    }
+
+    if (
+      nextLastUpdated === tab.lastUpdated &&
+      nextExpandedChildrenVersion === tab.expandedChildrenVersion
+    ) {
+      return tab;
+    }
+
+    return {
+      ...tab,
+      lastUpdated: nextLastUpdated,
+      expandedChildrenVersion: nextExpandedChildrenVersion,
+    };
+  });
 };
 
 export const refreshPanelsForEntryPaths = (paths: string[]) => {
@@ -115,51 +133,41 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
   state.invalidateEntrySizes(paths);
 
   const now = Date.now();
-  let changed = false;
-  const nextPanels = {} as Partial<Record<`${PanelId}Panel`, PanelState>>;
-  const setState = Reflect.get(usePanelStore, "setState");
+  updateTabsAcrossPanels(state, (tab) => {
+    const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
 
-  for (const panelId of PANEL_IDS) {
-    const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
+    let nextLastUpdated = tab.lastUpdated;
+    let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
 
-    const nextPanel = updatePanelTabs(panel, (tab) => {
-      const tabPath = coalescePanelPath(tab.resolvedPath, tab.currentPath);
-
-      let nextLastUpdated = tab.lastUpdated;
-      let nextExpandedChildrenVersion = tab.expandedChildrenVersion;
-
-      if (normalizedPaths.some((path) => isSameOrNestedPath(tabPath, path))) {
-        nextLastUpdated = now;
-      }
-
-      const normalizedTabPath = normalizePathForComparison(tabPath);
-      const nestedPrefix = normalizedTabPath.endsWith("/")
-        ? normalizedTabPath
-        : `${normalizedTabPath}/`;
-      if (normalizedPaths.some((path) => normalizePathForComparison(path).startsWith(nestedPrefix))) {
-        nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
-      }
-
-      if (nextLastUpdated === tab.lastUpdated && nextExpandedChildrenVersion === tab.expandedChildrenVersion) {
-        return tab;
-      }
-
-      return {
-        ...tab,
-        lastUpdated: nextLastUpdated,
-        expandedChildrenVersion: nextExpandedChildrenVersion,
-      };
-    });
-
-    if (nextPanel !== panel) {
-      nextPanels[panelId === "left" ? "leftPanel" : "rightPanel"] = nextPanel;
-      changed = true;
+    if (normalizedPaths.some((path) => isSameOrNestedPath(tabPath, path))) {
+      nextLastUpdated = now;
     }
-  }
 
-  if (changed && typeof setState === "function") {
-    setState(nextPanels);
-  }
+    const normalizedTabPath = normalizePathForComparison(tabPath);
+    const nestedPrefix = normalizedTabPath.endsWith("/")
+      ? normalizedTabPath
+      : `${normalizedTabPath}/`;
+    if (
+      normalizedPaths.some((path) =>
+        normalizePathForComparison(path).startsWith(nestedPrefix)
+      )
+    ) {
+      nextExpandedChildrenVersion = (tab.expandedChildrenVersion ?? 0) + 1;
+    }
+
+    if (
+      nextLastUpdated === tab.lastUpdated &&
+      nextExpandedChildrenVersion === tab.expandedChildrenVersion
+    ) {
+      return tab;
+    }
+
+    return {
+      ...tab,
+      lastUpdated: nextLastUpdated,
+      expandedChildrenVersion: nextExpandedChildrenVersion,
+    };
+  });
 };
 
 export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
@@ -180,46 +188,36 @@ export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
   }
 
   const state = usePanelStore.getState();
-  let changed = false;
-  const nextPanels = {} as Partial<Record<`${PanelId}Panel`, PanelState>>;
-  const setState = Reflect.get(usePanelStore, "setState");
+  updateTabsAcrossPanels(state, (tab) => {
+    const normalizedCurrentPath = getNormalizedPanelPath(
+      coalescePanelPath(tab.resolvedPath, tab.currentPath)
+    );
 
-  for (const panelId of PANEL_IDS) {
-    const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-    const nextPanel = updatePanelTabs(panel, (tab) => {
-      const normalizedCurrentPath = getNormalizedPanelPath(
-        coalescePanelPath(tab.resolvedPath, tab.currentPath)
-      );
-
-      if (!normalizedCurrentPath || !normalizedParentDirectories.has(normalizedCurrentPath)) {
-        return tab;
-      }
-
-      const nextFiles = tab.files.filter(
-        (entry) => !normalizedRemovedPaths.has(normalizePathForComparison(entry.path))
-      );
-      const nextSelection = Array.from(tab.selectedItems).filter(
-        (path) => !normalizedRemovedPaths.has(normalizePathForComparison(path))
-      );
-
-      if (nextFiles.length === tab.files.length && nextSelection.length === tab.selectedItems.size) {
-        return tab;
-      }
-
-      return {
-        ...tab,
-        files: nextFiles,
-        selectedItems: new Set(nextSelection),
-      };
-    });
-
-    if (nextPanel !== panel) {
-      nextPanels[panelId === "left" ? "leftPanel" : "rightPanel"] = nextPanel;
-      changed = true;
+    if (
+      !normalizedCurrentPath ||
+      !normalizedParentDirectories.has(normalizedCurrentPath)
+    ) {
+      return tab;
     }
-  }
 
-  if (changed && typeof setState === "function") {
-    setState(nextPanels);
-  }
+    const nextFiles = tab.files.filter(
+      (entry) => !normalizedRemovedPaths.has(normalizePathForComparison(entry.path))
+    );
+    const nextSelection = Array.from(tab.selectedItems).filter(
+      (path) => !normalizedRemovedPaths.has(normalizePathForComparison(path))
+    );
+
+    if (
+      nextFiles.length === tab.files.length &&
+      nextSelection.length === tab.selectedItems.size
+    ) {
+      return tab;
+    }
+
+    return {
+      ...tab,
+      files: nextFiles,
+      selectedItems: new Set(nextSelection),
+    };
+  });
 };

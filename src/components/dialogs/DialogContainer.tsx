@@ -20,6 +20,35 @@ import { useDialogInputState } from "./useDialogInputState";
 
 export { getRenameSelectionEnd } from "./useDialogInputState";
 
+const dialogTextInputClassName =
+  "w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white";
+
+interface DialogTextInputProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  inputRef?: React.Ref<HTMLInputElement>;
+  onFocus?: (input: HTMLInputElement) => void;
+}
+
+const DialogTextInput: React.FC<DialogTextInputProps> = ({
+  value,
+  onValueChange,
+  inputRef,
+  onFocus,
+}) => (
+  <input
+    autoFocus
+    ref={inputRef}
+    onFocus={(event) => onFocus?.(event.currentTarget)}
+    autoCorrect="off"
+    autoCapitalize="off"
+    spellCheck={false}
+    value={value}
+    onChange={(event) => onValueChange(event.target.value)}
+    className={dialogTextInputClassName}
+  />
+);
+
 export const DialogContainer: React.FC = () => {
   const {
     openDialog,
@@ -149,14 +178,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">
           Create directory in: {activePanel.currentPath}
         </p>
-        <input
-          autoFocus
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <DialogTextInput
           value={inputValue}
-          onChange={(e) => updateInputValue(e.target.value)}
-          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+          onValueChange={updateInputValue}
         />
       </BaseDialog>
 
@@ -172,14 +196,9 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">
           Create file in: {activePanel.currentPath}
         </p>
-        <input
-          autoFocus
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <DialogTextInput
           value={inputValue}
-          onChange={(e) => updateInputValue(e.target.value)}
-          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+          onValueChange={updateInputValue}
         />
       </BaseDialog>
 
@@ -197,16 +216,11 @@ export const DialogContainer: React.FC = () => {
         <p className="text-xs text-text-secondary mb-2">
           Rename item in: {dialogTarget ? dialogTarget.path : activePanel.currentPath}
         </p>
-        <input
-          autoFocus
-          ref={renameInputRef}
-          onFocus={(e) => handleRenameInputFocus(e.target)}
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <DialogTextInput
+          inputRef={renameInputRef}
+          onFocus={handleRenameInputFocus}
           value={inputValue}
-          onChange={(e) => updateInputValue(e.target.value)}
-          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+          onValueChange={updateInputValue}
         />
       </BaseDialog>
 
@@ -245,14 +259,9 @@ export const DialogContainer: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-text-secondary mb-2">Copy to:</p>
-        <input
-          autoFocus
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <DialogTextInput
           value={inputValue}
-          onChange={(e) => updateInputValue(e.target.value)}
-          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+          onValueChange={updateInputValue}
         />
       </BaseDialog>
 
@@ -277,14 +286,9 @@ export const DialogContainer: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-text-secondary mb-2">Move/Rename to:</p>
-        <input
-          autoFocus
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
+        <DialogTextInput
           value={inputValue}
-          onChange={(e) => updateInputValue(e.target.value)}
-          className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color selection:bg-bg-selected selection:text-white"
+          onValueChange={updateInputValue}
         />
       </BaseDialog>
 

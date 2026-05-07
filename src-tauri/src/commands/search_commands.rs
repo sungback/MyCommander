@@ -34,6 +34,40 @@ impl SearchConfig {
     }
 }
 
+struct SearchConfigInput {
+    query: String,
+    use_regex: bool,
+    case_sensitive: Option<bool>,
+    include_hidden: Option<bool>,
+    scope: Option<String>,
+    entry_kind: Option<String>,
+    extensions: Option<Vec<String>>,
+    min_size_bytes: Option<u64>,
+    max_size_bytes: Option<u64>,
+    modified_after_ms: Option<u64>,
+    modified_before_ms: Option<u64>,
+    max_results: Option<usize>,
+}
+
+impl SearchConfig {
+    fn from_input(input: SearchConfigInput) -> Self {
+        Self {
+            query: input.query.trim().to_string(),
+            use_regex: input.use_regex,
+            case_sensitive: input.case_sensitive.unwrap_or(true),
+            include_hidden: input.include_hidden.unwrap_or(true),
+            scope: input.scope.unwrap_or_else(|| "name".to_string()),
+            entry_kind: input.entry_kind.unwrap_or_else(|| "all".to_string()),
+            extensions: normalize_extensions(input.extensions),
+            min_size_bytes: input.min_size_bytes,
+            max_size_bytes: input.max_size_bytes,
+            modified_after_ms: input.modified_after_ms,
+            modified_before_ms: input.modified_before_ms,
+            max_results: input.max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS),
+        }
+    }
+}
+
 #[derive(Serialize, Clone)]
 pub struct SearchResult {
     name: String,
@@ -223,21 +257,22 @@ pub async fn search_files(
     max_results: Option<usize>,
     on_event: Channel<SearchEvent>,
 ) -> Result<(), String> {
-    let config = SearchConfig {
-        query: query.trim().to_string(),
+    let raw_query = query.clone();
+    let config = SearchConfig::from_input(SearchConfigInput {
+        query,
         use_regex,
-        case_sensitive: case_sensitive.unwrap_or(true),
-        include_hidden: include_hidden.unwrap_or(true),
-        scope: scope.unwrap_or_else(|| "name".to_string()),
-        entry_kind: entry_kind.unwrap_or_else(|| "all".to_string()),
-        extensions: normalize_extensions(extensions),
+        case_sensitive,
+        include_hidden,
+        scope,
+        entry_kind,
+        extensions,
         min_size_bytes,
         max_size_bytes,
         modified_after_ms,
         modified_before_ms,
-        max_results: max_results.unwrap_or(DEFAULT_SEARCH_MAX_RESULTS),
-    };
-    let re = build_search_regex(&query, &config);
+        max_results,
+    });
+    let re = build_search_regex(&raw_query, &config);
     let wildcard_patterns = build_wildcard_patterns(&config);
     let normalized_query = config.normalized_query();
 

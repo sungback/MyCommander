@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { SyncItem } from "../../types/sync";
+import type { SyncDirection, SyncItem, SyncStatus } from "../../types/sync";
 
 export const syncCommands = {
   compareDirectories: async (
@@ -13,10 +13,10 @@ export const syncCommands = {
       right_path: string | null;
       left_kind: "file" | "directory" | null;
       right_kind: "file" | "directory" | null;
-      status: string;
+      status: SyncStatus;
     }
 
-    const autoDirection = (status: string): "toRight" | "toLeft" | "skip" => {
+    const autoDirection = (status: SyncStatus): SyncDirection => {
       switch (status) {
         case "LeftOnly":
         case "LeftNewer":
@@ -41,7 +41,7 @@ export const syncCommands = {
       rightPath: item.right_path,
       leftKind: item.left_kind,
       rightKind: item.right_kind,
-      status: item.status as any,
+      status: item.status,
       direction: autoDirection(item.status),
     }));
   },
