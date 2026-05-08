@@ -1,4 +1,3 @@
-import { ArrowUpToLine, FolderClosed, FolderOpen, Package } from "lucide-react";
 import { FileEntry } from "../../types/file";
 import {
   APP_BUNDLE_EXTENSIONS,
@@ -24,6 +23,8 @@ import {
   VIDEO_EXTENSIONS,
 } from "./fileVisualCatalog";
 import { FILE_VISUALS, HIDDEN_FILE_VISUAL } from "./fileVisualDefinitions";
+import { resolveDirectoryVisual } from "./fileVisualFolders";
+import { getFileExtension, getNameStem } from "./fileVisualNames";
 import type {
   EntryVisual,
   EntryVisualGroup,
@@ -37,27 +38,7 @@ export type {
   EntryVisualSlot,
   ResolveEntryVisualOptions,
 } from "./fileVisualTypes";
-
-const getNameStem = (name: string) => {
-  const lowerName = name.toLowerCase();
-  const dotIndex = lowerName.lastIndexOf(".");
-  return dotIndex > 0 ? lowerName.slice(0, dotIndex) : lowerName;
-};
-
-export const getFileExtension = (name: string): string | null => {
-  const lowerName = name.toLowerCase();
-  const dotIndex = lowerName.lastIndexOf(".");
-
-  if (
-    dotIndex === -1 ||
-    dotIndex === lowerName.length - 1 ||
-    (dotIndex === 0 && lowerName.indexOf(".", 1) === -1 && lowerName.length <= 1)
-  ) {
-    return null;
-  }
-
-  return lowerName.slice(dotIndex + 1);
-};
+export { getFileExtension } from "./fileVisualNames";
 
 const isArchiveName = (name: string, extension: string | null) => {
   const lowerName = name.toLowerCase();
@@ -222,79 +203,7 @@ export const resolveEntryVisual = (
   options: ResolveEntryVisualOptions = {}
 ): EntryVisual => {
   if (entry.kind === "directory") {
-    const extension = getFileExtension(entry.name);
-
-    if (entry.name === "..") {
-      return {
-        group: "folder-parent",
-        slot: "tc-folder-parent",
-        icon: ArrowUpToLine,
-        iconSize: 15,
-        iconClassName: "theme-folder-parent-icon",
-        iconWrapperClassName: "theme-tc-folder-shell theme-tc-folder-parent-shell",
-        iconFillOpacity: undefined,
-        nameClassName: "theme-tc-folder-name",
-        nameWeightClassName: "font-semibold",
-      };
-    }
-
-    if (extension !== null && APP_BUNDLE_EXTENSIONS.has(extension)) {
-      return {
-        group: "folder-app-bundle",
-        slot: "tc-folder-app",
-        icon: Package,
-        iconSize: 15,
-        iconClassName: "theme-folder-app-bundle-icon",
-        iconWrapperClassName: "theme-tc-folder-shell theme-tc-folder-app-shell",
-        iconFillOpacity: 0.18,
-        nameClassName: "theme-tc-folder-name",
-        nameWeightClassName: "font-semibold",
-      };
-    }
-
-    if (entry.isHidden) {
-      return {
-        group: "folder-hidden",
-        slot: "tc-folder-hidden",
-        icon: options.isExpanded ? FolderOpen : FolderClosed,
-        iconSize: 16,
-        iconClassName: "theme-folder-hidden-icon",
-        iconWrapperClassName: "theme-tc-folder-shell theme-tc-folder-hidden-shell",
-        iconFillOpacity: 0.24,
-        iconStrokeWidth: 1.65,
-        nameClassName: "theme-tc-hidden-name",
-        nameWeightClassName: "font-semibold",
-        overlayClassName: "theme-tc-overlay-hidden",
-      };
-    }
-
-    if (options.isExpanded) {
-      return {
-        group: "folder-open",
-        slot: "tc-folder-open",
-        icon: FolderOpen,
-        iconSize: 16,
-        iconClassName: "theme-folder-open-icon",
-        iconWrapperClassName: "theme-tc-folder-shell theme-tc-folder-open-shell",
-        iconFillOpacity: 0.78,
-        iconStrokeWidth: 1.65,
-        nameClassName: "theme-tc-folder-name",
-        nameWeightClassName: "font-semibold",
-      };
-    }
-
-    return {
-      group: "folder",
-      slot: "tc-folder-closed",
-      icon: FolderClosed,
-      iconSize: 16,
-      iconClassName: "theme-folder-icon",
-      iconWrapperClassName: "theme-tc-folder-shell theme-tc-folder-closed-shell",
-      iconFillOpacity: 0.72,
-      iconStrokeWidth: 1.65,
-      nameClassName: "theme-tc-folder-name",
-      nameWeightClassName: "font-semibold",
-    };
+    return resolveDirectoryVisual(entry, options);
   }
 
   if (entry.isHidden) {

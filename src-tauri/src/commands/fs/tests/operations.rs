@@ -6,8 +6,8 @@ use super::create_test_dir;
 use std::fs;
 use std::path::PathBuf;
 
-#[test]
-fn move_single_path_allows_target_file_path() {
+#[tokio::test]
+async fn move_single_path_allows_target_file_path() {
     let tmp = create_test_dir("move_single_target_file_path");
     let source_dir = tmp.join("source");
     let target_dir = tmp.join("target");
@@ -18,16 +18,13 @@ fn move_single_path_allows_target_file_path() {
     let target = target_dir.join("new.txt");
     fs::write(&source, b"hello").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(async {
-        move_files_with_cancel_and_progress(
-            vec![source.to_string_lossy().to_string()],
-            target.to_string_lossy().to_string(),
-            None,
-            |_| {},
-        )
-        .await
-    });
+    let result = move_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target.to_string_lossy().to_string(),
+        None,
+        |_| {},
+    )
+    .await;
 
     assert!(
         result.is_ok(),
@@ -39,8 +36,8 @@ fn move_single_path_allows_target_file_path() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn move_multiple_paths_requires_existing_target_directory() {
+#[tokio::test]
+async fn move_multiple_paths_requires_existing_target_directory() {
     let tmp = create_test_dir("move_multiple_target_directory");
     let source_dir = tmp.join("source");
     let target_dir = tmp.join("target");
@@ -53,19 +50,16 @@ fn move_multiple_paths_requires_existing_target_directory() {
     fs::write(&first, b"a").unwrap();
     fs::write(&second, b"b").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(async {
-        move_files_with_cancel_and_progress(
-            vec![
-                first.to_string_lossy().to_string(),
-                second.to_string_lossy().to_string(),
-            ],
-            invalid_target.to_string_lossy().to_string(),
-            None,
-            |_| {},
-        )
-        .await
-    });
+    let result = move_files_with_cancel_and_progress(
+        vec![
+            first.to_string_lossy().to_string(),
+            second.to_string_lossy().to_string(),
+        ],
+        invalid_target.to_string_lossy().to_string(),
+        None,
+        |_| {},
+    )
+    .await;
 
     assert_eq!(
         result,
@@ -78,8 +72,8 @@ fn move_multiple_paths_requires_existing_target_directory() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn move_single_path_rejects_existing_target_without_overwriting() {
+#[tokio::test]
+async fn move_single_path_rejects_existing_target_without_overwriting() {
     let tmp = create_test_dir("move_existing_target");
     let source_dir = tmp.join("source");
     let target_dir = tmp.join("target");
@@ -91,16 +85,13 @@ fn move_single_path_rejects_existing_target_without_overwriting() {
     fs::write(&source, b"source").unwrap();
     fs::write(&target, b"target").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(async {
-        move_files_with_cancel_and_progress(
-            vec![source.to_string_lossy().to_string()],
-            target.to_string_lossy().to_string(),
-            None,
-            |_| {},
-        )
-        .await
-    });
+    let result = move_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target.to_string_lossy().to_string(),
+        None,
+        |_| {},
+    )
+    .await;
 
     assert!(result.is_err());
     assert_eq!(fs::read(&source).unwrap(), b"source");
@@ -109,8 +100,8 @@ fn move_single_path_rejects_existing_target_without_overwriting() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn move_into_directory_rejects_existing_child_without_overwriting() {
+#[tokio::test]
+async fn move_into_directory_rejects_existing_child_without_overwriting() {
     let tmp = create_test_dir("move_existing_child");
     let source_dir = tmp.join("source");
     let target_dir = tmp.join("target");
@@ -122,16 +113,13 @@ fn move_into_directory_rejects_existing_child_without_overwriting() {
     fs::write(&source, b"source").unwrap();
     fs::write(&target, b"target").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(async {
-        move_files_with_cancel_and_progress(
-            vec![source.to_string_lossy().to_string()],
-            target_dir.to_string_lossy().to_string(),
-            None,
-            |_| {},
-        )
-        .await
-    });
+    let result = move_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target_dir.to_string_lossy().to_string(),
+        None,
+        |_| {},
+    )
+    .await;
 
     assert!(result.is_err());
     assert_eq!(fs::read(&source).unwrap(), b"source");
@@ -140,16 +128,15 @@ fn move_into_directory_rejects_existing_child_without_overwriting() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn create_file_rejects_existing_file_without_truncating() {
+#[tokio::test]
+async fn create_file_rejects_existing_file_without_truncating() {
     let tmp = create_test_dir("create_file_existing");
     fs::create_dir_all(&tmp).unwrap();
 
     let existing = tmp.join("notes.txt");
     fs::write(&existing, b"keep me").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(create_file(existing.to_string_lossy().to_string()));
+    let result = create_file(existing.to_string_lossy().to_string()).await;
 
     assert!(result.is_err());
     assert_eq!(fs::read(&existing).unwrap(), b"keep me");
@@ -157,8 +144,8 @@ fn create_file_rejects_existing_file_without_truncating() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn rename_file_rejects_existing_target_without_overwriting() {
+#[tokio::test]
+async fn rename_file_rejects_existing_target_without_overwriting() {
     let tmp = create_test_dir("rename_existing_target");
     fs::create_dir_all(&tmp).unwrap();
 
@@ -167,11 +154,11 @@ fn rename_file_rejects_existing_target_without_overwriting() {
     fs::write(&source, b"source").unwrap();
     fs::write(&target, b"target").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(rename_file(
+    let result = rename_file(
         source.to_string_lossy().to_string(),
         target.to_string_lossy().to_string(),
-    ));
+    )
+    .await;
 
     assert!(result.is_err());
     assert_eq!(fs::read(&source).unwrap(), b"source");
@@ -180,8 +167,8 @@ fn rename_file_rejects_existing_target_without_overwriting() {
     let _ = fs::remove_dir_all(&tmp);
 }
 
-#[test]
-fn rename_file_converts_decomposed_hangul_name_to_nfc() {
+#[tokio::test]
+async fn rename_file_converts_decomposed_hangul_name_to_nfc() {
     let tmp = create_test_dir("rename_nfd_to_nfc");
     fs::create_dir_all(&tmp).unwrap();
 
@@ -191,11 +178,11 @@ fn rename_file_converts_decomposed_hangul_name_to_nfc() {
     let target = tmp.join(nfc_name);
     fs::write(&source, b"source").unwrap();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(rename_file(
+    let result = rename_file(
         source.to_string_lossy().to_string(),
         target.to_string_lossy().to_string(),
-    ));
+    )
+    .await;
 
     assert!(result.is_ok());
     assert_eq!(fs::read(&target).unwrap(), b"source");

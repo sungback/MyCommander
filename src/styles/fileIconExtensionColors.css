@@ -1,0 +1,187 @@
+.theme-tc-ext-document {
+  --tc-ext-bg: #1d4ed8;
+}
+
+.theme-tc-ext-txt {
+  --tc-ext-bg: #374151;
+}
+
+.theme-tc-ext-md {
+  --tc-ext-bg: #111827;
+}
+
+.theme-tc-ext-doc {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-pdf {
+  --tc-ext-bg: #d71920;
+}
+
+.theme-tc-ext-xls {
+  --tc-ext-bg: #0f8a3b;
+}
+
+.theme-tc-ext-ppt {
+  --tc-ext-bg: #d97706;
+}
+
+.theme-tc-ext-data,
+.theme-tc-ext-csv {
+  --tc-ext-bg: #0891b2;
+}
+
+.theme-tc-ext-db,
+.theme-tc-ext-sql {
+  --tc-ext-bg: #0f766e;
+}
+
+.theme-tc-ext-image,
+.theme-tc-ext-jpg,
+.theme-tc-ext-webp {
+  --tc-ext-bg: #0284c7;
+}
+
+.theme-tc-ext-png {
+  --tc-ext-bg: #2563eb;
+}
+
+.theme-tc-ext-gif {
+  --tc-ext-bg: #c026d3;
+}
+
+.theme-tc-ext-svg {
+  --tc-ext-bg: #f97316;
+}
+
+.theme-tc-ext-archive,
+.theme-tc-ext-zip {
+  --tc-ext-bg: #ca8a04;
+}
+
+.theme-tc-ext-rar {
+  --tc-ext-bg: #7c3aed;
+}
+
+.theme-tc-ext-7z {
+  --tc-ext-bg: #92400e;
+}
+
+.theme-tc-ext-tar {
+  --tc-ext-bg: #a16207;
+}
+
+.theme-tc-ext-code,
+.theme-tc-ext-ts {
+  --tc-ext-bg: #3178c6;
+}
+
+.theme-tc-ext-js {
+  --tc-ext-bg: #b88700;
+}
+
+.theme-tc-ext-json {
+  --tc-ext-bg: #7c2d12;
+}
+
+.theme-tc-ext-py {
+  --tc-ext-bg: #3776ab;
+}
+
+.theme-tc-ext-rs {
+  --tc-ext-bg: #b7410e;
+}
+
+.theme-tc-ext-go {
+  --tc-ext-bg: #00add8;
+}
+
+.theme-tc-ext-java {
+  --tc-ext-bg: #b07219;
+}
+
+.theme-tc-ext-rb {
+  --tc-ext-bg: #cc342d;
+}
+
+.theme-tc-ext-php {
+  --tc-ext-bg: #4f5d95;
+}
+
+.theme-tc-ext-swift {
+  --tc-ext-bg: #f05138;
+}
+
+.theme-tc-ext-c {
+  --tc-ext-bg: #5555aa;
+}
+
+.theme-tc-ext-cs {
+  --tc-ext-bg: #178600;
+}
+
+.theme-tc-ext-html {
+  --tc-ext-bg: #e34c26;
+}
+
+.theme-tc-ext-css {
+  --tc-ext-bg: #563d7c;
+}
+
+.theme-tc-ext-shell {
+  --tc-ext-bg: #16a34a;
+}
+
+.theme-tc-ext-config {
+  --tc-ext-bg: #5b6572;
+}
+
+.theme-tc-ext-env {
+  --tc-ext-bg: #4b5563;
+}
+
+.theme-tc-ext-yaml {
+  --tc-ext-bg: #cb171e;
+}
+
+.theme-tc-ext-toml {
+  --tc-ext-bg: #8b5e34;
+}
+
+.theme-tc-ext-lock,
+.theme-tc-ext-bin {
+  --tc-ext-bg: #475569;
+}
+
+.theme-tc-ext-audio {
+  --tc-ext-bg: #7e22ce;
+}
+
+.theme-tc-ext-mp3 {
+  --tc-ext-bg: #9333ea;
+}
+
+.theme-tc-ext-video {
+  --tc-ext-bg: #3730a3;
+}
+
+.theme-tc-ext-mp4 {
+  --tc-ext-bg: #4f46e5;
+}
+
+.theme-tc-ext-program,
+.theme-tc-ext-app {
+  --tc-ext-bg: #b36b00;
+}
+
+.theme-tc-ext-mac {
+  --tc-ext-bg: #64748b;
+}
+
+.theme-tc-ext-win {
+  --tc-ext-bg: #0078d4;
+}
+
+.theme-tc-ext-linux {
+  --tc-ext-bg: #ca8a04;
+}

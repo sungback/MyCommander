@@ -1,6 +1,10 @@
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Runtime};
 
+#[path = "app_menu/view_checks.rs"]
+mod view_checks;
+pub(crate) use view_checks::set_panel_view_menu_checks;
+
 pub(crate) const FILE_MENU_ID: &str = "file";
 pub(crate) const NEW_FOLDER_MENU_ITEM_ID: &str = "new_folder";
 pub(crate) const NEW_FILE_MENU_ITEM_ID: &str = "new_file";
@@ -23,37 +27,6 @@ pub(crate) const COMMANDS_MENU_ID: &str = "commands";
 pub(crate) const FOLDER_SYNC_MENU_ITEM_ID: &str = "folder_sync";
 pub(crate) const TARGET_EQUALS_SOURCE_MENU_ITEM_ID: &str = "target_equals_source";
 pub(crate) const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
-
-fn get_panel_view_submenu<R: Runtime>(app: &AppHandle<R>, submenu_id: &str) -> Option<Submenu<R>> {
-    let menu = app.menu()?;
-    let view_menu = menu.get(VIEW_MENU_ID)?.as_submenu().cloned()?;
-
-    view_menu.get(submenu_id)?.as_submenu().cloned()
-}
-
-pub(crate) fn set_panel_view_menu_checks<R: Runtime>(
-    app: &AppHandle<R>,
-    submenu_id: &str,
-    brief_item_id: &str,
-    detailed_item_id: &str,
-    view_mode: &str,
-) {
-    let Some(submenu) = get_panel_view_submenu(app, submenu_id) else {
-        return;
-    };
-
-    for (item_id, is_checked) in [
-        (brief_item_id, view_mode == "brief"),
-        (detailed_item_id, view_mode == "detailed"),
-    ] {
-        if let Some(item) = submenu
-            .get(item_id)
-            .and_then(|menu_item| menu_item.as_check_menuitem().cloned())
-        {
-            let _ = item.set_checked(is_checked);
-        }
-    }
-}
 
 pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let pkg_info = app.package_info();

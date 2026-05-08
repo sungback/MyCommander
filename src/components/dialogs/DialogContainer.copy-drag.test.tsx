@@ -10,6 +10,17 @@ import { DialogContainer } from './DialogContainer';
 import { useDialogStore } from '../../store/dialogStore';
 import { usePanelStore } from '../../store/panelStore';
 
+const queuedCopyJob = (id: string) => ({
+  id,
+  kind: "copy" as const,
+  status: "queued" as const,
+  createdAt: 1,
+  updatedAt: 1,
+  progress: { current: 0, total: 0, currentFile: "", unit: "items" as const },
+  error: null,
+  result: null,
+});
+
 describe('DialogContainer', () => {
   registerDialogContainerTestLifecycle();
 
@@ -39,16 +50,7 @@ describe('DialogContainer', () => {
       },
       isPasteMode: false,
     }));
-    mockSubmitJob.mockResolvedValue({
-      id: "job-2",
-      kind: "copy",
-      status: "queued",
-      createdAt: 1,
-      updatedAt: 1,
-      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
-      error: null,
-      result: null,
-    });
+    mockSubmitJob.mockResolvedValue(queuedCopyJob("job-2"));
 
     render(<DialogContainer />);
 
@@ -97,16 +99,7 @@ describe('DialogContainer', () => {
       isPasteMode: false,
     }));
     mockCheckCopyConflicts.mockResolvedValue(["file.txt"]);
-    mockSubmitJob.mockResolvedValue({
-      id: "job-3",
-      kind: "copy",
-      status: "queued",
-      createdAt: 1,
-      updatedAt: 1,
-      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
-      error: null,
-      result: null,
-    });
+    mockSubmitJob.mockResolvedValue(queuedCopyJob("job-3"));
 
     render(<DialogContainer />);
 
@@ -191,16 +184,7 @@ describe('DialogContainer', () => {
       isPasteMode: false,
     }));
     mockCheckCopyConflicts.mockResolvedValue(["file.txt"]);
-    mockSubmitJob.mockResolvedValue({
-      id: "job-4",
-      kind: "copy",
-      status: "queued",
-      createdAt: 1,
-      updatedAt: 1,
-      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
-      error: null,
-      result: null,
-    });
+    mockSubmitJob.mockResolvedValue(queuedCopyJob("job-4"));
 
     render(<DialogContainer />);
 
