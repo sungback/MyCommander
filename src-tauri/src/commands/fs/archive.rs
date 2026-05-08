@@ -8,13 +8,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use create::{create_zip_archive, create_zip_archive_from_paths};
-use extract::extract_zip_archive;
+pub(crate) use extract::extract_zip_archive;
 
 #[cfg(test)]
 pub(crate) use extract::flatten_matching_archive_root_dir;
 #[cfg(test)]
 pub(crate) use paths::{
-    get_unique_archive_path, get_unique_extraction_dir, validate_zip_source_directory,
+    get_hidden_temp_archive_path, get_unique_archive_path, get_unique_archive_path_named,
+    get_unique_extraction_dir, validate_zip_source_directory,
 };
 
 static ZIP_OPERATION_STATE: OnceLock<Mutex<Option<Arc<AtomicBool>>>> = OnceLock::new();

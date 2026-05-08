@@ -15,6 +15,7 @@ const {
   mockRenameFile,
   mockOpenInTerminal,
   mockRevealItemInDir,
+  mockExtractZip,
   mockWriteClipboardText,
   mockCloseContextMenu,
   mockShowTransientToast,
@@ -30,6 +31,7 @@ const {
   mockRenameFile: vi.fn(),
   mockOpenInTerminal: vi.fn(),
   mockRevealItemInDir: vi.fn(),
+  mockExtractZip: vi.fn(),
   mockWriteClipboardText: vi.fn(),
   mockCloseContextMenu: vi.fn(),
   mockShowTransientToast: vi.fn(),
@@ -104,6 +106,7 @@ vi.mock("../../store/toastStore", () => ({
 
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
+    extractZip: mockExtractZip,
     openInTerminal: mockOpenInTerminal,
     renameFile: mockRenameFile,
     submitJob: mockSubmitJob,
@@ -167,6 +170,7 @@ describe("ContextMenu", () => {
       error: null,
       result: null,
     });
+    mockExtractZip.mockResolvedValue(undefined);
     mockOpenInTerminal.mockResolvedValue(undefined);
     mockRenameFile.mockResolvedValue(undefined);
     mockRevealItemInDir.mockResolvedValue(undefined);
@@ -267,6 +271,108 @@ describe("ContextMenu", () => {
 
     expect(mockShowTransientToast).toHaveBeenCalledWith(
       "파일명을 NFC로 변환하지 못했습니다.",
+      { tone: "error" }
+    );
+  });
+
+  it("info 액션을 처리한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "info" });
+
+    expect(mockSetActivePanel).toHaveBeenCalledWith("left");
+    expect(mockOpenInfoDialog).toHaveBeenCalledWith({
+      panelId: "left",
+      path: "/home/user/Documents",
+      entry: expect.objectContaining({ name: "Documents" }),
+    });
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("reveal 액션을 처리한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "reveal" });
+
+    expect(mockRevealItemInDir).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("terminal 액션을 처리한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "terminal" });
+
+    expect(mockOpenInTerminal).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("extract-zip 액션을 처리한다", async () => {
+    mockContextState.targetPath = "/home/user/notes.txt";
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "extract-zip" });
+
+    expect(mockSetActivePanel).toHaveBeenCalledWith("left");
+    expect(mockExtractZip).toHaveBeenCalledWith("/home/user/notes.txt");
+    expect(mockRefreshPanel).toHaveBeenCalledWith("left");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("rename 액션을 처리한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "rename" });
+
+    expect(mockSetActivePanel).toHaveBeenCalledWith("left");
+    expect(mockOpenRenameDialog).toHaveBeenCalledWith({
+      panelId: "left",
+      path: "/home/user/Documents",
+      entry: expect.objectContaining({ name: "Documents" }),
+    });
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("refresh 액션을 처리한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "refresh" });
+
+    expect(mockRefreshPanel).toHaveBeenCalledWith("left");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("reveal 실패 시 오류 토스트를 표시한다", async () => {
+    mockRevealItemInDir.mockRejectedValueOnce(new Error("not found"));
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "reveal" });
+
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "항목 위치를 열 수 없습니다.",
+      { tone: "error" }
+    );
+  });
+
+  it("terminal 실패 시 오류 토스트를 표시한다", async () => {
+    mockOpenInTerminal.mockRejectedValueOnce(new Error("no terminal"));
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "terminal" });
+
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "터미널을 열 수 없습니다.",
       { tone: "error" }
     );
   });

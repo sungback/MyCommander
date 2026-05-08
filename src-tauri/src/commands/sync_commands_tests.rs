@@ -149,3 +149,75 @@ fn compare_directories_collapses_descendants_under_one_sided_directory() {
     fs::remove_dir_all(left).expect("cleanup left");
     fs::remove_dir_all(right).expect("cleanup right");
 }
+
+#[test]
+fn compare_directories_reports_left_only_file() {
+    let left = unique_temp_dir("left_only_l");
+    let right = unique_temp_dir("left_only_r");
+    fs::write(left.join("only_left.txt"), "left").expect("write");
+
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    let items = runtime
+        .block_on(compare_directories(
+            left.to_string_lossy().to_string(),
+            right.to_string_lossy().to_string(),
+            false,
+        ))
+        .expect("compare");
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].rel_path, "only_left.txt");
+    assert_eq!(items[0].status, SyncStatus::LeftOnly);
+
+    fs::remove_dir_all(left).expect("cleanup");
+    fs::remove_dir_all(right).expect("cleanup");
+}
+
+#[test]
+fn compare_directories_reports_right_only_file() {
+    let left = unique_temp_dir("right_only_l");
+    let right = unique_temp_dir("right_only_r");
+    fs::write(right.join("only_right.txt"), "right").expect("write");
+
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    let items = runtime
+        .block_on(compare_directories(
+            left.to_string_lossy().to_string(),
+            right.to_string_lossy().to_string(),
+            false,
+        ))
+        .expect("compare");
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].rel_path, "only_right.txt");
+    assert_eq!(items[0].status, SyncStatus::RightOnly);
+
+    fs::remove_dir_all(left).expect("cleanup");
+    fs::remove_dir_all(right).expect("cleanup");
+}
+
+#[test]
+fn compare_directories_reports_left_newer() {
+    let left = unique_temp_dir("left_newer_l");
+    let right = unique_temp_dir("left_newer_r");
+
+    fs::write(right.join("shared.txt"), "old").expect("write right first");
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    fs::write(left.join("shared.txt"), "new").expect("write left second");
+
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    let items = runtime
+        .block_on(compare_directories(
+            left.to_string_lossy().to_string(),
+            right.to_string_lossy().to_string(),
+            false,
+        ))
+        .expect("compare");
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].rel_path, "shared.txt");
+    assert_eq!(items[0].status, SyncStatus::LeftNewer);
+
+    fs::remove_dir_all(left).expect("cleanup");
+    fs::remove_dir_all(right).expect("cleanup");
+}

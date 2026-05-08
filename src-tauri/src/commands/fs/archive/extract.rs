@@ -3,7 +3,7 @@ use crate::commands::fs::shared::{describe_invalid_zip_problem, format_command_f
 use std::fs;
 use std::path::Path;
 
-pub(super) fn extract_zip_archive(path: &str) -> Result<String, String> {
+pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
     use std::process::Command;
 
     let archive_path = Path::new(path);

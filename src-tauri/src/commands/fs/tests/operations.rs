@@ -1,10 +1,13 @@
 use super::super::operations::{
     apply_batch_rename_operations, collapse_nested_paths, collect_delete_progress_targets,
-    create_file, move_files_with_cancel_and_progress, rename_file, BatchRenameOperation,
+    copy_files_with_cancel_and_progress, create_file, move_files_with_cancel_and_progress,
+    rename_file, BatchRenameOperation,
 };
 use super::create_test_dir;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[tokio::test]
 async fn move_single_path_allows_target_file_path() {
@@ -285,6 +288,249 @@ fn batch_rename_rejects_existing_target_outside_batch() {
     }]);
 
     assert!(result.is_err());
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn batch_rename_with_empty_operations_returns_ok() {
+    let result = apply_batch_rename_operations(vec![]);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn batch_rename_single_file_is_renamed() {
+    let tmp = create_test_dir("batch_single");
+    fs::create_dir_all(&tmp).unwrap();
+    let src = tmp.join("old.txt");
+    let dst = tmp.join("new.txt");
+    fs::write(&src, b"content").unwrap();
+
+    apply_batch_rename_operations(vec![BatchRenameOperation {
+        old_path: src.to_string_lossy().to_string(),
+        new_path: dst.to_string_lossy().to_string(),
+    }])
+    .unwrap();
+
+    assert!(!src.exists());
+    assert_eq!(fs::read(&dst).unwrap(), b"content");
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn batch_rename_rejects_nonexistent_source() {
+    let tmp = create_test_dir("batch_missing");
+    fs::create_dir_all(&tmp).unwrap();
+
+    let result = apply_batch_rename_operations(vec![BatchRenameOperation {
+        old_path: tmp.join("ghost.txt").to_string_lossy().to_string(),
+        new_path: tmp.join("new.txt").to_string_lossy().to_string(),
+    }]);
+
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("does not exist"));
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn batch_rename_rejects_duplicate_targets() {
+    let tmp = create_test_dir("batch_dup_target");
+    fs::create_dir_all(&tmp).unwrap();
+    let a = tmp.join("a.txt");
+    let b = tmp.join("b.txt");
+    fs::write(&a, b"a").unwrap();
+    fs::write(&b, b"b").unwrap();
+
+    let result = apply_batch_rename_operations(vec![
+        BatchRenameOperation {
+            old_path: a.to_string_lossy().to_string(),
+            new_path: tmp.join("same.txt").to_string_lossy().to_string(),
+        },
+        BatchRenameOperation {
+            old_path: b.to_string_lossy().to_string(),
+            new_path: tmp.join("same.txt").to_string_lossy().to_string(),
+        },
+    ]);
+
+    assert!(result.is_err());
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_single_file_to_new_path() {
+    let tmp = create_test_dir("copy_single_new_path");
+    fs::create_dir_all(&tmp).unwrap();
+    let source = tmp.join("source.txt");
+    let target = tmp.join("dest.txt");
+    fs::write(&source, b"hello").unwrap();
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target.to_string_lossy().to_string(),
+        None,
+        None,
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_ok(), "copy failed: {:?}", result);
+    assert!(source.exists());
+    assert_eq!(fs::read(&target).unwrap(), b"hello");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_single_file_into_existing_directory() {
+    let tmp = create_test_dir("copy_into_dir");
+    fs::create_dir_all(&tmp).unwrap();
+    let source = tmp.join("notes.txt");
+    let target_dir = tmp.join("target");
+    fs::write(&source, b"content").unwrap();
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target_dir.to_string_lossy().to_string(),
+        None,
+        None,
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_ok(), "copy failed: {:?}", result);
+    assert_eq!(fs::read(target_dir.join("notes.txt")).unwrap(), b"content");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_multiple_files_into_directory() {
+    let tmp = create_test_dir("copy_multiple_into_dir");
+    fs::create_dir_all(&tmp).unwrap();
+    let source_a = tmp.join("a.txt");
+    let source_b = tmp.join("b.txt");
+    let target_dir = tmp.join("target");
+    fs::write(&source_a, b"aaa").unwrap();
+    fs::write(&source_b, b"bbb").unwrap();
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![
+            source_a.to_string_lossy().to_string(),
+            source_b.to_string_lossy().to_string(),
+        ],
+        target_dir.to_string_lossy().to_string(),
+        None,
+        None,
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_ok(), "copy failed: {:?}", result);
+    assert_eq!(fs::read(target_dir.join("a.txt")).unwrap(), b"aaa");
+    assert_eq!(fs::read(target_dir.join("b.txt")).unwrap(), b"bbb");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_with_keep_both_generates_copy_name() {
+    let tmp = create_test_dir("copy_keep_both");
+    fs::create_dir_all(&tmp).unwrap();
+    let source = tmp.join("notes.txt");
+    let target_dir = tmp.join("target");
+    let existing = target_dir.join("notes.txt");
+    fs::write(&source, b"new").unwrap();
+    fs::create_dir_all(&target_dir).unwrap();
+    fs::write(&existing, b"old").unwrap();
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target_dir.to_string_lossy().to_string(),
+        Some(true),
+        None,
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_ok(), "copy failed: {:?}", result);
+    assert_eq!(fs::read(&existing).unwrap(), b"old");
+    let copy_names: Vec<_> = fs::read_dir(&target_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(
+        copy_names.len(),
+        2,
+        "expected original + copy, got: {copy_names:?}"
+    );
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_directory_creates_nested_structure() {
+    let tmp = create_test_dir("copy_directory_nested");
+    let source_dir = tmp.join("docs");
+    let nested = source_dir.join("sub");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(source_dir.join("readme.txt"), b"top").unwrap();
+    fs::write(nested.join("inner.txt"), b"nested").unwrap();
+
+    let target_dir = tmp.join("target");
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![source_dir.to_string_lossy().to_string()],
+        target_dir.to_string_lossy().to_string(),
+        None,
+        None,
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_ok(), "copy failed: {:?}", result);
+    assert_eq!(
+        fs::read(target_dir.join("docs").join("readme.txt")).unwrap(),
+        b"top"
+    );
+    assert_eq!(
+        fs::read(target_dir.join("docs").join("sub").join("inner.txt")).unwrap(),
+        b"nested"
+    );
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn copy_cancelled_before_start_returns_error() {
+    let tmp = create_test_dir("copy_cancelled");
+    fs::create_dir_all(&tmp).unwrap();
+    let source = tmp.join("big.txt");
+    let target_dir = tmp.join("target");
+    fs::write(&source, b"data").unwrap();
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let cancel_flag = Arc::new(AtomicBool::new(true));
+
+    let result = copy_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target_dir.to_string_lossy().to_string(),
+        None,
+        None,
+        Some(cancel_flag),
+        |_| {},
+    )
+    .await;
+
+    assert!(result.is_err(), "expected cancelled copy to return Err");
 
     let _ = fs::remove_dir_all(&tmp);
 }

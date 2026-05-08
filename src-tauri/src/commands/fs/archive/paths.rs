@@ -71,7 +71,7 @@ pub(crate) fn get_unique_archive_path(source_dir: &Path) -> Result<PathBuf, Stri
     ))
 }
 
-pub(super) fn get_unique_archive_path_named(
+pub(crate) fn get_unique_archive_path_named(
     target_dir: &Path,
     stem: &str,
 ) -> Result<PathBuf, String> {
@@ -88,7 +88,7 @@ pub(super) fn get_unique_archive_path_named(
     Err(format!("Could not find a unique archive path for {stem}"))
 }
 
-pub(super) fn get_hidden_temp_archive_path(archive_path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn get_hidden_temp_archive_path(archive_path: &Path) -> Result<PathBuf, String> {
     let parent_dir = archive_path.parent().ok_or_else(|| {
         format!(
             "Could not find parent directory for {}",

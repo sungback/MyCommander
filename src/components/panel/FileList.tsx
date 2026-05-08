@@ -1,12 +1,11 @@
-import React, { useEffect, useRef } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import React, { useRef } from "react";
 import { FileEntry, ViewMode } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { useGitStatus } from "../../hooks/useGitStatus";
 import { usePanelStore } from "../../store/panelStore";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
-import { useSettingsStore } from "../../store/settingsStore";
+import { useShallow } from "zustand/react/shallow";
 import { clsx } from "clsx";
 import { useFileListDrag } from "./useFileListDrag";
 import { getVisibleRows } from "./fileListRows";
@@ -14,6 +13,7 @@ import { FileListVirtualRows } from "./FileListVirtualRows";
 import { useExpandedDirectories } from "./useExpandedDirectories";
 import { useFileListKeyboard } from "./useFileListKeyboard";
 import { useFileListSelection } from "./useFileListSelection";
+import { useFileListVirtualizer } from "./useFileListVirtualizer";
 
 interface FileListProps {
   currentPath: string;
@@ -44,18 +44,30 @@ export const FileList: React.FC<FileListProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { getDirSize, listDirectory } = useFileSystem();
-  const activeTab = usePanelStore((s) => {
-    const key = panelId === "left" ? "leftPanel" : "rightPanel";
-    return s[key].tabs.find((t) => t.id === s[key].activeTabId);
-  });
+  const {
+    activeTab,
+    updateEntrySize,
+    setSelection,
+    selectOnly,
+    clearSelection,
+    showHiddenFiles,
+    sizeCache,
+  } = usePanelStore(
+    useShallow((s) => {
+      const key = panelId === "left" ? "leftPanel" : "rightPanel";
+      return {
+        activeTab: s[key].tabs.find((t) => t.id === s[key].activeTabId),
+        updateEntrySize: s.updateEntrySize,
+        setSelection: s.setSelection,
+        selectOnly: s.selectOnly,
+        clearSelection: s.clearSelection,
+        showHiddenFiles: s.showHiddenFiles,
+        sizeCache: s.sizeCache,
+      };
+    })
+  );
   const refreshKey = activeTab?.lastUpdated ?? 0;
   const { gitStatus } = useGitStatus(accessPath, refreshKey);
-  const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
-  const setSelection = usePanelStore((s) => s.setSelection);
-  const selectOnly = usePanelStore((s) => s.selectOnly);
-  const clearSelection = usePanelStore((s) => s.clearSelection);
-  const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
-  const sizeCache = usePanelStore((s) => s.sizeCache);
   const clipboard = useClipboardStore((s) => s.clipboard);
   const cutPaths = clipboard?.operation === "cut"
     ? new Set(clipboard.paths)
@@ -94,8 +106,6 @@ export const FileList: React.FC<FileListProps> = ({
     sortDirection,
   });
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
-  const settingsFontSize = useSettingsStore((s) => s.fontSize);
-  const rowHeight = Math.max(24, settingsFontSize * 2);
 
   const {
     extendSelectionToRow,
@@ -152,25 +162,13 @@ export const FileList: React.FC<FileListProps> = ({
     containerRef,
   });
 
-  const rowVirtualizer = useVirtualizer({
-    count: visibleRows.length,
-    getScrollElement: () => containerRef.current,
-    estimateSize: () => rowHeight,
-    overscan: 10,
+  const { rowVirtualizer } = useFileListVirtualizer({
+    containerRef,
+    cursorIndex,
+    isActivePanel,
+    rowCount: visibleRows.length,
+    setCursorIndex,
   });
-
-  useEffect(() => {
-    if (isActivePanel && cursorIndex >= 0 && cursorIndex < visibleRows.length) {
-      rowVirtualizer.scrollToIndex(cursorIndex, { align: "auto" });
-    }
-  }, [cursorIndex, isActivePanel, rowVirtualizer, visibleRows.length]);
-
-  useEffect(() => {
-    if (visibleRows.length === 0) return;
-    if (cursorIndex >= visibleRows.length) {
-      setCursorIndex(visibleRows.length - 1);
-    }
-  }, [cursorIndex, setCursorIndex, visibleRows.length]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
