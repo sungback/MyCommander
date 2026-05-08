@@ -2,12 +2,9 @@ use super::paths::{
     get_hidden_temp_archive_path, get_unique_archive_path, get_unique_archive_path_named,
     validate_zip_source_directory,
 };
-use super::progress::{
-    build_zip_canceled_message, build_zip_failure_details, emit_zip_progress,
-    parse_zip_progress_entry,
-};
+use super::process::{remove_temp_archive, spawn_zip_stderr_collector, spawn_zip_stdout_collector};
+use super::progress::{build_zip_canceled_message, build_zip_failure_details, emit_zip_progress};
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -162,64 +159,9 @@ fn create_zip_archive_with_zip_command(
         .take()
         .ok_or_else(|| "Failed to capture zip stderr.".to_string())?;
 
-    let progress_counter_for_stdout = progress_counter.clone();
-    let app_for_stdout = app.clone();
-    let stdout_handle = std::thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        let mut collected = Vec::new();
-
-        for line_result in reader.lines() {
-            match line_result {
-                Ok(line) => {
-                    let trimmed = line.trim().to_string();
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-
-                    if let Some(entry_name) = parse_zip_progress_entry(&trimmed) {
-                        let current =
-                            progress_counter_for_stdout.fetch_add(1, Ordering::SeqCst) + 1;
-                        emit_zip_progress(
-                            &app_for_stdout,
-                            current.min(total_entries),
-                            total_entries,
-                            &entry_name,
-                        );
-                    }
-
-                    collected.push(trimmed);
-                }
-                Err(error) => {
-                    collected.push(format!("stdout read error: {error}"));
-                    break;
-                }
-            }
-        }
-
-        collected
-    });
-
-    let stderr_handle = std::thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        let mut collected = Vec::new();
-
-        for line_result in reader.lines() {
-            match line_result {
-                Ok(line) => {
-                    let trimmed = line.trim().to_string();
-                    if !trimmed.is_empty() {
-                        collected.push(trimmed);
-                    }
-                }
-                Err(error) => {
-                    collected.push(format!("stderr read error: {error}"));
-                    break;
-                }
-            }
-        }
-
-        collected
-    });
+    let stdout_handle =
+        spawn_zip_stdout_collector(stdout, app.clone(), progress_counter.clone(), total_entries);
+    let stderr_handle = spawn_zip_stderr_collector(stderr);
 
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
@@ -227,7 +169,7 @@ fn create_zip_archive_with_zip_command(
             let _ = child.wait();
             let stdout_lines = stdout_handle.join().unwrap_or_default();
             let stderr_lines = stderr_handle.join().unwrap_or_default();
-            let _ = fs::remove_file(&temp_archive_path);
+            remove_temp_archive(&temp_archive_path);
             return Err(build_zip_canceled_message(&stdout_lines, &stderr_lines));
         }
 
@@ -237,7 +179,7 @@ fn create_zip_archive_with_zip_command(
                 let stderr_lines = stderr_handle.join().unwrap_or_default();
 
                 if !status.success() {
-                    let _ = fs::remove_file(&temp_archive_path);
+                    remove_temp_archive(&temp_archive_path);
                     return Err(format!(
                         "Failed to create archive at {}. {}",
                         archive_path.display(),
@@ -252,7 +194,7 @@ fn create_zip_archive_with_zip_command(
                     archive_path.to_string_lossy().as_ref(),
                 );
                 fs::rename(&temp_archive_path, &archive_path).map_err(|e| {
-                    let _ = fs::remove_file(&temp_archive_path);
+                    remove_temp_archive(&temp_archive_path);
                     format!(
                         "Failed to finalize archive at {}: {e}",
                         archive_path.display()

@@ -1,6 +1,7 @@
 mod create;
 mod extract;
 mod paths;
+mod process;
 mod progress;
 
 use std::sync::atomic::{AtomicBool, Ordering};

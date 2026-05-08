@@ -3,12 +3,12 @@ import { useFileSystem } from "../../hooks/useFileSystem";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
-import { BaseDialog } from "./BaseDialog";
 import { CopyConflictDialog } from "./CopyConflictDialog";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
-import { DialogTextInput } from "./DialogTextInput";
+import { TextInputOperationDialog } from "./TextInputOperationDialog";
 import {
   getDragCopyTargetPath,
   getSelectedItemsText,
@@ -138,7 +138,7 @@ export const DialogContainer: React.FC = () => {
 
   return (
     <>
-      <BaseDialog
+      <TextInputOperationDialog
         isOpen={openDialog === "mkdir"}
         onClose={closeDialog}
         onSubmit={handleMkdir}
@@ -146,17 +146,15 @@ export const DialogContainer: React.FC = () => {
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
+        value={inputValue}
+        onValueChange={updateInputValue}
       >
         <p className="text-xs text-text-secondary mb-2">
           Create directory in: {activePanel.currentPath}
         </p>
-        <DialogTextInput
-          value={inputValue}
-          onValueChange={updateInputValue}
-        />
-      </BaseDialog>
+      </TextInputOperationDialog>
 
-      <BaseDialog
+      <TextInputOperationDialog
         isOpen={openDialog === "newfile"}
         onClose={closeDialog}
         onSubmit={handleNewFile}
@@ -164,17 +162,15 @@ export const DialogContainer: React.FC = () => {
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
+        value={inputValue}
+        onValueChange={updateInputValue}
       >
         <p className="text-xs text-text-secondary mb-2">
           Create file in: {activePanel.currentPath}
         </p>
-        <DialogTextInput
-          value={inputValue}
-          onValueChange={updateInputValue}
-        />
-      </BaseDialog>
+      </TextInputOperationDialog>
 
-      <BaseDialog
+      <TextInputOperationDialog
         isOpen={openDialog === "rename"}
         onClose={closeDialog}
         onSubmit={handleRename}
@@ -184,37 +180,26 @@ export const DialogContainer: React.FC = () => {
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
+        inputRef={renameInputRef}
+        onFocus={handleRenameInputFocus}
+        value={inputValue}
+        onValueChange={updateInputValue}
       >
         <p className="text-xs text-text-secondary mb-2">
           Rename item in: {dialogTarget ? dialogTarget.path : activePanel.currentPath}
         </p>
-        <DialogTextInput
-          inputRef={renameInputRef}
-          onFocus={handleRenameInputFocus}
-          value={inputValue}
-          onValueChange={updateInputValue}
-        />
-      </BaseDialog>
+      </TextInputOperationDialog>
 
-      <BaseDialog
+      <DeleteConfirmationDialog
         isOpen={openDialog === "delete"}
         onClose={closeDialog}
         onSubmit={handleDelete}
-        title="Confirm Deletion"
-        submitLabel={isSubmitting ? "Deleting..." : "Delete"}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
-      >
-        <p className="text-sm">
-          Do you really want to delete{" "}
-          <span className="font-semibold text-accent-color break-all">
-            {getSelectedItemsText(selectedPaths)}
-          </span>
-          ?
-        </p>
-      </BaseDialog>
+        itemLabel={getSelectedItemsText(selectedPaths)}
+      />
 
-      <BaseDialog
+      <TextInputOperationDialog
         isOpen={openDialog === "copy"}
         onClose={closeDialog}
         onSubmit={() => handleCopyMove(false)}
@@ -223,6 +208,8 @@ export const DialogContainer: React.FC = () => {
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
+        value={inputValue}
+        onValueChange={updateInputValue}
       >
         <div className="text-sm mb-4">
           <span className="text-text-secondary">Selected: </span>
@@ -231,13 +218,9 @@ export const DialogContainer: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-text-secondary mb-2">Copy to:</p>
-        <DialogTextInput
-          value={inputValue}
-          onValueChange={updateInputValue}
-        />
-      </BaseDialog>
+      </TextInputOperationDialog>
 
-      <BaseDialog
+      <TextInputOperationDialog
         isOpen={openDialog === "move"}
         onClose={closeDialog}
         onSubmit={() => handleCopyMove(true)}
@@ -250,6 +233,8 @@ export const DialogContainer: React.FC = () => {
         submitAutoFocus={false}
         isSubmitting={isSubmitting}
         errorMessage={operationError}
+        value={inputValue}
+        onValueChange={updateInputValue}
       >
         <div className="text-sm mb-4">
           <span className="text-text-secondary">Selected: </span>
@@ -258,11 +243,7 @@ export const DialogContainer: React.FC = () => {
           </span>
         </div>
         <p className="text-xs text-text-secondary mb-2">Move/Rename to:</p>
-        <DialogTextInput
-          value={inputValue}
-          onValueChange={updateInputValue}
-        />
-      </BaseDialog>
+      </TextInputOperationDialog>
 
       <FileInfoDialog
         isOpen={openDialog === "info"}

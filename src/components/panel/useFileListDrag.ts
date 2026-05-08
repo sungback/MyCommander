@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { FileEntry } from "../../types/file";
 import { usePanelStore } from "../../store/panelStore";
 import { useDragStore } from "../../store/dragStore";
@@ -10,16 +9,12 @@ import {
   sharedPanelPaths,
 } from "./fileListDragSharedState";
 import {
-  getDraggedDirectoryPaths,
   getPanelIdFromElement,
-  hasPointerMovedBeyondThreshold,
   resolveCrossPanelDropIntent,
   resolveMouseUpTargetPanel,
   resolveSamePanelDropIntent,
 } from "./fileListDragRules";
-import { isPointerOutsideWindow } from "./fileListDragPointer";
 import type { VisibleEntryRow } from "./fileListRows";
-import { getDragIcon } from "./fileListDragIcon";
 import { useFileListDragActions } from "./useFileListDragActions";
 import { useExternalFileDrop } from "./useExternalFileDrop";
 import { updateFileListDragHover } from "./fileListDragHover";
@@ -31,6 +26,12 @@ import {
   runCrossPanelDropAction,
   runSamePanelDropAction,
 } from "./fileListDragDropActions";
+import {
+  resetDocumentDragStyles,
+  startLocalDragAfterThreshold,
+  startNativeDragOutsideWindow,
+  type FileListDragInteractionState,
+} from "./fileListDragInteraction";
 
 const DRAG_THRESHOLD_PX = 6;
 
@@ -56,13 +57,7 @@ export const useFileListDrag = ({
   const { dropUiState, updateDropUiState } = useFileListDropUiState();
   const [isLocalDragActive, setIsLocalDragActive] = useState(false);
 
-  const dragStateRef = useRef<{
-    startX: number;
-    startY: number;
-    paths: string[];
-    dragging: boolean;
-    nativeDragStarted: boolean;
-  } | null>(null);
+  const dragStateRef = useRef<FileListDragInteractionState | null>(null);
 
   const resetDragInteraction = useCallback(() => {
     setDragInfo(null);
@@ -102,35 +97,23 @@ export const useFileListDrag = ({
       if (!state || state.nativeDragStarted) return;
 
       if (!state.dragging) {
-        if (
-          hasPointerMovedBeyondThreshold({
-            startX: state.startX,
-            startY: state.startY,
-            currentX: pointer.clientX,
-            currentY: pointer.clientY,
-            thresholdPx: DRAG_THRESHOLD_PX,
-          })
-        ) {
-          const directoryPaths = getDraggedDirectoryPaths(state.paths, visibleRows);
-          state.dragging = true;
-          setDragInfo({ paths: state.paths, directoryPaths, sourcePanel: panelId });
-          setIsLocalDragActive(true);
-          document.body.style.cursor = "grabbing";
-          document.body.style.userSelect = "none";
-        }
+        startLocalDragAfterThreshold({
+          panelId,
+          pointer,
+          selectedState: state,
+          setDragInfo,
+          setIsLocalDragActive,
+          thresholdPx: DRAG_THRESHOLD_PX,
+          visibleRows,
+        });
         return;
       }
 
-      if (isPointerOutsideWindow(pointer)) {
-        state.nativeDragStarted = true;
-        document.body.style.cursor = "";
-
-        startDrag({ item: state.paths, icon: getDragIcon() })
-          .then(() => {
-            resetDragInteraction();
-          })
-          .catch(console.error);
-      }
+      startNativeDragOutsideWindow({
+        pointer,
+        resetDragInteraction,
+        selectedState: state,
+      });
     };
 
     const handleMouseUp = (event: MouseEvent) => {
@@ -142,8 +125,7 @@ export const useFileListDrag = ({
         return;
       }
 
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      resetDocumentDragStyles();
 
       if (state.dragging) {
         const activeDragInfo = useDragStore.getState().dragInfo;

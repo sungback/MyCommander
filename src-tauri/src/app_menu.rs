@@ -28,6 +28,25 @@ pub(crate) const FOLDER_SYNC_MENU_ITEM_ID: &str = "folder_sync";
 pub(crate) const TARGET_EQUALS_SOURCE_MENU_ITEM_ID: &str = "target_equals_source";
 pub(crate) const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
 
+fn app_menu_item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+    accelerator: Option<&str>,
+) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(app, id, label, true, accelerator)
+}
+
+fn app_check_menu_item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+    checked: bool,
+    accelerator: Option<&str>,
+) -> tauri::Result<CheckMenuItem<R>> {
+    CheckMenuItem::with_id(app, id, label, true, checked, accelerator)
+}
+
 pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let pkg_info = app.package_info();
     let config = app.config();
@@ -43,27 +62,24 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         ..Default::default()
     };
 
-    let show_hidden_files = CheckMenuItem::with_id(
+    let show_hidden_files = app_check_menu_item(
         app,
         SHOW_HIDDEN_MENU_ITEM_ID,
         "숨김 파일 표시",
-        true,
         false,
         Some("CmdOrCtrl+Shift+Period"),
     )?;
-    let left_view_mode_brief = CheckMenuItem::with_id(
+    let left_view_mode_brief = app_check_menu_item(
         app,
         LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
         "간단히",
-        true,
         false,
         None::<&str>,
     )?;
-    let left_view_mode_detailed = CheckMenuItem::with_id(
+    let left_view_mode_detailed = app_check_menu_item(
         app,
         LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
         "자세히",
-        true,
         true,
         None::<&str>,
     )?;
@@ -74,19 +90,17 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         true,
         &[&left_view_mode_brief, &left_view_mode_detailed],
     )?;
-    let right_view_mode_brief = CheckMenuItem::with_id(
+    let right_view_mode_brief = app_check_menu_item(
         app,
         RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
         "간단히",
-        true,
         false,
         None::<&str>,
     )?;
-    let right_view_mode_detailed = CheckMenuItem::with_id(
+    let right_view_mode_detailed = app_check_menu_item(
         app,
         RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
         "자세히",
-        true,
         true,
         None::<&str>,
     )?;
@@ -98,30 +112,11 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         &[&right_view_mode_brief, &right_view_mode_detailed],
     )?;
 
-    let theme_auto = CheckMenuItem::with_id(
-        app,
-        THEME_AUTO_MENU_ITEM_ID,
-        "자동",
-        true,
-        true,
-        None::<&str>,
-    )?;
-    let theme_light = CheckMenuItem::with_id(
-        app,
-        THEME_LIGHT_MENU_ITEM_ID,
-        "라이트",
-        true,
-        false,
-        None::<&str>,
-    )?;
-    let theme_dark = CheckMenuItem::with_id(
-        app,
-        THEME_DARK_MENU_ITEM_ID,
-        "다크",
-        true,
-        false,
-        None::<&str>,
-    )?;
+    let theme_auto = app_check_menu_item(app, THEME_AUTO_MENU_ITEM_ID, "자동", true, None::<&str>)?;
+    let theme_light =
+        app_check_menu_item(app, THEME_LIGHT_MENU_ITEM_ID, "라이트", false, None::<&str>)?;
+    let theme_dark =
+        app_check_menu_item(app, THEME_DARK_MENU_ITEM_ID, "다크", false, None::<&str>)?;
     let theme_menu = Submenu::with_id_and_items(
         app,
         THEME_MENU_ID,
@@ -129,11 +124,10 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         true,
         &[&theme_auto, &theme_light, &theme_dark],
     )?;
-    let recover_renderer = MenuItem::with_id(
+    let recover_renderer = app_menu_item(
         app,
         RECOVER_RENDERER_MENU_ITEM_ID,
         "화면 복구",
-        true,
         Some("CmdOrCtrl+Shift+R"),
     )?;
 
@@ -149,47 +143,26 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         ],
     )?;
 
-    let new_folder = MenuItem::with_id(app, NEW_FOLDER_MENU_ITEM_ID, "새 폴더", true, Some("F7"))?;
-    let new_file = MenuItem::with_id(
-        app,
-        NEW_FILE_MENU_ITEM_ID,
-        "새 파일",
-        true,
-        Some("Shift+F4"),
-    )?;
-    let multi_rename = MenuItem::with_id(
+    let new_folder = app_menu_item(app, NEW_FOLDER_MENU_ITEM_ID, "새 폴더", Some("F7"))?;
+    let new_file = app_menu_item(app, NEW_FILE_MENU_ITEM_ID, "새 파일", Some("Shift+F4"))?;
+    let multi_rename = app_menu_item(
         app,
         MULTI_RENAME_MENU_ITEM_ID,
         "일괄 이름 변경 도구",
-        true,
         None::<&str>,
     )?;
-    let settings = MenuItem::with_id(
-        app,
-        SETTINGS_MENU_ITEM_ID,
-        "설정",
-        true,
-        Some("CmdOrCtrl+,"),
-    )?;
-    let folder_sync = MenuItem::with_id(
-        app,
-        FOLDER_SYNC_MENU_ITEM_ID,
-        "폴더 동기화",
-        true,
-        Some("F11"),
-    )?;
-    let target_equals_source = MenuItem::with_id(
+    let settings = app_menu_item(app, SETTINGS_MENU_ITEM_ID, "설정", Some("CmdOrCtrl+,"))?;
+    let folder_sync = app_menu_item(app, FOLDER_SYNC_MENU_ITEM_ID, "폴더 동기화", Some("F11"))?;
+    let target_equals_source = app_menu_item(
         app,
         TARGET_EQUALS_SOURCE_MENU_ITEM_ID,
         "대상=원본",
-        true,
         Some("CmdOrCtrl+Shift+M"),
     )?;
-    let swap_panels = MenuItem::with_id(
+    let swap_panels = app_menu_item(
         app,
         SWAP_PANELS_MENU_ITEM_ID,
         "패널 교환",
-        true,
         Some("CmdOrCtrl+U"),
     )?;
     let commands_menu = Submenu::with_id_and_items(

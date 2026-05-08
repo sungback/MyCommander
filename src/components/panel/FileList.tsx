@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileEntry, ViewMode } from "../../types/file";
-import { FileItem } from "./FileItem";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { useGitStatus } from "../../hooks/useGitStatus";
 import { usePanelStore } from "../../store/panelStore";
@@ -11,8 +10,7 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { clsx } from "clsx";
 import { useFileListDrag } from "./useFileListDrag";
 import { getVisibleRows } from "./fileListRows";
-import { getFileEntryDataAttributes } from "./fileEntryElement";
-import { getGitMarkForEntry } from "./fileListGitMark";
+import { FileListVirtualRows } from "./FileListVirtualRows";
 import { useExpandedDirectories } from "./useExpandedDirectories";
 import { useFileListKeyboard } from "./useFileListKeyboard";
 import { useFileListSelection } from "./useFileListSelection";
@@ -202,55 +200,25 @@ export const FileList: React.FC<FileListProps> = ({
       }}
       onKeyDown={handleKeyDown}
     >
-      <div
-        className="relative min-h-full w-full"
-        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-      >
-        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-          const row = visibleRows[virtualItem.index];
-          const entry = row.entry;
-          return (
-            <div
-              key={`${entry.path}:${row.depth}`}
-              className="absolute top-0 left-0 w-full"
-              {...getFileEntryDataAttributes(entry, virtualItem.index)}
-              style={{
-                height: `${virtualItem.size}px`,
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-              onMouseDown={(e) => handleMouseDown(e, entry)}
-            >
-              <FileItem
-                entry={entry}
-                depth={row.depth}
-                canExpand={row.canExpand}
-                isExpanded={row.isExpanded}
-                isSelected={selectedItems.has(entry.path)}
-                isCursor={cursorIndex === virtualItem.index}
-                isActivePanel={isActivePanel}
-                isDragSource={isLocalDragActive && selectedItems.has(entry.path)}
-                isCut={cutPaths?.has(entry.path) ?? false}
-                dropHint={
-                  dropUiState.dropTargetPath === entry.path
-                    ? dropUiState.isDropAllowed
-                      ? "copy"
-                      : "blocked"
-                    : null
-                }
-                viewMode={viewMode}
-                gitMark={getGitMarkForEntry(entry, gitStatus)}
-                onClick={(event) => {
-                  handleRowClick(event, virtualItem.index, entry);
-                }}
-                onDoubleClick={() => onEnter(entry)}
-                onToggleExpand={() => {
-                  void toggleExpanded(virtualItem.index, entry);
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
+      <FileListVirtualRows
+        cutPaths={cutPaths}
+        cursorIndex={cursorIndex}
+        dropUiState={dropUiState}
+        gitStatus={gitStatus}
+        isActivePanel={isActivePanel}
+        isLocalDragActive={isLocalDragActive}
+        onEnter={onEnter}
+        onMouseDown={handleMouseDown}
+        onRowClick={handleRowClick}
+        onToggleExpand={(rowIndex, entry) => {
+          void toggleExpanded(rowIndex, entry);
+        }}
+        selectedItems={selectedItems}
+        totalHeight={rowVirtualizer.getTotalSize()}
+        viewMode={viewMode}
+        virtualItems={rowVirtualizer.getVirtualItems()}
+        visibleRows={visibleRows}
+      />
     </div>
   );
 };
