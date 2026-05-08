@@ -15,6 +15,29 @@ pub struct GitStatus {
 mod tests {
     use super::*;
     use std::io;
+    use std::process::{ExitStatus, Output};
+
+    #[cfg(unix)]
+    fn success_status() -> ExitStatus {
+        use std::os::unix::process::ExitStatusExt;
+
+        ExitStatus::from_raw(0)
+    }
+
+    #[cfg(windows)]
+    fn success_status() -> ExitStatus {
+        use std::os::windows::process::ExitStatusExt;
+
+        ExitStatus::from_raw(0)
+    }
+
+    fn success_output(stdout: &str) -> Output {
+        Output {
+            status: success_status(),
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: Vec::new(),
+        }
+    }
 
     #[test]
     fn git_status_returns_none_when_git_cannot_start() {
@@ -23,6 +46,51 @@ mod tests {
                 .unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn git_status_parses_branch_and_relativizes_paths_from_subdirectory() {
+        let outputs = [
+            success_output("/repo\n"),
+            success_output(
+                "## main...origin/main\n M src/app.rs\nA  src/new.rs\n D src/old.rs\n?? src/tmp.txt\n",
+            ),
+        ];
+        let mut output_iter = outputs.into_iter();
+
+        let result = get_git_status_with_runner("/repo/src", |_, _| {
+            output_iter
+                .next()
+                .ok_or_else(|| io::Error::other("unexpected git call"))
+        })
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(result.branch, "main");
+        assert_eq!(result.modified, vec!["app.rs"]);
+        assert_eq!(result.added, vec!["new.rs"]);
+        assert_eq!(result.deleted, vec!["old.rs"]);
+        assert_eq!(result.untracked, vec!["tmp.txt"]);
+    }
+
+    #[test]
+    fn git_status_keeps_head_branch_name_without_upstream() {
+        let outputs = [
+            success_output("/repo\n"),
+            success_output("## HEAD (no branch)\n M README.md\n"),
+        ];
+        let mut output_iter = outputs.into_iter();
+
+        let result = get_git_status_with_runner("/repo", |_, _| {
+            output_iter
+                .next()
+                .ok_or_else(|| io::Error::other("unexpected git call"))
+        })
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(result.branch, "HEAD (no branch)");
+        assert_eq!(result.modified, vec!["README.md"]);
     }
 
     #[test]
@@ -50,101 +118,115 @@ fn get_git_status_with_runner<F>(path: &str, mut run_git: F) -> Result<Option<Gi
 where
     F: FnMut(&str, &[&str]) -> io::Result<Output>,
 {
-    let root_output = match run_git(path, &["rev-parse", "--show-toplevel"]) {
-        Ok(output) => output,
-        Err(_) => return Ok(None),
+    let root_output =
+        match run_successful_git_command(&mut run_git, path, &["rev-parse", "--show-toplevel"]) {
+            Some(output) => output,
+            None => return Ok(None),
+        };
+    let git_root = git_output_to_trimmed_string(&root_output);
+    let rel_prefix = git_relative_prefix(path, &git_root);
+
+    let status_output = match run_successful_git_command(
+        &mut run_git,
+        path,
+        &["status", "--porcelain", "--branch"],
+    ) {
+        Some(output) => output,
+        None => return Ok(None),
     };
 
-    if !root_output.status.success() {
-        // Not a git repository
-        return Ok(None);
+    Ok(Some(parse_git_status_output(
+        &status_output.stdout,
+        &rel_prefix,
+    )))
+}
+
+fn run_successful_git_command<F>(run_git: &mut F, path: &str, args: &[&str]) -> Option<Output>
+where
+    F: FnMut(&str, &[&str]) -> io::Result<Output>,
+{
+    run_git(path, args)
+        .ok()
+        .filter(|output| output.status.success())
+}
+
+fn git_output_to_trimmed_string(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn git_relative_prefix(path: &str, git_root: &str) -> String {
+    let path_clean = path.trim_end_matches('/');
+    let root_clean = git_root.trim_end_matches('/');
+
+    if path_clean == root_clean {
+        return String::new();
     }
 
-    let git_root = String::from_utf8_lossy(&root_output.stdout)
-        .trim()
-        .to_string();
-
-    // Calculate relative path prefix from git root to current path
-    let rel_prefix = {
-        let path_clean = path.trim_end_matches('/');
-        let root_clean = git_root.trim_end_matches('/');
-
-        if path_clean != root_clean && path_clean.starts_with(root_clean) {
-            let rel = &path_clean[root_clean.len()..].trim_start_matches('/');
-            if !rel.is_empty() {
-                format!("{}/", rel.replace('\\', "/"))
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        }
+    let Some(rel) = path_clean.strip_prefix(root_clean) else {
+        return String::new();
     };
+    let rel = rel.trim_start_matches('/');
 
-    // Get git status with porcelain format
-    let status_output = match run_git(path, &["status", "--porcelain", "--branch"]) {
-        Ok(output) => output,
-        Err(_) => return Ok(None),
-    };
-
-    if !status_output.status.success() {
-        return Ok(None);
+    if rel.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", rel.replace('\\', "/"))
     }
+}
 
-    let status_str = String::from_utf8_lossy(&status_output.stdout);
-    let lines: Vec<&str> = status_str.lines().collect();
-
-    let mut branch = "unknown".to_string();
-    let mut modified = Vec::new();
-    let mut added = Vec::new();
-    let mut deleted = Vec::new();
-    let mut untracked = Vec::new();
-
-    // Helper to strip rel_prefix from paths
-    let relativize = |p: String| -> String {
-        if rel_prefix.is_empty() {
-            p
-        } else if p.starts_with(&rel_prefix) {
-            p[rel_prefix.len()..].to_string()
-        } else {
-            p
-        }
+fn parse_git_status_output(stdout: &[u8], rel_prefix: &str) -> GitStatus {
+    let status_str = String::from_utf8_lossy(stdout);
+    let mut status = GitStatus {
+        branch: "unknown".to_string(),
+        modified: Vec::new(),
+        added: Vec::new(),
+        deleted: Vec::new(),
+        untracked: Vec::new(),
     };
 
-    for line in lines {
-        // Parse branch from "## main...origin/main" or "## HEAD"
+    for line in status_str.lines() {
         if let Some(branch_info) = line.strip_prefix("## ") {
-            branch = branch_info
-                .split("...")
-                .next()
-                .unwrap_or(branch_info)
-                .trim()
-                .to_string();
-        } else if line.len() >= 3 {
-            let status_code = &line[0..2];
-            let file_path = line[3..].to_string();
+            status.branch = parse_branch_name(branch_info);
+            continue;
+        }
 
-            // Match both index and worktree states
-            let c1 = status_code.chars().next();
-            let c2 = status_code.chars().nth(1);
+        let Some(((index_status, worktree_status), file_path)) = parse_porcelain_status_line(line)
+        else {
+            continue;
+        };
+        let file_path = relativize_git_path(file_path, rel_prefix);
 
-            match (c1, c2) {
-                (Some('M'), _) | (_, Some('M')) => modified.push(relativize(file_path)),
-                (Some('A'), _) | (_, Some('A')) => added.push(relativize(file_path)),
-                (Some('D'), _) | (_, Some('D')) => deleted.push(relativize(file_path)),
-                (Some('?'), Some('?')) => untracked.push(relativize(file_path)),
-                _ => {}
-            }
+        match (index_status, worktree_status) {
+            ('M', _) | (_, 'M') => status.modified.push(file_path),
+            ('A', _) | (_, 'A') => status.added.push(file_path),
+            ('D', _) | (_, 'D') => status.deleted.push(file_path),
+            ('?', '?') => status.untracked.push(file_path),
+            _ => {}
         }
     }
 
-    Ok(Some(GitStatus {
-        branch,
-        modified,
-        added,
-        deleted,
-        untracked,
-    }))
+    status
+}
+
+fn parse_branch_name(branch_info: &str) -> String {
+    branch_info
+        .split_once("...")
+        .map_or(branch_info, |(branch, _)| branch)
+        .trim()
+        .to_string()
+}
+
+fn parse_porcelain_status_line(line: &str) -> Option<((char, char), &str)> {
+    let mut chars = line.chars();
+    let index_status = chars.next()?;
+    let worktree_status = chars.next()?;
+    chars.next()?;
+
+    Some(((index_status, worktree_status), chars.as_str()))
+}
+
+fn relativize_git_path(path: &str, rel_prefix: &str) -> String {
+    path.strip_prefix(rel_prefix).unwrap_or(path).to_string()
 }
 
 fn run_background_git(path: &str, args: &[&str]) -> io::Result<Output> {

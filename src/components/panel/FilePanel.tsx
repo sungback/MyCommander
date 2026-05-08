@@ -128,7 +128,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       }
 
       try {
-        const handled = await enterArchiveEntry({
+        await enterArchiveEntry({
           entry,
           fs,
           onZipExtracted: isZipArchive
@@ -138,11 +138,6 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
               }
             : undefined,
         });
-
-        if (!handled) {
-          console.log("Cannot enter file, need to open:", entry.path);
-          return;
-        }
       } catch (error) {
         console.error("Failed to open archive file:", error);
         window.alert(
