@@ -1,20 +1,30 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FavoritesPanel } from "./FavoritesPanel";
 
 const {
   mockFavoriteState,
+  mockLocationState,
   mockPanelState,
   mockAddFavorite,
   mockRemoveFavorite,
   mockRenameFavorite,
   mockReorderFavorites,
+  mockRemoveLocation,
   mockSetPath,
   mockToggleFavoritesPanel,
   mockShowTransientToast,
 } = vi.hoisted(() => ({
   mockFavoriteState: {
     favorites: [] as Array<{ id: string; name: string; path: string; order: number }>,
+  },
+  mockLocationState: {
+    locations: [] as Array<{
+      path: string;
+      name: string;
+      lastVisited: number;
+      visitCount: number;
+    }>,
   },
   mockPanelState: {
     activePanel: "left" as const,
@@ -43,6 +53,7 @@ const {
   mockRemoveFavorite: vi.fn(),
   mockRenameFavorite: vi.fn(),
   mockReorderFavorites: vi.fn(),
+  mockRemoveLocation: vi.fn(),
   mockSetPath: vi.fn(),
   mockToggleFavoritesPanel: vi.fn(),
   mockShowTransientToast: vi.fn(),
@@ -63,6 +74,40 @@ vi.mock("../../store/favoriteStore", () => ({
     {
       getState: () => ({
         favorites: mockFavoriteState.favorites,
+      }),
+    }
+  ),
+}));
+
+vi.mock("../../store/locationHistoryStore", () => ({
+  getFrequentLocations: (
+    locations: typeof mockLocationState.locations,
+    limit = 5
+  ) =>
+    [...locations]
+      .filter((entry) => entry.visitCount > 1)
+      .sort(
+        (left, right) =>
+          right.visitCount - left.visitCount ||
+          right.lastVisited - left.lastVisited
+      )
+      .slice(0, limit),
+  getRecentLocations: (
+    locations: typeof mockLocationState.locations,
+    limit = 8
+  ) => [...locations].sort((left, right) => right.lastVisited - left.lastVisited).slice(0, limit),
+  useLocationHistoryStore: Object.assign(
+    (selector?: (state: Record<string, unknown>) => unknown) =>
+      selector
+        ? selector({
+            locations: mockLocationState.locations,
+            removeLocation: mockRemoveLocation,
+          })
+        : null,
+    {
+      getState: () => ({
+        locations: mockLocationState.locations,
+        removeLocation: mockRemoveLocation,
       }),
     }
   ),
@@ -145,6 +190,7 @@ describe("FavoritesPanel", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockFavoriteState.favorites = [];
+    mockLocationState.locations = [];
     mockPanelState.activePanel = "left";
     mockPanelState.dragInfo = null;
   });
@@ -274,5 +320,42 @@ describe("FavoritesPanel", () => {
       durationMs: 1800,
       tone: "success",
     });
+  });
+
+  it("최근 위치를 클릭하면 활성 패널에서 해당 경로를 연다", () => {
+    mockLocationState.locations = [
+      {
+        path: "/home/user/Projects",
+        name: "Projects",
+        lastVisited: 20,
+        visitCount: 1,
+      },
+    ];
+
+    const { getByText } = render(<FavoritesPanel />);
+
+    fireEvent.click(getByText("Projects"));
+
+    expect(mockSetPath).toHaveBeenCalledWith("left", "/home/user/Projects");
+  });
+
+  it("자주 쓰는 위치를 표시하고 기록 제거를 호출한다", () => {
+    mockLocationState.locations = [
+      {
+        path: "/home/user/Projects",
+        name: "Projects",
+        lastVisited: 20,
+        visitCount: 3,
+      },
+    ];
+
+    const { getByText, getByTitle } = render(<FavoritesPanel />);
+
+    expect(getByText("자주 쓰는 위치")).toBeInTheDocument();
+    expect(getByText("3")).toBeInTheDocument();
+
+    fireEvent.click(getByTitle("위치 기록 제거"));
+
+    expect(mockRemoveLocation).toHaveBeenCalledWith("/home/user/Projects");
   });
 });

@@ -8,6 +8,7 @@ import {
   FilePenLine,
   FilePlus,
   FolderPlus,
+  FolderOpen,
   Info,
   Keyboard,
   ListChecks,
@@ -23,6 +24,11 @@ import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useJobStore } from "../../store/jobStore";
+import {
+  getFrequentLocations,
+  getRecentLocations,
+  useLocationHistoryStore,
+} from "../../store/locationHistoryStore";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
 import { showTransientToast } from "../../store/toastStore";
@@ -38,6 +44,7 @@ import {
   moveCommandPaletteSelection,
   type CommandPaletteActions,
   type CommandPaletteItem,
+  type CommandPaletteLocation,
 } from "./commandPaletteActions";
 
 const ITEM_ICONS: Record<string, LucideIcon> = {
@@ -68,6 +75,9 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   quit: Keyboard,
 };
 
+const getCommandIcon = (item: CommandPaletteItem) =>
+  item.id.startsWith("open-location:") ? FolderOpen : ITEM_ICONS[item.id] ?? Command;
+
 const getArchiveStem = (path: string) =>
   path.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean).pop() || "Archive";
 
@@ -85,7 +95,7 @@ const CommandRow = ({
   isActive: boolean;
   onRun: (item: CommandPaletteItem) => void;
 }) => {
-  const Icon = ITEM_ICONS[item.id] ?? Command;
+  const Icon = getCommandIcon(item);
   const isDisabled = Boolean(item.disabledReason);
 
   return (
@@ -133,7 +143,9 @@ export const CommandPalette: React.FC = () => {
   const setShowHiddenFiles = usePanelStore((state) => state.setShowHiddenFiles);
   const swapPanels = usePanelStore((state) => state.swapPanels);
   const setActivePanel = usePanelStore((state) => state.setActivePanel);
+  const setPath = usePanelStore((state) => state.setPath);
   const refreshPanel = usePanelStore((state) => state.refreshPanel);
+  const locations = useLocationHistoryStore((state) => state.locations);
   const setClipboard = useClipboardStore((state) => state.setClipboard);
   const clipboard = useClipboardStore((state) => state.clipboard);
   const upsertJob = useJobStore((state) => state.upsertJob);
@@ -153,6 +165,25 @@ export const CommandPalette: React.FC = () => {
     [activePanel, activePanelId]
   );
   const activeAccessPath = getPanelCommandPath(activePanel);
+  const commandLocations = useMemo<CommandPaletteLocation[]>(() => {
+    const frequent = getFrequentLocations(locations, 4).map((location) => ({
+      path: location.path,
+      name: location.name,
+      visitCount: location.visitCount,
+      source: "frequent" as const,
+    }));
+    const frequentPaths = new Set(frequent.map((location) => location.path));
+    const recent = getRecentLocations(locations, 6)
+      .filter((location) => !frequentPaths.has(location.path))
+      .map((location) => ({
+        path: location.path,
+        name: location.name,
+        visitCount: location.visitCount,
+        source: "recent" as const,
+      }));
+
+    return [...frequent, ...recent];
+  }, [locations]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -278,6 +309,10 @@ export const CommandPalette: React.FC = () => {
         });
       },
       openJobCenter: () => setOpenDialog("jobcenter"),
+      openLocation: (path: string) => {
+        closeDialog();
+        setPath(activePanelId, path);
+      },
       openMkdir: () => setOpenDialog("mkdir"),
       openMove: () => setOpenDialog("move"),
       openNewFile: () => setOpenDialog("newfile"),
@@ -356,6 +391,7 @@ export const CommandPalette: React.FC = () => {
       setActivePanel,
       setClipboard,
       setOpenDialog,
+      setPath,
       setShowHiddenFiles,
       showHiddenFiles,
       swapPanels,
@@ -370,6 +406,7 @@ export const CommandPalette: React.FC = () => {
         activePanel,
         actions,
         isMac,
+        locations: commandLocations,
         primaryTarget,
         selectedPaths,
         showHiddenFiles,
@@ -379,6 +416,7 @@ export const CommandPalette: React.FC = () => {
       activePanel,
       activePanelId,
       isMac,
+      commandLocations,
       primaryTarget,
       selectedPaths,
       showHiddenFiles,

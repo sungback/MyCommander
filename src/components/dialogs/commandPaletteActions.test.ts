@@ -45,6 +45,7 @@ const commandActions = {
   openEditor: vi.fn(),
   openInfo: vi.fn(),
   openJobCenter: vi.fn(),
+  openLocation: vi.fn(),
   openMkdir: vi.fn(),
   openMove: vi.fn(),
   openNewFile: vi.fn(),
@@ -156,6 +157,41 @@ describe("commandPaletteActions", () => {
       "command-palette"
     );
     expect(filterCommandPaletteItems(items, "prefs")[0].id).toBe("settings");
+  });
+
+  it("adds recent and frequent location commands", () => {
+    const items = buildCommandPaletteItems({
+      activePanelId: "left",
+      activePanel: makePanel(),
+      isMac: false,
+      selectedPaths: ["/home/user/notes.txt"],
+      primaryTarget: getPrimaryCommandTarget(makePanel()),
+      showHiddenFiles: false,
+      actions: commandActions,
+      locations: [
+        {
+          path: "/home/user/Projects",
+          name: "Projects",
+          source: "frequent",
+          visitCount: 3,
+        },
+        {
+          path: "/home/user/Downloads",
+          name: "Downloads",
+          source: "recent",
+        },
+      ],
+    });
+
+    expect(filterCommandPaletteItems(items, "frequent projects")[0]).toEqual(
+      expect.objectContaining({
+        id: "open-location:/home/user/Projects",
+        title: "Open Projects",
+      })
+    );
+    expect(filterCommandPaletteItems(items, "recent downloads")[0]?.id).toBe(
+      "open-location:/home/user/Downloads"
+    );
   });
 
   it("wraps selection movement", () => {

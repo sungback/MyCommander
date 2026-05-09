@@ -17,6 +17,13 @@ export interface CommandPaletteItem {
   run: () => void | Promise<void>;
 }
 
+export interface CommandPaletteLocation {
+  path: string;
+  name: string;
+  source: "frequent" | "recent";
+  visitCount?: number;
+}
+
 export interface CommandPaletteActions {
   closeApp: () => void | Promise<void>;
   copyCurrentPath: () => void | Promise<void>;
@@ -29,6 +36,7 @@ export interface CommandPaletteActions {
   openEditor: () => void | Promise<void>;
   openInfo: () => void;
   openJobCenter: () => void;
+  openLocation: (path: string) => void;
   openMkdir: () => void;
   openMove: () => void;
   openNewFile: () => void;
@@ -49,6 +57,7 @@ interface BuildCommandPaletteItemsArgs {
   activePanel: PanelState;
   actions: CommandPaletteActions;
   isMac: boolean;
+  locations?: CommandPaletteLocation[];
   primaryTarget: CommandTarget | null;
   selectedPaths: string[];
   showHiddenFiles: boolean;
@@ -117,11 +126,37 @@ const isZipTarget = (target: CommandTarget | null) =>
 
 const commandShortcut = (isMac: boolean) => (isMac ? "Cmd+Shift+P" : "Ctrl+Shift+P");
 
+const getLocationSourceLabel = (location: CommandPaletteLocation) =>
+  location.source === "frequent"
+    ? `Frequent location${location.visitCount ? ` • ${location.visitCount} visits` : ""}`
+    : "Recent location";
+
+const buildLocationItems = (
+  locations: CommandPaletteLocation[] | undefined,
+  actions: CommandPaletteActions
+): CommandPaletteItem[] =>
+  (locations ?? []).map((location) => ({
+    id: `open-location:${location.path}`,
+    title: `Open ${location.name}`,
+    subtitle: `${getLocationSourceLabel(location)} • ${location.path}`,
+    keywords: [
+      "folder",
+      "location",
+      "path",
+      "open",
+      location.source,
+      location.name,
+      location.path,
+    ],
+    run: () => actions.openLocation(location.path),
+  }));
+
 export const buildCommandPaletteItems = ({
   activePanelId,
   activePanel,
   actions,
   isMac,
+  locations,
   primaryTarget,
   selectedPaths,
   showHiddenFiles,
@@ -214,6 +249,7 @@ export const buildCommandPaletteItems = ({
       keywords: ["mkdir", "directory"],
       run: actions.openMkdir,
     },
+    ...buildLocationItems(locations, actions),
     {
       id: "search",
       title: "Search Files",

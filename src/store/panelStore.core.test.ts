@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { useLocationHistoryStore } from './locationHistoryStore';
 import { registerPanelStoreReset, usePanelStore } from './panelStore.test-harness';
 
 registerPanelStoreReset();
@@ -114,6 +115,18 @@ describe("panelStore — setPath", () => {
 
     setPath("left", "/new/path");
     expect(usePanelStore.getState().leftPanel.selectedItems.size).toBe(0);
+  });
+
+  it("records visited paths for recent locations", () => {
+    usePanelStore.getState().setPath("left", "/recent/path");
+
+    expect(useLocationHistoryStore.getState().locations[0]).toEqual(
+      expect.objectContaining({
+        path: "/recent/path",
+        name: "path",
+        visitCount: 1,
+      })
+    );
   });
 });
 

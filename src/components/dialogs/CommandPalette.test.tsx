@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogStore } from "../../store/dialogStore";
 import { useJobStore } from "../../store/jobStore";
+import { useLocationHistoryStore } from "../../store/locationHistoryStore";
 import { usePanelStore } from "../../store/panelStore";
 import { CommandPalette } from "./CommandPalette";
 
@@ -66,6 +67,7 @@ describe("CommandPalette", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useDialogStore.setState(useDialogStore.getInitialState());
+    useLocationHistoryStore.setState({ locations: [] });
     usePanelStore.setState(usePanelStore.getInitialState());
     useJobStore.getState().resetJobs();
     mockSubmitJob.mockResolvedValue({
@@ -152,5 +154,31 @@ describe("CommandPalette", () => {
       });
     });
     expect(useDialogStore.getState().openDialog).toBe("progress");
+  });
+
+  it("opens a recent location from the command palette", () => {
+    useLocationHistoryStore.setState({
+      locations: [
+        {
+          path: "/home/user/Projects",
+          name: "Projects",
+          lastVisited: 10,
+          visitCount: 1,
+        },
+      ],
+    });
+    openPalette();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Command" }), {
+      target: { value: "recent projects" },
+    });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Command" }), {
+      key: "Enter",
+    });
+
+    expect(usePanelStore.getState().leftPanel.currentPath).toBe(
+      "/home/user/Projects"
+    );
+    expect(useDialogStore.getState().openDialog).toBeNull();
   });
 });

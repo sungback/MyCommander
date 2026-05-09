@@ -66,6 +66,7 @@
 - **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
 - **Command Palette:** `Cmd/Ctrl+Shift+P`로 열고 `src/components/dialogs/commandPaletteActions.ts`에서 현재 패널 상태 기반 명령 목록과 비활성 사유를 계산합니다. 실행은 `CommandPalette.tsx`에서 기존 dialog/store/Tauri facade를 호출합니다.
 - **현재 폴더 빠른 필터:** 각 `FilePanel`은 패널 로컬 상태로 필터 문자열을 보관하고 `quickFilter.ts` 헬퍼로 현재 폴더 파일 목록만 좁힙니다. `/` 키는 활성 패널의 필터 입력으로 포커스를 이동하며, 필터 적용 중 숨겨진 선택 항목은 안전하게 해제합니다.
+- **최근 위치 / 자주 쓰는 위치:** `locationHistoryStore.ts`가 패널 경로 이동을 localStorage에 기록합니다. 즐겨찾기 패널은 최근/자주 쓰는 위치 섹션을 표시하고, Command Palette는 위치 항목을 검색 가능한 명령으로 추가합니다.
 
 ---
 

@@ -13,6 +13,7 @@ import {
   type PanelStoreActions,
   type PanelStoreSet,
 } from "./panelStoreActionTypes";
+import { useLocationHistoryStore } from "./locationHistoryStore";
 
 type NavigationActions = Pick<
   PanelStoreActions,
@@ -38,6 +39,7 @@ export const createPanelStoreNavigationActions = (
       );
 
       persistPanelUpdate(state, panel, nextPanelState);
+      useLocationHistoryStore.getState().recordLocation(path);
 
       return panelUpdate(panelKey, nextPanelState);
     }),
@@ -85,6 +87,9 @@ export const createPanelStoreNavigationActions = (
       if (!nextPanelState) return state;
 
       persistPanelUpdate(state, panel, nextPanelState);
+      useLocationHistoryStore
+        .getState()
+        .recordLocation(nextPanelState.currentPath);
 
       return panelUpdate(panelKey, nextPanelState);
     }),
@@ -96,6 +101,9 @@ export const createPanelStoreNavigationActions = (
       if (!nextPanelState) return state;
 
       persistPanelUpdate(state, panel, nextPanelState);
+      useLocationHistoryStore
+        .getState()
+        .recordLocation(nextPanelState.currentPath);
 
       return panelUpdate(panelKey, nextPanelState);
     }),
