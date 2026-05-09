@@ -17,6 +17,7 @@ export type DialogType =
   | "progress"
   | "jobcenter"
   | "settings"
+  | "commandPalette"
   | null;
 
 export interface DialogTarget {

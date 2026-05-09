@@ -52,6 +52,7 @@ export function useAppCommands() {
   const openDelete = () => setOpenDialog("delete");
   const openSearch = () => setOpenDialog("search");
   const openSync = () => setOpenDialog("sync");
+  const openCommandPalette = () => setOpenDialog("commandPalette");
   const swapPanels = () => usePanelStore.getState().swapPanels();
 
   const openEditor = async () => {
@@ -217,6 +218,7 @@ export function useAppCommands() {
     openDelete,
     openSearch,
     openSync,
+    openCommandPalette,
     swapPanels,
     closeApp,
     syncOtherPanelToCurrentPath,

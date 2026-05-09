@@ -48,6 +48,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   openPreview: vi.fn(),
   openSearch: vi.fn(),
   openSync: vi.fn(),
+  openCommandPalette: vi.fn(),
   openInfoDialog: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
@@ -216,6 +217,20 @@ describe('createKeyboardHandler', () => {
     const handler = createKeyboardHandler(deps);
     handler(makeEvent('f', { ctrlKey: true, code: 'KeyF' }));
     expect(deps.openSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+Shift+P → calls deps.openCommandPalette()', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('p', { ctrlKey: true, shiftKey: true, code: 'KeyP' }));
+    expect(deps.openCommandPalette).toHaveBeenCalledTimes(1);
+  });
+
+  it('Mac Cmd+Shift+P → calls deps.openCommandPalette()', () => {
+    const deps = makeDeps({ isMac: true });
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('p', { metaKey: true, shiftKey: true, code: 'KeyP' }));
+    expect(deps.openCommandPalette).toHaveBeenCalledTimes(1);
   });
 
   it('Ctrl+C → calls deps.copyToClipboard()', () => {

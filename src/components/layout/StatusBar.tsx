@@ -7,7 +7,7 @@ import { formatSize } from "../../utils/format";
 import { coalescePanelPath } from "../../utils/path";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
-import { Settings } from "lucide-react";
+import { Command, Settings } from "lucide-react";
 
 type PanelId = "left" | "right";
 
@@ -234,6 +234,19 @@ export const StatusBar: React.FC = () => {
           {operations.map((operation) => (
             <OperationButton key={operation.keyLabel} {...operation} />
           ))}
+          <button
+            type="button"
+            onClick={() => setOpenDialog("commandPalette")}
+            className="flex items-center gap-2 rounded-md border border-border-color bg-bg-panel px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-hover"
+            title="Command Palette"
+            aria-label="Command Palette"
+          >
+            <Command size={15} className="text-accent-color" />
+            <span>명령</span>
+            <span className="font-mono text-[11px] text-text-secondary">
+              {isMac ? "Cmd+Shift+P" : "Ctrl+Shift+P"}
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => setOpenDialog("settings")}

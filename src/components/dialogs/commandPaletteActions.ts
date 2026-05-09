@@ -1,0 +1,401 @@
+import type { FileEntry, PanelId, PanelState } from "../../types/file";
+import { coalescePanelPath } from "../../utils/path";
+
+export interface CommandTarget {
+  entry: FileEntry;
+  panelId: PanelId;
+  path: string;
+}
+
+export interface CommandPaletteItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  shortcut?: string;
+  keywords: string[];
+  disabledReason?: string;
+  run: () => void | Promise<void>;
+}
+
+export interface CommandPaletteActions {
+  closeApp: () => void | Promise<void>;
+  copyCurrentPath: () => void | Promise<void>;
+  copyToClipboard: () => void | Promise<void>;
+  createZipFromSelection: () => void | Promise<void>;
+  cutToClipboard: () => void | Promise<void>;
+  extractZip: () => void | Promise<void>;
+  openCopy: () => void;
+  openDelete: () => void;
+  openEditor: () => void | Promise<void>;
+  openInfo: () => void;
+  openJobCenter: () => void;
+  openMkdir: () => void;
+  openMove: () => void;
+  openNewFile: () => void;
+  openPreview: () => void;
+  openRename: () => void;
+  openSearch: () => void;
+  openSettings: () => void;
+  openSync: () => void;
+  openTerminal: () => void | Promise<void>;
+  pasteFromClipboard: () => void;
+  swapPanels: () => void;
+  syncOtherPanel: () => void;
+  toggleHiddenFiles: () => void;
+}
+
+interface BuildCommandPaletteItemsArgs {
+  activePanelId: PanelId;
+  activePanel: PanelState;
+  actions: CommandPaletteActions;
+  isMac: boolean;
+  primaryTarget: CommandTarget | null;
+  selectedPaths: string[];
+  showHiddenFiles: boolean;
+}
+
+export const getPanelCommandPath = (panel: PanelState) =>
+  coalescePanelPath(panel.resolvedPath, panel.currentPath);
+
+export const getSelectedCommandPaths = (panel: PanelState): string[] => {
+  const selectedPaths = Array.from(panel.selectedItems);
+  if (selectedPaths.length > 0) {
+    return selectedPaths;
+  }
+
+  const cursorEntry = panel.files[panel.cursorIndex];
+  if (!cursorEntry || cursorEntry.name === "..") {
+    return [];
+  }
+
+  return [cursorEntry.path];
+};
+
+export const getPrimaryCommandTarget = (
+  panel: PanelState,
+  panelId: PanelId = panel.id
+): CommandTarget | null => {
+  const selectedPaths = Array.from(panel.selectedItems);
+
+  if (selectedPaths.length > 1) {
+    return null;
+  }
+
+  if (selectedPaths.length === 1) {
+    const selectedPath = selectedPaths[0];
+    const selectedEntry = panel.files.find(
+      (entry) => entry.path.normalize("NFC") === selectedPath.normalize("NFC")
+    );
+    if (!selectedEntry || selectedEntry.name === "..") {
+      return null;
+    }
+    return { entry: selectedEntry, panelId, path: selectedEntry.path };
+  }
+
+  const cursorEntry = panel.files[panel.cursorIndex];
+  if (!cursorEntry || cursorEntry.name === "..") {
+    return null;
+  }
+
+  return { entry: cursorEntry, panelId, path: cursorEntry.path };
+};
+
+export const getCommandSelectionLabel = (paths: string[]) => {
+  if (paths.length === 0) {
+    return "No selection";
+  }
+
+  if (paths.length > 1) {
+    return `${paths.length} selected`;
+  }
+
+  return paths[0].replace(/[\\/]+$/, "").split(/[\\/]/).pop() || paths[0];
+};
+
+const isZipTarget = (target: CommandTarget | null) =>
+  target?.entry.kind === "file" && target.entry.name.toLowerCase().endsWith(".zip");
+
+const commandShortcut = (isMac: boolean) => (isMac ? "Cmd+Shift+P" : "Ctrl+Shift+P");
+
+export const buildCommandPaletteItems = ({
+  activePanelId,
+  activePanel,
+  actions,
+  isMac,
+  primaryTarget,
+  selectedPaths,
+  showHiddenFiles,
+}: BuildCommandPaletteItemsArgs): CommandPaletteItem[] => {
+  const selectionLabel = getCommandSelectionLabel(selectedPaths);
+  const singleTargetReason = primaryTarget ? undefined : "Select one item";
+  const selectionReason = selectedPaths.length > 0 ? undefined : "No files selected";
+  const fileTargetReason =
+    primaryTarget?.entry.kind === "file" ? undefined : "Select a file";
+  const zipReason = isZipTarget(primaryTarget) ? undefined : "Select a ZIP archive";
+  const activePath = getPanelCommandPath(activePanel);
+  const activePanelLabel = `${activePanelId.toUpperCase()} panel`;
+
+  return [
+    {
+      id: "command-palette",
+      title: "Command Palette",
+      subtitle: "Find and run commands",
+      shortcut: commandShortcut(isMac),
+      keywords: ["action", "run", "ctrl shift p", "cmd shift p"],
+      disabledReason: "Already open",
+      run: () => undefined,
+    },
+    {
+      id: "preview",
+      title: "Open Quick Preview",
+      subtitle: primaryTarget?.entry.name ?? "No item selected",
+      shortcut: "F3",
+      keywords: ["view", "quick look", "space"],
+      disabledReason: singleTargetReason,
+      run: actions.openPreview,
+    },
+    {
+      id: "edit",
+      title: "Open in Editor",
+      subtitle: primaryTarget?.entry.name ?? "No file selected",
+      shortcut: "F4",
+      keywords: ["edit", "open"],
+      disabledReason: fileTargetReason,
+      run: actions.openEditor,
+    },
+    {
+      id: "copy",
+      title: "Copy to Other Panel",
+      subtitle: selectionLabel,
+      shortcut: "F5",
+      keywords: ["copy selected"],
+      disabledReason: selectionReason,
+      run: actions.openCopy,
+    },
+    {
+      id: "move",
+      title: "Move to Other Panel",
+      subtitle: selectionLabel,
+      shortcut: "F6",
+      keywords: ["move selected", "rename path"],
+      disabledReason: selectionReason,
+      run: actions.openMove,
+    },
+    {
+      id: "delete",
+      title: "Delete Selected",
+      subtitle: selectionLabel,
+      shortcut: "F8",
+      keywords: ["trash", "remove"],
+      disabledReason: selectionReason,
+      run: actions.openDelete,
+    },
+    {
+      id: "rename",
+      title: "Rename Selected Item",
+      subtitle: primaryTarget?.entry.name ?? "No item selected",
+      keywords: ["f2", "name"],
+      disabledReason: singleTargetReason,
+      run: actions.openRename,
+    },
+    {
+      id: "new-file",
+      title: "Create New File",
+      subtitle: activePath,
+      shortcut: "Shift+F4",
+      keywords: ["touch", "file"],
+      run: actions.openNewFile,
+    },
+    {
+      id: "new-folder",
+      title: "Create New Folder",
+      subtitle: activePath,
+      shortcut: "F7",
+      keywords: ["mkdir", "directory"],
+      run: actions.openMkdir,
+    },
+    {
+      id: "search",
+      title: "Search Files",
+      subtitle: activePath,
+      shortcut: isMac ? "Option+F7" : "Alt+F7",
+      keywords: ["find", "filter"],
+      run: actions.openSearch,
+    },
+    {
+      id: "compare-folders",
+      title: "Compare Left and Right Folders",
+      subtitle: "Open folder sync comparison",
+      shortcut: "F11",
+      keywords: ["sync", "synchronize", "diff"],
+      run: actions.openSync,
+    },
+    {
+      id: "sync-other-panel",
+      title: "Sync Other Panel to Current Path",
+      subtitle: activePanelLabel,
+      shortcut: isMac ? "Cmd+Shift+M" : "Ctrl+Shift+M",
+      keywords: ["target equals source", "same path"],
+      run: actions.syncOtherPanel,
+    },
+    {
+      id: "create-zip",
+      title: "Create ZIP from Selection",
+      subtitle: selectionLabel,
+      keywords: ["archive", "compress", "zip"],
+      disabledReason: selectionReason,
+      run: actions.createZipFromSelection,
+    },
+    {
+      id: "extract-zip",
+      title: "Extract ZIP Here",
+      subtitle: primaryTarget?.entry.name ?? "No archive selected",
+      keywords: ["archive", "unzip", "extract"],
+      disabledReason: zipReason,
+      run: actions.extractZip,
+    },
+    {
+      id: "terminal",
+      title: "Open Terminal Here",
+      subtitle: activePath,
+      keywords: ["shell", "command line", "cmd"],
+      run: actions.openTerminal,
+    },
+    {
+      id: "toggle-hidden-files",
+      title: showHiddenFiles ? "Hide Hidden Files" : "Show Hidden Files",
+      subtitle: activePanelLabel,
+      keywords: ["dotfiles", "hidden"],
+      run: actions.toggleHiddenFiles,
+    },
+    {
+      id: "copy-current-path",
+      title: "Copy Current Path",
+      subtitle: activePath,
+      shortcut: isMac ? "Cmd+Shift+C" : "Ctrl+Shift+C",
+      keywords: ["clipboard", "path"],
+      run: actions.copyCurrentPath,
+    },
+    {
+      id: "copy-to-clipboard",
+      title: "Copy Selected to Clipboard",
+      subtitle: selectionLabel,
+      shortcut: isMac ? "Cmd+C" : "Ctrl+C",
+      keywords: ["clipboard", "pasteboard"],
+      disabledReason: selectionReason,
+      run: actions.copyToClipboard,
+    },
+    {
+      id: "cut-to-clipboard",
+      title: "Cut Selected to Clipboard",
+      subtitle: selectionLabel,
+      shortcut: isMac ? "Cmd+X" : "Ctrl+X",
+      keywords: ["clipboard", "pasteboard"],
+      disabledReason: selectionReason,
+      run: actions.cutToClipboard,
+    },
+    {
+      id: "paste",
+      title: "Paste from Clipboard",
+      subtitle: activePath,
+      shortcut: isMac ? "Cmd+V" : "Ctrl+V",
+      keywords: ["clipboard", "pasteboard"],
+      run: actions.pasteFromClipboard,
+    },
+    {
+      id: "info",
+      title: "Show File Info",
+      subtitle: primaryTarget?.entry.name ?? "No item selected",
+      shortcut: isMac ? "Cmd+I" : "Ctrl+I",
+      keywords: ["metadata", "properties"],
+      disabledReason: singleTargetReason,
+      run: actions.openInfo,
+    },
+    {
+      id: "swap-panels",
+      title: "Swap Panels",
+      subtitle: "Exchange left and right panel state",
+      shortcut: isMac ? "Cmd+U" : "Ctrl+U",
+      keywords: ["left right"],
+      run: actions.swapPanels,
+    },
+    {
+      id: "job-center",
+      title: "Open Job Center",
+      subtitle: "Review queued and completed jobs",
+      keywords: ["progress", "queue", "history"],
+      run: actions.openJobCenter,
+    },
+    {
+      id: "settings",
+      title: "Open Settings",
+      subtitle: "Preferences",
+      keywords: ["preferences", "prefs", "config"],
+      run: actions.openSettings,
+    },
+    {
+      id: "quit",
+      title: "Quit MyCommander",
+      subtitle: "Close the app",
+      shortcut: isMac ? "Cmd+Q" : "Alt+F4",
+      keywords: ["exit", "close"],
+      run: actions.closeApp,
+    },
+  ];
+};
+
+const normalizeSearchText = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9가-힣]+/g, " ").trim();
+
+const getSearchHaystack = (item: CommandPaletteItem) =>
+  normalizeSearchText(
+    [item.title, item.subtitle, item.shortcut, ...item.keywords].filter(Boolean).join(" ")
+  );
+
+const getMatchScore = (item: CommandPaletteItem, query: string) => {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) {
+    return 0;
+  }
+
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  const title = normalizeSearchText(item.title);
+  const haystack = getSearchHaystack(item);
+  if (!tokens.every((token) => haystack.includes(token))) {
+    return null;
+  }
+
+  if (title.startsWith(normalizedQuery)) {
+    return 0;
+  }
+
+  if (title.includes(normalizedQuery)) {
+    return 1;
+  }
+
+  return 2;
+};
+
+export const filterCommandPaletteItems = (
+  items: CommandPaletteItem[],
+  query: string
+) =>
+  items
+    .map((item, index) => ({ item, index, score: getMatchScore(item, query) }))
+    .filter((entry): entry is { item: CommandPaletteItem; index: number; score: number } =>
+      entry.score !== null
+    )
+    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .map((entry) => entry.item);
+
+export const moveCommandPaletteSelection = (
+  currentIndex: number,
+  delta: number,
+  itemCount: number
+) => {
+  if (itemCount <= 0) {
+    return 0;
+  }
+
+  return (currentIndex + delta + itemCount) % itemCount;
+};

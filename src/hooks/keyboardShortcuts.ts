@@ -53,6 +53,7 @@ export interface KeyboardHandlerDependencies
     | "openCopy"
     | "openDelete"
     | "openDialog"
+    | "openCommandPalette"
     | "openEditor"
     | "openMkdir"
     | "openMove"
@@ -183,6 +184,12 @@ const handleModifiedShortcut = (
   if (hasCommandModifier && event.code === "KeyF") {
     event.preventDefault();
     deps.openSearch();
+    return true;
+  }
+
+  if (hasCommandModifier && event.shiftKey && event.code === "KeyP") {
+    event.preventDefault();
+    deps.openCommandPalette();
     return true;
   }
 

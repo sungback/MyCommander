@@ -40,6 +40,7 @@ describe("dialogStore — setOpenDialog", () => {
       "progress",
       "jobcenter",
       "settings",
+      "commandPalette",
     ] as const;
     for (const type of types) {
       useDialogStore.getState().setOpenDialog(type);

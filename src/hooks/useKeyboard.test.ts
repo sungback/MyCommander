@@ -8,7 +8,7 @@ import { useClipboardStore } from '../store/clipboardStore';
 const {
   mockOpenPreview, mockOpenEditor, mockOpenCopy, mockOpenMove,
   mockOpenMkdir, mockOpenNewFile, mockOpenDelete, mockOpenSearch,
-  mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
+  mockOpenCommandPalette, mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
   mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard,
   mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
@@ -23,6 +23,7 @@ const {
   mockOpenNewFile:     vi.fn(),
   mockOpenDelete:      vi.fn(),
   mockOpenSearch:      vi.fn(),
+  mockOpenCommandPalette: vi.fn(),
     mockCloseApp:        vi.fn().mockResolvedValue(undefined),
     mockSyncOtherPanel:  vi.fn(),
     mockCopyCurrentPath: vi.fn().mockResolvedValue(undefined),
@@ -56,6 +57,7 @@ vi.mock('./useAppCommands', () => ({
     openNewFile:                mockOpenNewFile,
     openDelete:                 mockOpenDelete,
     openSearch:                 mockOpenSearch,
+    openCommandPalette:         mockOpenCommandPalette,
     openSync:                   mockOpenSync,
     swapPanels:                 mockSwapPanels,
     closeApp:                   mockCloseApp,
@@ -185,6 +187,12 @@ describe('useKeyboard', () => {
       renderKeyboard();
       press('f', { code: 'KeyF', ctrlKey: true });
       expect(mockOpenSearch).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+Shift+P → openCommandPalette 호출', () => {
+      renderKeyboard();
+      press('p', { code: 'KeyP', ctrlKey: true, shiftKey: true });
+      expect(mockOpenCommandPalette).toHaveBeenCalledTimes(1);
     });
 
     it('Ctrl+Shift+M → syncOtherPanelToCurrentPath 호출', () => {

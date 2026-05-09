@@ -4,6 +4,7 @@ import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { CopyConflictDialog } from "./CopyConflictDialog";
+import { CommandPalette } from "./CommandPalette";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
@@ -265,6 +266,7 @@ export const DialogContainer: React.FC = () => {
 
       <QuickPreviewDialog />
       <SettingsDialog />
+      <CommandPalette />
     </>
   );
 };

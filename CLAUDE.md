@@ -64,6 +64,7 @@
 - **렌더러 복구 (`useRendererRecovery`):** 30초마다 틱을 체크하여 2분 이상 간격이 감지되면 macOS sleep/wake 후 화면 고착으로 판단합니다. 포그라운드 전환 시 CSS pulse + Tauri 창/WebView `show()`로 복구를 시도하고, 고착 상태가 지속되면 1.5초 후 페이지 리로드합니다(쿨다운 1분). 사용자에게 투명하게 동작합니다.
 - **Git 상태 표시 (`useGitStatus`):** 경로별 Git 상태를 `gitStatusStore`에 캐싱하고 패널 파일 리스트에 M/A/D/? 마킹으로 표시합니다. 이전에 실패한 경로는 `hasFreshFailure` 체크로 재시도 없이 null을 반환합니다(Windows noisy probe 억제).
 - **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
+- **Command Palette:** `Cmd/Ctrl+Shift+P`로 열고 `src/components/dialogs/commandPaletteActions.ts`에서 현재 패널 상태 기반 명령 목록과 비활성 사유를 계산합니다. 실행은 `CommandPalette.tsx`에서 기존 dialog/store/Tauri facade를 호출합니다.
 
 ---
 
