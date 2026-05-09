@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -13,6 +13,11 @@ import type { FileEntry } from "../../types/file";
 import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
 import { useDirectoryLoader } from "./useDirectoryLoader";
 import { usePanelContextMenu } from "./usePanelContextMenu";
+import { QuickFilterBar } from "./QuickFilterBar";
+import {
+  filterEntriesByQuickFilter,
+  normalizeQuickFilterQuery,
+} from "./quickFilter";
 
 interface FilePanelProps {
   id: "left" | "right";
@@ -20,6 +25,8 @@ interface FilePanelProps {
 
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  const [quickFilterQuery, setQuickFilterQuery] = useState("");
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
@@ -34,9 +41,66 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const selectOnly = usePanelStore((s) => s.selectOnly);
+  const setSelection = usePanelStore((s) => s.setSelection);
   const fs = useFileSystem();
 
   const isActive = activePanelId === id;
+  const normalizedQuickFilter = normalizeQuickFilterQuery(quickFilterQuery);
+  const isQuickFilterActive = normalizedQuickFilter.length > 0;
+  const filteredFiles = useMemo(
+    () => filterEntriesByQuickFilter(panelState.files, quickFilterQuery),
+    [panelState.files, quickFilterQuery]
+  );
+  const totalFilterableFiles = useMemo(
+    () => panelState.files.filter((entry) => entry.name !== "..").length,
+    [panelState.files]
+  );
+
+  useEffect(() => {
+    setQuickFilterQuery("");
+  }, [panelState.currentPath]);
+
+  useEffect(() => {
+    if (!isQuickFilterActive) {
+      return;
+    }
+
+    const visiblePaths = new Set(filteredFiles.map((entry) => entry.path));
+    const selectedPaths = Array.from(panelState.selectedItems);
+    const nextSelection = selectedPaths.filter((path) => visiblePaths.has(path));
+
+    if (nextSelection.length !== selectedPaths.length) {
+      setSelection(id, nextSelection);
+    }
+  }, [filteredFiles, id, isQuickFilterActive, panelState.selectedItems, setSelection]);
+
+  useEffect(() => {
+    if (filteredFiles.length === 0 && panelState.cursorIndex !== 0) {
+      setCursor(id, 0);
+      return;
+    }
+
+    if (panelState.cursorIndex >= filteredFiles.length) {
+      setCursor(id, Math.max(0, filteredFiles.length - 1));
+    }
+  }, [filteredFiles.length, id, panelState.cursorIndex, setCursor]);
+
+  const handleQuickFilterChange = (query: string) => {
+    setQuickFilterQuery(query);
+    setCursor(id, 0);
+  };
+
+  const handleClearQuickFilter = () => {
+    setQuickFilterQuery("");
+    setCursor(id, 0);
+    filterInputRef.current?.focus({ preventScroll: true });
+  };
+
+  const focusQuickFilter = () => {
+    setActivePanel(id);
+    filterInputRef.current?.focus({ preventScroll: true });
+    filterInputRef.current?.select();
+  };
 
   useDirectoryLoader({
     activeTabId: panelState.activeTabId,
@@ -167,6 +231,15 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       <DriveList panelId={id} />
       <TabBar panelId={id} />
       <AddressBar panelId={id} />
+      <QuickFilterBar
+        inputRef={filterInputRef}
+        isActive={isActive}
+        query={quickFilterQuery}
+        resultCount={isQuickFilterActive ? filteredFiles.length : totalFilterableFiles}
+        totalCount={totalFilterableFiles}
+        onChange={handleQuickFilterChange}
+        onClear={handleClearQuickFilter}
+      />
       {viewMode === "detailed" ? (
         <ColumnHeader
           sortField={panelState.sortField}
@@ -177,12 +250,14 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
       <FileList
         currentPath={panelState.currentPath}
         accessPath={coalescePanelPath(panelState.resolvedPath, panelState.currentPath)}
-        files={panelState.files}
+        files={filteredFiles}
         selectedItems={panelState.selectedItems}
         cursorIndex={panelState.cursorIndex}
         isActivePanel={isActive}
         panelId={id}
         viewMode={viewMode}
+        emptyMessage={isQuickFilterActive ? "일치하는 항목 없음" : undefined}
+        onOpenFilter={focusQuickFilter}
         onSelect={(path, _toggle) => toggleSelection(id, path)}
         onEnter={handleEnter}
         setCursorIndex={(idx) => setCursor(id, idx)}

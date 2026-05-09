@@ -24,6 +24,8 @@ interface FileListProps {
   isActivePanel: boolean;
   panelId: "left" | "right";
   viewMode: ViewMode;
+  emptyMessage?: string;
+  onOpenFilter?: () => void;
   onSelect: (path: string, toggle: boolean) => void;
   onEnter: (entry: FileEntry) => void;
   setCursorIndex: (idx: number) => void;
@@ -38,6 +40,8 @@ export const FileList: React.FC<FileListProps> = ({
   isActivePanel,
   panelId,
   viewMode,
+  emptyMessage,
+  onOpenFilter,
   onSelect,
   onEnter,
   setCursorIndex,
@@ -135,6 +139,7 @@ export const FileList: React.FC<FileListProps> = ({
     isActivePanel,
     moveSelectionToRow,
     onEnter,
+    onOpenFilter,
     onSelect,
     openPreviewDialog,
     panelId,
@@ -198,25 +203,31 @@ export const FileList: React.FC<FileListProps> = ({
       }}
       onKeyDown={handleKeyDown}
     >
-      <FileListVirtualRows
-        cutPaths={cutPaths}
-        cursorIndex={cursorIndex}
-        dropUiState={dropUiState}
-        gitStatus={gitStatus}
-        isActivePanel={isActivePanel}
-        isLocalDragActive={isLocalDragActive}
-        onEnter={onEnter}
-        onMouseDown={handleMouseDown}
-        onRowClick={handleRowClick}
-        onToggleExpand={(rowIndex, entry) => {
-          void toggleExpanded(rowIndex, entry);
-        }}
-        selectedItems={selectedItems}
-        totalHeight={rowVirtualizer.getTotalSize()}
-        viewMode={viewMode}
-        virtualItems={rowVirtualizer.getVirtualItems()}
-        visibleRows={visibleRows}
-      />
+      {visibleRows.length === 0 && emptyMessage ? (
+        <div className="flex h-full min-h-32 items-center justify-center px-3 text-sm text-text-secondary">
+          {emptyMessage}
+        </div>
+      ) : (
+        <FileListVirtualRows
+          cutPaths={cutPaths}
+          cursorIndex={cursorIndex}
+          dropUiState={dropUiState}
+          gitStatus={gitStatus}
+          isActivePanel={isActivePanel}
+          isLocalDragActive={isLocalDragActive}
+          onEnter={onEnter}
+          onMouseDown={handleMouseDown}
+          onRowClick={handleRowClick}
+          onToggleExpand={(rowIndex, entry) => {
+            void toggleExpanded(rowIndex, entry);
+          }}
+          selectedItems={selectedItems}
+          totalHeight={rowVirtualizer.getTotalSize()}
+          viewMode={viewMode}
+          virtualItems={rowVirtualizer.getVirtualItems()}
+          visibleRows={visibleRows}
+        />
+      )}
     </div>
   );
 };

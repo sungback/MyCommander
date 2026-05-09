@@ -129,6 +129,13 @@ describe('FileList', () => {
       expect(setCursorIndex).not.toHaveBeenCalled();
     });
 
+    it('/ 입력 → 현재 패널 빠른 필터를 연다', () => {
+      const onOpenFilter = vi.fn();
+      render(<FileList {...makeProps({ files: [], onOpenFilter })} />);
+      fireEvent.keyDown(getListEl(), { key: '/' });
+      expect(onOpenFilter).toHaveBeenCalledTimes(1);
+    });
+
     it('Ctrl+A → ".." 제외한 모든 항목 경로로 setSelection 호출', () => {
       render(<FileList {...makeProps()} />);
       fireEvent.keyDown(getListEl(), { key: 'a', code: 'KeyA', ctrlKey: true });

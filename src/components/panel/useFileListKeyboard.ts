@@ -10,6 +10,7 @@ interface UseFileListKeyboardProps {
   isActivePanel: boolean;
   moveSelectionToRow: (targetIndex: number) => void;
   onEnter: (entry: VisibleEntryRow["entry"]) => void;
+  onOpenFilter?: () => void;
   onSelect: (path: string, toggle: boolean) => void;
   openPreviewDialog: (request: { panelId: PanelId; path: string }) => void;
   panelId: PanelId;
@@ -28,6 +29,7 @@ export const useFileListKeyboard = ({
   isActivePanel,
   moveSelectionToRow,
   onEnter,
+  onOpenFilter,
   onSelect,
   openPreviewDialog,
   panelId,
@@ -60,6 +62,18 @@ export const useFileListKeyboard = ({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!isActivePanel) return;
+
+    if (
+      event.key === "/" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      onOpenFilter?.();
+      return;
+    }
+
     if (visibleRows.length === 0) return;
 
     const current = visibleRows[cursorIndex]?.entry;
