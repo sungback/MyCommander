@@ -86,6 +86,7 @@ export const createMockInvoke = () =>
       case 'open_file':           return Promise.resolve(undefined);
       case 'quit_app':            return Promise.resolve(undefined);
       case 'run_shell_command':   return Promise.resolve(undefined);
+      case 'get_git_status':      return Promise.resolve(null);
       default:                    return Promise.resolve(undefined);
     }
   });

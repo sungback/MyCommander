@@ -41,7 +41,7 @@
 | State | Zustand |
 | Desktop Shell | Tauri v2 |
 | Backend | Rust, Tauri custom commands |
-| UI | Radix UI Dialog, Lucide React, `react-resizable-panels` |
+| UI | Radix UI Dialog, Lucide React, `react-resizable-panels`, `re-resizable` |
 | Virtualized List | `@tanstack/react-virtual` |
 | Preview Helpers | `highlight.js`, `marked`, `read-excel-file`, `jszip` |
 | Utilities | `date-fns`, `clsx`, `tailwind-merge` |
@@ -61,6 +61,9 @@
 - **`panelStore` 경로 이중 구조:** `currentPath`(UI/히스토리 표시용) / `resolvedPath`(실제 파일시스템 접근용). 경로 비교·접근은 `resolvedPath ?? currentPath` 패턴 우선.
 - **프런트엔드 Tauri IPC 경계:** 프런트엔드의 직접 `invoke()` 호출은 `src/hooks/tauriCommands/` 하위 명령 클라이언트에만 둡니다. 컴포넌트와 일반 훅은 `useFileSystem()` facade를 통해 Tauri 명령을 호출합니다.
 - **탭-패널 상태 동기화:** 활성 탭 상태를 패널 상단 상태로 반영하는 계약은 `src/utils/panelHelpers.ts`의 `syncPanelWithActiveTab`이 담당합니다. `panelRefresh` 같은 갱신 경로에서 별도 동기화 복사본을 만들지 않습니다.
+- **렌더러 복구 (`useRendererRecovery`):** 30초마다 틱을 체크하여 2분 이상 간격이 감지되면 macOS sleep/wake 후 화면 고착으로 판단합니다. 포그라운드 전환 시 CSS pulse + Tauri 창/WebView `show()`로 복구를 시도하고, 고착 상태가 지속되면 1.5초 후 페이지 리로드합니다(쿨다운 1분). 사용자에게 투명하게 동작합니다.
+- **Git 상태 표시 (`useGitStatus`):** 경로별 Git 상태를 `gitStatusStore`에 캐싱하고 패널 파일 리스트에 M/A/D/? 마킹으로 표시합니다. 이전에 실패한 경로는 `hasFreshFailure` 체크로 재시도 없이 null을 반환합니다(Windows noisy probe 억제).
+- **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
 
 ---
 
@@ -74,7 +77,16 @@ src/
     layout/      # 상태바, 컨텍스트 메뉴, 하단 액션
     panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록 + drag helper modules
   features/      # 기능 단위 로직 (예: multiRename)
-  hooks/         # Tauri 명령 facade, tauriCommands 하위 명령 클라이언트, 키보드 훅
+  hooks/
+    tauriCommands/     # IPC 클라이언트: archiveCommands / fileCommands / gitCommands / jobCommands / searchCommands / syncCommands / systemCommands
+    useFileSystem.ts   # Tauri 명령 facade (컴포넌트·훅의 단일 진입점)
+    useGitStatus.ts    # 경로별 Git 상태 조회 + gitStatusStore 캐싱
+    useJobQueue.ts     # 잡 큐 복원 + job-updated 이벤트 → 패널 갱신 연동
+    useRendererRecovery.ts  # macOS sleep/wake 후 렌더러 고착 복구
+    useAppCommands.ts  # 앱 레벨 키보드 액션 바인딩
+    useAppLifecycle.ts # 앱 시작/종료 훅
+    useDirectoryWatch.ts    # file_watch_commands 이벤트 구독 → 패널 갱신
+    useKeyboard.ts     # 저수준 키보드 이벤트 처리
   constants/     # 앱 전역 상수 (폰트 옵션 등)
   store/         # Zustand 스토어 + 패널 영속화/새로고침 보조 로직
   types/         # 파일/테마/동기화 타입 정의
@@ -84,10 +96,11 @@ src-tauri/src/commands/
   system/             # drives / paths / menu / launch 하위 모듈
   fs/                 # metadata / operations / archive / shared 하위 모듈
   jobs/               # state / persistence / execution / commands 하위 모듈
-  file_watch_commands.rs  # notify 기반 파일시스템 감시, 변경 시 패널 자동 갱신 이벤트 발송
-  search_commands.rs      # 파일 검색
-  sync_commands.rs        # 디렉터리 비교
-  drag_commands.rs        # 네이티브 드래그 시작
+  git_commands.rs          # Git 상태 파싱 (git_commands/status.rs 하위 모듈)
+  file_watch_commands.rs   # notify 기반 파일시스템 감시, 변경 시 패널 자동 갱신 이벤트 발송
+  search_commands.rs       # 파일 검색
+  sync_commands.rs         # 디렉터리 비교
+  drag_commands.rs         # 네이티브 드래그 시작
 ```
 
 - `src-tauri/src/lib.rs` — Tauri 앱 빌더, 메뉴, `invoke_handler` 등록

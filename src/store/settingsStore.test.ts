@@ -31,4 +31,34 @@ describe("settingsStore", () => {
       'D2Coding, "Noto Sans KR"'
     );
   });
+
+  it("setFontSize updates fontSize", () => {
+    useSettingsStore.getState().setFontSize(16);
+    expect(useSettingsStore.getState().fontSize).toBe(16);
+  });
+
+  it("setPanelLeftRatio updates panelLeftRatio", () => {
+    useSettingsStore.getState().setPanelLeftRatio(60);
+    expect(useSettingsStore.getState().panelLeftRatio).toBe(60);
+  });
+
+  it("merge migrates legacy uiFontFamily to fontFamily", () => {
+    localStorage.setItem(
+      "mycommander-settings",
+      JSON.stringify({ state: { uiFontFamily: "system", fontSize: 16 }, version: 0 })
+    );
+    useSettingsStore.persist.rehydrate();
+    expect(useSettingsStore.getState().fontFamily).toBe(DEFAULT_FONT_FAMILY);
+    localStorage.removeItem("mycommander-settings");
+  });
+
+  it("merge migrates legacy monoFontFamily to fontFamily", () => {
+    localStorage.setItem(
+      "mycommander-settings",
+      JSON.stringify({ state: { monoFontFamily: "MonoFont", fontSize: 14 }, version: 0 })
+    );
+    useSettingsStore.persist.rehydrate();
+    expect(useSettingsStore.getState().fontFamily).toBe("MonoFont");
+    localStorage.removeItem("mycommander-settings");
+  });
 });

@@ -283,6 +283,8 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 - 빌드가 예상과 다르게 실패하면 저장소 루트의 `build_log.txt` 를 확인합니다.
 - `.omc/`, `.omx/` 는 도구/설정 디렉터리이므로, 명시적으로 필요한 작업이 아니면 수정하지 않습니다.
 - **유니코드 파일명 정책 / 새 파일 다이얼로그 기본값:** [`CLAUDE.md` 설계 정책](./CLAUDE.md#설계-정책) 참조.
+- **macOS sleep 후 앱 화면 고착:** `useRendererRecovery`가 자동으로 복구를 시도합니다(CSS pulse → Tauri 창/WebView show → 필요 시 페이지 리로드). 수동 재시작 없이 대기하면 됩니다. 재현 시 `RENDERER_RECOVERY_STALE_MS`(2분), `RENDERER_RECOVERY_RELOAD_COOLDOWN_MS`(1분) 상수를 확인합니다.
+- **Windows에서 Git 상태가 표시되지 않는 경우:** `git_commands/status.rs`에서 Git 바이너리를 찾지 못한 경우이며 정상 폴백입니다. Git이 PATH에 있는지 확인하고, 없으면 Git 상태 마킹 없이 동작합니다. noisy probe 억제 로직으로 인해 오류 토스트는 표시되지 않습니다.
 - **ESM/Vite 호환성:** 프런트엔드 소스에서 인라인 `require()` 를 사용하지 않습니다. `@types/node` 관련 타입 오류를 피하기 위해 표준 ESM `import` 또는 동적 `import()` 를 사용합니다.
 - **서드파티 API 변경 대응:** `react-resizable-panels` 같은 UI 라이브러리를 다룰 때는 실제 export된 정확한 타입을 반드시 확인합니다. 예: `ImperativePanelHandle` 대신 `PanelImperativeHandle`, 레이아웃 반환이 배열이 아니라 맵일 수 있음.
 - **Zustand mock 유지보수:** 테스트에서 `"Cannot read properties of undefined"` 오류가 나면 `vi.mock` 안의 mock 데이터 구조가 실제 스토어 정의와 어긋났을 가능성이 큽니다. 새 경계값, 배열, 유틸 export 등이 빠지지 않았는지 실제 구현과 맞춰 확인합니다.
