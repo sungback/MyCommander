@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useCopyMoveFlow } from "./useCopyMoveFlow";
 import type { DialogType } from "../../store/dialogStore";
 import type { ClipboardState } from "../../store/clipboardStore";
+import { useFileOperationUndoStore } from "../../store/fileOperationUndoStore";
 
 const {
   mockResolveTargetPath,
@@ -87,9 +88,21 @@ describe("useCopyMoveFlow", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     mockResolveTargetPath.mockReturnValue("/target");
     mockCheckCopyConflicts.mockResolvedValue([]);
-    mockSubmitJob.mockResolvedValue(undefined);
+    mockSubmitJob.mockResolvedValue({
+      id: "job-1",
+      kind: "move",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
     mockResolveConflictAction.mockReturnValue(null);
     mockFilterNonConflictingSourcePaths.mockReturnValue([]);
     props = defaultProps();
@@ -137,6 +150,30 @@ describe("useCopyMoveFlow", () => {
       );
       expect(mockShowTransientStatusMessage).toHaveBeenCalledWith(
         "이동 작업이 대기열에 추가되었습니다."
+      );
+    });
+
+    it("이동 job id가 있으면 Undo 대기 정보를 등록한다", async () => {
+      props.selectedPaths = ["/source/a.txt"];
+      props.inputValue = "/target";
+      const { result } = renderHook(() => useCopyMoveFlow(props));
+
+      await act(async () => {
+        await result.current.handleCopyMove(true);
+      });
+
+      expect(
+        useFileOperationUndoStore.getState().pendingMoveOperations["job-1"]
+      ).toEqual(
+        expect.objectContaining({
+          kind: "move",
+          entries: [
+            {
+              originalPath: "/source/a.txt",
+              currentPath: "/target/a.txt",
+            },
+          ],
+        })
       );
     });
   });

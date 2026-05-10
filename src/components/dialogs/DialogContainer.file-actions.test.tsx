@@ -11,6 +11,8 @@ import {
 } from './DialogContainer.test-harness';
 import { DialogContainer, getRenameSelectionEnd } from './DialogContainer';
 import { useDialogStore } from '../../store/dialogStore';
+import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
+import { usePanelStore } from '../../store/panelStore';
 
 describe('DialogContainer', () => {
   registerDialogContainerTestLifecycle();
@@ -103,7 +105,74 @@ describe('DialogContainer', () => {
       );
     });
     expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
+    expect(useFileOperationUndoStore.getState().lastOperation).toEqual(
+      expect.objectContaining({
+        kind: "rename",
+        entries: [
+          {
+            originalPath: "/home/user/old.txt",
+            currentPath: "/home/user/new.txt",
+          },
+        ],
+      })
+    );
     expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("registers pending undo metadata when a move job is queued", async () => {
+    mockSubmitJob.mockResolvedValue({
+      id: "move-job-1",
+      kind: "move",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+    usePanelStore.setState((state) => ({
+      ...state,
+      activePanel: "left",
+      rightPanel: {
+        ...state.rightPanel,
+        currentPath: "/target",
+        resolvedPath: "/target",
+      },
+    }));
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "move",
+    }));
+
+    render(<DialogContainer />);
+
+    await waitFor(() => {
+      expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe(
+        "/target"
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Move" }));
+
+    await waitFor(() => {
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: "move",
+        sourcePaths: ["/home/user/LargeFolder"],
+        targetDir: "/target",
+      });
+    });
+    expect(
+      useFileOperationUndoStore.getState().pendingMoveOperations["move-job-1"]
+    ).toEqual(
+      expect.objectContaining({
+        kind: "move",
+        entries: [
+          {
+            originalPath: "/home/user/LargeFolder",
+            currentPath: "/target/LargeFolder",
+          },
+        ],
+      })
+    );
   });
 
   it("computes the rename selection range for regular files", () => {

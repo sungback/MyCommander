@@ -1,6 +1,7 @@
 import { beforeEach, vi } from 'vitest';
 import { useClipboardStore } from '../../store/clipboardStore';
 import { useDialogStore } from '../../store/dialogStore';
+import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
 import { usePanelStore } from '../../store/panelStore';
 
 const dialogContainerMocks = vi.hoisted(() => ({
@@ -97,6 +98,9 @@ export const registerDialogContainerTestLifecycle = () => {
   beforeEach(() => {
     useDialogStore.setState(useDialogStore.getInitialState());
     usePanelStore.setState(usePanelStore.getInitialState());
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     useClipboardStore.setState({ clipboard: null });
     setSelectedDeleteState();
     useDialogStore.getState().setOpenDialog('delete');
@@ -110,5 +114,15 @@ export const registerDialogContainerTestLifecycle = () => {
     dialogContainerMocks.mockRefreshPanelsForDirectories.mockReset();
     dialogContainerMocks.mockGetDirSize.mockResolvedValue(0);
     dialogContainerMocks.mockCheckCopyConflicts.mockResolvedValue([]);
+    dialogContainerMocks.mockSubmitJob.mockResolvedValue({
+      id: 'job-1',
+      kind: 'move',
+      status: 'queued',
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: '', unit: 'items' },
+      error: null,
+      result: null,
+    });
   });
 };

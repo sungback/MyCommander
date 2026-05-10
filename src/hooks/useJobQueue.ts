@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { useFileSystem } from "./useFileSystem";
+import { useFileOperationUndoStore } from "../store/fileOperationUndoStore";
 import { useJobStore } from "../store/jobStore";
 import type { JobRecord } from "../types/job";
 import { useDialogStore } from "../store/dialogStore";
@@ -61,7 +62,20 @@ export const useJobQueue = () => {
           job.status === "failed" ||
           job.status === "cancelled");
 
-      if (!reachedTerminalState || !job.result) {
+      if (!reachedTerminalState) {
+        return;
+      }
+
+      if (job.kind === "move") {
+        const undoStore = useFileOperationUndoStore.getState();
+        if (job.status === "completed") {
+          undoStore.completePendingMoveUndo(job.id);
+        } else {
+          undoStore.discardPendingMoveUndo(job.id);
+        }
+      }
+
+      if (!job.result) {
         return;
       }
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import type { FileEntry } from '../../types/file';
 import { useClipboardStore } from '../../store/clipboardStore';
 import { useDragStore } from '../../store/dragStore';
+import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
 import {
   resetSharedDragState,
   sharedPanelPaths,
@@ -220,6 +221,9 @@ export const registerFileListTestLifecycle = () => {
     mockPanelState.rightPanel.activeTabId = 'tab2';
     useClipboardStore.setState({ clipboard: null });
     useDragStore.setState({ dragInfo: null });
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     resetSharedDragGlobals();
     mockSubmitJob.mockResolvedValue({
       id: 'job-1',
@@ -245,6 +249,9 @@ export const registerFileListTestLifecycle = () => {
     }
     useClipboardStore.setState({ clipboard: null });
     useDragStore.setState({ dragInfo: null });
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     resetSharedDragGlobals();
     document.body.style.cursor = '';
     document.body.style.userSelect = '';

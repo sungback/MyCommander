@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { ClipboardState } from "../../store/clipboardStore";
 import { DialogType, DragCopyRequest } from "../../store/dialogStore";
+import {
+  buildMoveUndoEntries,
+  useFileOperationUndoStore,
+} from "../../store/fileOperationUndoStore";
 import { useFileSystem, getErrorMessage } from "../../hooks/useFileSystem";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
@@ -12,7 +16,7 @@ import {
   resolveConflictAction,
   type PendingCopy,
 } from "./copyMoveConflict";
-import { resolveTargetPath } from "./dialogTargetPath";
+import { getPanelAccessPath, resolveTargetPath } from "./dialogTargetPath";
 
 interface UseCopyMoveFlowArgs {
   openDialog: DialogType;
@@ -30,6 +34,9 @@ interface UseCopyMoveFlowArgs {
   openDragCopyDialog: (request: DragCopyRequest) => void;
   closeDialog: () => void;
 }
+
+const pathsMatchNfc = (left: string, right: string) =>
+  left.normalize("NFC") === right.normalize("NFC");
 
 export const useCopyMoveFlow = ({
   openDialog,
@@ -70,6 +77,23 @@ export const useCopyMoveFlow = ({
     );
   };
 
+  const isDirectoryMoveTarget = (paths: string[], targetPath: string) => {
+    if (paths.length !== 1) {
+      return true;
+    }
+
+    const trimmedInput = inputValue.trim();
+    if (trimmedInput.endsWith("/") || trimmedInput.endsWith("\\")) {
+      return true;
+    }
+
+    const basePanel = isPasteMode ? activePanel : targetPanel;
+    return (
+      pathsMatchNfc(trimmedInput, basePanel.currentPath) ||
+      pathsMatchNfc(targetPath, getPanelAccessPath(basePanel))
+    );
+  };
+
   const executeCopyMove = async (
     isMove: boolean,
     paths: string[],
@@ -88,11 +112,19 @@ export const useCopyMoveFlow = ({
     setOpenDialog("progress");
     try {
       if (isMove) {
-        await fs.submitJob({
+        const moveJob = await fs.submitJob({
           kind: "move",
           sourcePaths: paths,
           targetDir: targetPath,
         });
+        if (moveJob?.id) {
+          useFileOperationUndoStore.getState().registerPendingMoveUndo(
+            moveJob.id,
+            buildMoveUndoEntries(paths, targetPath, {
+              targetIsDirectory: isDirectoryMoveTarget(paths, targetPath),
+            })
+          );
+        }
       } else {
         const copyJob: JobSubmission = {
           kind: "copy",

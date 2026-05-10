@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { useDialogStore } from "../../store/dialogStore";
+import {
+  buildMoveUndoEntries,
+  useFileOperationUndoStore,
+} from "../../store/fileOperationUndoStore";
 import { usePanelStore } from "../../store/panelStore";
 import { showTransientToast } from "../../store/toastStore";
 import type { PanelId } from "../../types/file";
@@ -49,11 +53,19 @@ export const useFileListDragActions = (panelId: PanelId) => {
         return false;
       }
 
-      await submitJob({
+      const job = await submitJob({
         kind: "move",
         sourcePaths: collapsedPaths,
         targetDir: targetPath,
       });
+      if (job?.id) {
+        useFileOperationUndoStore.getState().registerPendingMoveUndo(
+          job.id,
+          buildMoveUndoEntries(collapsedPaths, targetPath, {
+            targetIsDirectory: true,
+          })
+        );
+      }
       showTransientToast("선택한 폴더를 이동 대기열에 추가했습니다.", {
         durationMs: 1800,
         tone: "success",

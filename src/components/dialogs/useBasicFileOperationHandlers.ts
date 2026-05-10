@@ -1,5 +1,6 @@
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import type { DialogTarget, DialogType } from "../../store/dialogStore";
+import { useFileOperationUndoStore } from "../../store/fileOperationUndoStore";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import type { PanelState } from "../../types/file";
 import { getPathDirectoryName, joinPath } from "../../utils/path";
@@ -78,6 +79,9 @@ export const useBasicFileOperationHandlers = ({
       const parentPath = getPathDirectoryName(sourcePath);
       const fullPath = parentPath ? joinPath(parentPath, targetName) : targetName;
       await fs.renameFile(sourcePath, fullPath);
+      useFileOperationUndoStore
+        .getState()
+        .recordRenameUndo(sourcePath, fullPath);
       closeDialog();
       refreshPanelsForDirectories([parentPath]);
     } catch (error) {

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogStore } from "../store/dialogStore";
+import { useFileOperationUndoStore } from "../store/fileOperationUndoStore";
 import { useJobStore } from "../store/jobStore";
 import type { JobRecord } from "../types/job";
 import { useJobQueue } from "./useJobQueue";
@@ -60,6 +61,9 @@ const makeJob = (overrides: Partial<JobRecord> = {}): JobRecord => ({
 describe("useJobQueue", () => {
   beforeEach(() => {
     useDialogStore.setState(useDialogStore.getInitialState());
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     useJobStore.getState().resetJobs();
     listenHandlers.clear();
     mockListJobs.mockReset();
@@ -214,6 +218,86 @@ describe("useJobQueue", () => {
 
     expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/target/dir"]);
     expect(mockRemoveDeletedPathsFromVisiblePanels).not.toHaveBeenCalled();
+  });
+
+  it("promotes pending move undo metadata when a move job completes", async () => {
+    useFileOperationUndoStore.getState().registerPendingMoveUndo("job-1", [
+      {
+        originalPath: "/source/a.txt",
+        currentPath: "/target/a.txt",
+      },
+    ]);
+    renderHook(() => useJobQueue());
+
+    await waitFor(() => {
+      expect(listenHandlers.has("job-updated")).toBe(true);
+    });
+
+    act(() => {
+      listenHandlers.get("job-updated")?.({
+        payload: makeJob({ id: "job-1", kind: "move", status: "running" }),
+      });
+    });
+
+    act(() => {
+      listenHandlers.get("job-updated")?.({
+        payload: makeJob({
+          id: "job-1",
+          kind: "move",
+          status: "completed",
+          result: {
+            affectedEntryPaths: ["/source/a.txt"],
+            affectedDirectories: ["/source", "/target"],
+            savedNames: [],
+            archivePath: null,
+          },
+        }),
+      });
+    });
+
+    const undoState = useFileOperationUndoStore.getState();
+    expect(undoState.pendingMoveOperations["job-1"]).toBeUndefined();
+    expect(undoState.lastOperation).toEqual(
+      expect.objectContaining({
+        kind: "move",
+        entries: [
+          {
+            originalPath: "/source/a.txt",
+            currentPath: "/target/a.txt",
+          },
+        ],
+      })
+    );
+  });
+
+  it("discards pending move undo metadata when a move job fails", async () => {
+    useFileOperationUndoStore.getState().registerPendingMoveUndo("job-1", [
+      {
+        originalPath: "/source/a.txt",
+        currentPath: "/target/a.txt",
+      },
+    ]);
+    renderHook(() => useJobQueue());
+
+    await waitFor(() => {
+      expect(listenHandlers.has("job-updated")).toBe(true);
+    });
+
+    act(() => {
+      listenHandlers.get("job-updated")?.({
+        payload: makeJob({ id: "job-1", kind: "move", status: "running" }),
+      });
+    });
+
+    act(() => {
+      listenHandlers.get("job-updated")?.({
+        payload: makeJob({ id: "job-1", kind: "move", status: "failed" }),
+      });
+    });
+
+    const undoState = useFileOperationUndoStore.getState();
+    expect(undoState.pendingMoveOperations["job-1"]).toBeUndefined();
+    expect(undoState.lastOperation).toBeNull();
   });
 
   it("does not open ProgressDialog if it is already open", async () => {

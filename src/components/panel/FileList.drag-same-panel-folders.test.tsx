@@ -16,6 +16,7 @@ import {
   setContainerRect,
 } from './FileList.test-harness';
 import { FileList } from './FileList';
+import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
 
 describe('FileList same-panel drag copy', () => {
   registerFileListTestLifecycle();
@@ -149,6 +150,19 @@ describe('FileList same-panel drag copy', () => {
       expect(mockCheckCopyConflicts).toHaveBeenCalledWith(
         ['/home/user/Project'],
         '/home/user/Downloads'
+      );
+      expect(
+        useFileOperationUndoStore.getState().pendingMoveOperations['job-1']
+      ).toEqual(
+        expect.objectContaining({
+          kind: 'move',
+          entries: [
+            {
+              originalPath: '/home/user/Project',
+              currentPath: '/home/user/Downloads/Project',
+            },
+          ],
+        })
       );
       expect(mockOpenDragCopyDialog).not.toHaveBeenCalled();
     });
