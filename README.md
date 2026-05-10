@@ -3,7 +3,7 @@
 이 문서는 MyCommander의 사용자/기여자용 시작 안내입니다. 구현 컨텍스트와 설계 정책은 [`CLAUDE.md`](./CLAUDE.md), 에이전트 작업 규칙과 검증 기준은 [`AGENTS.md`](./AGENTS.md)를 참고합니다.
 
 MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
-현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX, 토스트 기반 피드백까지 포함합니다.
+현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX, 파일 작업 Undo, 토스트 기반 피드백까지 포함합니다.
 
 ![MyCommander](public/screenshot.png)
 
@@ -15,6 +15,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 사이드바와 Command Palette의 **최근 위치 / 자주 쓰는 위치** 빠른 이동
 - 폴더 **트리 확장(Expand)** 및 **하위 항목별 컨텍스트 메뉴(이름 변경, 정보 보기 등) 지원**
 - 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
+- Command Palette에서 마지막 **이름 변경 / 이동 작업 Undo**
 - 패널 간 **드래그 드롭 복사**
 - 같은 패널 안에서 폴더만 선택한 경우 **드래그 이동**
 - 같은 폴더를 보는 양쪽 패널의 **자동 동기 갱신**
@@ -133,6 +134,7 @@ npm run dev
 - `Cmd+Q` / `Alt+F4`: 앱 종료
 - `CmdOrCtrl+Shift+.`: 숨김 파일 표시 토글
 - `CmdOrCtrl+Shift+M`: 반대 패널을 현재 경로로 동기화
+- `CmdOrCtrl+Shift+P`: Command Palette 열기
 - `CmdOrCtrl+U`: 패널 교환
 - `/`: 활성 패널의 현재 폴더 빠른 필터 포커스
 
