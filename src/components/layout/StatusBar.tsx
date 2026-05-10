@@ -54,9 +54,6 @@ const getAvailableSpaceText = (availableSpace: number | null | undefined) => {
   return `${formatSize(availableSpace, { base: 1000 })} available`;
 };
 
-const shouldSkipAvailableSpaceRequest = (panel: PanelState) =>
-  panel.files.length === 0 && /^[A-Z]:\\$/.test(panel.currentPath);
-
 const getPanelAccessPath = (panel: PanelState) =>
   coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
@@ -132,12 +129,6 @@ export const StatusBar: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
 
-    if (shouldSkipAvailableSpaceRequest(leftPanel)) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
     setAvailableSpace((current) => ({ ...current, left: undefined }));
 
     void getAvailableSpace(getPanelAccessPath(leftPanel)).then((space) => {
@@ -153,12 +144,6 @@ export const StatusBar: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-
-    if (shouldSkipAvailableSpaceRequest(rightPanel)) {
-      return () => {
-        cancelled = true;
-      };
-    }
 
     setAvailableSpace((current) => ({ ...current, right: undefined }));
 

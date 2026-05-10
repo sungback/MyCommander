@@ -2,11 +2,20 @@ import React from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { HardDrive } from "lucide-react";
 import { clsx } from "clsx";
-import { useFileSystem, DriveInfo } from "../../hooks/useFileSystem";
+import { useFileSystem, type DriveInfo } from "../../hooks/useFileSystem";
+import { formatSize } from "../../utils/format";
 
 interface DriveListProps {
   panelId: "left" | "right";
 }
+
+const getDriveSpaceText = (drive: DriveInfo) => {
+  if (drive.availableSpace === undefined || drive.availableSpace === null) {
+    return null;
+  }
+
+  return `${formatSize(drive.availableSpace, { base: 1000 })} free`;
+};
 
 export const DriveList: React.FC<DriveListProps> = ({ panelId }) => {
   const currentPath = usePanelStore((s) =>
@@ -26,6 +35,7 @@ export const DriveList: React.FC<DriveListProps> = ({ panelId }) => {
     <div className="flex bg-bg-secondary border-b border-border-color h-8 items-center px-2 gap-1 shrink-0 overflow-x-auto text-xs font-mono">
       {drives.map((drive) => {
         const letter = drive.mount_point.replace(/\\$/, "").toUpperCase();
+        const spaceText = getDriveSpaceText(drive);
         return (
           <button
             key={drive.mount_point}
@@ -36,18 +46,20 @@ export const DriveList: React.FC<DriveListProps> = ({ panelId }) => {
                 ? "text-text-primary bg-bg-hover" 
                 : "text-text-secondary"
             )}
-            title={`${drive.name} (${drive.type})`}
+            title={`${drive.name} (${drive.type})${spaceText ? ` - ${spaceText}` : ""}`}
           >
             <HardDrive size={14} />
-            <span className="font-bold">
+            <span className="font-bold whitespace-nowrap">
               {drive.mount_point.length < 4 ? `[${drive.mount_point}]` : drive.name}
             </span>
+            {spaceText ? (
+              <span className="whitespace-nowrap text-[10px] font-normal text-text-secondary/80">
+                {spaceText}
+              </span>
+            ) : null}
           </button>
         );
       })}
-      <div className="ml-auto flex gap-2 text-text-secondary/70">
-        {/* Drive space could be fetched later */}
-      </div>
     </div>
   );
 };

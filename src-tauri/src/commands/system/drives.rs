@@ -2,11 +2,15 @@ use serde::Serialize;
 
 #[cfg(not(target_os = "windows"))]
 use std::path::Path;
+#[cfg(target_os = "windows")]
+use std::{os::windows::ffi::OsStrExt, path::Path};
 #[cfg(not(target_os = "windows"))]
 use sysinfo::{Disk, Disks};
 
 #[cfg(target_os = "windows")]
-use windows::Win32::Storage::FileSystem::GetLogicalDrives;
+use windows::core::PCWSTR;
+#[cfg(target_os = "windows")]
+use windows::Win32::Storage::FileSystem::{GetDiskFreeSpaceExW, GetLogicalDrives};
 
 #[derive(Serialize)]
 pub struct DriveInfo {
@@ -38,7 +42,7 @@ pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
                     device_type: "system".to_string(),
                     icon: "drive".to_string(),
                     is_ejectable: false,
-                    available_space: None,
+                    available_space: get_windows_available_space(&path),
                 });
             }
         }
@@ -66,6 +70,28 @@ pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
 
     sort_drives(&mut drives);
     Ok(drives)
+}
+
+#[cfg(target_os = "windows")]
+fn get_windows_available_space(path: &str) -> Option<u64> {
+    let wide_path: Vec<u16> = Path::new(path)
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let mut free_bytes = 0_u64;
+
+    unsafe {
+        GetDiskFreeSpaceExW(
+            PCWSTR(wide_path.as_ptr()),
+            Some(&mut free_bytes as *mut u64),
+            None,
+            None,
+        )
+    }
+    .ok()?;
+
+    Some(free_bytes)
 }
 
 #[cfg(not(target_os = "windows"))]

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StatusBar } from "./StatusBar";
 
 const mockSetOpenDialog = vi.fn();
@@ -9,11 +9,13 @@ const mockPanelState = {
   activePanel: "left" as const,
   leftPanel: {
     currentPath: "/home/user",
+    resolvedPath: null as string | null,
     selectedItems: new Set<string>(),
     files: [],
   },
   rightPanel: {
     currentPath: "/home/other",
+    resolvedPath: null as string | null,
     selectedItems: new Set<string>(),
     files: [],
   },
@@ -70,6 +72,12 @@ vi.mock("../../hooks/useAppCommands", () => ({
 describe("StatusBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPanelState.leftPanel.currentPath = "/home/user";
+    mockPanelState.leftPanel.resolvedPath = null;
+    mockPanelState.leftPanel.files = [];
+    mockPanelState.rightPanel.currentPath = "/home/other";
+    mockPanelState.rightPanel.resolvedPath = null;
+    mockPanelState.rightPanel.files = [];
     mockGetAvailableSpace.mockResolvedValue(1024);
   });
 
@@ -79,5 +87,15 @@ describe("StatusBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "설정" }));
 
     expect(mockSetOpenDialog).toHaveBeenCalledWith("settings");
+  });
+
+  it("빈 Windows 루트 드라이브도 용량 조회를 요청한다", async () => {
+    mockPanelState.leftPanel.currentPath = "C:\\";
+
+    render(<StatusBar />);
+
+    await waitFor(() => {
+      expect(mockGetAvailableSpace).toHaveBeenCalledWith("C:\\");
+    });
   });
 });
