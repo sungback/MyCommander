@@ -16,8 +16,68 @@ jobs:
   preflight:
     uses: ./.github/workflows/ci.yml
 
-  publish-tauri:
+  create-draft-release:
+    name: 릴리즈 draft 생성
     needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: 릴리즈 draft 생성
+        id: release
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="v$version"
+          npm run verify:release-version -- --tag "$tag"
+
+          mapfile -t matching_releases < <(
+            gh api "repos/$GITHUB_REPOSITORY/releases" \
+              --paginate \
+              --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | @tsv"
+          )
+
+          if [ "${#matching_releases[@]}" -gt 1 ]; then
+            echo "Multiple releases already exist for $tag. Clean up duplicate draft releases before rerunning." >&2
+            exit 1
+          fi
+
+          if [ "${#matching_releases[@]}" -eq 1 ]; then
+            IFS=$'\t' read -r release_id is_draft <<< "${matching_releases[0]}"
+            if [ "$is_draft" != "true" ]; then
+              echo "Release $tag already exists and is not a draft." >&2
+              exit 1
+            fi
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "MyCommander v$version" \
+              --notes "자동으로 빌드된 MyCommander 설치 파일(윈도우, 맥, 리눅스)입니다." \
+              --draft \
+              --prerelease=false
+            release_id="$(
+              gh release view "$tag" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json databaseId \
+                --jq ".databaseId"
+            )"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+  publish-tauri:
+    needs: create-draft-release
     permissions:
       contents: write
     strategy:
@@ -117,6 +177,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         with:
+          # All matrix jobs upload to the same pre-created draft release. Letting
+          # each job create/find drafts concurrently can split assets across
+          # duplicate untagged draft releases for the same tag.
+          releaseId: ${{ needs.create-draft-release.outputs.release_id }}
           # package.json version과 동일한 v* 태그 규칙을 유지합니다.
           tagName: v__VERSION__
           releaseName: "MyCommander v__VERSION__"

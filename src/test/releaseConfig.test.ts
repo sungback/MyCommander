@@ -26,6 +26,15 @@ describe("release configuration", () => {
     expect(releaseWorkflowSource).toContain("npm run verify:release-version");
   });
 
+  it("uploads release matrix assets into one pre-created draft release", () => {
+    expect(releaseWorkflowSource).toContain("create-draft-release:");
+    expect(releaseWorkflowSource).toContain("release_id:");
+    expect(releaseWorkflowSource).toContain(
+      "releaseId: ${{ needs.create-draft-release.outputs.release_id }}"
+    );
+    expect(releaseWorkflowSource).toContain("Multiple releases already exist");
+  });
+
   it("pushes only the current release tag instead of every local tag", () => {
     expect(packageJson.scripts["release:push"]).toContain("scripts/push-release.cjs");
     expect(packageJson.scripts["release:push"]).not.toContain("--tags");
