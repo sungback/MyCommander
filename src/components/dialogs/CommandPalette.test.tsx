@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogStore } from "../../store/dialogStore";
+import { useFileOperationUndoStore } from "../../store/fileOperationUndoStore";
 import { useJobStore } from "../../store/jobStore";
 import { useLocationHistoryStore } from "../../store/locationHistoryStore";
 import { usePanelStore } from "../../store/panelStore";
@@ -9,6 +10,7 @@ import { CommandPalette } from "./CommandPalette";
 const commandPaletteMocks = vi.hoisted(() => ({
   mockOpenInTerminal: vi.fn(),
   mockSubmitJob: vi.fn(),
+  mockMoveFiles: vi.fn(),
   mockExtractZip: vi.fn(),
   mockOpenInEditor: vi.fn(),
   mockRefreshPanelsForDirectories: vi.fn(),
@@ -17,6 +19,7 @@ const commandPaletteMocks = vi.hoisted(() => ({
 
 const mockOpenInTerminal = commandPaletteMocks.mockOpenInTerminal;
 const mockSubmitJob = commandPaletteMocks.mockSubmitJob;
+const mockMoveFiles = commandPaletteMocks.mockMoveFiles;
 const mockExtractZip = commandPaletteMocks.mockExtractZip;
 
 vi.mock("../../hooks/useFileSystem", () => ({
@@ -24,6 +27,7 @@ vi.mock("../../hooks/useFileSystem", () => ({
     extractZip: commandPaletteMocks.mockExtractZip,
     openInEditor: commandPaletteMocks.mockOpenInEditor,
     openInTerminal: commandPaletteMocks.mockOpenInTerminal,
+    moveFiles: commandPaletteMocks.mockMoveFiles,
     submitJob: commandPaletteMocks.mockSubmitJob,
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
@@ -67,6 +71,9 @@ describe("CommandPalette", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useDialogStore.setState(useDialogStore.getInitialState());
+    useFileOperationUndoStore.setState(
+      useFileOperationUndoStore.getInitialState()
+    );
     useLocationHistoryStore.setState({ locations: [] });
     usePanelStore.setState(usePanelStore.getInitialState());
     useJobStore.getState().resetJobs();
@@ -80,6 +87,7 @@ describe("CommandPalette", () => {
       error: null,
       result: null,
     });
+    mockMoveFiles.mockResolvedValue(undefined);
     mockExtractZip.mockResolvedValue("/resolved/user/archive");
     seedPanel();
   });
@@ -179,6 +187,32 @@ describe("CommandPalette", () => {
     expect(usePanelStore.getState().leftPanel.currentPath).toBe(
       "/home/user/Projects"
     );
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("undoes the latest file operation from the command palette", async () => {
+    useFileOperationUndoStore
+      .getState()
+      .recordRenameUndo("/resolved/user/old.txt", "/resolved/user/new.txt");
+    openPalette();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Command" }), {
+      target: { value: "undo" },
+    });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Command" }), {
+      key: "Enter",
+    });
+
+    await waitFor(() => {
+      expect(mockMoveFiles).toHaveBeenCalledWith(
+        ["/resolved/user/new.txt"],
+        "/resolved/user/old.txt"
+      );
+    });
+    expect(commandPaletteMocks.mockRefreshPanelsForDirectories).toHaveBeenCalledWith([
+      "/resolved/user",
+    ]);
+    expect(useFileOperationUndoStore.getState().lastOperation).toBeNull();
     expect(useDialogStore.getState().openDialog).toBeNull();
   });
 });

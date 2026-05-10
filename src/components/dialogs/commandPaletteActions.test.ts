@@ -59,6 +59,7 @@ const commandActions = {
   swapPanels: vi.fn(),
   syncOtherPanel: vi.fn(),
   toggleHiddenFiles: vi.fn(),
+  undoLastFileOperation: vi.fn(),
 };
 
 describe("commandPaletteActions", () => {
@@ -118,6 +119,36 @@ describe("commandPaletteActions", () => {
     expect(items.find((item) => item.id === "extract-zip")?.disabledReason).toBe(
       "Select a ZIP archive"
     );
+    expect(items.find((item) => item.id === "undo-file-operation")?.disabledReason).toBe(
+      "No rename or move to undo"
+    );
+  });
+
+  it("enables the file operation undo command when an undo operation exists", () => {
+    const items = buildCommandPaletteItems({
+      activePanelId: "left",
+      activePanel: makePanel(),
+      isMac: false,
+      selectedPaths: ["/home/user/notes.txt"],
+      primaryTarget: getPrimaryCommandTarget(makePanel()),
+      showHiddenFiles: false,
+      actions: commandActions,
+      undoOperation: {
+        id: "undo-1",
+        kind: "rename",
+        entries: [
+          {
+            originalPath: "/home/user/old.txt",
+            currentPath: "/home/user/new.txt",
+          },
+        ],
+        createdAt: 1,
+      },
+    });
+
+    const undoItem = items.find((item) => item.id === "undo-file-operation");
+    expect(undoItem?.disabledReason).toBeUndefined();
+    expect(undoItem?.subtitle).toBe("Rename new.txt back to old.txt");
   });
 
   it("enables ZIP extraction when the primary target is a ZIP file", () => {

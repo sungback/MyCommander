@@ -1,3 +1,7 @@
+import {
+  getFileOperationUndoSubtitle,
+  type FileOperationUndoOperation,
+} from "../../store/fileOperationUndoStore";
 import type { FileEntry, PanelId, PanelState } from "../../types/file";
 import { coalescePanelPath } from "../../utils/path";
 
@@ -50,6 +54,7 @@ export interface CommandPaletteActions {
   swapPanels: () => void;
   syncOtherPanel: () => void;
   toggleHiddenFiles: () => void;
+  undoLastFileOperation: () => void | Promise<void>;
 }
 
 interface BuildCommandPaletteItemsArgs {
@@ -61,6 +66,7 @@ interface BuildCommandPaletteItemsArgs {
   primaryTarget: CommandTarget | null;
   selectedPaths: string[];
   showHiddenFiles: boolean;
+  undoOperation?: FileOperationUndoOperation | null;
 }
 
 export const getPanelCommandPath = (panel: PanelState) =>
@@ -160,6 +166,7 @@ export const buildCommandPaletteItems = ({
   primaryTarget,
   selectedPaths,
   showHiddenFiles,
+  undoOperation,
 }: BuildCommandPaletteItemsArgs): CommandPaletteItem[] => {
   const selectionLabel = getCommandSelectionLabel(selectedPaths);
   const singleTargetReason = primaryTarget ? undefined : "Select one item";
@@ -232,6 +239,14 @@ export const buildCommandPaletteItems = ({
       keywords: ["f2", "name"],
       disabledReason: singleTargetReason,
       run: actions.openRename,
+    },
+    {
+      id: "undo-file-operation",
+      title: "Undo Last File Operation",
+      subtitle: getFileOperationUndoSubtitle(undoOperation ?? null),
+      keywords: ["undo", "revert", "rename", "move"],
+      disabledReason: undoOperation ? undefined : "No rename or move to undo",
+      run: actions.undoLastFileOperation,
     },
     {
       id: "new-file",

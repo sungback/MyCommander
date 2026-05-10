@@ -18,6 +18,7 @@ import {
   Settings,
   Terminal,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
@@ -29,6 +30,10 @@ import {
   getRecentLocations,
   useLocationHistoryStore,
 } from "../../store/locationHistoryStore";
+import {
+  useFileOperationUndoStore,
+  type FileOperationUndoOperation,
+} from "../../store/fileOperationUndoStore";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
 import { showTransientToast } from "../../store/toastStore";
@@ -55,6 +60,7 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   move: MoveRight,
   delete: Trash2,
   rename: FilePenLine,
+  "undo-file-operation": Undo2,
   "new-file": FilePlus,
   "new-folder": FolderPlus,
   search: Search,
@@ -80,6 +86,16 @@ const getCommandIcon = (item: CommandPaletteItem) =>
 
 const getArchiveStem = (path: string) =>
   path.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean).pop() || "Archive";
+
+const getUndoRefreshDirectories = (operation: FileOperationUndoOperation) =>
+  Array.from(
+    new Set(
+      operation.entries.flatMap((entry) => [
+        getPathDirectoryName(entry.originalPath),
+        getPathDirectoryName(entry.currentPath),
+      ])
+    )
+  );
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === "object" &&
@@ -146,6 +162,9 @@ export const CommandPalette: React.FC = () => {
   const setPath = usePanelStore((state) => state.setPath);
   const refreshPanel = usePanelStore((state) => state.refreshPanel);
   const locations = useLocationHistoryStore((state) => state.locations);
+  const lastUndoOperation = useFileOperationUndoStore(
+    (state) => state.lastOperation
+  );
   const setClipboard = useClipboardStore((state) => state.setClipboard);
   const clipboard = useClipboardStore((state) => state.clipboard);
   const upsertJob = useJobStore((state) => state.upsertJob);
@@ -374,6 +393,30 @@ export const CommandPalette: React.FC = () => {
         refreshPanel(activePanelId);
         showTransientToast(showHiddenFiles ? "숨김 파일을 숨겼습니다." : "숨김 파일을 표시합니다.");
       },
+      undoLastFileOperation: async () => {
+        const operation = useFileOperationUndoStore.getState().lastOperation;
+        if (!operation) {
+          return;
+        }
+
+        closeDialog();
+        const refreshDirectories = getUndoRefreshDirectories(operation);
+        try {
+          for (const entry of [...operation.entries].reverse()) {
+            await fs.moveFiles([entry.currentPath], entry.originalPath);
+          }
+          useFileOperationUndoStore.getState().clearLastOperation();
+          refreshPanelsForDirectories(refreshDirectories);
+          showTransientToast("마지막 파일 작업을 되돌렸습니다.");
+        } catch (error) {
+          console.error("Failed to undo last file operation:", error);
+          refreshPanelsForDirectories(refreshDirectories);
+          showTransientToast(
+            getErrorMessage(error, "파일 작업을 되돌리지 못했습니다."),
+            { tone: "error" }
+          );
+        }
+      },
     }),
     [
       activeAccessPath,
@@ -410,6 +453,7 @@ export const CommandPalette: React.FC = () => {
         primaryTarget,
         selectedPaths,
         showHiddenFiles,
+        undoOperation: lastUndoOperation,
       }),
     [
       actions,
@@ -417,6 +461,7 @@ export const CommandPalette: React.FC = () => {
       activePanelId,
       isMac,
       commandLocations,
+      lastUndoOperation,
       primaryTarget,
       selectedPaths,
       showHiddenFiles,
