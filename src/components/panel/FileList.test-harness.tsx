@@ -17,6 +17,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 const fileListMocks = vi.hoisted(() => ({
   mockSubmitJob: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
+  mockEstimateDirSize: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockSetSelection: vi.fn(),
@@ -47,6 +48,7 @@ const fileListMocks = vi.hoisted(() => ({
 
 export const mockSubmitJob = fileListMocks.mockSubmitJob;
 export const mockCheckCopyConflicts = fileListMocks.mockCheckCopyConflicts;
+export const mockEstimateDirSize = fileListMocks.mockEstimateDirSize;
 export const mockGetDirSize = fileListMocks.mockGetDirSize;
 export const mockListDirectory = fileListMocks.mockListDirectory;
 export const mockSetSelection = fileListMocks.mockSetSelection;
@@ -64,6 +66,7 @@ vi.mock('../../hooks/useFileSystem', () => ({
     checkCopyConflicts: fileListMocks.mockCheckCopyConflicts,
     copyFiles: vi.fn().mockResolvedValue([]),
     submitJob: fileListMocks.mockSubmitJob,
+    estimateDirSize: fileListMocks.mockEstimateDirSize,
     getDirSize: fileListMocks.mockGetDirSize,
     listDirectory: fileListMocks.mockListDirectory,
   }),
@@ -87,6 +90,8 @@ vi.mock('../../store/panelStore', () => ({
   usePanelStore: Object.assign((selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       updateEntrySize: vi.fn(),
+      updateEntrySizeEstimate: vi.fn(),
+      setEntrySizeStatus: vi.fn(),
       setSelection: fileListMocks.mockSetSelection,
       selectOnly: fileListMocks.mockSelectOnly,
       clearSelection: fileListMocks.mockClearSelection,
@@ -94,6 +99,7 @@ vi.mock('../../store/panelStore', () => ({
       setActivePanel: fileListMocks.mockSetActivePanel,
       showHiddenFiles: false,
       sizeCache: {},
+      sizeStatusCache: {},
       leftPanel: fileListMocks.mockPanelState.leftPanel,
       rightPanel: fileListMocks.mockPanelState.rightPanel,
     }), {
@@ -236,6 +242,11 @@ export const registerFileListTestLifecycle = () => {
       result: null,
     });
     mockCheckCopyConflicts.mockResolvedValue([]);
+    mockEstimateDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+    });
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
     mockSetSelection.mockReset();

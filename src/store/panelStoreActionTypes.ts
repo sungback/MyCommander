@@ -9,6 +9,7 @@ type PanelStoreStateKey =
   | "panelViewModes"
   | "showHiddenFiles"
   | "sizeCache"
+  | "sizeStatusCache"
   | "themePreference";
 
 export type PanelStoreActions = Omit<AppState, PanelStoreStateKey>;

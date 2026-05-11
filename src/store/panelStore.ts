@@ -21,6 +21,7 @@ export const usePanelStore = create<AppState>((set) => {
       persistedPanelState.rightPath
     ),
     sizeCache: {},
+    sizeStatusCache: {},
     activePanel: persistedPanelState.activePanel ?? "left",
     showHiddenFiles: persistedPanelState.showHiddenFiles ?? false,
     themePreference: persistedPanelState.themePreference ?? "auto",

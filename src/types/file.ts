@@ -1,12 +1,21 @@
 export type FileType = "file" | "directory" | "symlink";
 export type ViewMode = "brief" | "detailed";
 export type PanelId = "left" | "right";
+export type DirectorySizeStatus =
+  | "unknown"
+  | "estimating"
+  | "estimated"
+  | "calculating"
+  | "exact"
+  | "partial"
+  | "error";
 
 export interface FileEntry {
   name: string;
   path: string;
   kind: FileType;
   size?: number | null; // Directories might not have a quick size
+  sizeStatus?: DirectorySizeStatus;
   lastModified?: number | null; // Timestamp
   isHidden?: boolean;
 }

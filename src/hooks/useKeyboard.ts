@@ -29,6 +29,7 @@ export function useKeyboard() {
   } = useAppCommands();
   const { getDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const setEntrySizeStatus = usePanelStore((s) => s.setEntrySizeStatus);
   const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
   const goBack = usePanelStore((s) => s.goBack);
   const goForward = usePanelStore((s) => s.goForward);
@@ -56,6 +57,7 @@ export function useKeyboard() {
       openSearch,
       openSync,
       pasteFromClipboard,
+      setEntrySizeStatus,
       setPanelViewMode,
       swapPanels,
       syncOtherPanelToCurrentPath,
@@ -83,6 +85,7 @@ export function useKeyboard() {
     openSync,
     swapPanels,
     setPanelViewMode,
+    setEntrySizeStatus,
     copyCurrentPath,
     syncOtherPanelToCurrentPath,
     updateEntrySize,

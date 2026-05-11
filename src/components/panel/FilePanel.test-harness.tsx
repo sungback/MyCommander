@@ -5,6 +5,7 @@ import type { FileEntry } from '../../types/file';
 export const mockListDirectory = vi.fn();
 export const mockGetHomeDir = vi.fn();
 export const mockResolvePath = vi.fn();
+export const mockEstimateDirSize = vi.fn();
 export const mockGetDirSize = vi.fn();
 export const mockOpenFile = vi.fn();
 export const mockShowContextMenu = vi.fn();
@@ -19,6 +20,7 @@ const mockFileSystem = {
   listDirectory: mockListDirectory,
   getHomeDir: mockGetHomeDir,
   resolvePath: mockResolvePath,
+  estimateDirSize: mockEstimateDirSize,
   getDirSize: mockGetDirSize,
   openFile: mockOpenFile,
   showContextMenu: mockShowContextMenu,
@@ -127,6 +129,12 @@ export const registerFilePanelTestLifecycle = () => {
     mockGetHomeDir.mockReset();
     mockResolvePath.mockReset();
     mockResolvePath.mockImplementation(async (path: string) => path);
+    mockEstimateDirSize.mockReset();
+    mockEstimateDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+    });
     mockGetDirSize.mockReset();
     mockOpenFile.mockReset();
     mockShowContextMenu.mockReset();

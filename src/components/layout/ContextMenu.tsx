@@ -64,7 +64,12 @@ export const ContextMenu: React.FC = () => {
         const { panelId, panel, targetPath, targetEntry } = context;
         const { setOpenDialog, openRenameDialog, openInfoDialog, closeDialog } =
           useDialogStore.getState();
-        const { setActivePanel, refreshPanel, updateEntrySize } = usePanelStore.getState();
+        const {
+          setActivePanel,
+          refreshPanel,
+          setEntrySizeStatus,
+          updateEntrySize,
+        } = usePanelStore.getState();
         const { closeContextMenu } = useContextMenuStore.getState();
 
         const openDialogForPanel = (
@@ -98,9 +103,15 @@ export const ContextMenu: React.FC = () => {
               closeContextMenu();
               if (targetPath && targetEntry?.kind === "directory" && targetEntry.name !== "..") {
                 showTransientToast("폴더 용량 계산을 시작했습니다.");
-                const size = await fs.getDirSize(targetPath);
-                updateEntrySize(panelId, targetPath, size);
-                showTransientToast(`${targetEntry.name}: ${formatSize(size)}`);
+                setEntrySizeStatus(panelId, targetPath, "calculating");
+                try {
+                  const size = await fs.getDirSize(targetPath);
+                  updateEntrySize(panelId, targetPath, size);
+                  showTransientToast(`${targetEntry.name}: ${formatSize(size)}`);
+                } catch (error) {
+                  setEntrySizeStatus(panelId, targetPath, "error");
+                  throw error;
+                }
                 return;
               }
 
@@ -110,6 +121,7 @@ export const ContextMenu: React.FC = () => {
                   panelId,
                   panel,
                   getDirSize: fs.getDirSize,
+                  setEntrySizeStatus,
                   updateEntrySize,
                 });
                 showTransientToast(

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   alertSpy,
   lastFileListProps,
+  mockEstimateDirSize,
   mockGetDirSize,
   mockListDirectory,
   mockOpenContextMenu,
@@ -143,7 +144,7 @@ describe('FilePanel', () => {
     );
   });
 
-  it("fills missing directory sizes in the background", async () => {
+  it("estimates missing directory sizes in the background", async () => {
     const entries: FileEntry[] = [
       { name: "Documents", path: "/home/user/Documents", kind: "directory", size: null },
       { name: "Downloads", path: "/home/user/Downloads", kind: "directory" },
@@ -151,20 +152,32 @@ describe('FilePanel', () => {
     ];
 
     mockListDirectory.mockResolvedValue(entries);
-    mockGetDirSize.mockResolvedValue(42);
+    mockEstimateDirSize.mockResolvedValue({
+      size: 42,
+      isPartial: true,
+      scannedEntries: 4,
+    });
 
     setLeftPanelPath("/home/user");
     render(<FilePanel id="left" />);
 
     await waitFor(() => {
-      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Documents");
-      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Downloads");
+      expect(mockEstimateDirSize).toHaveBeenCalledWith("/home/user/Documents", {
+        maxDepth: 1,
+        maxEntries: 200,
+      });
+      expect(mockEstimateDirSize).toHaveBeenCalledWith("/home/user/Downloads", {
+        maxDepth: 1,
+        maxEntries: 200,
+      });
     });
 
     await waitFor(() => {
       const files = usePanelStore.getState().leftPanel.files;
       expect(files.find((entry) => entry.name === "Documents")?.size).toBe(42);
+      expect(files.find((entry) => entry.name === "Documents")?.sizeStatus).toBe("partial");
       expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(42);
+      expect(files.find((entry) => entry.name === "Downloads")?.sizeStatus).toBe("partial");
     });
   });
 
@@ -210,7 +223,7 @@ describe('FilePanel', () => {
     );
     expect(usePanelStore.getState().leftPanel.files).toEqual([
       resolvedEntries[0],
-      { ...resolvedEntries[1], size: 0 },
+      { ...resolvedEntries[1], size: 0, sizeStatus: "estimated" },
     ]);
     expect(alertSpy).not.toHaveBeenCalled();
   });
@@ -237,7 +250,7 @@ describe('FilePanel', () => {
     await waitFor(() => {
       expect(usePanelStore.getState().leftPanel.files).toEqual([
         homeEntries[0],
-        { ...homeEntries[1], size: 0 },
+        { ...homeEntries[1], size: 0, sizeStatus: "estimated" },
       ]);
     });
 

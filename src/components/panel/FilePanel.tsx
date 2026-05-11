@@ -39,7 +39,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const setResolvedPath = usePanelStore((s) => s.setResolvedPath);
   const setPendingCursorName = usePanelStore((s) => s.setPendingCursorName);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
-  const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const setEntrySizeStatus = usePanelStore((s) => s.setEntrySizeStatus);
+  const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const setSelection = usePanelStore((s) => s.setSelection);
   const fs = useFileSystem();
@@ -119,7 +120,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     files: panelState.files,
     lastUpdated: panelState.lastUpdated,
     panelId: id,
-    updateEntrySize,
+    setEntrySizeStatus,
+    updateEntrySizeEstimate,
   });
 
   usePanelContextMenu({

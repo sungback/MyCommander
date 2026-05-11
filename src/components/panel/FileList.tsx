@@ -47,26 +47,32 @@ export const FileList: React.FC<FileListProps> = ({
   setCursorIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { getDirSize, listDirectory } = useFileSystem();
+  const { estimateDirSize, getDirSize, listDirectory } = useFileSystem();
   const {
     activeTab,
+    setEntrySizeStatus,
     updateEntrySize,
+    updateEntrySizeEstimate,
     setSelection,
     selectOnly,
     clearSelection,
     showHiddenFiles,
     sizeCache,
+    sizeStatusCache,
   } = usePanelStore(
     useShallow((s) => {
       const key = panelId === "left" ? "leftPanel" : "rightPanel";
       return {
         activeTab: s[key].tabs.find((t) => t.id === s[key].activeTabId),
+        setEntrySizeStatus: s.setEntrySizeStatus,
         updateEntrySize: s.updateEntrySize,
+        updateEntrySizeEstimate: s.updateEntrySizeEstimate,
         setSelection: s.setSelection,
         selectOnly: s.selectOnly,
         clearSelection: s.clearSelection,
         showHiddenFiles: s.showHiddenFiles,
         sizeCache: s.sizeCache,
+        sizeStatusCache: s.sizeStatusCache,
       };
     })
   );
@@ -89,15 +95,16 @@ export const FileList: React.FC<FileListProps> = ({
     toggleExpanded,
   } = useExpandedDirectories({
     currentPath,
+    estimateDirSize,
     expandedChildrenVersion,
     files,
-    getDirSize,
     listDirectory,
     panelId,
     refreshKey,
     showHiddenFiles,
     setCursorIndex,
-    updateEntrySize,
+    setEntrySizeStatus,
+    updateEntrySizeEstimate,
     focusContainer,
   });
 
@@ -106,6 +113,7 @@ export const FileList: React.FC<FileListProps> = ({
     expandedPaths,
     childEntriesByPath,
     sizeCache,
+    sizeStatusCache,
     sortField,
     sortDirection,
   });
@@ -144,6 +152,7 @@ export const FileList: React.FC<FileListProps> = ({
     openPreviewDialog,
     panelId,
     setCursorIndex,
+    setEntrySizeStatus,
     setSelection,
     showHiddenFiles,
     updateEntrySize,

@@ -163,6 +163,7 @@ export const CommandPalette: React.FC = () => {
   const setActivePanel = usePanelStore((state) => state.setActivePanel);
   const setPath = usePanelStore((state) => state.setPath);
   const refreshPanel = usePanelStore((state) => state.refreshPanel);
+  const setEntrySizeStatus = usePanelStore((state) => state.setEntrySizeStatus);
   const updateEntrySize = usePanelStore((state) => state.updateEntrySize);
   const locations = useLocationHistoryStore((state) => state.locations);
   const lastUndoOperation = useFileOperationUndoStore(
@@ -226,6 +227,7 @@ export const CommandPalette: React.FC = () => {
           panelId: activePanelId,
           panel: activePanel,
           getDirSize: fs.getDirSize,
+          setEntrySizeStatus,
           updateEntrySize,
         });
 
@@ -455,6 +457,7 @@ export const CommandPalette: React.FC = () => {
       setClipboard,
       setOpenDialog,
       setPath,
+      setEntrySizeStatus,
       setShowHiddenFiles,
       showHiddenFiles,
       swapPanels,

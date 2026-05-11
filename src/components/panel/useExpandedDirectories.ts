@@ -1,17 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import type { FileEntry, PanelId } from "../../types/file";
+import type { DirectorySizeStatus, FileEntry, PanelId } from "../../types/file";
+import type { DirectorySizeEstimate } from "../../hooks/tauriCommands/fileCommands";
 
 interface UseExpandedDirectoriesProps {
   currentPath: string;
   expandedChildrenVersion: number;
   files: FileEntry[];
-  getDirSize: (path: string) => Promise<number>;
+  estimateDirSize: (
+    path: string,
+    options?: { maxDepth?: number; maxEntries?: number }
+  ) => Promise<DirectorySizeEstimate>;
   listDirectory: (path: string, showHiddenFiles: boolean) => Promise<FileEntry[]>;
   panelId: PanelId;
   refreshKey: number;
   showHiddenFiles: boolean;
   setCursorIndex: (index: number) => void;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  setEntrySizeStatus: (
+    panel: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
+  updateEntrySizeEstimate: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
   focusContainer: () => void;
 }
 
@@ -22,13 +36,14 @@ export const useExpandedDirectories = ({
   currentPath,
   expandedChildrenVersion,
   files,
-  getDirSize,
+  estimateDirSize,
   listDirectory,
   panelId,
   refreshKey,
   showHiddenFiles,
   setCursorIndex,
-  updateEntrySize,
+  setEntrySizeStatus,
+  updateEntrySizeEstimate,
   focusContainer,
 }: UseExpandedDirectoriesProps) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -111,10 +126,21 @@ export const useExpandedDirectories = ({
     };
   }, [currentPath, expandedChildrenVersion, files, listDirectory, refreshKey, showHiddenFiles]);
 
-  const calculateDirectorySize = (path: string, message: string) => {
-    getDirSize(path)
-      .then((size) => updateEntrySize(panelId, path, size))
-      .catch((error) => console.error(message, error));
+  const estimateDirectorySize = (path: string, message: string) => {
+    setEntrySizeStatus(panelId, path, "estimating");
+    estimateDirSize(path, { maxDepth: 1, maxEntries: 200 })
+      .then((estimate) =>
+        updateEntrySizeEstimate(
+          panelId,
+          path,
+          estimate.size,
+          estimate.isPartial ? "partial" : "estimated"
+        )
+      )
+      .catch((error) => {
+        setEntrySizeStatus(panelId, path, "error");
+        console.error(message, error);
+      });
   };
 
   const toggleExpanded = async (rowIndex: number, entry: FileEntry) => {
@@ -146,9 +172,9 @@ export const useExpandedDirectories = ({
             child.kind === "directory" &&
             (child.size === undefined || child.size === null)
           ) {
-            calculateDirectorySize(
+            estimateDirectorySize(
               child.path,
-              "Failed to calculate child dir size:"
+              "Failed to estimate child dir size:"
             );
           }
         });
@@ -159,7 +185,7 @@ export const useExpandedDirectories = ({
     }
 
     if (entry.size === undefined || entry.size === null) {
-      calculateDirectorySize(entry.path, "Failed to calculate dir size:");
+      estimateDirectorySize(entry.path, "Failed to estimate dir size:");
     }
 
     setExpandedPaths((current) => {

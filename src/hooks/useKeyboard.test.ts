@@ -12,7 +12,7 @@ const {
   mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard,
   mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
-  mockUpdateEntrySize, mockSetPanelViewMode,
+  mockUpdateEntrySize, mockSetEntrySizeStatus, mockSetPanelViewMode,
   mockGetDirSize, mockIsMacPlatform,
 } = vi.hoisted(() => ({
   mockOpenPreview:     vi.fn(),
@@ -36,6 +36,7 @@ const {
     mockOpenInfoDialog:  vi.fn(),
     mockCloseDialog:     vi.fn(),
     mockUpdateEntrySize: vi.fn(),
+    mockSetEntrySizeStatus: vi.fn(),
   mockSetPanelViewMode: vi.fn(),
   mockGetDirSize:      vi.fn().mockResolvedValue(0),
   mockIsMacPlatform:   vi.fn().mockReturnValue(false),
@@ -76,7 +77,11 @@ vi.mock('./useFileSystem', () => ({
 vi.mock('../store/panelStore', () => ({
   usePanelStore: Object.assign(
     (selector: (s: Record<string, unknown>) => unknown) =>
-      selector({ updateEntrySize: mockUpdateEntrySize, setPanelViewMode: mockSetPanelViewMode }),
+      selector({
+        updateEntrySize: mockUpdateEntrySize,
+        setEntrySizeStatus: mockSetEntrySizeStatus,
+        setPanelViewMode: mockSetPanelViewMode,
+      }),
     {
       getState: () => ({
         activePanel: 'left',

@@ -180,4 +180,30 @@ describe("fileCommands", () => {
       expect(result).toBe(1024);
     });
   });
+
+  describe("estimateDirSize", () => {
+    it("calls estimate_dir_size with limits and returns estimate metadata", async () => {
+      mockInvoke.mockResolvedValue({
+        size: 2048,
+        isPartial: true,
+        scannedEntries: 12,
+      });
+
+      const result = await fileCommands.estimateDirSize("/some/dir", {
+        maxDepth: 1,
+        maxEntries: 200,
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith("estimate_dir_size", {
+        path: "/some/dir",
+        max_depth: 1,
+        max_entries: 200,
+      });
+      expect(result).toEqual({
+        size: 2048,
+        isPartial: true,
+        scannedEntries: 12,
+      });
+    });
+  });
 });

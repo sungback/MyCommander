@@ -26,4 +26,5 @@ export {
   setPanelFiles,
   sortPanelByField,
   updateEntrySizeAcrossPanels,
+  updateEntrySizeStatusAcrossPanels,
 } from "./panelStoreFiles";

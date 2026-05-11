@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import type { PanelId } from "../../types/file";
+import type { DirectorySizeStatus, PanelId } from "../../types/file";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
 
 interface UseFileListKeyboardProps {
@@ -15,6 +15,11 @@ interface UseFileListKeyboardProps {
   openPreviewDialog: (request: { panelId: PanelId; path: string }) => void;
   panelId: PanelId;
   setCursorIndex: (index: number) => void;
+  setEntrySizeStatus: (
+    panel: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
   setSelection: (panel: PanelId, paths: string[]) => void;
   showHiddenFiles: boolean;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
@@ -34,6 +39,7 @@ export const useFileListKeyboard = ({
   openPreviewDialog,
   panelId,
   setCursorIndex,
+  setEntrySizeStatus,
   setSelection,
   showHiddenFiles,
   updateEntrySize,
@@ -129,9 +135,13 @@ export const useFileListKeyboard = ({
 
       onSelect(current.path, true);
       if (current.kind === "directory" && current.name !== "..") {
+        setEntrySizeStatus(panelId, current.path, "calculating");
         getDirSize(current.path)
           .then((size) => updateEntrySize(panelId, current.path, size))
-          .catch((error) => console.error("Failed to calculate dir size:", error));
+          .catch((error) => {
+            setEntrySizeStatus(panelId, current.path, "error");
+            console.error("Failed to calculate dir size:", error);
+          });
       }
       return;
     }

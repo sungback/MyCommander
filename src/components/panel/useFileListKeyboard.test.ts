@@ -56,6 +56,7 @@ const defaultProps = () => ({
   openPreviewDialog: vi.fn(),
   panelId: "left" as const,
   setCursorIndex: vi.fn(),
+  setEntrySizeStatus: vi.fn(),
   setSelection: vi.fn(),
   showHiddenFiles: false,
   updateEntrySize: vi.fn(),
@@ -175,6 +176,11 @@ describe("useFileListKeyboard", () => {
     const event = makeKey(" ", { code: "Space" });
     result.current.handleKeyDown(event as unknown as React.KeyboardEvent<HTMLDivElement>);
     expect(props.onSelect).toHaveBeenCalledWith("/home/docs", true);
+    expect(props.setEntrySizeStatus).toHaveBeenCalledWith(
+      "left",
+      "/home/docs",
+      "calculating"
+    );
     expect(props.getDirSize).toHaveBeenCalledWith("/home/docs");
   });
 

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-estimate-dir-size"
+description = "Enables the estimate_dir_size command without any pre-configured scope."
+commands.allow = ["estimate_dir_size"]
+
+[[permission]]
+identifier = "deny-estimate-dir-size"
+description = "Denies the estimate_dir_size command without any pre-configured scope."
+commands.deny = ["estimate_dir_size"]

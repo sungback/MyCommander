@@ -46,6 +46,7 @@
     "allow-read-file-content",
     "allow-search-files",
     "allow-get-dir-size",
+    "allow-estimate-dir-size",
     "allow-compare-directories",
     "allow-sync-watched-directories",
     "allow-write-files-to-pasteboard",

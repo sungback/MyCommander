@@ -75,4 +75,38 @@ describe("FileItem", () => {
     expect(label).not.toBeNull();
     expect(label).toHaveTextContent("sec");
   });
+
+  it("marks estimated and partial directory sizes", () => {
+    render(
+      <>
+        <FileItem
+          entry={{
+            name: "estimated",
+            path: "/tmp/estimated",
+            kind: "directory",
+            size: 1024,
+            sizeStatus: "estimated",
+          }}
+          viewMode="detailed"
+          onClick={vi.fn()}
+          onDoubleClick={vi.fn()}
+        />
+        <FileItem
+          entry={{
+            name: "partial",
+            path: "/tmp/partial",
+            kind: "directory",
+            size: 2048,
+            sizeStatus: "partial",
+          }}
+          viewMode="detailed"
+          onClick={vi.fn()}
+          onDoubleClick={vi.fn()}
+        />
+      </>
+    );
+
+    expect(screen.getByText("~1.0 KB")).toBeInTheDocument();
+    expect(screen.getByText("2.0 KB+")).toBeInTheDocument();
+  });
 });

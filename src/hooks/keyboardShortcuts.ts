@@ -2,7 +2,7 @@ import { useClipboardStore } from "../store/clipboardStore";
 import { useDialogStore, type DialogType } from "../store/dialogStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { usePanelStore } from "../store/panelStore";
-import type { PanelId, PanelState, ViewMode } from "../types/file";
+import type { DirectorySizeStatus, PanelId, PanelState, ViewMode } from "../types/file";
 import { showTransientStatusMessage, type useAppCommands } from "./useAppCommands";
 
 type AppCommands = ReturnType<typeof useAppCommands>;
@@ -11,6 +11,11 @@ interface CalculatePanelDirectoriesArgs {
   panelId: PanelId;
   panel: PanelState;
   getDirSize: (path: string) => Promise<number>;
+  setEntrySizeStatus?: (
+    panelId: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
   updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
 }
 
@@ -24,6 +29,7 @@ export const calculatePanelDirectories = async ({
   panelId,
   panel,
   getDirSize,
+  setEntrySizeStatus,
   updateEntrySize,
 }: CalculatePanelDirectoriesArgs): Promise<DirectorySizeCalculationResult> => {
   const directories = panel.files.filter(
@@ -43,10 +49,12 @@ export const calculatePanelDirectories = async ({
       }
 
       try {
+        setEntrySizeStatus?.(panelId, entry.path, "calculating");
         const size = await getDirSize(entry.path);
         updateEntrySize(panelId, entry.path, size);
         result.completed += 1;
       } catch (error) {
+        setEntrySizeStatus?.(panelId, entry.path, "error");
         result.failed += 1;
         console.error(`Failed to calculate dir size for ${entry.path}:`, error);
       }
@@ -85,6 +93,11 @@ export interface KeyboardHandlerDependencies
   goForward: (panelId: PanelId) => void;
   openInfoDialog: (target: { panelId: PanelId; path: string }) => void;
   setPanelViewMode: (panelId: PanelId, viewMode: ViewMode) => void;
+  setEntrySizeStatus: (
+    panelId: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
   updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
 }
 
@@ -293,12 +306,14 @@ const handleModifiedShortcut = (
         panelId: "left",
         panel: state.leftPanel,
         getDirSize: deps.getDirSize,
+        setEntrySizeStatus: deps.setEntrySizeStatus,
         updateEntrySize: deps.updateEntrySize,
       }),
       calculatePanelDirectories({
         panelId: "right",
         panel: state.rightPanel,
         getDirSize: deps.getDirSize,
+        setEntrySizeStatus: deps.setEntrySizeStatus,
         updateEntrySize: deps.updateEntrySize,
       }),
     ]);

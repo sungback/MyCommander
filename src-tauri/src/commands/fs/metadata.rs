@@ -5,6 +5,7 @@ mod listing;
 #[path = "metadata/preview.rs"]
 mod preview;
 
+pub use dir_size::DirectorySizeEstimate;
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;
 
@@ -26,4 +27,13 @@ pub async fn read_file_content(path: String) -> Result<String, String> {
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_dir_size(path: String) -> Result<u64, String> {
     dir_size::get_dir_size(path).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn estimate_dir_size(
+    path: String,
+    max_depth: Option<usize>,
+    max_entries: Option<usize>,
+) -> Result<DirectorySizeEstimate, String> {
+    dir_size::estimate_dir_size(path, max_depth, max_entries).await
 }

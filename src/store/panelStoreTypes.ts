@@ -1,5 +1,6 @@
 import type {
   FileEntry,
+  DirectorySizeStatus,
   PanelId,
   PanelState,
   SortField,
@@ -12,6 +13,7 @@ export interface AppState {
   leftPanel: PanelState;
   rightPanel: PanelState;
   sizeCache: Record<string, number>;
+  sizeStatusCache: Record<string, DirectorySizeStatus>;
   activePanel: PanelId;
   showHiddenFiles: boolean;
   themePreference: ThemePreference;
@@ -38,6 +40,17 @@ export interface AppState {
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: SortField) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySizeEstimate: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
+  setEntrySizeStatus: (
+    panel: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
   invalidateEntrySizes: (paths: string[]) => void;
   swapPanels: () => void;
 }

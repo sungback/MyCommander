@@ -53,6 +53,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
   syncOtherPanelToCurrentPath: vi.fn(),
+  setEntrySizeStatus: vi.fn(),
   setPanelViewMode: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
@@ -116,6 +117,29 @@ describe('calculatePanelDirectories', () => {
     await calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize });
 
     expect(updateEntrySize).toHaveBeenCalledWith('left', '/home/docs', 512);
+  });
+
+  it('marks directory entries as calculating before exact size work', async () => {
+    const getDirSize = vi.fn().mockResolvedValue(512);
+    const setEntrySizeStatus = vi.fn();
+    const updateEntrySize = vi.fn();
+    const panel = makePanel([
+      { name: 'docs', path: '/home/docs', kind: 'directory' },
+    ]);
+
+    await calculatePanelDirectories({
+      panelId: 'left',
+      panel,
+      getDirSize,
+      setEntrySizeStatus,
+      updateEntrySize,
+    });
+
+    expect(setEntrySizeStatus).toHaveBeenCalledWith(
+      'left',
+      '/home/docs',
+      'calculating'
+    );
   });
 
   it('skips non-directory entries (kind === "file")', async () => {

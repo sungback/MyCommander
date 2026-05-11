@@ -75,7 +75,9 @@ describe("panelStore — updateEntrySize", () => {
     const rightFiles = usePanelStore.getState().rightPanel.files;
 
     expect(leftFiles.find((f) => f.name === "folder")?.size).toBe(9999);
+    expect(leftFiles.find((f) => f.name === "folder")?.sizeStatus).toBe("exact");
     expect(rightFiles.find((f) => f.name === "folder")?.size).toBe(9999);
+    expect(rightFiles.find((f) => f.name === "folder")?.sizeStatus).toBe("exact");
   });
 
   it("caches the size for future setFiles calls", () => {
@@ -90,6 +92,7 @@ describe("panelStore — updateEntrySize", () => {
 
     const files = usePanelStore.getState().leftPanel.files;
     expect(files.find((f) => f.name === "dir")?.size).toBe(5000);
+    expect(files.find((f) => f.name === "dir")?.sizeStatus).toBe("exact");
   });
 
   it("sizeCache에 경로-크기가 직접 저장된다", () => {
@@ -97,6 +100,7 @@ describe("panelStore — updateEntrySize", () => {
     updateEntrySize("left", "/some/dir", 1234);
     // sizeCache는 FileList의 getVisibleRows가 직접 읽는 공유 캐시
     expect(usePanelStore.getState().sizeCache["/some/dir"]).toBe(1234);
+    expect(usePanelStore.getState().sizeStatusCache["/some/dir"]).toBe("exact");
   });
 
   it("파일 목록에 없는 경로도 sizeCache에 저장된다", () => {
@@ -134,7 +138,27 @@ describe("panelStore — updateEntrySize", () => {
     expect(afterSecondUpdate.leftPanel).toBe(afterFirstUpdate.leftPanel);
     expect(afterSecondUpdate.rightPanel).toBe(afterFirstUpdate.rightPanel);
     expect(afterSecondUpdate.sizeCache).toBe(afterFirstUpdate.sizeCache);
+    expect(afterSecondUpdate.sizeStatusCache).toBe(afterFirstUpdate.sizeStatusCache);
     expect(notificationCount).toBe(0);
+  });
+
+  it("stores estimated directory sizes separately from exact calculations", () => {
+    const { setFiles, updateEntrySizeEstimate } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dir", path: "/estimated/dir", kind: "directory" },
+    ]);
+
+    updateEntrySizeEstimate("left", "/estimated/dir", 123, "partial");
+
+    const file = usePanelStore
+      .getState()
+      .leftPanel.files.find((entry) => entry.name === "dir");
+
+    expect(file?.size).toBe(123);
+    expect(file?.sizeStatus).toBe("partial");
+    expect(usePanelStore.getState().sizeCache["/estimated/dir"]).toBe(123);
+    expect(usePanelStore.getState().sizeStatusCache["/estimated/dir"]).toBe("partial");
   });
 });
 

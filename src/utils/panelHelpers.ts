@@ -1,4 +1,11 @@
-import { FileEntry, PanelId, PanelState, PanelTabState, SortField } from "../types/file";
+import {
+  DirectorySizeStatus,
+  FileEntry,
+  PanelId,
+  PanelState,
+  PanelTabState,
+  SortField,
+} from "../types/file";
 import { ThemePreference } from "../types/theme";
 import { coalescePanelPath, stripWindowsExtendedPathPrefix } from "./path";
 import {
@@ -174,15 +181,31 @@ export const normalizePathKey = (path: string) => path.normalize("NFC");
 
 export const applyCachedSizes = (
   entries: FileEntry[],
-  sizeCache: Record<string, number>
+  sizeCache: Record<string, number>,
+  sizeStatusCache: Record<string, DirectorySizeStatus> = {}
 ): FileEntry[] =>
   entries.map((entry) => {
     if (entry.kind !== "directory" || entry.name === "..") {
       return entry;
     }
 
-    const cachedSize = sizeCache[normalizePathKey(entry.path)];
-    return cachedSize === undefined ? entry : { ...entry, size: cachedSize };
+    const normalizedPath = normalizePathKey(entry.path);
+    const cachedSize = sizeCache[normalizedPath];
+    const cachedStatus = sizeStatusCache[normalizedPath];
+
+    if (cachedSize === undefined && cachedStatus === undefined) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      ...(cachedSize === undefined ? {} : { size: cachedSize }),
+      ...(cachedStatus === undefined
+        ? cachedSize === undefined
+          ? {}
+          : { sizeStatus: "exact" as const }
+        : { sizeStatus: cachedStatus }),
+    };
   });
 
 export const updateTab = (
@@ -202,7 +225,8 @@ export const updateActiveTab = (
 export const updatePanelEntrySize = (
   panelState: PanelState,
   normalizedPath: string,
-  size: number
+  size: number,
+  status: DirectorySizeStatus = "exact"
 ): PanelState => {
   let changed = false;
 
@@ -210,13 +234,13 @@ export const updatePanelEntrySize = (
     let tabChanged = false;
     const files = tab.files.map((entry) => {
       if (normalizePathKey(entry.path) === normalizedPath) {
-        if (entry.size === size) {
+        if (entry.size === size && entry.sizeStatus === status) {
           return entry;
         }
 
         tabChanged = true;
         changed = true;
-        return { ...entry, size };
+        return { ...entry, size, sizeStatus: status };
       }
 
       return entry;
@@ -225,6 +249,35 @@ export const updatePanelEntrySize = (
     return tabChanged
       ? { ...tab, files: sortEntries(files, tab.sortField, tab.sortDirection) }
       : tab;
+  });
+
+  return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;
+};
+
+export const updatePanelEntrySizeStatus = (
+  panelState: PanelState,
+  normalizedPath: string,
+  status: DirectorySizeStatus
+): PanelState => {
+  let changed = false;
+
+  const tabs = panelState.tabs.map((tab) => {
+    let tabChanged = false;
+    const files = tab.files.map((entry) => {
+      if (normalizePathKey(entry.path) === normalizedPath) {
+        if (entry.sizeStatus === status) {
+          return entry;
+        }
+
+        tabChanged = true;
+        changed = true;
+        return { ...entry, sizeStatus: status };
+      }
+
+      return entry;
+    });
+
+    return tabChanged ? { ...tab, files } : tab;
   });
 
   return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;

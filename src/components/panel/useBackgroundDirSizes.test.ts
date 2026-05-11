@@ -1,15 +1,18 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileEntry } from "../../types/file";
-import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import {
+  getAutomaticEstimateOptions,
+  useBackgroundDirSizes,
+} from "./useBackgroundDirSizes";
 
-const { mockGetDirSize } = vi.hoisted(() => ({
-  mockGetDirSize: vi.fn(),
+const { mockEstimateDirSize } = vi.hoisted(() => ({
+  mockEstimateDirSize: vi.fn(),
 }));
 
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
-    getDirSize: mockGetDirSize,
+    estimateDirSize: mockEstimateDirSize,
   }),
 }));
 
@@ -25,7 +28,8 @@ const makeProps = (overrides = {}) => ({
   files: [makeDirectory("C:\\Windows")],
   lastUpdated: 0,
   panelId: "left" as const,
-  updateEntrySize: vi.fn(),
+  setEntrySizeStatus: vi.fn(),
+  updateEntrySizeEstimate: vi.fn(),
   ...overrides,
 });
 
@@ -33,7 +37,7 @@ describe("useBackgroundDirSizes", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    mockGetDirSize.mockReset();
+    mockEstimateDirSize.mockReset();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -42,7 +46,11 @@ describe("useBackgroundDirSizes", () => {
   });
 
   it("does not requeue the same unresolved directory after a size calculation settles", async () => {
-    mockGetDirSize.mockResolvedValue(1024);
+    mockEstimateDirSize.mockResolvedValue({
+      size: 1024,
+      isPartial: false,
+      scannedEntries: 1,
+    });
     const props = makeProps();
     const { rerender } = renderHook(
       (hookProps: ReturnType<typeof makeProps>) =>
@@ -51,10 +59,11 @@ describe("useBackgroundDirSizes", () => {
     );
 
     await waitFor(() =>
-      expect(props.updateEntrySize).toHaveBeenCalledWith(
+      expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
         "left",
         "C:\\Windows",
-        1024
+        1024,
+        "estimated"
       )
     );
 
@@ -64,11 +73,11 @@ describe("useBackgroundDirSizes", () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(mockGetDirSize).toHaveBeenCalledTimes(1);
+    expect(mockEstimateDirSize).toHaveBeenCalledTimes(1);
   });
 
   it("marks failed calculations as settled until the panel is refreshed", async () => {
-    mockGetDirSize.mockRejectedValue(new Error("access denied"));
+    mockEstimateDirSize.mockRejectedValue(new Error("access denied"));
     const props = makeProps();
     const { rerender } = renderHook(
       (hookProps: ReturnType<typeof makeProps>) =>
@@ -84,13 +93,28 @@ describe("useBackgroundDirSizes", () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(mockGetDirSize).toHaveBeenCalledTimes(1);
+    expect(mockEstimateDirSize).toHaveBeenCalledTimes(1);
 
     rerender({
       ...props,
       lastUpdated: 1,
     });
 
-    await waitFor(() => expect(mockGetDirSize).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockEstimateDirSize).toHaveBeenCalledTimes(2));
+  });
+
+  it("uses shallower estimates for filesystem roots", () => {
+    expect(getAutomaticEstimateOptions("C:\\")).toEqual({
+      maxDepth: 0,
+      maxEntries: 100,
+    });
+    expect(getAutomaticEstimateOptions("/")).toEqual({
+      maxDepth: 0,
+      maxEntries: 100,
+    });
+    expect(getAutomaticEstimateOptions("/Users/sam")).toEqual({
+      maxDepth: 1,
+      maxEntries: 200,
+    });
   });
 });

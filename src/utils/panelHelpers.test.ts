@@ -121,7 +121,7 @@ describe("sortEntries", () => {
 describe("updatePanelEntrySize", () => {
   it("returns the original panel when the entry already has the requested size", () => {
     const tab = makeTab({
-      files: [makeDir("folder", { size: 123 })],
+      files: [makeDir("folder", { size: 123, sizeStatus: "exact" })],
       sortField: "size",
     });
     const panel = syncPanelWithActiveTab({

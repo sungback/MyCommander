@@ -10,6 +10,7 @@ const {
   mockOpenInfoDialog,
   mockCloseDialog,
   mockRefreshPanel,
+  mockSetEntrySizeStatus,
   mockUpdateEntrySize,
   mockSetActivePanel,
   mockSubmitJob,
@@ -28,6 +29,7 @@ const {
   mockOpenInfoDialog: vi.fn(),
   mockCloseDialog: vi.fn(),
   mockRefreshPanel: vi.fn(),
+  mockSetEntrySizeStatus: vi.fn(),
   mockUpdateEntrySize: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSubmitJob: vi.fn(),
@@ -84,6 +86,7 @@ const mockPanelState = {
     files: [],
   },
   refreshPanel: mockRefreshPanel,
+  setEntrySizeStatus: mockSetEntrySizeStatus,
   updateEntrySize: mockUpdateEntrySize,
   setActivePanel: mockSetActivePanel,
 };
@@ -324,6 +327,11 @@ describe("ContextMenu", () => {
     await listenHandlers.get("context-menu-action")?.({ payload: "calculate-size" });
 
     expect(mockSetActivePanel).toHaveBeenCalledWith("left");
+    expect(mockSetEntrySizeStatus).toHaveBeenCalledWith(
+      "left",
+      "/home/user/Documents",
+      "calculating"
+    );
     expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Documents");
     expect(mockUpdateEntrySize).toHaveBeenCalledWith(
       "left",

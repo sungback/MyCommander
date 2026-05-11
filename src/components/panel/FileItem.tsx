@@ -13,6 +13,38 @@ const THUMBNAIL_EXTENSIONS = new Set([
 
 const getExt = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
 
+const getEntrySizeText = (entry: FileEntry) => {
+  if (entry.kind !== "directory" || entry.name === "..") {
+    return formatSize(entry.size);
+  }
+
+  switch (entry.sizeStatus) {
+    case "estimating":
+      return "...";
+    case "calculating":
+      return "calc...";
+    case "estimated":
+      return entry.size === undefined || entry.size === null
+        ? "..."
+        : `~${formatSize(entry.size)}`;
+    case "partial":
+      return entry.size === undefined || entry.size === null
+        ? "-"
+        : `${formatSize(entry.size)}+`;
+    case "exact":
+      return entry.size === undefined || entry.size === null
+        ? "-"
+        : formatSize(entry.size);
+    case "error":
+    case "unknown":
+      return "-";
+    default:
+      return entry.size === undefined || entry.size === null
+        ? "-"
+        : formatSize(entry.size);
+  }
+};
+
 interface ThumbnailImgProps {
   path: string;
   fallback: React.ReactNode;
@@ -222,9 +254,7 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
               secondaryTextClass
             )}
           >
-            {isDir && entry.name !== ".." && (entry.size === undefined || entry.size === null)
-              ? "<DIR>"
-              : formatSize(entry.size)}
+            {getEntrySizeText(entry)}
           </div>
           <div className={clsx("w-36 px-2 whitespace-nowrap", secondaryTextClass)}>
             {formatDate(entry.lastModified)}

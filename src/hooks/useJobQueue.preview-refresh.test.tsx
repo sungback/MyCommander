@@ -13,6 +13,7 @@ import type { JobRecord } from "../types/job";
 const {
   listenHandlers,
   mockCheckCopyConflicts,
+  mockEstimateDirSize,
   mockGetDirSize,
   mockListDirectory,
   mockListJobs,
@@ -21,6 +22,7 @@ const {
 } = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
   mockCheckCopyConflicts: vi.fn(),
+  mockEstimateDirSize: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockListJobs: vi.fn(),
@@ -67,6 +69,7 @@ vi.mock("./useFileSystem", () => ({
     listDirectory: mockListDirectory,
     checkCopyConflicts: mockCheckCopyConflicts,
     submitJob: mockSubmitJob,
+    estimateDirSize: mockEstimateDirSize,
     getDirSize: mockGetDirSize,
   }),
 }));
@@ -133,12 +136,18 @@ describe("useJobQueue + expanded preview refresh", () => {
     mockListJobs.mockReset();
     mockListDirectory.mockReset();
     mockCheckCopyConflicts.mockReset();
+    mockEstimateDirSize.mockReset();
     mockSubmitJob.mockReset();
     mockGetDirSize.mockReset();
     mockStartDrag.mockReset();
 
     mockListJobs.mockResolvedValue([]);
     mockCheckCopyConflicts.mockResolvedValue([]);
+    mockEstimateDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+    });
     mockSubmitJob.mockResolvedValue(undefined);
     mockGetDirSize.mockResolvedValue(0);
 

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useFileSystem } from "../../hooks/useFileSystem";
-import type { FileEntry, PanelId } from "../../types/file";
+import type { DirectorySizeStatus, FileEntry, PanelId } from "../../types/file";
 
 const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
+const DEFAULT_ESTIMATE_OPTIONS = { maxDepth: 1, maxEntries: 200 };
+const ROOT_ESTIMATE_OPTIONS = { maxDepth: 0, maxEntries: 100 };
 
 interface BackgroundSizeScheduler {
   activeCount: number;
@@ -17,7 +19,17 @@ interface UseBackgroundDirSizesProps {
   files: FileEntry[];
   lastUpdated: number;
   panelId: PanelId;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  setEntrySizeStatus: (
+    panel: PanelId,
+    path: string,
+    status: DirectorySizeStatus
+  ) => void;
+  updateEntrySizeEstimate: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
 }
 
 const createScheduler = (): BackgroundSizeScheduler => ({
@@ -27,13 +39,21 @@ const createScheduler = (): BackgroundSizeScheduler => ({
   settledPaths: new Set(),
 });
 
+export const getAutomaticEstimateOptions = (currentPath: string) => {
+  const trimmed = currentPath.replace(/[\\/]+$/, "");
+  return trimmed === "" || /^[A-Za-z]:$/.test(trimmed)
+    ? ROOT_ESTIMATE_OPTIONS
+    : DEFAULT_ESTIMATE_OPTIONS;
+};
+
 export const useBackgroundDirSizes = ({
   activeTabId,
   currentPath,
   files,
   lastUpdated,
   panelId,
-  updateEntrySize,
+  setEntrySizeStatus,
+  updateEntrySizeEstimate,
 }: UseBackgroundDirSizesProps) => {
   const fs = useFileSystem();
   const backgroundSchedulerRef = useRef<BackgroundSizeScheduler>(
@@ -46,6 +66,7 @@ export const useBackgroundDirSizes = ({
 
   useEffect(() => {
     const scheduler = backgroundSchedulerRef.current;
+    const estimateOptions = getAutomaticEstimateOptions(currentPath);
     const pendingDirectories = files.filter(
       (entry) =>
         entry.kind === "directory" &&
@@ -70,16 +91,22 @@ export const useBackgroundDirSizes = ({
         }
 
         scheduler.activeCount += 1;
+        setEntrySizeStatus(panelId, entry.path, "estimating");
 
         void fs
-          .getDirSize(entry.path)
-          .then((size) => {
+          .estimateDirSize(entry.path, estimateOptions)
+          .then((estimate) => {
             if (backgroundSchedulerRef.current !== scheduler) {
               return;
             }
 
             scheduler.settledPaths.add(entry.path);
-            updateEntrySize(panelId, entry.path, size);
+            updateEntrySizeEstimate(
+              panelId,
+              entry.path,
+              estimate.size,
+              estimate.isPartial ? "partial" : "estimated"
+            );
           })
           .catch((error) => {
             if (backgroundSchedulerRef.current !== scheduler) {
@@ -87,8 +114,9 @@ export const useBackgroundDirSizes = ({
             }
 
             scheduler.settledPaths.add(entry.path);
+            setEntrySizeStatus(panelId, entry.path, "error");
             console.error(
-              `Failed to calculate background dir size for ${entry.path}:`,
+              `Failed to estimate background dir size for ${entry.path}:`,
               error
             );
           })
@@ -109,5 +137,13 @@ export const useBackgroundDirSizes = ({
     }
 
     drainQueue();
-  }, [currentPath, files, fs, lastUpdated, panelId, updateEntrySize]);
+  }, [
+    currentPath,
+    files,
+    fs,
+    lastUpdated,
+    panelId,
+    setEntrySizeStatus,
+    updateEntrySizeEstimate,
+  ]);
 };

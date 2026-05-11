@@ -2,6 +2,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { FileEntry } from "../../types/file";
 import { BatchRenameOperation } from "../../features/multiRename";
 
+export interface DirectorySizeEstimate {
+  size: number;
+  isPartial: boolean;
+  scannedEntries: number;
+}
+
+interface DirectorySizeEstimateResponse {
+  size: number;
+  isPartial: boolean;
+  scannedEntries: number;
+}
+
 export const fileCommands = {
   listDirectory: async (
     path: string,
@@ -80,5 +92,22 @@ export const fileCommands = {
 
   getDirSize: async (path: string): Promise<number> => {
     return await invoke<number>("get_dir_size", { path });
+  },
+
+  estimateDirSize: async (
+    path: string,
+    options: { maxDepth?: number; maxEntries?: number } = {}
+  ): Promise<DirectorySizeEstimate> => {
+    const result = await invoke<DirectorySizeEstimateResponse>("estimate_dir_size", {
+      path,
+      max_depth: options.maxDepth,
+      max_entries: options.maxEntries,
+    });
+
+    return {
+      size: result.size,
+      isPartial: result.isPartial,
+      scannedEntries: result.scannedEntries,
+    };
   },
 };
