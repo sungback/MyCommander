@@ -1,6 +1,6 @@
 import { FileEntry, PanelId, PanelState, PanelTabState, SortField } from "../types/file";
 import { ThemePreference } from "../types/theme";
-import { coalescePanelPath } from "./path";
+import { coalescePanelPath, stripWindowsExtendedPathPrefix } from "./path";
 import {
   createTabId,
   PersistedPanelData,
@@ -238,8 +238,8 @@ export const persistVisiblePanelState = (
     activeTabId: panel.activeTabId,
     tabs: panel.tabs.map((tab) => ({
       id: tab.id,
-      currentPath: tab.currentPath,
-      history: [...tab.history],
+      currentPath: stripWindowsExtendedPathPrefix(tab.currentPath),
+      history: tab.history.map(stripWindowsExtendedPathPrefix),
       historyIndex: tab.historyIndex,
       sortField: tab.sortField,
       sortDirection: tab.sortDirection,

@@ -1,4 +1,23 @@
+const WINDOWS_EXTENDED_UNC_PREFIX = "\\\\?\\UNC\\";
+const WINDOWS_EXTENDED_PATH_PREFIX = "\\\\?\\";
+
+export function stripWindowsExtendedPathPrefix(path: string): string {
+  if (path.startsWith(WINDOWS_EXTENDED_UNC_PREFIX)) {
+    return `\\\\${path.slice(WINDOWS_EXTENDED_UNC_PREFIX.length)}`;
+  }
+
+  if (path.startsWith(WINDOWS_EXTENDED_PATH_PREFIX)) {
+    const rest = path.slice(WINDOWS_EXTENDED_PATH_PREFIX.length);
+    if (/^[A-Z]:[\\/]/i.test(rest)) {
+      return rest;
+    }
+  }
+
+  return path;
+}
+
 export function joinPath(base: string, child: string): string {
+  base = stripWindowsExtendedPathPrefix(base);
   // Simple check for Windows vs Unix paths
   const isWindows = base.includes("\\") || /^[A-Z]:/i.test(base);
   const sep = isWindows ? "\\" : "/";
@@ -10,6 +29,7 @@ export function joinPath(base: string, child: string): string {
 }
 
 export function getParentPath(path: string): string {
+  path = stripWindowsExtendedPathPrefix(path);
   const isWindows = path.includes("\\") || /^[A-Z]:/i.test(path);
   const sep = isWindows ? "\\" : "/";
   
@@ -25,14 +45,17 @@ export function getParentPath(path: string): string {
 }
 
 export function isWindowsPath(path: string): boolean {
+  path = stripWindowsExtendedPathPrefix(path);
   return path.includes("\\") || /^[A-Z]:/i.test(path);
 }
 
 export function isAbsolutePath(path: string): boolean {
+  path = stripWindowsExtendedPathPrefix(path);
   return /^([A-Z]:[\\/]|\/|\\\\)/i.test(path);
 }
 
 export function getPathDirectoryName(path: string): string {
+  path = stripWindowsExtendedPathPrefix(path);
   const normalized = path.replace(/[\\/]+$/, "") || path;
 
   if (normalized === "/") {
@@ -62,6 +85,7 @@ export function getPathDirectoryName(path: string): string {
 }
 
 export function normalizePathForComparison(path: string): string {
+  path = stripWindowsExtendedPathPrefix(path);
   const normalized = path.normalize("NFC").replace(/\\/g, "/");
   const driveRootMatch = normalized.match(/^([A-Z]:)\/?$/i);
 
@@ -115,6 +139,7 @@ export interface BreadcrumbPart {
 }
 
 export function getBreadcrumbParts(path: string): BreadcrumbPart[] {
+  path = stripWindowsExtendedPathPrefix(path);
   if (!path) {
     return [];
   }

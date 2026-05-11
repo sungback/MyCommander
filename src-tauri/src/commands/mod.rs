@@ -3,6 +3,7 @@ pub mod file_watch_commands;
 pub mod fs;
 pub mod git_commands;
 pub mod jobs;
+pub(crate) mod path_display;
 pub mod search_commands;
 pub mod sync_commands;
 pub mod system;

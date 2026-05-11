@@ -1,3 +1,4 @@
+use super::super::path_display::path_to_display_string;
 use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "windows")]
@@ -12,7 +13,7 @@ use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_home_dir() -> Result<String, String> {
     dirs::home_dir()
-        .map(|path| path.to_string_lossy().to_string())
+        .map(|path| path_to_display_string(&path))
         .ok_or_else(|| "Could not find home directory".to_string())
 }
 
@@ -66,11 +67,9 @@ fn resolve_path_for_navigation(path: &Path) -> Result<String, String> {
         return Err(format!("{} does not exist", path.display()));
     }
 
-    Ok(path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf())
-        .to_string_lossy()
-        .to_string())
+    let resolved_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
+    Ok(path_to_display_string(&resolved_path))
 }
 
 #[cfg(target_os = "windows")]

@@ -1,5 +1,5 @@
 import type { PanelState } from "../types/file";
-import { coalescePanelPath } from "../utils/path";
+import { coalescePanelPath, stripWindowsExtendedPathPrefix } from "../utils/path";
 import { updateActiveTab } from "../utils/panelHelpers";
 
 export const setPanelPath = (
@@ -8,6 +8,7 @@ export const setPanelPath = (
   pendingCursorName?: string
 ): PanelState =>
   updateActiveTab(panelState, (tab) => {
+    path = stripWindowsExtendedPathPrefix(path);
     if (tab.currentPath === path) return tab;
 
     const prevEntries =
@@ -32,6 +33,7 @@ export const setPanelResolvedPath = (
   path: string
 ): PanelState =>
   updateActiveTab(panelState, (tab) => {
+    path = stripWindowsExtendedPathPrefix(path);
     if (coalescePanelPath(tab.resolvedPath, tab.currentPath) === path) {
       return tab;
     }
@@ -81,11 +83,12 @@ export const navigatePanelHistory = (
 
   const nextPath = activeTab.history[nextIndex];
   if (!nextPath) return null;
+  const displayPath = stripWindowsExtendedPathPrefix(nextPath);
 
   return updateActiveTab(panelState, (tab) => ({
     ...tab,
-    currentPath: nextPath,
-    resolvedPath: nextPath,
+    currentPath: displayPath,
+    resolvedPath: displayPath,
     historyIndex: nextIndex,
     cursorIndex: 0,
     selectedItems: new Set<string>(),

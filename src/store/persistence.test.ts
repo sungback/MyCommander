@@ -33,6 +33,38 @@ describe("readPersistedPanelState", () => {
     expect(result.showHiddenFiles).toBe(false);
   });
 
+  it("strips Windows extended-length prefixes from persisted panel paths", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        leftPath: "\\\\?\\C:\\Users\\sam",
+        rightPath: "\\\\?\\UNC\\server\\share",
+        leftPanel: {
+          tabs: [
+            {
+              id: "tab-1",
+              currentPath: "\\\\?\\C:\\Users\\sam\\AppData",
+              history: ["C:\\Users\\sam", "\\\\?\\C:\\Users\\sam\\AppData"],
+              historyIndex: 1,
+              sortField: "name",
+              sortDirection: "asc",
+            },
+          ],
+          activeTabId: "tab-1",
+        },
+      })
+    );
+
+    const result = readPersistedPanelState();
+    expect(result.leftPath).toBe("C:\\Users\\sam");
+    expect(result.rightPath).toBe("\\\\server\\share");
+    expect(result.leftPanel!.tabs[0].currentPath).toBe("C:\\Users\\sam\\AppData");
+    expect(result.leftPanel!.tabs[0].history).toEqual([
+      "C:\\Users\\sam",
+      "C:\\Users\\sam\\AppData",
+    ]);
+  });
+
   it("returns {} on invalid JSON", () => {
     localStorage.setItem(STORAGE_KEY, "not-json{{");
     expect(readPersistedPanelState()).toEqual({});

@@ -9,7 +9,28 @@ import {
   getBreadcrumbParts,
   isSameOrNestedPath,
   normalizePathForComparison,
+  stripWindowsExtendedPathPrefix,
 } from "./path";
+
+describe("stripWindowsExtendedPathPrefix", () => {
+  it("strips Windows drive extended-length prefix", () => {
+    expect(stripWindowsExtendedPathPrefix("\\\\?\\C:\\Users\\sam\\AppData")).toBe(
+      "C:\\Users\\sam\\AppData"
+    );
+  });
+
+  it("converts Windows UNC extended-length prefix", () => {
+    expect(stripWindowsExtendedPathPrefix("\\\\?\\UNC\\server\\share\\folder")).toBe(
+      "\\\\server\\share\\folder"
+    );
+  });
+
+  it("keeps non-drive extended paths unchanged", () => {
+    expect(stripWindowsExtendedPathPrefix("\\\\?\\Volume{123}\\folder")).toBe(
+      "\\\\?\\Volume{123}\\folder"
+    );
+  });
+});
 
 describe("joinPath", () => {
   it("joins Unix paths", () => {
@@ -111,6 +132,10 @@ describe("normalizePathForComparison", () => {
     expect(normalizePathForComparison("C:\\Users\\Back\\")).toBe("c:/users/back");
   });
 
+  it("normalizes Windows extended-length paths as regular paths", () => {
+    expect(normalizePathForComparison("\\\\?\\C:\\Users\\Back\\")).toBe("c:/users/back");
+  });
+
   it("preserves Unix casing while trimming trailing separators", () => {
     expect(normalizePathForComparison("/Users/back/")).toBe("/Users/back");
   });
@@ -176,5 +201,15 @@ describe("getBreadcrumbParts", () => {
   it("generates parts for Windows drive root", () => {
     const parts = getBreadcrumbParts("C:\\");
     expect(parts).toEqual([{ label: "C:\\", path: "C:\\" }]);
+  });
+
+  it("generates parts for Windows extended-length drive paths without exposing prefix", () => {
+    const parts = getBreadcrumbParts("\\\\?\\C:\\Users\\sam\\AppData");
+    expect(parts).toEqual([
+      { label: "C:\\", path: "C:\\" },
+      { label: "Users", path: "C:\\Users" },
+      { label: "sam", path: "C:\\Users\\sam" },
+      { label: "AppData", path: "C:\\Users\\sam\\AppData" },
+    ]);
   });
 });

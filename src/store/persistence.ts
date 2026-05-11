@@ -1,5 +1,6 @@
 import { PanelId, SortDirection, SortField, ViewMode } from "../types/file";
 import { ThemePreference } from "../types/theme";
+import { stripWindowsExtendedPathPrefix } from "../utils/path";
 
 export interface PersistedPanelState {
   activePanel?: PanelId;
@@ -63,7 +64,9 @@ export const readPersistedPanelState = (): PersistedPanelState => {
 
       const historyValue = Reflect.get(tab, "history");
       const history = Array.isArray(historyValue)
-        ? historyValue.filter((entry): entry is string => typeof entry === "string")
+        ? historyValue
+            .filter((entry): entry is string => typeof entry === "string")
+            .map(stripWindowsExtendedPathPrefix)
         : [];
       const historyIndexValue = Reflect.get(tab, "historyIndex");
       const clampedHistoryIndex =
@@ -82,7 +85,7 @@ export const readPersistedPanelState = (): PersistedPanelState => {
           typeof Reflect.get(tab, "id") === "string" && Reflect.get(tab, "id")
             ? (Reflect.get(tab, "id") as string)
             : createTabId(),
-        currentPath,
+        currentPath: stripWindowsExtendedPathPrefix(currentPath),
         history,
         historyIndex: clampedHistoryIndex,
         sortField,
@@ -119,8 +122,14 @@ export const readPersistedPanelState = (): PersistedPanelState => {
         parsed.activePanel === "left" || parsed.activePanel === "right"
           ? parsed.activePanel
           : undefined,
-      leftPath: typeof parsed.leftPath === "string" ? parsed.leftPath : undefined,
-      rightPath: typeof parsed.rightPath === "string" ? parsed.rightPath : undefined,
+      leftPath:
+        typeof parsed.leftPath === "string"
+          ? stripWindowsExtendedPathPrefix(parsed.leftPath)
+          : undefined,
+      rightPath:
+        typeof parsed.rightPath === "string"
+          ? stripWindowsExtendedPathPrefix(parsed.rightPath)
+          : undefined,
       leftPanel: restorePanel(parsed.leftPanel),
       rightPanel: restorePanel(parsed.rightPanel),
       showHiddenFiles:

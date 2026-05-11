@@ -1,3 +1,4 @@
+use crate::commands::path_display::path_to_display_string;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -30,7 +31,7 @@ pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
     if let Some(parent) = dir_path.parent() {
         files.push(FileEntry {
             name: "..".to_string(),
-            path: parent.to_string_lossy().to_string(),
+            path: path_to_display_string(parent),
             kind: "directory".to_string(),
             size: None,
             last_modified: None,
@@ -41,7 +42,7 @@ pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
     for entry in entries.flatten() {
         let metadata = entry.metadata().map_err(|e| e.to_string());
         let file_name = entry.file_name().to_string_lossy().to_string();
-        let file_path = entry.path().to_string_lossy().to_string();
+        let file_path = path_to_display_string(&entry.path());
 
         if let Ok(meta) = metadata {
             let is_hidden = is_hidden_entry(&file_name, &meta);
