@@ -89,6 +89,7 @@ describe("jobStore", () => {
   it("clears finished jobs from local state", () => {
     useJobStore.getState().hydrateJobs([
       queuedJob,
+      { ...failedJob, id: "job-3", status: "failed", createdAt: 3, updatedAt: 3 },
       { ...queuedJob, id: "job-4", status: "completed", createdAt: 4, updatedAt: 4 },
       { ...queuedJob, id: "job-5", status: "cancelled", createdAt: 5, updatedAt: 5 },
     ]);

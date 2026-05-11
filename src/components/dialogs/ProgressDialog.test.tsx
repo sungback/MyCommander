@@ -290,4 +290,136 @@ describe("ProgressDialog", () => {
       expect(useDialogStore.getState().openDialog).toBeNull();
     });
   });
+
+  it("does not surface stale failed jobs after the current dialog job completes", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "old-move",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+        error: "Access denied",
+        result: null,
+      },
+      {
+        id: "delete-job",
+        kind: "delete",
+        status: "running",
+        createdAt: 3,
+        updatedAt: 3,
+        progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+      expect(screen.getByText("Failed: 0")).toBeInTheDocument();
+    });
+
+    act(() => {
+      useJobStore.getState().hydrateJobs([
+        {
+          id: "old-move",
+          kind: "move",
+          status: "failed",
+          createdAt: 1,
+          updatedAt: 2,
+          progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+          error: "Access denied",
+          result: null,
+        },
+        {
+          id: "delete-job",
+          kind: "delete",
+          status: "completed",
+          createdAt: 3,
+          updatedAt: 4,
+          progress: { current: 1, total: 1, currentFile: "Completed", unit: "items" },
+          error: null,
+          result: {
+            affectedDirectories: ["/tmp"],
+            affectedEntryPaths: ["/tmp/delete-me.txt"],
+            archivePath: null,
+            savedNames: [],
+          },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBeNull();
+    });
+  });
+
+  it("keeps the dialog open for failures from the current dialog job", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "old-move",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+        error: "Access denied",
+        result: null,
+      },
+      {
+        id: "delete-job",
+        kind: "delete",
+        status: "running",
+        createdAt: 3,
+        updatedAt: 3,
+        progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+    });
+
+    act(() => {
+      useJobStore.getState().hydrateJobs([
+        {
+          id: "old-move",
+          kind: "move",
+          status: "failed",
+          createdAt: 1,
+          updatedAt: 2,
+          progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+          error: "Access denied",
+          result: null,
+        },
+        {
+          id: "delete-job",
+          kind: "delete",
+          status: "failed",
+          createdAt: 3,
+          updatedAt: 4,
+          progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+          error: "Delete denied",
+          result: null,
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBe("progress");
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+      expect(screen.getByText("Failed: 1")).toBeInTheDocument();
+      expect(screen.getByText("Last failed job: delete")).toBeInTheDocument();
+      expect(screen.getByText("Delete denied")).toBeInTheDocument();
+    });
+  });
 });

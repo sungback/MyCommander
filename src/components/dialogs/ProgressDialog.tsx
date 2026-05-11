@@ -27,6 +27,25 @@ export const ProgressDialog: React.FC = () => {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isClearingFinished, setIsClearingFinished] = useState(false);
+  const sessionJobIdsRef = React.useRef<Set<string>>(new Set());
+  const previousOpenDialogRef = React.useRef(openDialog);
+
+  if (previousOpenDialogRef.current !== openDialog) {
+    previousOpenDialogRef.current = openDialog;
+    if (openDialog === "progress") {
+      sessionJobIdsRef.current = new Set();
+    }
+  }
+
+  if (openDialog === "progress" && activeJob) {
+    sessionJobIdsRef.current.add(activeJob.id);
+  }
+
+  const sessionJobIds = sessionJobIdsRef.current;
+  const dialogFailedJobs =
+    sessionJobIds.size > 0
+      ? failedJobs.filter((job) => sessionJobIds.has(job.id))
+      : failedJobs;
 
   useEffect(() => {
     if (openDialog !== "progress") {
@@ -34,6 +53,7 @@ export const ProgressDialog: React.FC = () => {
       setIsCancelling(false);
       setIsRetrying(false);
       setIsClearingFinished(false);
+      sessionJobIdsRef.current = new Set();
       return;
     }
 
@@ -64,19 +84,22 @@ export const ProgressDialog: React.FC = () => {
     }
 
     const hasRunningOrQueued = Boolean(activeJob);
-    const hasFailed = failedJobs.length > 0;
+    const hasFailed = dialogFailedJobs.length > 0;
 
     if (!hasRunningOrQueued && !hasFailed) {
       closeDialog();
     }
-  }, [activeJob, closeDialog, failedJobs.length, openDialog]);
+  }, [activeJob, closeDialog, dialogFailedJobs.length, openDialog]);
 
   useEffect(() => {
     setProgress(null);
   }, [activeJob?.id]);
 
   const isOpen = openDialog === "progress";
-  const latestFailedJob = failedJobs.length > 0 ? failedJobs[failedJobs.length - 1] : null;
+  const latestFailedJob =
+    dialogFailedJobs.length > 0
+      ? dialogFailedJobs[dialogFailedJobs.length - 1]
+      : null;
   const canDismiss = !activeJob;
   const latestOperation =
     progress?.operation ??
@@ -154,7 +177,7 @@ export const ProgressDialog: React.FC = () => {
 
             <div className="flex items-center justify-between text-[11px] text-text-secondary">
               <span>Queued: {queuedJobs.length}</span>
-              <span>Failed: {failedJobs.length}</span>
+              <span>Failed: {dialogFailedJobs.length}</span>
             </div>
 
             {latestFailedJob ? (

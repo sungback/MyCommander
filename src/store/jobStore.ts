@@ -60,7 +60,7 @@ export const useJobStore = create<JobState>((set) => ({
     set((state) =>
       createState(
         state.jobs.filter(
-          (job) => job.status === "queued" || job.status === "running" || job.status === "failed"
+          (job) => job.status === "queued" || job.status === "running"
         )
       )
     ),

@@ -12,6 +12,7 @@ import {
 import { DialogContainer, getRenameSelectionEnd } from './DialogContainer';
 import { useDialogStore } from '../../store/dialogStore';
 import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
+import { useJobStore } from '../../store/jobStore';
 import { usePanelStore } from '../../store/panelStore';
 
 describe('DialogContainer', () => {
@@ -331,5 +332,7 @@ describe('DialogContainer', () => {
       });
     });
     expect(useDialogStore.getState().openDialog).toBe("progress");
+    expect(useJobStore.getState().activeJob?.id).toBe("job-1");
+    expect(useJobStore.getState().activeJob?.kind).toBe("delete");
   });
 });

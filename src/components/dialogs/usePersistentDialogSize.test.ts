@@ -1,11 +1,31 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usePersistentDialogSize } from "./usePersistentDialogSize";
 
 const STORAGE_KEY = "test:dialog-size";
 const DEFAULT_SIZE = { width: 700, height: 560 };
 
 describe("usePersistentDialogSize", () => {
+  let storage: Map<string, string>;
+
+  beforeEach(() => {
+    storage = new Map();
+    vi.stubGlobal("localStorage", {
+      get length() {
+        return storage.size;
+      },
+      clear: vi.fn(() => storage.clear()),
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      key: vi.fn((index: number) => Array.from(storage.keys())[index] ?? null),
+      removeItem: vi.fn((key: string) => {
+        storage.delete(key);
+      }),
+      setItem: vi.fn((key: string, value: string) => {
+        storage.set(key, value);
+      }),
+    } satisfies Storage);
+  });
+
   it("loads the saved size from localStorage", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ width: 820, height: 640 }));
 
