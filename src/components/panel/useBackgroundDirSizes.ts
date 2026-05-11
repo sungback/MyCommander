@@ -8,12 +8,14 @@ interface BackgroundSizeScheduler {
   activeCount: number;
   queue: Array<{ path: string }>;
   queuedPaths: Set<string>;
+  settledPaths: Set<string>;
 }
 
 interface UseBackgroundDirSizesProps {
   activeTabId: string;
   currentPath: string;
   files: FileEntry[];
+  lastUpdated: number;
   panelId: PanelId;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
 }
@@ -22,12 +24,14 @@ const createScheduler = (): BackgroundSizeScheduler => ({
   activeCount: 0,
   queue: [],
   queuedPaths: new Set(),
+  settledPaths: new Set(),
 });
 
 export const useBackgroundDirSizes = ({
   activeTabId,
   currentPath,
   files,
+  lastUpdated,
   panelId,
   updateEntrySize,
 }: UseBackgroundDirSizesProps) => {
@@ -38,7 +42,7 @@ export const useBackgroundDirSizes = ({
 
   useEffect(() => {
     backgroundSchedulerRef.current = createScheduler();
-  }, [activeTabId, currentPath, panelId]);
+  }, [activeTabId, currentPath, lastUpdated, panelId]);
 
   useEffect(() => {
     const scheduler = backgroundSchedulerRef.current;
@@ -47,7 +51,8 @@ export const useBackgroundDirSizes = ({
         entry.kind === "directory" &&
         entry.name !== ".." &&
         (entry.size === undefined || entry.size === null) &&
-        !scheduler.queuedPaths.has(entry.path)
+        !scheduler.queuedPaths.has(entry.path) &&
+        !scheduler.settledPaths.has(entry.path)
     );
 
     if (pendingDirectories.length === 0) {
@@ -73,6 +78,7 @@ export const useBackgroundDirSizes = ({
               return;
             }
 
+            scheduler.settledPaths.add(entry.path);
             updateEntrySize(panelId, entry.path, size);
           })
           .catch((error) => {
@@ -80,6 +86,7 @@ export const useBackgroundDirSizes = ({
               return;
             }
 
+            scheduler.settledPaths.add(entry.path);
             console.error(
               `Failed to calculate background dir size for ${entry.path}:`,
               error
@@ -102,5 +109,5 @@ export const useBackgroundDirSizes = ({
     }
 
     drainQueue();
-  }, [currentPath, files, fs, panelId, updateEntrySize]);
+  }, [currentPath, files, fs, lastUpdated, panelId, updateEntrySize]);
 };

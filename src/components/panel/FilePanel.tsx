@@ -117,6 +117,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     activeTabId: panelState.activeTabId,
     currentPath: panelState.currentPath,
     files: panelState.files,
+    lastUpdated: panelState.lastUpdated,
     panelId: id,
     updateEntrySize,
   });

@@ -210,6 +210,10 @@ export const updatePanelEntrySize = (
     let tabChanged = false;
     const files = tab.files.map((entry) => {
       if (normalizePathKey(entry.path) === normalizedPath) {
+        if (entry.size === size) {
+          return entry;
+        }
+
         tabChanged = true;
         changed = true;
         return { ...entry, size };

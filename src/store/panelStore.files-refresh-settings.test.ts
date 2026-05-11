@@ -112,6 +112,30 @@ describe("panelStore — updateEntrySize", () => {
     updateEntrySize("left", "/dir", 200);
     expect(usePanelStore.getState().sizeCache["/dir"]).toBe(200);
   });
+
+  it("동일한 크기 업데이트는 패널과 캐시 상태를 다시 만들지 않는다", () => {
+    const { setFiles, updateEntrySize } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dir", path: "/same/dir", kind: "directory" },
+    ]);
+    updateEntrySize("left", "/same/dir", 100);
+
+    const afterFirstUpdate = usePanelStore.getState();
+    let notificationCount = 0;
+    const unsubscribe = usePanelStore.subscribe(() => {
+      notificationCount += 1;
+    });
+
+    updateEntrySize("left", "/same/dir", 100);
+    unsubscribe();
+
+    const afterSecondUpdate = usePanelStore.getState();
+    expect(afterSecondUpdate.leftPanel).toBe(afterFirstUpdate.leftPanel);
+    expect(afterSecondUpdate.rightPanel).toBe(afterFirstUpdate.rightPanel);
+    expect(afterSecondUpdate.sizeCache).toBe(afterFirstUpdate.sizeCache);
+    expect(notificationCount).toBe(0);
+  });
 });
 
 describe("panelStore — setCursor", () => {

@@ -50,12 +50,25 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         path,
         size
       );
+      const cachedSize = state.sizeCache[nextPanels.normalizedPath];
+
+      if (
+        cachedSize === size &&
+        nextPanels.leftPanel === state.leftPanel &&
+        nextPanels.rightPanel === state.rightPanel
+      ) {
+        return state;
+      }
 
       return {
-        sizeCache: {
-          ...state.sizeCache,
-          [nextPanels.normalizedPath]: size,
-        },
+        ...(cachedSize === size
+          ? {}
+          : {
+              sizeCache: {
+                ...state.sizeCache,
+                [nextPanels.normalizedPath]: size,
+              },
+            }),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };

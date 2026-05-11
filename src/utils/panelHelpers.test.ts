@@ -4,6 +4,7 @@ import {
   syncPanelWithActiveTab,
   updateTab,
   updateActiveTab,
+  updatePanelEntrySize,
   defaultPanelState,
   cloneTabState,
 } from "./panelHelpers";
@@ -114,6 +115,24 @@ describe("sortEntries", () => {
     const desc = sortEntries(entries, "ext", "desc");
     expect(asc.map((e) => e.name)).toEqual(["alpha", "bravo", "charlie"]);
     expect(desc.map((e) => e.name)).toEqual(["charlie", "bravo", "alpha"]);
+  });
+});
+
+describe("updatePanelEntrySize", () => {
+  it("returns the original panel when the entry already has the requested size", () => {
+    const tab = makeTab({
+      files: [makeDir("folder", { size: 123 })],
+      sortField: "size",
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    const result = updatePanelEntrySize(panel, "/test/folder", 123);
+
+    expect(result).toBe(panel);
   });
 });
 
