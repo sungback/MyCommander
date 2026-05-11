@@ -190,6 +190,34 @@ describe("ProgressDialog", () => {
     expect(screen.getByText("Last failed job: move")).toBeInTheDocument();
   });
 
+  it("lets users close a failed-only progress dialog", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-7",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "", unit: "items" },
+        error: "Access is denied. (os error 5)",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Close" }).click();
+    });
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
   it("clears finished jobs from the dialog state", async () => {
     mockClearFinishedJobs.mockResolvedValue(undefined);
     useDialogStore.getState().setOpenDialog("progress");

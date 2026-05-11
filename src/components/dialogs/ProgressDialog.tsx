@@ -77,6 +77,7 @@ export const ProgressDialog: React.FC = () => {
 
   const isOpen = openDialog === "progress";
   const latestFailedJob = failedJobs.length > 0 ? failedJobs[failedJobs.length - 1] : null;
+  const canDismiss = !activeJob;
   const latestOperation =
     progress?.operation ??
     activeJob?.kind ??
@@ -100,13 +101,28 @@ export const ProgressDialog: React.FC = () => {
     : "";
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={() => {}}>
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open && canDismiss) {
+          closeDialog();
+        }
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
         <Dialog.Content
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[450px] z-50 p-4 focus:outline-none text-text-primary"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => {
+            if (!canDismiss) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            if (!canDismiss) {
+              e.preventDefault();
+            }
+          }}
         >
           <Dialog.Description className="sr-only">
             Displays progress for long-running file system operations.
@@ -223,6 +239,15 @@ export const ProgressDialog: React.FC = () => {
                     className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isCancelling ? "Cancelling..." : "Cancel"}
+                  </button>
+                ) : null}
+                {canDismiss ? (
+                  <button
+                    type="button"
+                    onClick={closeDialog}
+                    className="rounded-md border border-border-color bg-bg-secondary px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-bg-hover"
+                  >
+                    Close
                   </button>
                 ) : null}
               </div>

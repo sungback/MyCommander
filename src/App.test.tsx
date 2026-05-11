@@ -203,6 +203,28 @@ describe('App — Tab 키 패널 전환', () => {
     expect(useDialogStore.getState().openDialog).toBe('progress');
   });
 
+  it('does not open the progress dialog on startup for restored failed jobs only', async () => {
+    mockListJobs.mockResolvedValueOnce([
+      {
+        id: 'job-1',
+        kind: 'move',
+        status: 'failed',
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: '', unit: 'items' },
+        error: 'Access is denied. (os error 5)',
+        result: null,
+      },
+    ]);
+
+    render(<App />);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
   it('macOS 장시간 대기 후 포커스 복귀 시 렌더러 표면 복구를 요청', async () => {
     const root = document.createElement('div');
     root.id = 'root';

@@ -113,14 +113,16 @@ describe("useJobQueue", () => {
     });
   });
 
-  it("opens ProgressDialog when there are failed jobs", async () => {
+  it("does not open ProgressDialog when only failed jobs are restored", async () => {
     mockListJobs.mockResolvedValue([makeJob({ status: "failed" })]);
 
     renderHook(() => useJobQueue());
 
     await waitFor(() => {
-      expect(useDialogStore.getState().openDialog).toBe("progress");
+      expect(mockListJobs).toHaveBeenCalled();
     });
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
   });
 
   it("does not open ProgressDialog when only completed jobs exist", async () => {

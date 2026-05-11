@@ -31,8 +31,7 @@ export const useJobQueue = () => {
           const shouldOpenProgress = jobs.some(
             (job) =>
               job.status === "queued" ||
-              job.status === "running" ||
-              job.status === "failed"
+              job.status === "running"
           );
 
           if (shouldOpenProgress && useDialogStore.getState().openDialog === null) {
