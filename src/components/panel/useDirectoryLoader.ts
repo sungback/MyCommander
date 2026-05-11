@@ -33,18 +33,6 @@ export const useDirectoryLoader = ({
   useEffect(() => {
     let cancelled = false;
     let activePath = currentPath;
-    const startedFromRootPlaceholder = activePath === "/";
-
-    const resolveHomeDirectory = async () => {
-      const home = await fs.getHomeDir();
-      if (cancelled) {
-        return home;
-      }
-
-      activePath = home;
-      setPath(panelId, home);
-      return home;
-    };
 
     const commitLoadedEntries = (
       path: string,
@@ -66,11 +54,6 @@ export const useDirectoryLoader = ({
 
     const loadDir = async () => {
       try {
-        // Only replace the generic root placeholder. Windows drive roots are real targets.
-        if (activePath === "/") {
-          activePath = await resolveHomeDirectory();
-        }
-
         let accessPath = activePath;
         try {
           accessPath = await fs.resolvePath(activePath);
@@ -92,25 +75,6 @@ export const useDirectoryLoader = ({
           setPath(panelId, previousPath, getLeafName(currentPath) ?? undefined);
           if (previousResolvedPath) {
             setResolvedPath(panelId, previousResolvedPath);
-          }
-        } else if (startedFromRootPlaceholder) {
-          try {
-            const home = await resolveHomeDirectory();
-            if (cancelled) {
-              return;
-            }
-
-            let resolvedHome = home;
-            try {
-              resolvedHome = await fs.resolvePath(home);
-            } catch (resolveHomeError) {
-              console.warn(`Failed to resolve home path for ${home}:`, resolveHomeError);
-            }
-
-            const entries = await fs.listDirectory(resolvedHome, showHiddenFiles);
-            commitLoadedEntries(home, resolvedHome, entries);
-          } catch (fallbackError) {
-            console.error("Failed loading fallback home dir: ", fallbackError);
           }
         }
 

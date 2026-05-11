@@ -37,19 +37,27 @@ fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
         .output()
         .map_err(|e| e.to_string())?;
 
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed_size = parse_du_size_bytes(&stdout);
+    if let Some(size) = parsed_size {
+        return Ok(size);
+    }
+
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let size_kb = stdout
-        .split_whitespace()
-        .next()
-        .ok_or_else(|| "Failed to parse `du` output".to_string())?
-        .parse::<u64>()
-        .map_err(|e| e.to_string())?;
+    Err("Failed to parse `du` output".to_string())
+}
 
-    Ok(size_kb * 1024)
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn parse_du_size_bytes(stdout: &str) -> Option<u64> {
+    stdout
+        .split_whitespace()
+        .next()?
+        .parse::<u64>()
+        .ok()
+        .map(|size_kb| size_kb.saturating_mul(1024))
 }
 
 fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
@@ -65,4 +73,21 @@ fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
     }
 
     Ok(total_size)
+}
+
+#[cfg(test)]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod tests {
+    use super::parse_du_size_bytes;
+
+    #[test]
+    fn parse_du_size_bytes_reads_summary_even_with_other_output() {
+        assert_eq!(parse_du_size_bytes("42\t/Users/example\n"), Some(43_008));
+    }
+
+    #[test]
+    fn parse_du_size_bytes_returns_none_for_unparseable_output() {
+        assert_eq!(parse_du_size_bytes(""), None);
+        assert_eq!(parse_du_size_bytes("du: cannot read directory"), None);
+    }
 }

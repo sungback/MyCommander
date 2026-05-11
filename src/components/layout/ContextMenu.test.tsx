@@ -10,8 +10,10 @@ const {
   mockOpenInfoDialog,
   mockCloseDialog,
   mockRefreshPanel,
+  mockUpdateEntrySize,
   mockSetActivePanel,
   mockSubmitJob,
+  mockGetDirSize,
   mockRenameFile,
   mockOpenInTerminal,
   mockRevealItemInDir,
@@ -26,8 +28,10 @@ const {
   mockOpenInfoDialog: vi.fn(),
   mockCloseDialog: vi.fn(),
   mockRefreshPanel: vi.fn(),
+  mockUpdateEntrySize: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSubmitJob: vi.fn(),
+  mockGetDirSize: vi.fn(),
   mockRenameFile: vi.fn(),
   mockOpenInTerminal: vi.fn(),
   mockRevealItemInDir: vi.fn(),
@@ -80,6 +84,7 @@ const mockPanelState = {
     files: [],
   },
   refreshPanel: mockRefreshPanel,
+  updateEntrySize: mockUpdateEntrySize,
   setActivePanel: mockSetActivePanel,
 };
 
@@ -107,6 +112,7 @@ vi.mock("../../store/toastStore", () => ({
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     extractZip: mockExtractZip,
+    getDirSize: mockGetDirSize,
     openInTerminal: mockOpenInTerminal,
     renameFile: mockRenameFile,
     submitJob: mockSubmitJob,
@@ -171,6 +177,7 @@ describe("ContextMenu", () => {
       result: null,
     });
     mockExtractZip.mockResolvedValue(undefined);
+    mockGetDirSize.mockResolvedValue(42);
     mockOpenInTerminal.mockResolvedValue(undefined);
     mockRenameFile.mockResolvedValue(undefined);
     mockRevealItemInDir.mockResolvedValue(undefined);
@@ -307,6 +314,23 @@ describe("ContextMenu", () => {
     await listenHandlers.get("context-menu-action")?.({ payload: "terminal" });
 
     expect(mockOpenInTerminal).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("calculate-size 액션은 대상 폴더 용량을 계산해 패널 항목을 갱신한다", async () => {
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "calculate-size" });
+
+    expect(mockSetActivePanel).toHaveBeenCalledWith("left");
+    expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockUpdateEntrySize).toHaveBeenCalledWith(
+      "left",
+      "/home/user/Documents",
+      42
+    );
+    expect(mockShowTransientToast).toHaveBeenCalledWith("Documents: 42 B");
     expect(mockCloseContextMenu).toHaveBeenCalled();
   });
 

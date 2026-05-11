@@ -154,7 +154,7 @@ describe('calculatePanelDirectories', () => {
 
     await expect(
       calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ total: 1, completed: 0, failed: 1 });
 
     expect(updateEntrySize).not.toHaveBeenCalled();
   });

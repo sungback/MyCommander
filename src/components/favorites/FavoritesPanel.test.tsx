@@ -193,6 +193,10 @@ describe("FavoritesPanel", () => {
     mockLocationState.locations = [];
     mockPanelState.activePanel = "left";
     mockPanelState.dragInfo = null;
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "Linux x86_64",
+    });
   });
 
   afterEach(() => {
@@ -337,6 +341,19 @@ describe("FavoritesPanel", () => {
     fireEvent.click(getByText("Projects"));
 
     expect(mockSetPath).toHaveBeenCalledWith("left", "/home/user/Projects");
+  });
+
+  it("macOS에서는 Macintosh HD 위치를 표시하고 루트로 이동한다", () => {
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+
+    const { getByText } = render(<FavoritesPanel />);
+
+    fireEvent.click(getByText("Macintosh HD"));
+
+    expect(mockSetPath).toHaveBeenCalledWith("left", "/");
   });
 
   it("자주 쓰는 위치를 표시하고 기록 제거를 호출한다", () => {

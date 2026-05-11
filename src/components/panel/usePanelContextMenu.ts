@@ -121,6 +121,9 @@ export const usePanelContextMenu = ({
           targetEntry.kind === "file" &&
           targetEntry.name.toLowerCase().endsWith(".zip")
       );
+      const canCalculateSize = Boolean(
+        targetEntry && targetEntry.name !== ".." && targetEntry.kind === "directory"
+      );
 
       void fs
         .showContextMenu({
@@ -133,6 +136,7 @@ export const usePanelContextMenu = ({
               targetEntry.name !== ".." &&
               hasDecomposedUnicodeFilename(targetEntry.name)
           ),
+          canCalculateSize,
           canCreateZip,
           canExtractZip,
         })

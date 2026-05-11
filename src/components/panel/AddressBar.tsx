@@ -15,6 +15,7 @@ import {
   coalescePanelPath,
   getBreadcrumbParts,
 } from "../../utils/path";
+import { getBreadcrumbDisplayLabel } from "../../utils/pathDisplay";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { useGitStatus } from "../../hooks/useGitStatus";
@@ -120,7 +121,7 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
               className="hover:bg-bg-hover hover:text-text-primary px-1 rounded cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis transition-colors text-text-secondary"
               title={part.path}
             >
-              {part.label}
+              {getBreadcrumbDisplayLabel(part.path, part.label)}
             </button>
           </React.Fragment>
         ))}

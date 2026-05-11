@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getPathDisplayName } from "../utils/pathDisplay";
 
 export interface Favorite {
   id: string;
@@ -56,8 +57,7 @@ export const useFavoriteStore = create<FavoriteState>((set) => ({
   addFavorite: (path, name) =>
     set((state) => {
       if (state.favorites.some((f) => f.path === path)) return state;
-      const folderName =
-        name ?? path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? path;
+      const folderName = name ?? getPathDisplayName(path);
       const newFav: Favorite = {
         id: createId(),
         name: folderName,

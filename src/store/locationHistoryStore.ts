@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { normalizePathForComparison } from "../utils/path";
+import { getPathDisplayName } from "../utils/pathDisplay";
 
 export interface LocationHistoryEntry {
   path: string;
@@ -18,17 +19,7 @@ interface LocationHistoryState {
 const LOCATION_HISTORY_STORAGE_KEY = "total-commander:location-history";
 const MAX_LOCATION_HISTORY_ENTRIES = 50;
 
-const getLocationName = (path: string) => {
-  const normalized = path.replace(/[\\/]+$/, "") || path;
-  if (normalized === "/") {
-    return "/";
-  }
-  if (/^[A-Z]:$/i.test(normalized)) {
-    return `${normalized}\\`;
-  }
-
-  return normalized.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? normalized;
-};
+const getLocationName = (path: string) => getPathDisplayName(path);
 
 const isLocationHistoryEntry = (value: unknown): value is LocationHistoryEntry => {
   if (!value || typeof value !== "object") {

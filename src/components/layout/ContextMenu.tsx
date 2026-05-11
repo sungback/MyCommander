@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { calculatePanelDirectories } from "../../hooks/keyboardShortcuts";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { useJobStore } from "../../store/jobStore";
 import { FileEntry } from "../../types/file";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { formatSize } from "../../utils/format";
 import { writeClipboardText } from "../../utils/clipboard";
 import { coalescePanelPath } from "../../utils/path";
 import {
@@ -62,7 +64,7 @@ export const ContextMenu: React.FC = () => {
         const { panelId, panel, targetPath, targetEntry } = context;
         const { setOpenDialog, openRenameDialog, openInfoDialog, closeDialog } =
           useDialogStore.getState();
-        const { setActivePanel, refreshPanel } = usePanelStore.getState();
+        const { setActivePanel, refreshPanel, updateEntrySize } = usePanelStore.getState();
         const { closeContextMenu } = useContextMenuStore.getState();
 
         const openDialogForPanel = (
@@ -90,6 +92,32 @@ export const ContextMenu: React.FC = () => {
             case "terminal":
               await fs.openInTerminal(targetPath ?? panel.currentPath);
               closeContextMenu();
+              return;
+            case "calculate-size":
+              setActivePanel(panelId);
+              closeContextMenu();
+              if (targetPath && targetEntry?.kind === "directory" && targetEntry.name !== "..") {
+                showTransientToast("폴더 용량 계산을 시작했습니다.");
+                const size = await fs.getDirSize(targetPath);
+                updateEntrySize(panelId, targetPath, size);
+                showTransientToast(`${targetEntry.name}: ${formatSize(size)}`);
+                return;
+              }
+
+              showTransientToast("폴더 용량 계산을 시작했습니다.");
+              {
+                const result = await calculatePanelDirectories({
+                  panelId,
+                  panel,
+                  getDirSize: fs.getDirSize,
+                  updateEntrySize,
+                });
+                showTransientToast(
+                  result.failed > 0
+                    ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
+                    : `폴더 용량 계산 완료: ${result.completed}개`
+                );
+              }
               return;
             case "create-zip": {
               if (!targetPath || !targetEntry || targetEntry.name === "..") {
@@ -205,6 +233,9 @@ export const ContextMenu: React.FC = () => {
               break;
             case "terminal":
               showTransientToast("터미널을 열 수 없습니다.", { tone: "error" });
+              break;
+            case "calculate-size":
+              showTransientToast("폴더 용량을 계산하지 못했습니다.", { tone: "error" });
               break;
             case "copy-path":
               showTransientToast("클립보드를 사용할 수 없습니다.", { tone: "error" });

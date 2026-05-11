@@ -14,15 +14,26 @@ interface CalculatePanelDirectoriesArgs {
   updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
 }
 
+export interface DirectorySizeCalculationResult {
+  total: number;
+  completed: number;
+  failed: number;
+}
+
 export const calculatePanelDirectories = async ({
   panelId,
   panel,
   getDirSize,
   updateEntrySize,
-}: CalculatePanelDirectoriesArgs) => {
+}: CalculatePanelDirectoriesArgs): Promise<DirectorySizeCalculationResult> => {
   const directories = panel.files.filter(
     (entry) => entry.kind === "directory" && entry.name !== ".."
   );
+  const result: DirectorySizeCalculationResult = {
+    total: directories.length,
+    completed: 0,
+    failed: 0,
+  };
   const queue = [...directories];
   const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
     while (queue.length > 0) {
@@ -34,13 +45,16 @@ export const calculatePanelDirectories = async ({
       try {
         const size = await getDirSize(entry.path);
         updateEntrySize(panelId, entry.path, size);
+        result.completed += 1;
       } catch (error) {
+        result.failed += 1;
         console.error(`Failed to calculate dir size for ${entry.path}:`, error);
       }
     }
   });
 
   await Promise.all(workers);
+  return result;
 };
 
 export interface KeyboardHandlerDependencies

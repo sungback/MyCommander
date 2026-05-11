@@ -13,6 +13,7 @@ const {
   mockSyncOtherPanelToCurrentPath,
   mockCopyCurrentPath,
   mockGetBreadcrumbParts,
+  mockIsMacPlatform,
 } = vi.hoisted(() => ({
   mockSetPath: vi.fn(),
   mockGoBack: vi.fn(),
@@ -23,6 +24,7 @@ const {
   mockSyncOtherPanelToCurrentPath: vi.fn(),
   mockCopyCurrentPath: vi.fn(),
   mockGetBreadcrumbParts: vi.fn(),
+  mockIsMacPlatform: vi.fn(),
 }));
 
 const mockPanelState = {
@@ -63,7 +65,7 @@ vi.mock("../../hooks/useFileSystem", () => ({
 }));
 
 vi.mock("../../hooks/useAppCommands", () => ({
-  isMacPlatform: () => false,
+  isMacPlatform: mockIsMacPlatform,
   useAppCommands: () => ({
     syncOtherPanelToCurrentPath: mockSyncOtherPanelToCurrentPath,
     copyCurrentPath: mockCopyCurrentPath,
@@ -86,6 +88,11 @@ describe("AddressBar", () => {
     mockPanelState.leftPanel.history = ["/home/user", "/home/user/docs"];
     mockPanelState.rightPanel.currentPath = "/home/user/pictures";
     mockPanelState.activePanel = "left";
+    mockIsMacPlatform.mockReturnValue(false);
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "Linux x86_64",
+    });
     mockGetBreadcrumbParts.mockReturnValue([
       { path: "/home", label: "home" },
       { path: "/home/user", label: "user" },
@@ -157,5 +164,23 @@ describe("AddressBar", () => {
 
     expect(mockSetActivePanel).toHaveBeenCalledWith("left");
     expect(mockSetPath).toHaveBeenCalledWith("left", "/home/user");
+  });
+
+  it("macOS 루트 브레드크럼은 Macintosh HD로 표시한다", () => {
+    mockPanelState.leftPanel.currentPath = "/";
+    mockPanelState.leftPanel.historyIndex = 0;
+    mockPanelState.leftPanel.history = ["/"];
+    mockIsMacPlatform.mockReturnValue(true);
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+    mockGetBreadcrumbParts.mockReturnValue([{ path: "/", label: "/" }]);
+
+    render(<AddressBar panelId="left" />);
+
+    expect(
+      screen.getByRole("button", { name: "Macintosh HD" })
+    ).toBeInTheDocument();
   });
 });

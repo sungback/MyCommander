@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronLeft, Clock3, Plus, Star, TrendingUp } from "lucide-react";
+import { ChevronLeft, Clock3, HardDrive, Plus, Star, TrendingUp } from "lucide-react";
 import { clsx } from "clsx";
 import { useFavoriteStore, Favorite } from "../../store/favoriteStore";
 import {
@@ -14,6 +14,8 @@ import { FavoriteRow } from "./FavoriteRow";
 import { FavoritesDropHint } from "./FavoritesDropHint";
 import { LocationHistoryRow } from "./LocationHistoryRow";
 import { useFavoritesPanelDrop } from "./useFavoritesPanelDrop";
+import { MAC_ROOT_DISPLAY_NAME } from "../../utils/pathDisplay";
+import { isMacPlatform } from "../../utils/platform";
 
 export const FavoritesPanel: React.FC = () => {
   const favorites = useFavoriteStore((s) => s.favorites);
@@ -67,6 +69,7 @@ export const FavoritesPanel: React.FC = () => {
   const recentLocations = getRecentLocations(locations, 8)
     .filter((location) => !frequentPaths.has(location.path))
     .slice(0, 6);
+  const showMacintoshHdLocation = isMacPlatform();
 
   const renderLocationSection = (
     title: string,
@@ -146,6 +149,20 @@ export const FavoritesPanel: React.FC = () => {
 
       {/* List */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-1">
+        {showMacintoshHdLocation ? (
+          <section className="border-b border-border-color/70 pb-1">
+            <button
+              type="button"
+              onClick={() => handleNavigate("/")}
+              className="group flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
+              title={MAC_ROOT_DISPLAY_NAME}
+            >
+              <HardDrive size={12} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{MAC_ROOT_DISPLAY_NAME}</span>
+            </button>
+          </section>
+        ) : null}
+
         <section className="pb-1">
           {sorted.length === 0 && (
             <p className="text-xs text-text-secondary px-3 py-2 leading-relaxed">

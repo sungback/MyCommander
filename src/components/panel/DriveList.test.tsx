@@ -38,10 +38,30 @@ const drives: DriveInfo[] = [
   },
 ];
 
+const macDrives: DriveInfo[] = [
+  {
+    mount_point: "/",
+    name: "Macintosh HD",
+    type: "system",
+    icon: "drive",
+    isEjectable: false,
+    availableSpace: 257_210_000_000,
+  },
+  {
+    mount_point: "/Volumes/Backup",
+    name: "Backup",
+    type: "removable",
+    icon: "drive",
+    isEjectable: true,
+    availableSpace: null,
+  },
+];
+
 describe("DriveList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPanelState.leftPanel.currentPath = "C:\\";
+    mockPanelState.rightPanel.currentPath = "/Volumes/Backup";
     mockGetDrives.mockResolvedValue(drives);
   });
 
@@ -60,5 +80,32 @@ describe("DriveList", () => {
     fireEvent.click(await screen.findByRole("button", { name: /\[C:\\\]/ }));
 
     expect(mockSetPath).toHaveBeenCalledWith("left", "C:\\");
+  });
+
+  it("macOS 루트 드라이브를 Macintosh HD로 표시하고 '/'로 이동한다", async () => {
+    mockPanelState.leftPanel.currentPath = "/";
+    mockGetDrives.mockResolvedValue(macDrives);
+
+    render(<DriveList panelId="left" />);
+
+    const rootButton = await screen.findByRole("button", { name: /Macintosh HD/ });
+    expect(rootButton).toBeInTheDocument();
+    expect(screen.queryByText("[/]")).not.toBeInTheDocument();
+
+    fireEvent.click(rootButton);
+
+    expect(mockSetPath).toHaveBeenCalledWith("left", "/");
+  });
+
+  it("macOS 볼륨 경로에서는 '/' 루트 대신 해당 볼륨을 활성화한다", async () => {
+    mockGetDrives.mockResolvedValue(macDrives);
+
+    render(<DriveList panelId="right" />);
+
+    const rootButton = await screen.findByRole("button", { name: /Macintosh HD/ });
+    const volumeButton = screen.getByRole("button", { name: /Backup/ });
+
+    expect(rootButton).not.toHaveClass("text-text-primary");
+    expect(volumeButton).toHaveClass("text-text-primary");
   });
 });

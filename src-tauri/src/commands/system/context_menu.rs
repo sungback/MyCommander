@@ -5,6 +5,7 @@ use tauri::{LogicalPosition, Position, Window};
 pub const CONTEXT_INFO_MENU_ITEM_ID: &str = "context_info";
 pub const CONTEXT_REVEAL_MENU_ITEM_ID: &str = "context_reveal";
 pub const CONTEXT_TERMINAL_MENU_ITEM_ID: &str = "context_terminal";
+pub const CONTEXT_CALCULATE_SIZE_MENU_ITEM_ID: &str = "context_calculate_size";
 pub const CONTEXT_CREATE_ZIP_MENU_ITEM_ID: &str = "context_create_zip";
 pub const CONTEXT_EXTRACT_ZIP_MENU_ITEM_ID: &str = "context_extract_zip";
 pub const CONTEXT_PASTE_MENU_ITEM_ID: &str = "context_paste";
@@ -29,6 +30,7 @@ pub struct ShowContextMenuRequest {
     pub has_target_item: bool,
     pub can_rename: bool,
     pub can_normalize_filename: bool,
+    pub can_calculate_size: bool,
     pub can_create_zip: bool,
     pub can_extract_zip: bool,
 }
@@ -60,6 +62,7 @@ pub fn show_context_menu(window: Window, request: ShowContextMenuRequest) -> Res
             &window,
             request.can_rename,
             request.can_normalize_filename,
+            request.can_calculate_size,
             request.can_create_zip,
             request.can_extract_zip,
         )?
@@ -79,6 +82,7 @@ fn build_target_context_menu(
     window: &Window,
     can_rename: bool,
     can_normalize_filename: bool,
+    can_calculate_size: bool,
     can_create_zip: bool,
     can_extract_zip: bool,
 ) -> Result<Menu<tauri::Wry>, String> {
@@ -94,6 +98,12 @@ fn build_target_context_menu(
         CONTEXT_TERMINAL_MENU_ITEM_ID,
         "터미널에서 열기",
         true,
+    )?;
+    let calculate_size = context_menu_item(
+        window,
+        CONTEXT_CALCULATE_SIZE_MENU_ITEM_ID,
+        "용량 계산",
+        can_calculate_size,
     )?;
     let create_zip = context_menu_item(
         window,
@@ -133,6 +143,7 @@ fn build_target_context_menu(
             &info,
             &reveal,
             &terminal,
+            &calculate_size,
             &create_zip,
             &extract_zip,
             &paste,
@@ -166,6 +177,12 @@ fn build_background_context_menu(window: &Window) -> Result<Menu<tauri::Wry>, St
     )?;
     let copy_path = context_menu_item(window, CONTEXT_COPY_PATH_MENU_ITEM_ID, "경로 복사", true)?;
     let search = context_menu_item(window, CONTEXT_SEARCH_MENU_ITEM_ID, "여기서 검색", true)?;
+    let calculate_size = context_menu_item(
+        window,
+        CONTEXT_CALCULATE_SIZE_MENU_ITEM_ID,
+        "폴더 용량 계산",
+        true,
+    )?;
     let first_separator = context_menu_separator(window)?;
     let second_separator = context_menu_separator(window)?;
 
@@ -179,6 +196,7 @@ fn build_background_context_menu(window: &Window) -> Result<Menu<tauri::Wry>, St
             &terminal,
             &copy_path,
             &second_separator,
+            &calculate_size,
             &search,
         ],
     )

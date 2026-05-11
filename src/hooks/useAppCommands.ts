@@ -4,16 +4,11 @@ import { useClipboardStore, ClipboardState } from "../store/clipboardStore";
 import { showTransientToast } from "../store/toastStore";
 import { writeClipboardText } from "../utils/clipboard";
 import { arePathsEquivalent, coalescePanelPath } from "../utils/path";
+import { isMacPlatform } from "../utils/platform";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 import { PanelState } from "../types/file";
 
-export const isMacPlatform = () => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return window.navigator.platform.toUpperCase().includes("MAC");
-};
+export { isMacPlatform };
 
 const getPrimaryTargetPath = () => {
   const state = usePanelStore.getState();

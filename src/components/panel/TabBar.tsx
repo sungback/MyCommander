@@ -3,13 +3,18 @@ import { Plus, X } from "lucide-react";
 import { usePanelStore } from "../../store/panelStore";
 import { clsx } from "clsx";
 import { PanelTabState } from "../../types/file";
+import { getPathDisplayName } from "../../utils/pathDisplay";
 
 interface TabBarProps {
   panelId: "left" | "right";
 }
 
 const getTabLabel = (tab: PanelTabState) => {
-  if (tab.currentPath === "/" || /^[A-Z]:\\$/.test(tab.currentPath)) {
+  if (tab.currentPath === "/") {
+    return getPathDisplayName(tab.currentPath);
+  }
+
+  if (/^[A-Z]:\\$/.test(tab.currentPath)) {
     return tab.currentPath;
   }
 

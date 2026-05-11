@@ -53,17 +53,30 @@ describe("useDirectoryLoader", () => {
     expect(props.setResolvedPath).toHaveBeenCalledWith("left", "/home/user");
   });
 
-  it("currentPath가 '/'이면 홈 디렉터리를 조회하여 경로를 설정한다", async () => {
-    mockGetHomeDir.mockResolvedValue("/home/user");
-    mockResolvePath.mockResolvedValue("/home/user");
-    mockListDirectory.mockResolvedValue(sampleEntries);
+  it("currentPath가 '/'이면 루트 디렉터리를 직접 로드한다", async () => {
+    const rootEntries = [
+      {
+        name: "Applications",
+        path: "/Applications",
+        kind: "directory" as const,
+        size: null,
+        lastModified: null,
+        isHidden: false,
+      },
+    ];
+    mockResolvePath.mockResolvedValue("/");
+    mockListDirectory.mockResolvedValue(rootEntries);
 
     const props = makeProps({ currentPath: "/" });
     renderHook(() => useDirectoryLoader(props));
 
-    await waitFor(() => expect(props.setPath).toHaveBeenCalledWith("left", "/home/user"));
     await waitFor(() => expect(props.setFiles).toHaveBeenCalled());
-    expect(props.setFiles).toHaveBeenCalledWith("left", sampleEntries);
+    expect(mockGetHomeDir).not.toHaveBeenCalled();
+    expect(mockResolvePath).toHaveBeenCalledWith("/");
+    expect(mockListDirectory).toHaveBeenCalledWith("/", false);
+    expect(props.setPath).not.toHaveBeenCalled();
+    expect(props.setResolvedPath).toHaveBeenCalledWith("left", "/");
+    expect(props.setFiles).toHaveBeenCalledWith("left", rootEntries);
   });
 
   it("resolvePath가 실패하면 원본 경로로 listDirectory를 호출한다", async () => {
@@ -100,19 +113,17 @@ describe("useDirectoryLoader", () => {
     );
   });
 
-  it("listDirectory 실패 + 이전 경로 없음 + '/' 시작 → 홈 디렉터리로 폴백한다", async () => {
-    // getHomeDir은 두 번 호출됨 (초기 경로 해석 + 폴백)
-    mockGetHomeDir.mockResolvedValue("/home/user");
-    mockResolvePath.mockResolvedValue("/home/user");
-    // 첫 번째 listDirectory는 실패, 두 번째(폴백)는 성공
+  it("listDirectory 실패 + 이전 경로 없음 + '/' 시작 → 홈 디렉터리로 폴백하지 않는다", async () => {
+    mockResolvePath.mockResolvedValue("/");
     mockListDirectory.mockRejectedValueOnce(new Error("first fail"));
-    mockListDirectory.mockResolvedValueOnce(sampleEntries);
 
     const props = makeProps({ currentPath: "/" });
     renderHook(() => useDirectoryLoader(props));
 
-    await waitFor(() => expect(props.setFiles).toHaveBeenCalled());
-    expect(props.setFiles).toHaveBeenCalledWith("left", sampleEntries);
+    await waitFor(() => expect(window.alert).toHaveBeenCalledWith("/ 폴더를 열지 못했습니다."));
+    expect(mockGetHomeDir).not.toHaveBeenCalled();
+    expect(mockListDirectory).toHaveBeenCalledTimes(1);
+    expect(props.setFiles).not.toHaveBeenCalled();
   });
 
   it("showHiddenFiles: true → listDirectory가 true로 호출된다", async () => {

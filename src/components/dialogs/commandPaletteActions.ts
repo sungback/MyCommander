@@ -4,6 +4,7 @@ import {
 } from "../../store/fileOperationUndoStore";
 import type { FileEntry, PanelId, PanelState } from "../../types/file";
 import { coalescePanelPath } from "../../utils/path";
+import { getPathDisplayName } from "../../utils/pathDisplay";
 
 export interface CommandTarget {
   entry: FileEntry;
@@ -29,6 +30,7 @@ export interface CommandPaletteLocation {
 }
 
 export interface CommandPaletteActions {
+  calculateFolderSizes: () => void | Promise<void>;
   closeApp: () => void | Promise<void>;
   copyCurrentPath: () => void | Promise<void>;
   copyToClipboard: () => void | Promise<void>;
@@ -124,7 +126,7 @@ export const getCommandSelectionLabel = (paths: string[]) => {
     return `${paths.length} selected`;
   }
 
-  return paths[0].replace(/[\\/]+$/, "").split(/[\\/]/).pop() || paths[0];
+  return getPathDisplayName(paths[0]);
 };
 
 const isZipTarget = (target: CommandTarget | null) =>
@@ -288,6 +290,14 @@ export const buildCommandPaletteItems = ({
       shortcut: isMac ? "Cmd+Shift+M" : "Ctrl+Shift+M",
       keywords: ["target equals source", "same path"],
       run: actions.syncOtherPanel,
+    },
+    {
+      id: "calculate-folder-sizes",
+      title: "Calculate Folder Sizes",
+      subtitle: activePanelLabel,
+      shortcut: isMac ? "Cmd+L" : "Ctrl+L",
+      keywords: ["directory", "folder", "size", "du"],
+      run: actions.calculateFolderSizes,
     },
     {
       id: "create-zip",

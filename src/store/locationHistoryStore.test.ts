@@ -12,6 +12,10 @@ describe("locationHistoryStore", () => {
     vi.useFakeTimers();
     localStorage.clear();
     useLocationHistoryStore.setState({ locations: [] });
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "Linux x86_64",
+    });
   });
 
   afterEach(() => {
@@ -74,5 +78,21 @@ describe("locationHistoryStore", () => {
     useLocationHistoryStore.getState().removeLocation("/home/user/Documents/");
 
     expect(useLocationHistoryStore.getState().locations).toEqual([]);
+  });
+
+  it("macOS 루트 위치 이름은 Macintosh HD로 기록한다", () => {
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "MacIntel",
+    });
+
+    useLocationHistoryStore.getState().recordLocation("/");
+
+    expect(useLocationHistoryStore.getState().locations[0]).toEqual(
+      expect.objectContaining({
+        name: "Macintosh HD",
+        path: "/",
+      })
+    );
   });
 });

@@ -7,6 +7,10 @@ describe("favoriteStore", () => {
   beforeEach(() => {
     localStorage.clear();
     useFavoriteStore.setState({ favorites: [] });
+    Object.defineProperty(window.navigator, "platform", {
+      configurable: true,
+      value: "Linux x86_64",
+    });
   });
 
   describe("addFavorite", () => {
@@ -43,6 +47,22 @@ describe("favoriteStore", () => {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
       expect(stored).toHaveLength(1);
       expect(stored[0].path).toBe("/home/user/Downloads");
+    });
+
+    it("macOS 루트 경로는 Macintosh HD 이름으로 추가한다", () => {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: "MacIntel",
+      });
+
+      useFavoriteStore.getState().addFavorite("/");
+
+      expect(useFavoriteStore.getState().favorites[0]).toEqual(
+        expect.objectContaining({
+          name: "Macintosh HD",
+          path: "/",
+        })
+      );
     });
   });
 

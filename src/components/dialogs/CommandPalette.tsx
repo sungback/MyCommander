@@ -21,6 +21,7 @@ import {
   Undo2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { calculatePanelDirectories } from "../../hooks/keyboardShortcuts";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
@@ -66,6 +67,7 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   search: Search,
   "compare-folders": ListChecks,
   "sync-other-panel": PanelsLeftRight,
+  "calculate-folder-sizes": ListChecks,
   "create-zip": Archive,
   "extract-zip": Archive,
   terminal: Terminal,
@@ -161,6 +163,7 @@ export const CommandPalette: React.FC = () => {
   const setActivePanel = usePanelStore((state) => state.setActivePanel);
   const setPath = usePanelStore((state) => state.setPath);
   const refreshPanel = usePanelStore((state) => state.refreshPanel);
+  const updateEntrySize = usePanelStore((state) => state.updateEntrySize);
   const locations = useLocationHistoryStore((state) => state.locations);
   const lastUndoOperation = useFileOperationUndoStore(
     (state) => state.lastOperation
@@ -216,6 +219,22 @@ export const CommandPalette: React.FC = () => {
 
   const actions = useMemo<CommandPaletteActions>(
     () => ({
+      calculateFolderSizes: async () => {
+        closeDialog();
+        showTransientToast("폴더 용량 계산을 시작했습니다.");
+        const result = await calculatePanelDirectories({
+          panelId: activePanelId,
+          panel: activePanel,
+          getDirSize: fs.getDirSize,
+          updateEntrySize,
+        });
+
+        showTransientToast(
+          result.failed > 0
+            ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
+            : `폴더 용량 계산 완료: ${result.completed}개`
+        );
+      },
       closeApp: async () => {
         closeDialog();
         try {
@@ -421,6 +440,7 @@ export const CommandPalette: React.FC = () => {
     [
       activeAccessPath,
       activePanel.currentPath,
+      activePanel,
       activePanelId,
       clipboard,
       closeDialog,
@@ -439,6 +459,7 @@ export const CommandPalette: React.FC = () => {
       showHiddenFiles,
       swapPanels,
       upsertJob,
+      updateEntrySize,
     ]
   );
 

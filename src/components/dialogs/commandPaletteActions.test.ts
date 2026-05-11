@@ -34,6 +34,7 @@ const makePanel = (overrides: Partial<PanelState> = {}): PanelState =>
   } as PanelState);
 
 const commandActions = {
+  calculateFolderSizes: vi.fn(),
   closeApp: vi.fn(),
   copyCurrentPath: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -121,6 +122,9 @@ describe("commandPaletteActions", () => {
     );
     expect(items.find((item) => item.id === "undo-file-operation")?.disabledReason).toBe(
       "No rename or move to undo"
+    );
+    expect(items.find((item) => item.id === "calculate-folder-sizes")?.shortcut).toBe(
+      "Cmd+L"
     );
   });
 
