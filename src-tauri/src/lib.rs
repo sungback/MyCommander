@@ -8,6 +8,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::file_watch_commands::FileWatcherState::default())
+        .manage(commands::fs::metadata::DirSizeScanState::default())
         .menu(app_menu::build_app_menu)
         .on_menu_event(|app, event| app_menu_events::handle_menu_event(app, event.id().as_ref()))
         .manage(commands::jobs::JobEngineState::default())
@@ -60,6 +61,8 @@ pub fn run() {
             commands::search_commands::search_files,
             commands::fs::metadata::get_dir_size,
             commands::fs::metadata::estimate_dir_size,
+            commands::fs::metadata::scan_dir_size,
+            commands::fs::metadata::cancel_dir_size_scan,
             commands::drag_commands::write_files_to_pasteboard,
             commands::git_commands::get_git_status,
             commands::sync_commands::compare_directories,

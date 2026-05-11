@@ -40,6 +40,11 @@ export interface AppState {
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: SortField) => void;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySizeProgress: (
+    panel: PanelId,
+    path: string,
+    size: number
+  ) => void;
   updateEntrySizeEstimate: (
     panel: PanelId,
     path: string,

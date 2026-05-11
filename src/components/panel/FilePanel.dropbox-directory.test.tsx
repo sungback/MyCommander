@@ -46,7 +46,7 @@ describe('FilePanel Dropbox-like directories', () => {
     await waitFor(() => {
       expect(lastFileListProps).not.toBeNull();
       expect(usePanelStore.getState().leftPanel.files).toEqual([
-        { ...dropboxEntry, size: 0, sizeStatus: "estimated" },
+        { ...dropboxEntry, size: 0, sizeStatus: "exact" },
       ]);
     });
 

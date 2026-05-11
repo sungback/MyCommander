@@ -5,8 +5,10 @@ import type { FileEntry } from '../../types/file';
 export const mockListDirectory = vi.fn();
 export const mockGetHomeDir = vi.fn();
 export const mockResolvePath = vi.fn();
+export const mockCancelDirSizeScan = vi.fn();
 export const mockEstimateDirSize = vi.fn();
 export const mockGetDirSize = vi.fn();
+export const mockScanDirSize = vi.fn();
 export const mockOpenFile = vi.fn();
 export const mockShowContextMenu = vi.fn();
 export const mockOpenContextMenu = vi.fn();
@@ -18,16 +20,22 @@ let mockExtraFileListRows: FileEntry[] = [];
 
 const mockFileSystem = {
   listDirectory: mockListDirectory,
+  cancelDirSizeScan: mockCancelDirSizeScan,
   getHomeDir: mockGetHomeDir,
   resolvePath: mockResolvePath,
   estimateDirSize: mockEstimateDirSize,
   getDirSize: mockGetDirSize,
+  scanDirSize: mockScanDirSize,
   openFile: mockOpenFile,
   showContextMenu: mockShowContextMenu,
 };
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
 vi.mock('../../hooks/useFileSystem', () => ({
@@ -129,6 +137,7 @@ export const registerFilePanelTestLifecycle = () => {
     mockGetHomeDir.mockReset();
     mockResolvePath.mockReset();
     mockResolvePath.mockImplementation(async (path: string) => path);
+    mockCancelDirSizeScan.mockReset();
     mockEstimateDirSize.mockReset();
     mockEstimateDirSize.mockResolvedValue({
       size: 0,
@@ -136,6 +145,13 @@ export const registerFilePanelTestLifecycle = () => {
       scannedEntries: 0,
     });
     mockGetDirSize.mockReset();
+    mockScanDirSize.mockReset();
+    mockScanDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+      errorCount: 0,
+    });
     mockOpenFile.mockReset();
     mockShowContextMenu.mockReset();
     mockShowContextMenu.mockResolvedValue(undefined);

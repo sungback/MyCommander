@@ -1,12 +1,21 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 
 const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
 const DEFAULT_ESTIMATE_MAX_ENTRIES: usize = 200;
 const MAX_ESTIMATE_DEPTH: usize = 4;
 const MAX_ESTIMATE_ENTRIES: usize = 5_000;
+const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
+const SCAN_PROGRESS_ENTRY_INTERVAL: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +23,65 @@ pub struct DirectorySizeEstimate {
     pub size: u64,
     pub is_partial: bool,
     pub scanned_entries: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectorySizeScanResult {
+    pub size: u64,
+    pub is_partial: bool,
+    pub scanned_entries: usize,
+    pub error_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectorySizeProgress {
+    pub scan_id: String,
+    pub path: String,
+    pub size: u64,
+    pub is_partial: bool,
+    pub scanned_entries: usize,
+    pub completed: bool,
+}
+
+#[derive(Clone, Default)]
+pub struct DirSizeScanState {
+    active_scans: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+}
+
+impl DirSizeScanState {
+    fn begin(&self, scan_id: &str) -> Result<Arc<AtomicBool>, String> {
+        let mut active_scans = self
+            .active_scans
+            .lock()
+            .map_err(|_| "Directory size scan state is unavailable".to_string())?;
+
+        if active_scans.contains_key(scan_id) {
+            return Err(format!("Directory size scan `{scan_id}` is already active"));
+        }
+
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        active_scans.insert(scan_id.to_string(), cancel_flag.clone());
+        Ok(cancel_flag)
+    }
+
+    fn end(&self, scan_id: &str) {
+        if let Ok(mut active_scans) = self.active_scans.lock() {
+            active_scans.remove(scan_id);
+        }
+    }
+
+    pub fn cancel(&self, scan_id: &str) -> bool {
+        self.active_scans
+            .lock()
+            .ok()
+            .and_then(|active_scans| active_scans.get(scan_id).cloned())
+            .is_some_and(|cancel_flag| {
+                cancel_flag.store(true, Ordering::SeqCst);
+                true
+            })
+    }
 }
 
 pub async fn get_dir_size(path: String) -> Result<u64, String> {
@@ -36,6 +104,44 @@ pub async fn estimate_dir_size(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+pub async fn scan_dir_size(
+    app: AppHandle,
+    state: DirSizeScanState,
+    path: String,
+    scan_id: String,
+) -> Result<DirectorySizeScanResult, String> {
+    let cancel_flag = state.begin(&scan_id)?;
+    let scan_result = tokio::task::spawn_blocking({
+        let cancel_flag = cancel_flag.clone();
+        let path = path.clone();
+        let scan_id = scan_id.clone();
+        move || {
+            scan_path_size_with_progress(&path, &cancel_flag, |progress| {
+                let _ = app.emit(
+                    "dir-size-progress",
+                    DirectorySizeProgress {
+                        scan_id: scan_id.clone(),
+                        path: path.clone(),
+                        size: progress.size,
+                        is_partial: progress.is_partial,
+                        scanned_entries: progress.scanned_entries,
+                        completed: progress.completed,
+                    },
+                );
+            })
+        }
+    })
+    .await;
+
+    state.end(&scan_id);
+    scan_result.map_err(|e| e.to_string())?
+}
+
+pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<(), String> {
+    state.cancel(&scan_id);
+    Ok(())
 }
 
 pub(crate) fn compute_path_size(path: &str) -> Result<u64, String> {
@@ -87,6 +193,106 @@ pub(crate) fn estimate_path_size(
     Ok(estimate)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ScanProgress {
+    size: u64,
+    is_partial: bool,
+    scanned_entries: usize,
+    completed: bool,
+}
+
+struct ScanAccumulator {
+    size: u64,
+    is_partial: bool,
+    scanned_entries: usize,
+    error_count: usize,
+    last_emit_at: Instant,
+    entries_since_emit: usize,
+}
+
+impl ScanAccumulator {
+    fn new() -> Self {
+        Self {
+            size: 0,
+            is_partial: false,
+            scanned_entries: 0,
+            error_count: 0,
+            last_emit_at: Instant::now(),
+            entries_since_emit: 0,
+        }
+    }
+
+    fn mark_partial(&mut self) {
+        self.is_partial = true;
+        self.error_count = self.error_count.saturating_add(1);
+    }
+
+    fn progress(&self, completed: bool) -> ScanProgress {
+        ScanProgress {
+            size: self.size,
+            is_partial: self.is_partial,
+            scanned_entries: self.scanned_entries,
+            completed,
+        }
+    }
+
+    fn maybe_emit<F>(&mut self, completed: bool, emit_progress: &mut F)
+    where
+        F: FnMut(ScanProgress),
+    {
+        if !completed
+            && self.entries_since_emit < SCAN_PROGRESS_ENTRY_INTERVAL
+            && self.last_emit_at.elapsed() < SCAN_PROGRESS_INTERVAL
+        {
+            return;
+        }
+
+        emit_progress(self.progress(completed));
+        self.entries_since_emit = 0;
+        self.last_emit_at = Instant::now();
+    }
+}
+
+fn scan_path_size_with_progress<F>(
+    path: &str,
+    cancel_flag: &AtomicBool,
+    mut emit_progress: F,
+) -> Result<DirectorySizeScanResult, String>
+where
+    F: FnMut(ScanProgress),
+{
+    let target = Path::new(path);
+    let metadata = fs::symlink_metadata(target).map_err(|e| e.to_string())?;
+    let mut accumulator = ScanAccumulator::new();
+
+    if metadata.is_file() {
+        accumulator.size = metadata.len();
+        accumulator.scanned_entries = 1;
+        accumulator.maybe_emit(true, &mut emit_progress);
+        return Ok(accumulator.into_result());
+    }
+
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        accumulator.maybe_emit(true, &mut emit_progress);
+        return Ok(accumulator.into_result());
+    }
+
+    scan_dir_size_recursive(target, cancel_flag, &mut accumulator, &mut emit_progress)?;
+    accumulator.maybe_emit(true, &mut emit_progress);
+    Ok(accumulator.into_result())
+}
+
+impl ScanAccumulator {
+    fn into_result(self) -> DirectorySizeScanResult {
+        DirectorySizeScanResult {
+            size: self.size,
+            is_partial: self.is_partial,
+            scanned_entries: self.scanned_entries,
+            error_count: self.error_count,
+        }
+    }
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
     use std::process::Command;
@@ -133,6 +339,66 @@ fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
     }
 
     Ok(total_size)
+}
+
+fn scan_dir_size_recursive<F>(
+    path: &Path,
+    cancel_flag: &AtomicBool,
+    accumulator: &mut ScanAccumulator,
+    emit_progress: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(ScanProgress),
+{
+    if cancel_flag.load(Ordering::SeqCst) {
+        return Err("Directory size scan cancelled".to_string());
+    }
+
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(_) => {
+            accumulator.mark_partial();
+            accumulator.maybe_emit(false, emit_progress);
+            return Ok(());
+        }
+    };
+
+    for entry in entries {
+        if cancel_flag.load(Ordering::SeqCst) {
+            return Err("Directory size scan cancelled".to_string());
+        }
+
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => {
+                accumulator.mark_partial();
+                accumulator.maybe_emit(false, emit_progress);
+                continue;
+            }
+        };
+
+        accumulator.scanned_entries = accumulator.scanned_entries.saturating_add(1);
+        accumulator.entries_since_emit = accumulator.entries_since_emit.saturating_add(1);
+
+        let metadata = match fs::symlink_metadata(entry.path()) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                accumulator.mark_partial();
+                accumulator.maybe_emit(false, emit_progress);
+                continue;
+            }
+        };
+
+        if metadata.is_file() {
+            accumulator.size = accumulator.size.saturating_add(metadata.len());
+        } else if metadata.is_dir() {
+            scan_dir_size_recursive(&entry.path(), cancel_flag, accumulator, emit_progress)?;
+        }
+
+        accumulator.maybe_emit(false, emit_progress);
+    }
+
+    Ok(())
 }
 
 fn scan_estimate_dir(
@@ -196,10 +462,11 @@ fn scan_estimate_dir(
 
 #[cfg(test)]
 mod tests {
-    use super::estimate_path_size;
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     use super::parse_du_size_bytes;
+    use super::{estimate_path_size, scan_path_size_with_progress};
     use std::fs;
+    use std::sync::atomic::AtomicBool;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -258,6 +525,43 @@ mod tests {
 
         assert!(estimate.is_partial);
         assert_eq!(estimate.scanned_entries, 1);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn scan_path_size_with_progress_reports_nested_exact_size() {
+        let root = make_temp_dir("scan-exact");
+        let child = root.join("child");
+        fs::create_dir_all(&child).unwrap();
+        fs::write(root.join("root.bin"), [1_u8; 10]).unwrap();
+        fs::write(child.join("child.bin"), [1_u8; 20]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+        let mut progress_events = Vec::new();
+
+        let result =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |progress| {
+                progress_events.push(progress);
+            })
+            .unwrap();
+
+        assert_eq!(result.size, 30);
+        assert!(!result.is_partial);
+        assert_eq!(result.error_count, 0);
+        assert!(progress_events.last().is_some_and(|event| event.completed));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn scan_path_size_with_progress_can_be_cancelled() {
+        let root = make_temp_dir("scan-cancel");
+        fs::write(root.join("file.bin"), [1_u8; 10]).unwrap();
+        let cancel_flag = AtomicBool::new(true);
+
+        let result = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {});
+
+        assert_eq!(result.unwrap_err(), "Directory size scan cancelled");
 
         fs::remove_dir_all(root).unwrap();
     }

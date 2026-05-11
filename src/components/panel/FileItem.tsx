@@ -22,7 +22,9 @@ const getEntrySizeText = (entry: FileEntry) => {
     case "estimating":
       return "...";
     case "calculating":
-      return "calc...";
+      return entry.size === undefined || entry.size === null
+        ? "calc..."
+        : `${formatSize(entry.size)}+`;
     case "estimated":
       return entry.size === undefined || entry.size === null
         ? "..."

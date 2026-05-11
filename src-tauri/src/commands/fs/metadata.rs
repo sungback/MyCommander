@@ -5,7 +5,7 @@ mod listing;
 #[path = "metadata/preview.rs"]
 mod preview;
 
-pub use dir_size::DirectorySizeEstimate;
+pub use dir_size::{DirSizeScanState, DirectorySizeEstimate, DirectorySizeScanResult};
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;
 
@@ -36,4 +36,22 @@ pub async fn estimate_dir_size(
     max_entries: Option<usize>,
 ) -> Result<DirectorySizeEstimate, String> {
     dir_size::estimate_dir_size(path, max_depth, max_entries).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn scan_dir_size(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DirSizeScanState>,
+    path: String,
+    scan_id: String,
+) -> Result<DirectorySizeScanResult, String> {
+    dir_size::scan_dir_size(app, state.inner().clone(), path, scan_id).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn cancel_dir_size_scan(
+    state: tauri::State<'_, DirSizeScanState>,
+    scan_id: String,
+) -> Result<(), String> {
+    dir_size::cancel_dir_size_scan(state.inner().clone(), scan_id)
 }

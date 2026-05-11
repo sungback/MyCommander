@@ -134,6 +134,27 @@ describe("updatePanelEntrySize", () => {
 
     expect(result).toBe(panel);
   });
+
+  it("does not resort a size-sorted panel while sizes stream in", () => {
+    const tab = makeTab({
+      files: [
+        makeDir("first", { size: 1, sizeStatus: "partial" }),
+        makeDir("second", { size: 2, sizeStatus: "partial" }),
+      ],
+      sortField: "size",
+      sortDirection: "asc",
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    const result = updatePanelEntrySize(panel, "/test/first", 999, "calculating");
+
+    expect(result.files.map((entry) => entry.name)).toEqual(["first", "second"]);
+    expect(result.files[0].size).toBe(999);
+  });
 });
 
 describe("syncPanelWithActiveTab", () => {

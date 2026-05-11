@@ -35,6 +35,8 @@ fn main() {
         "search_files",
         "get_dir_size",
         "estimate_dir_size",
+        "scan_dir_size",
+        "cancel_dir_size_scan",
         "write_files_to_pasteboard",
         "get_git_status",
         "compare_directories",

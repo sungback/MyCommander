@@ -8,6 +8,7 @@ import {
   mockListDirectory,
   mockOpenContextMenu,
   mockResolvePath,
+  mockScanDirSize,
   mockShowContextMenu,
   registerFilePanelTestLifecycle,
   setLeftPanelPath,
@@ -157,6 +158,12 @@ describe('FilePanel', () => {
       isPartial: true,
       scannedEntries: 4,
     });
+    mockScanDirSize.mockResolvedValue({
+      size: 84,
+      isPartial: false,
+      scannedEntries: 8,
+      errorCount: 0,
+    });
 
     setLeftPanelPath("/home/user");
     render(<FilePanel id="left" />);
@@ -174,10 +181,10 @@ describe('FilePanel', () => {
 
     await waitFor(() => {
       const files = usePanelStore.getState().leftPanel.files;
-      expect(files.find((entry) => entry.name === "Documents")?.size).toBe(42);
-      expect(files.find((entry) => entry.name === "Documents")?.sizeStatus).toBe("partial");
-      expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(42);
-      expect(files.find((entry) => entry.name === "Downloads")?.sizeStatus).toBe("partial");
+      expect(files.find((entry) => entry.name === "Documents")?.size).toBe(84);
+      expect(files.find((entry) => entry.name === "Documents")?.sizeStatus).toBe("exact");
+      expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(84);
+      expect(files.find((entry) => entry.name === "Downloads")?.sizeStatus).toBe("exact");
     });
   });
 
@@ -223,7 +230,7 @@ describe('FilePanel', () => {
     );
     expect(usePanelStore.getState().leftPanel.files).toEqual([
       resolvedEntries[0],
-      { ...resolvedEntries[1], size: 0, sizeStatus: "estimated" },
+      { ...resolvedEntries[1], size: 0, sizeStatus: "exact" },
     ]);
     expect(alertSpy).not.toHaveBeenCalled();
   });
@@ -250,7 +257,7 @@ describe('FilePanel', () => {
     await waitFor(() => {
       expect(usePanelStore.getState().leftPanel.files).toEqual([
         homeEntries[0],
-        { ...homeEntries[1], size: 0, sizeStatus: "estimated" },
+        { ...homeEntries[1], size: 0, sizeStatus: "exact" },
       ]);
     });
 

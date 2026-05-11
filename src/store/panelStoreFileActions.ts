@@ -21,7 +21,11 @@ type FileActions = Pick<
   | "setSort"
   | "updateEntrySize"
   | "updateEntrySizeEstimate"
+  | "updateEntrySizeProgress"
 >;
+
+const shouldCacheSizeStatus = (status: string) =>
+  status === "estimated" || status === "partial" || status === "exact";
 
 export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => ({
   setFiles: (panel, files) =>
@@ -135,6 +139,39 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
+  updateEntrySizeProgress: (_panel, path, size) =>
+    set((state) => {
+      const nextPanels = updateEntrySizeAcrossPanels(
+        state.leftPanel,
+        state.rightPanel,
+        path,
+        size,
+        "calculating"
+      );
+      const cachedSize = state.sizeCache[nextPanels.normalizedPath];
+
+      if (
+        cachedSize === size &&
+        nextPanels.leftPanel === state.leftPanel &&
+        nextPanels.rightPanel === state.rightPanel
+      ) {
+        return state;
+      }
+
+      return {
+        ...(cachedSize === size
+          ? {}
+          : {
+              sizeCache: {
+                ...state.sizeCache,
+                [nextPanels.normalizedPath]: size,
+              },
+            }),
+        leftPanel: nextPanels.leftPanel,
+        rightPanel: nextPanels.rightPanel,
+      };
+    }),
+
   setEntrySizeStatus: (_panel, path, status) =>
     set((state) => {
       const nextPanels = updateEntrySizeStatusAcrossPanels(
@@ -144,9 +181,18 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         status
       );
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
+      const nextSizeStatusCache = shouldCacheSizeStatus(status)
+        ? {
+            ...state.sizeStatusCache,
+            [nextPanels.normalizedPath]: status,
+          }
+        : state.sizeStatusCache;
+      const nextCachedStatus = shouldCacheSizeStatus(status)
+        ? status
+        : cachedStatus;
 
       if (
-        cachedStatus === status &&
+        nextCachedStatus === cachedStatus &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -154,13 +200,10 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       }
 
       return {
-        ...(cachedStatus === status
+        ...(nextCachedStatus === cachedStatus
           ? {}
           : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: status,
-              },
+              sizeStatusCache: nextSizeStatusCache,
             }),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,

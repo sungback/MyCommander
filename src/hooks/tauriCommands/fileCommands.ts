@@ -8,10 +8,33 @@ export interface DirectorySizeEstimate {
   scannedEntries: number;
 }
 
+export interface DirectorySizeScanResult {
+  size: number;
+  isPartial: boolean;
+  scannedEntries: number;
+  errorCount: number;
+}
+
+export interface DirectorySizeProgressEvent {
+  scanId: string;
+  path: string;
+  size: number;
+  isPartial: boolean;
+  scannedEntries: number;
+  completed: boolean;
+}
+
 interface DirectorySizeEstimateResponse {
   size: number;
   isPartial: boolean;
   scannedEntries: number;
+}
+
+interface DirectorySizeScanResponse {
+  size: number;
+  isPartial: boolean;
+  scannedEntries: number;
+  errorCount: number;
 }
 
 export const fileCommands = {
@@ -109,5 +132,26 @@ export const fileCommands = {
       isPartial: result.isPartial,
       scannedEntries: result.scannedEntries,
     };
+  },
+
+  scanDirSize: async (
+    path: string,
+    scanId: string
+  ): Promise<DirectorySizeScanResult> => {
+    const result = await invoke<DirectorySizeScanResponse>("scan_dir_size", {
+      path,
+      scan_id: scanId,
+    });
+
+    return {
+      size: result.size,
+      isPartial: result.isPartial,
+      scannedEntries: result.scannedEntries,
+      errorCount: result.errorCount,
+    };
+  },
+
+  cancelDirSizeScan: async (scanId: string): Promise<void> => {
+    await invoke("cancel_dir_size_scan", { scan_id: scanId });
   },
 };

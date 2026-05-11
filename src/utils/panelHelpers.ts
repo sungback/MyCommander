@@ -246,9 +246,7 @@ export const updatePanelEntrySize = (
       return entry;
     });
 
-    return tabChanged
-      ? { ...tab, files: sortEntries(files, tab.sortField, tab.sortDirection) }
-      : tab;
+    return tabChanged ? { ...tab, files } : tab;
   });
 
   return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;

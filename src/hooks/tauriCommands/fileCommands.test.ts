@@ -206,4 +206,40 @@ describe("fileCommands", () => {
       });
     });
   });
+
+  describe("scanDirSize", () => {
+    it("calls scan_dir_size with scan id and returns scan metadata", async () => {
+      mockInvoke.mockResolvedValue({
+        size: 4096,
+        isPartial: false,
+        scannedEntries: 30,
+        errorCount: 0,
+      });
+
+      const result = await fileCommands.scanDirSize("/some/dir", "scan-1");
+
+      expect(mockInvoke).toHaveBeenCalledWith("scan_dir_size", {
+        path: "/some/dir",
+        scan_id: "scan-1",
+      });
+      expect(result).toEqual({
+        size: 4096,
+        isPartial: false,
+        scannedEntries: 30,
+        errorCount: 0,
+      });
+    });
+  });
+
+  describe("cancelDirSizeScan", () => {
+    it("calls cancel_dir_size_scan with scan id", async () => {
+      mockInvoke.mockResolvedValue(undefined);
+
+      await fileCommands.cancelDirSizeScan("scan-1");
+
+      expect(mockInvoke).toHaveBeenCalledWith("cancel_dir_size_scan", {
+        scan_id: "scan-1",
+      });
+    });
+  });
 });
