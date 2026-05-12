@@ -244,4 +244,57 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - name: GitHub Release 공개
-        run: gh release edit "${{ steps.release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GITHUB_RELEASE_RETRY_ATTEMPTS: 6
+          GITHUB_RELEASE_RETRY_DELAY_SECONDS: 10
+        run: |
+          set -euo pipefail
+
+          attempts="$GITHUB_RELEASE_RETRY_ATTEMPTS"
+          delay="$GITHUB_RELEASE_RETRY_DELAY_SECONDS"
+
+          release_is_public() {
+            [[ "$(
+              gh release view "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json isDraft \
+                --jq ".isDraft"
+            )" == "false" ]]
+          }
+
+          publish_release_once() {
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease=false
+
+            release_is_public
+          }
+
+          for ((attempt = 1; attempt <= attempts; attempt++)); do
+            if release_is_public; then
+              echo "Release $RELEASE_TAG is already public."
+              exit 0
+            fi
+
+            if publish_release_once; then
+              echo "Release $RELEASE_TAG is public."
+              exit 0
+            fi
+
+            if (( attempt >= attempts )); then
+              echo "Failed to publish $RELEASE_TAG after $attempt attempts." >&2
+              exit 1
+            fi
+
+            echo "Publishing $RELEASE_TAG failed on attempt $attempt/$attempts; retrying in ${delay}s." >&2
+            sleep "$delay"
+
+            if (( delay < 60 )); then
+              delay=$((delay * 2))
+              if (( delay > 60 )); then
+                delay=60
+              fi
+            fi
+          done
