@@ -19,6 +19,7 @@ import { useSettingsStore } from "./store/settingsStore";
 import { buildFontFamilyStack } from "./constants/fontOptions";
 import { useJobQueue } from "./hooks/useJobQueue";
 import { useRendererRecovery } from "./hooks/useRendererRecovery";
+import { usePersistentSizeCache } from "./hooks/usePersistentSizeCache";
 import {
   useAppCommandListeners,
   useAutoTheme,
@@ -43,6 +44,7 @@ function App() {
 
   // Initialize global shortcuts
   useKeyboard();
+  usePersistentSizeCache();
   useDirectoryWatch();
   useJobQueue();
   useRendererRecovery();

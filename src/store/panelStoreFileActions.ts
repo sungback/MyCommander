@@ -1,4 +1,5 @@
 import {
+  collectEntrySizeInvalidationPaths,
   getPanelKey,
   invalidateEntrySizesAcrossPanels,
   setPanelFiles,
@@ -8,10 +9,16 @@ import {
 } from "./panelStoreReducers";
 import { persistPanelUpdate } from "./panelStorePersistence";
 import {
+  queuePersistentSizeCacheDelete,
+  queuePersistentSizeCacheUpsert,
+} from "./directorySizeCachePersistence";
+import {
   panelUpdate,
   type PanelStoreActions,
   type PanelStoreSet,
 } from "./panelStoreActionTypes";
+import { normalizePathKey } from "../utils/panelHelpers";
+import type { DirectorySizeStatus } from "../types/file";
 
 type FileActions = Pick<
   PanelStoreActions,
@@ -22,10 +29,31 @@ type FileActions = Pick<
   | "updateEntrySize"
   | "updateEntrySizeEstimate"
   | "updateEntrySizeProgress"
+  | "hydrateEntrySizesFromCache"
 >;
 
-const shouldCacheSizeStatus = (status: string) =>
+const shouldCacheSizeStatus = (status: unknown) =>
   status === "estimated" || status === "partial" || status === "exact";
+
+const toHydratedStatus = (
+  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">,
+  isStale: boolean
+) => (isStale && status === "exact" ? "estimated" : status);
+
+const queueStableSizeCacheWrite = (
+  path: string,
+  size: number,
+  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
+) => {
+  const timestamp = Date.now();
+  queuePersistentSizeCacheUpsert({
+    path: normalizePathKey(path),
+    size,
+    status,
+    scannedAt: timestamp,
+    lastUsedAt: timestamp,
+  });
+};
 
 export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => ({
   setFiles: (panel, files) =>
@@ -53,8 +81,10 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
-  updateEntrySize: (_panel, path, size) =>
-    set((state) => {
+  updateEntrySize: (_panel, path, size) => {
+    queueStableSizeCacheWrite(path, size, "exact");
+
+    return set((state) => {
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,
@@ -64,10 +94,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       );
       const cachedSize = state.sizeCache[nextPanels.normalizedPath];
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
+      const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
 
       if (
         cachedSize === size &&
         cachedStatus === "exact" &&
+        !cachedStale &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -91,13 +123,24 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
                 [nextPanels.normalizedPath]: "exact",
               },
             }),
+        ...(cachedStale
+          ? {
+              sizeCacheStale: {
+                ...state.sizeCacheStale,
+                [nextPanels.normalizedPath]: false,
+              },
+            }
+          : {}),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
-    }),
+    });
+  },
 
-  updateEntrySizeEstimate: (_panel, path, size, status) =>
-    set((state) => {
+  updateEntrySizeEstimate: (_panel, path, size, status) => {
+    queueStableSizeCacheWrite(path, size, status);
+
+    return set((state) => {
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,
@@ -107,10 +150,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       );
       const cachedSize = state.sizeCache[nextPanels.normalizedPath];
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
+      const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
 
       if (
         cachedSize === size &&
         cachedStatus === status &&
+        !cachedStale &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -134,10 +179,19 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
                 [nextPanels.normalizedPath]: status,
               },
             }),
+        ...(cachedStale
+          ? {
+              sizeCacheStale: {
+                ...state.sizeCacheStale,
+                [nextPanels.normalizedPath]: false,
+              },
+            }
+          : {}),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
-    }),
+    });
+  },
 
   updateEntrySizeProgress: (_panel, path, size) =>
     set((state) => {
@@ -210,16 +264,107 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
+  hydrateEntrySizesFromCache: (entries) =>
+    set((state) => {
+      if (entries.length === 0) {
+        return state;
+      }
+
+      let leftPanel = state.leftPanel;
+      let rightPanel = state.rightPanel;
+      let changedSizeCache = false;
+      let changedStatusCache = false;
+      let changedStaleCache = false;
+      const nextSizeCache = { ...state.sizeCache };
+      const nextStatusCache = { ...state.sizeStatusCache };
+      const nextStaleCache = { ...state.sizeCacheStale };
+
+      for (const entry of entries) {
+        const normalizedPath = normalizePathKey(entry.path);
+        const existingStatus = state.sizeStatusCache[normalizedPath];
+        const existingFreshStable =
+          shouldCacheSizeStatus(existingStatus) &&
+          !state.sizeCacheStale[normalizedPath];
+
+        if (existingFreshStable) {
+          continue;
+        }
+
+        const status = toHydratedStatus(entry.status, entry.isStale);
+        const nextPanels = updateEntrySizeAcrossPanels(
+          leftPanel,
+          rightPanel,
+          normalizedPath,
+          entry.size,
+          status
+        );
+        leftPanel = nextPanels.leftPanel;
+        rightPanel = nextPanels.rightPanel;
+
+        if (nextSizeCache[normalizedPath] !== entry.size) {
+          nextSizeCache[normalizedPath] = entry.size;
+          changedSizeCache = true;
+        }
+
+        if (nextStatusCache[normalizedPath] !== status) {
+          nextStatusCache[normalizedPath] = status;
+          changedStatusCache = true;
+        }
+
+        if (nextStaleCache[normalizedPath] !== entry.isStale) {
+          nextStaleCache[normalizedPath] = entry.isStale;
+          changedStaleCache = true;
+        }
+      }
+
+      if (
+        !changedSizeCache &&
+        !changedStatusCache &&
+        !changedStaleCache &&
+        leftPanel === state.leftPanel &&
+        rightPanel === state.rightPanel
+      ) {
+        return state;
+      }
+
+      return {
+        ...(changedSizeCache ? { sizeCache: nextSizeCache } : {}),
+        ...(changedStatusCache ? { sizeStatusCache: nextStatusCache } : {}),
+        ...(changedStaleCache ? { sizeCacheStale: nextStaleCache } : {}),
+        leftPanel,
+        rightPanel,
+      };
+    }),
+
   invalidateEntrySizes: (paths) =>
     set((state) => {
-      return (
-        invalidateEntrySizesAcrossPanels(
-          state.leftPanel,
-          state.rightPanel,
-          state.sizeCache,
-          state.sizeStatusCache,
-          paths
-        ) ?? state
+      const invalidatedPaths = collectEntrySizeInvalidationPaths(paths);
+      queuePersistentSizeCacheDelete(invalidatedPaths);
+
+      const nextState = invalidateEntrySizesAcrossPanels(
+        state.leftPanel,
+        state.rightPanel,
+        state.sizeCache,
+        state.sizeStatusCache,
+        paths
       );
+
+      const nextStaleCache = { ...state.sizeCacheStale };
+      let changedStaleCache = false;
+      for (const path of invalidatedPaths) {
+        if (nextStaleCache[path] !== undefined) {
+          delete nextStaleCache[path];
+          changedStaleCache = true;
+        }
+      }
+
+      if (!nextState) {
+        return changedStaleCache ? { sizeCacheStale: nextStaleCache } : state;
+      }
+
+      return {
+        ...nextState,
+        ...(changedStaleCache ? { sizeCacheStale: nextStaleCache } : {}),
+      };
     }),
 });

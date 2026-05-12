@@ -160,6 +160,81 @@ describe("panelStore — updateEntrySize", () => {
     expect(usePanelStore.getState().sizeCache["/estimated/dir"]).toBe(123);
     expect(usePanelStore.getState().sizeStatusCache["/estimated/dir"]).toBe("partial");
   });
+
+  it("hydrates persistent cached directory sizes and marks stale exact values as estimated", () => {
+    const { hydrateEntrySizesFromCache, setFiles } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      {
+        path: "/cached/stale",
+        size: 1234,
+        status: "exact",
+        isStale: true,
+      },
+      {
+        path: "/cached/fresh",
+        size: 5678,
+        status: "exact",
+        isStale: false,
+      },
+    ]);
+
+    setFiles("left", [
+      { name: "stale", path: "/cached/stale", kind: "directory" },
+      { name: "fresh", path: "/cached/fresh", kind: "directory" },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/cached/stale"]).toBe(1234);
+    expect(state.sizeStatusCache["/cached/stale"]).toBe("estimated");
+    expect(state.sizeCacheStale["/cached/stale"]).toBe(true);
+    expect(state.leftPanel.files.find((entry) => entry.name === "stale")?.sizeStatus).toBe(
+      "estimated"
+    );
+    expect(state.sizeCache["/cached/fresh"]).toBe(5678);
+    expect(state.sizeStatusCache["/cached/fresh"]).toBe("exact");
+    expect(state.sizeCacheStale["/cached/fresh"]).toBe(false);
+  });
+
+  it("clears stale flags when an exact size is recalculated", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      {
+        path: "/cached/stale",
+        size: 1234,
+        status: "exact",
+        isStale: true,
+      },
+    ]);
+
+    updateEntrySize("left", "/cached/stale", 2000);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/cached/stale"]).toBe(2000);
+    expect(state.sizeStatusCache["/cached/stale"]).toBe("exact");
+    expect(state.sizeCacheStale["/cached/stale"]).toBe(false);
+  });
+
+  it("invalidates stale persistent cache markers with size cache entries", () => {
+    const { hydrateEntrySizesFromCache, invalidateEntrySizes } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      {
+        path: "/cached/stale",
+        size: 1234,
+        status: "partial",
+        isStale: true,
+      },
+    ]);
+
+    invalidateEntrySizes(["/cached/stale/child.txt"]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/cached/stale"]).toBeUndefined();
+    expect(state.sizeStatusCache["/cached/stale"]).toBeUndefined();
+    expect(state.sizeCacheStale["/cached/stale"]).toBeUndefined();
+  });
 });
 
 describe("panelStore — setCursor", () => {

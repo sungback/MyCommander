@@ -27,6 +27,7 @@ interface UseBackgroundDirSizesProps {
   files: FileEntry[];
   lastUpdated: number;
   panelId: PanelId;
+  sizeCacheStale: Record<string, boolean>;
   setEntrySizeStatus: (
     panel: PanelId,
     path: string,
@@ -74,6 +75,7 @@ export const useBackgroundDirSizes = ({
   files,
   lastUpdated,
   panelId,
+  sizeCacheStale,
   setEntrySizeStatus,
   updateEntrySizeEstimate,
   updateEntrySize,
@@ -213,11 +215,14 @@ export const useBackgroundDirSizes = ({
     }
 
     const scheduler = backgroundSchedulerRef.current;
+    const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
     const pendingDirectories = files.filter(
       (entry) =>
         entry.kind === "directory" &&
         entry.name !== ".." &&
-        (entry.sizeStatus === "estimated" || entry.sizeStatus === "partial") &&
+        (entry.sizeStatus === "estimated" ||
+          entry.sizeStatus === "partial" ||
+          isStale(entry.path)) &&
         !scheduler.queuedExactPaths.has(entry.path) &&
         !scheduler.settledExactPaths.has(entry.path)
     );
@@ -291,6 +296,7 @@ export const useBackgroundDirSizes = ({
     fs,
     lastUpdated,
     panelId,
+    sizeCacheStale,
     setEntrySizeStatus,
     updateEntrySize,
     updateEntrySizeEstimate,

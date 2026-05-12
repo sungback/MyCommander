@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-upsert-dir-size-cache-entries"
+description = "Enables the upsert_dir_size_cache_entries command without any pre-configured scope."
+commands.allow = ["upsert_dir_size_cache_entries"]
+
+[[permission]]
+identifier = "deny-upsert-dir-size-cache-entries"
+description = "Denies the upsert_dir_size_cache_entries command without any pre-configured scope."
+commands.deny = ["upsert_dir_size_cache_entries"]

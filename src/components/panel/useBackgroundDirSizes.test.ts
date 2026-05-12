@@ -46,6 +46,7 @@ const makeProps = (overrides = {}) => ({
   files: [makeDirectory("C:\\Windows")],
   lastUpdated: 0,
   panelId: "left" as const,
+  sizeCacheStale: {},
   setEntrySizeStatus: vi.fn(),
   updateEntrySize: vi.fn(),
   updateEntrySizeEstimate: vi.fn(),
@@ -177,6 +178,34 @@ describe("useBackgroundDirSizes", () => {
         "left",
         "/Users/sam/Projects",
         2048
+      )
+    );
+  });
+
+  it("revalidates stale cached directory sizes outside roots", async () => {
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "exact" as const,
+        },
+      ],
+      sizeCacheStale: {
+        "/Users/sam/Projects": true,
+      },
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/sam/Projects",
+        expect.stringMatching(/^left-/)
       )
     );
   });

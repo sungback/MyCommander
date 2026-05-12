@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { FileEntry } from "../../types/file";
 import { BatchRenameOperation } from "../../features/multiRename";
+import type { DirectorySizeStatus, FileEntry } from "../../types/file";
+
+export type PersistentDirectorySizeStatus = Extract<
+  DirectorySizeStatus,
+  "exact" | "estimated" | "partial"
+>;
 
 export interface DirectorySizeEstimate {
   size: number;
@@ -24,6 +29,23 @@ export interface DirectorySizeProgressEvent {
   completed: boolean;
 }
 
+export interface PersistentDirectorySizeCacheEntry {
+  path: string;
+  size: number;
+  status: PersistentDirectorySizeStatus;
+  scannedAt: number;
+  lastUsedAt: number;
+  isStale: boolean;
+}
+
+export interface PersistentDirectorySizeCacheUpdate {
+  path: string;
+  size: number;
+  status: PersistentDirectorySizeStatus;
+  scannedAt?: number;
+  lastUsedAt?: number;
+}
+
 interface DirectorySizeEstimateResponse {
   size: number;
   isPartial: boolean;
@@ -35,6 +57,12 @@ interface DirectorySizeScanResponse {
   isPartial: boolean;
   scannedEntries: number;
   errorCount: number;
+}
+
+interface PersistentDirectorySizeCacheLoadResponse {
+  version: number;
+  entries: PersistentDirectorySizeCacheEntry[];
+  loadedAt: number;
 }
 
 export const fileCommands = {
@@ -153,5 +181,23 @@ export const fileCommands = {
 
   cancelDirSizeScan: async (scanId: string): Promise<void> => {
     await invoke("cancel_dir_size_scan", { scan_id: scanId });
+  },
+
+  loadDirSizeCache: async (): Promise<PersistentDirectorySizeCacheEntry[]> => {
+    const result = await invoke<PersistentDirectorySizeCacheLoadResponse>(
+      "load_dir_size_cache"
+    );
+
+    return result.entries;
+  },
+
+  upsertDirSizeCacheEntries: async (
+    entries: PersistentDirectorySizeCacheUpdate[]
+  ): Promise<void> => {
+    await invoke("upsert_dir_size_cache_entries", { entries });
+  },
+
+  deleteDirSizeCacheEntries: async (paths: string[]): Promise<void> => {
+    await invoke("delete_dir_size_cache_entries", { paths });
   },
 };

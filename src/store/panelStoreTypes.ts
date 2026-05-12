@@ -14,6 +14,7 @@ export interface AppState {
   rightPanel: PanelState;
   sizeCache: Record<string, number>;
   sizeStatusCache: Record<string, DirectorySizeStatus>;
+  sizeCacheStale: Record<string, boolean>;
   activePanel: PanelId;
   showHiddenFiles: boolean;
   themePreference: ThemePreference;
@@ -55,6 +56,14 @@ export interface AppState {
     panel: PanelId,
     path: string,
     status: DirectorySizeStatus
+  ) => void;
+  hydrateEntrySizesFromCache: (
+    entries: Array<{
+      path: string;
+      size: number;
+      status: Extract<DirectorySizeStatus, "exact" | "estimated" | "partial">;
+      isStale: boolean;
+    }>
   ) => void;
   invalidateEntrySizes: (paths: string[]) => void;
   swapPanels: () => void;

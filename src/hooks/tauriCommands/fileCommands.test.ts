@@ -242,4 +242,70 @@ describe("fileCommands", () => {
       });
     });
   });
+
+  describe("loadDirSizeCache", () => {
+    it("loads persisted directory size cache entries", async () => {
+      mockInvoke.mockResolvedValue({
+        version: 1,
+        loadedAt: 123,
+        entries: [
+          {
+            path: "/some/dir",
+            size: 4096,
+            status: "exact",
+            scannedAt: 100,
+            lastUsedAt: 120,
+            isStale: false,
+          },
+        ],
+      });
+
+      const result = await fileCommands.loadDirSizeCache();
+
+      expect(mockInvoke).toHaveBeenCalledWith("load_dir_size_cache");
+      expect(result).toEqual([
+        {
+          path: "/some/dir",
+          size: 4096,
+          status: "exact",
+          scannedAt: 100,
+          lastUsedAt: 120,
+          isStale: false,
+        },
+      ]);
+    });
+  });
+
+  describe("upsertDirSizeCacheEntries", () => {
+    it("persists stable directory size cache entries", async () => {
+      mockInvoke.mockResolvedValue(undefined);
+      const entries = [
+        {
+          path: "/some/dir",
+          size: 4096,
+          status: "partial" as const,
+          scannedAt: 100,
+          lastUsedAt: 120,
+        },
+      ];
+
+      await fileCommands.upsertDirSizeCacheEntries(entries);
+
+      expect(mockInvoke).toHaveBeenCalledWith("upsert_dir_size_cache_entries", {
+        entries,
+      });
+    });
+  });
+
+  describe("deleteDirSizeCacheEntries", () => {
+    it("deletes persisted directory size cache entries", async () => {
+      mockInvoke.mockResolvedValue(undefined);
+
+      await fileCommands.deleteDirSizeCacheEntries(["/some/dir"]);
+
+      expect(mockInvoke).toHaveBeenCalledWith("delete_dir_size_cache_entries", {
+        paths: ["/some/dir"],
+      });
+    });
+  });
 });

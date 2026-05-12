@@ -4,10 +4,13 @@ mod dir_size;
 mod listing;
 #[path = "metadata/preview.rs"]
 mod preview;
+#[path = "metadata/size_cache.rs"]
+mod size_cache;
 
 pub use dir_size::{DirSizeScanState, DirectorySizeEstimate, DirectorySizeScanResult};
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;
+pub use size_cache::{DirectorySizeCacheEntryUpdate, DirectorySizeCacheLoadResult};
 
 #[cfg(test)]
 pub(crate) use dir_size::compute_path_size;
@@ -54,4 +57,27 @@ pub fn cancel_dir_size_scan(
     scan_id: String,
 ) -> Result<(), String> {
     dir_size::cancel_dir_size_scan(state.inner().clone(), scan_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn load_dir_size_cache(
+    app: tauri::AppHandle,
+) -> Result<DirectorySizeCacheLoadResult, String> {
+    size_cache::load_dir_size_cache(app).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn upsert_dir_size_cache_entries(
+    app: tauri::AppHandle,
+    entries: Vec<DirectorySizeCacheEntryUpdate>,
+) -> Result<(), String> {
+    size_cache::upsert_dir_size_cache_entries(app, entries).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn delete_dir_size_cache_entries(
+    app: tauri::AppHandle,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    size_cache::delete_dir_size_cache_entries(app, paths).await
 }

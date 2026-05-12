@@ -9,6 +9,7 @@ type PanelStoreStateKey =
   | "panelViewModes"
   | "showHiddenFiles"
   | "sizeCache"
+  | "sizeCacheStale"
   | "sizeStatusCache"
   | "themePreference";
 

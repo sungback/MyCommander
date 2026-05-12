@@ -97,13 +97,7 @@ export const updateEntrySizeStatusAcrossPanels = (
   };
 };
 
-export const invalidateEntrySizesAcrossPanels = (
-  leftPanel: PanelState,
-  rightPanel: PanelState,
-  sizeCache: Record<string, number>,
-  sizeStatusCache: Record<string, DirectorySizeStatus>,
-  paths: string[]
-) => {
+export const collectEntrySizeInvalidationPaths = (paths: string[]) => {
   const pathsToInvalidate = new Set<string>();
 
   for (const path of paths) {
@@ -119,6 +113,18 @@ export const invalidateEntrySizesAcrossPanels = (
       parent = getPathDirectoryName(current);
     }
   }
+
+  return Array.from(pathsToInvalidate);
+};
+
+export const invalidateEntrySizesAcrossPanels = (
+  leftPanel: PanelState,
+  rightPanel: PanelState,
+  sizeCache: Record<string, number>,
+  sizeStatusCache: Record<string, DirectorySizeStatus>,
+  paths: string[]
+) => {
+  const pathsToInvalidate = new Set(collectEntrySizeInvalidationPaths(paths));
 
   if (pathsToInvalidate.size === 0) {
     return null;

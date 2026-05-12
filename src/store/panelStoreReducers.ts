@@ -22,6 +22,7 @@ export {
   togglePanelSelection,
 } from "./panelStoreSelection";
 export {
+  collectEntrySizeInvalidationPaths,
   invalidateEntrySizesAcrossPanels,
   setPanelFiles,
   sortPanelByField,

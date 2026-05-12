@@ -43,6 +43,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
   const updateEntrySizeProgress = usePanelStore((s) => s.updateEntrySizeProgress);
+  const sizeCacheStale = usePanelStore((s) => s.sizeCacheStale);
   const selectOnly = usePanelStore((s) => s.selectOnly);
   const setSelection = usePanelStore((s) => s.setSelection);
   const fs = useFileSystem();
@@ -122,6 +123,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     files: panelState.files,
     lastUpdated: panelState.lastUpdated,
     panelId: id,
+    sizeCacheStale,
     setEntrySizeStatus,
     updateEntrySize,
     updateEntrySizeEstimate,

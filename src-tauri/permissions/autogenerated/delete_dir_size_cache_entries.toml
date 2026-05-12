@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-dir-size-cache-entries"
+description = "Enables the delete_dir_size_cache_entries command without any pre-configured scope."
+commands.allow = ["delete_dir_size_cache_entries"]
+
+[[permission]]
+identifier = "deny-delete-dir-size-cache-entries"
+description = "Denies the delete_dir_size_cache_entries command without any pre-configured scope."
+commands.deny = ["delete_dir_size_cache_entries"]
