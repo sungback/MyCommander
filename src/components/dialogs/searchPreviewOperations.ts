@@ -1,13 +1,9 @@
 import type { SearchResult } from "../../hooks/useFileSystem";
 import type { PanelState } from "../../types/file";
-import {
-  coalescePanelPath,
-  isAbsolutePath,
-  joinPath,
-} from "../../utils/path";
+import { getPanelAccessPath } from "../../utils/panelPath";
+import { isAbsolutePath, joinPath } from "../../utils/path";
 
-export const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
+export { getPanelAccessPath };
 
 export const isSearchResultDescendantOf = (path: string, parentPath: string) =>
   path === parentPath ||

@@ -1,6 +1,7 @@
-import type { PanelState } from "../../types/file";
 import type { SyncDirection, SyncItem, SyncStatus } from "../../types/sync";
-import { coalescePanelPath } from "../../utils/path";
+import { getPanelAccessPath } from "../../utils/panelPath";
+
+export { getPanelAccessPath };
 
 export type SyncStage = "paths" | "analyzing" | "results" | "executing";
 
@@ -25,9 +26,6 @@ export const formatSyncExecutionFailures = (
 
   return `${failures.length} ${itemLabel} failed to synchronize: ${failureDetails}${hiddenFailureSuffix}.`;
 };
-
-export const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const updateSyncItemDirection = (
   items: SyncItem[],

@@ -10,16 +10,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { clsx } from "clsx";
-import {
-  arePathsEquivalent,
-  coalescePanelPath,
-  getBreadcrumbParts,
-} from "../../utils/path";
+import { arePathsEquivalent, getBreadcrumbParts } from "../../utils/path";
 import { getBreadcrumbDisplayLabel } from "../../utils/pathDisplay";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { useGitStatus } from "../../hooks/useGitStatus";
-import { PanelState } from "../../types/file";
+import { getPanelAccessPath } from "../../utils/panelPath";
 
 interface AddressBarProps {
   panelId: "left" | "right";
@@ -48,15 +44,13 @@ export const AddressBar: React.FC<AddressBarProps> = ({ panelId }) => {
   const { syncOtherPanelToCurrentPath, copyCurrentPath } = useAppCommands();
   const isMac = isMacPlatform();
   const otherPanelLabel = panelId === "left" ? "right" : "left";
-  const getPanelAccessPath = (panel: PanelState) =>
-    coalescePanelPath(panel.resolvedPath, panel.currentPath);
   const isAlreadySynced = arePathsEquivalent(
     getPanelAccessPath(currentPanel),
     getPanelAccessPath(otherPanel)
   );
 
   const parts = getBreadcrumbParts(currentPath);
-  const gitAccessPath = coalescePanelPath(currentPanel.resolvedPath, currentPanel.currentPath);
+  const gitAccessPath = getPanelAccessPath(currentPanel);
   const { gitStatus } = useGitStatus(gitAccessPath);
 
   const handleNavigate = (path: string) => {

@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { ClipboardState } from "../../store/clipboardStore";
 import { DialogType, DragCopyRequest } from "../../store/dialogStore";
 import {
-  buildMoveUndoEntries,
-  useFileOperationUndoStore,
-} from "../../store/fileOperationUndoStore";
+  submitCopyJob,
+  submitMoveJobWithUndo,
+} from "../../features/fileOperationJobs";
 import { useFileSystem, getErrorMessage } from "../../hooks/useFileSystem";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
-import type { JobSubmission } from "../../types/job";
 import {
   COPY_MOVE_MISSING_TARGET_MESSAGE,
   filterNonConflictingSourcePaths,
@@ -112,30 +111,19 @@ export const useCopyMoveFlow = ({
     setOpenDialog("progress");
     try {
       if (isMove) {
-        const moveJob = await fs.submitJob({
-          kind: "move",
+        await submitMoveJobWithUndo({
+          client: fs,
           sourcePaths: paths,
           targetDir: targetPath,
+          targetIsDirectory: isDirectoryMoveTarget(paths, targetPath),
         });
-        if (moveJob?.id) {
-          useFileOperationUndoStore.getState().registerPendingMoveUndo(
-            moveJob.id,
-            buildMoveUndoEntries(paths, targetPath, {
-              targetIsDirectory: isDirectoryMoveTarget(paths, targetPath),
-            })
-          );
-        }
       } else {
-        const copyJob: JobSubmission = {
-          kind: "copy",
+        await submitCopyJob(fs, {
           sourcePaths: paths,
           targetPath,
           keepBoth,
-        };
-        if (overwrite) {
-          copyJob.overwrite = true;
-        }
-        await fs.submitJob(copyJob);
+          overwrite,
+        });
       }
 
       if (isPasteMode && clipboard?.operation === "cut") {

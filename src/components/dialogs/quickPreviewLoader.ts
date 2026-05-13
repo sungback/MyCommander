@@ -1,7 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import {
-  MAX_NOTEBOOK_BYTES,
   type MarkdownRendererModule,
   type NotebookRendererModule,
   type PptxRendererModule,
@@ -9,82 +8,17 @@ import {
   type XlsxRendererModule,
   type TextHighlighterModule,
 } from "./quickPreviewRenderers/shared";
-import {
-  DOCX_EXTENSIONS,
-  HWPX_EXTENSIONS,
-  IMAGE_EXTENSIONS,
-  NOTEBOOK_EXTENSIONS,
-  PDF_EXTENSIONS,
-  PPTX_EXTENSIONS,
-  RENDER_EXTENSIONS,
-  TEXT_EXTENSIONS,
-  VIDEO_EXTENSIONS,
-  XLSX_EXTENSIONS,
-  getExtension,
-} from "./quickPreviewFileTypes";
+import { getExtension } from "./quickPreviewFileTypes";
+import { loadPreviewFromHandlers } from "./quickPreviewHandlers";
+import type {
+  DocxRendererModule,
+  PreviewState,
+  QuickPreviewLoaderOptions,
+  PreviewType,
+} from "./quickPreviewTypes";
 
 export { getExtension, getFileName } from "./quickPreviewFileTypes";
-
-export type PreviewType =
-  | "image"
-  | "video"
-  | "pdf"
-  | "text"
-  | "rendered"
-  | "unsupported"
-  | "loading"
-  | "error";
-
-export interface PreviewState {
-  type: PreviewType;
-  content?: string;
-  highlightedHtml?: string;
-  renderedHtml?: string;
-  language?: string;
-  src?: string;
-  error?: string;
-  renderExt?: string;
-}
-
-type InvokeImpl = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
-
-interface DocxRendererModule {
-  renderDocx: (filePath: string) => Promise<string>;
-}
-
-export interface QuickPreviewLoaderOptions {
-  convertFileSrcImpl?: (path: string) => string;
-  invokeImpl?: InvokeImpl;
-  fetchImpl?: typeof fetch;
-  loadTextHighlighter?: () => Promise<TextHighlighterModule>;
-  loadMarkdownRenderer?: () => Promise<MarkdownRendererModule>;
-  loadNotebookRenderer?: () => Promise<NotebookRendererModule>;
-  loadPptxRenderer?: () => Promise<PptxRendererModule>;
-  loadHwpxRenderer?: () => Promise<HwpxRendererModule>;
-  loadXlsxRenderer?: () => Promise<XlsxRendererModule>;
-  loadDocxRenderer?: () => Promise<DocxRendererModule>;
-}
-
-const fetchPreviewText = async (
-  path: string,
-  fetchImpl: typeof fetch,
-  convertFileSrcImpl: (path: string) => string
-) => {
-  const url = convertFileSrcImpl(path);
-  const response = await fetchImpl(url);
-  const contentLength = response.headers.get("content-length");
-
-  if (contentLength && Number.parseInt(contentLength, 10) > MAX_NOTEBOOK_BYTES) {
-    throw new Error("파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.");
-  }
-
-  const content = await response.text();
-  if (content.length > MAX_NOTEBOOK_BYTES) {
-    throw new Error("파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.");
-  }
-
-  return content;
-};
+export type { PreviewState, PreviewType, QuickPreviewLoaderOptions };
 
 const defaultLoadDocxRenderer = async (): Promise<DocxRendererModule> => {
   const { renderDocx } = await import("./quickPreviewDocxRenderer");
@@ -171,114 +105,17 @@ export const loadPreviewForPath = async (
   const loadXlsxRenderer = options.loadXlsxRenderer ?? defaultLoadXlsxRenderer;
   const loadDocxRenderer = options.loadDocxRenderer ?? defaultLoadDocxRenderer;
 
-  if (IMAGE_EXTENSIONS.has(extension)) {
-    return {
-      type: "image",
-      src: convertFileSrcImpl(path),
-    };
-  }
-
-  if (VIDEO_EXTENSIONS.has(extension)) {
-    return {
-      type: "video",
-      src: convertFileSrcImpl(path),
-    };
-  }
-
-  if (PDF_EXTENSIONS.has(extension)) {
-    return {
-      type: "pdf",
-      src: convertFileSrcImpl(path),
-    };
-  }
-
-  if (PPTX_EXTENSIONS.has(extension)) {
-    const renderer = await loadPptxRenderer();
-    return {
-      type: "rendered",
-      renderedHtml: await renderer.renderPptx(path),
-      renderExt: "pptx",
-    };
-  }
-
-  if (HWPX_EXTENSIONS.has(extension)) {
-    const renderer = await loadHwpxRenderer();
-    return {
-      type: "rendered",
-      renderedHtml: await renderer.renderHwpx(path),
-      renderExt: "hwpx",
-    };
-  }
-
-  if (XLSX_EXTENSIONS.has(extension)) {
-    const renderer = await loadXlsxRenderer();
-    return {
-      type: "rendered",
-      renderedHtml: await renderer.renderXlsx(path),
-      renderExt: extension,
-    };
-  }
-
-  if (DOCX_EXTENSIONS.has(extension)) {
-    const renderer = await loadDocxRenderer();
-    return {
-      type: "rendered",
-      renderedHtml: await renderer.renderDocx(path),
-      renderExt: "docx",
-    };
-  }
-
-  if (NOTEBOOK_EXTENSIONS.has(extension)) {
-    const content = await fetchPreviewText(path, fetchImpl, convertFileSrcImpl);
-    const renderer = await loadNotebookRenderer();
-    return {
-      type: "rendered",
-      content,
-      renderedHtml: await renderer.renderNotebook(content),
-      renderExt: "ipynb",
-    };
-  }
-
-  if (RENDER_EXTENSIONS.has(extension)) {
-    const content = await readFileContent(path);
-
-    if (extension === "md" || extension === "markdown") {
-      const renderer = await loadMarkdownRenderer();
-      return {
-        type: "rendered",
-        content,
-        renderedHtml: await renderer.renderMarkdown(content),
-        renderExt: "markdown",
-      };
-    }
-
-    return {
-      type: "rendered",
-      content,
-      renderedHtml: content,
-      renderExt: "html",
-    };
-  }
-
-  if (TEXT_EXTENSIONS.has(extension) || extension === "") {
-    const content = await readFileContent(path);
-    const highlighter = await loadTextHighlighter();
-    const highlighted = await highlighter.highlightText(content, extension);
-
-    return highlighted
-      ? {
-          type: "text",
-          content,
-          highlightedHtml: highlighted.highlightedHtml,
-          language: highlighted.language,
-        }
-      : {
-          type: "text",
-          content,
-        };
-  }
-
-  return {
-    type: "unsupported",
-  };
+  return loadPreviewFromHandlers(path, {
+    extension,
+    readFileContent,
+    convertFileSrcImpl,
+    fetchImpl,
+    loadTextHighlighter,
+    loadMarkdownRenderer,
+    loadNotebookRenderer,
+    loadPptxRenderer,
+    loadHwpxRenderer,
+    loadXlsxRenderer,
+    loadDocxRenderer,
+  });
 };

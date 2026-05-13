@@ -1,17 +1,18 @@
 import { useCallback } from "react";
+import {
+  submitCopyJob,
+  submitMoveJobWithUndo,
+} from "../../features/fileOperationJobs";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { useDialogStore } from "../../store/dialogStore";
-import {
-  buildMoveUndoEntries,
-  useFileOperationUndoStore,
-} from "../../store/fileOperationUndoStore";
 import { usePanelStore } from "../../store/panelStore";
 import { showTransientToast } from "../../store/toastStore";
 import type { PanelId } from "../../types/file";
 import { collapseNestedDirectoryPaths } from "./fileListDragRules";
 
 export const useFileListDragActions = (panelId: PanelId) => {
-  const { checkCopyConflicts, submitJob } = useFileSystem();
+  const fs = useFileSystem();
+  const { checkCopyConflicts } = fs;
   const setActivePanel = usePanelStore((s) => s.setActivePanel);
   const openDragCopyDialog = useDialogStore((s) => s.openDragCopyDialog);
 
@@ -30,14 +31,13 @@ export const useFileListDragActions = (panelId: PanelId) => {
         return false;
       }
 
-      await submitJob({
-        kind: "copy",
+      await submitCopyJob(fs, {
         sourcePaths: paths,
         targetPath,
       });
       return true;
     },
-    [checkCopyConflicts, openDragCopyDialog, panelId, setActivePanel, submitJob]
+    [checkCopyConflicts, fs, openDragCopyDialog, panelId, setActivePanel]
   );
 
   const handleDraggedMove = useCallback(
@@ -53,26 +53,19 @@ export const useFileListDragActions = (panelId: PanelId) => {
         return false;
       }
 
-      const job = await submitJob({
-        kind: "move",
+      await submitMoveJobWithUndo({
+        client: fs,
         sourcePaths: collapsedPaths,
         targetDir: targetPath,
+        targetIsDirectory: true,
       });
-      if (job?.id) {
-        useFileOperationUndoStore.getState().registerPendingMoveUndo(
-          job.id,
-          buildMoveUndoEntries(collapsedPaths, targetPath, {
-            targetIsDirectory: true,
-          })
-        );
-      }
       showTransientToast("선택한 폴더를 이동 대기열에 추가했습니다.", {
         durationMs: 1800,
         tone: "success",
       });
       return true;
     },
-    [checkCopyConflicts, submitJob]
+    [checkCopyConflicts, fs]
   );
 
   return {

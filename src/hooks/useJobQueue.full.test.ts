@@ -186,7 +186,7 @@ describe("useJobQueue", () => {
     ]);
     expect(mockRefreshPanelsForEntryPaths).toHaveBeenCalledWith([
       "/some/path/file.txt",
-    ]);
+    ], "delete-completed");
     expect(mockRefreshPanelsForDirectories).not.toHaveBeenCalled();
   });
 
@@ -218,7 +218,10 @@ describe("useJobQueue", () => {
       listenHandlers.get("job-updated")?.({ payload: completedJob });
     });
 
-    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/target/dir"]);
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(
+      ["/target/dir"],
+      "job-completed"
+    );
     expect(mockRemoveDeletedPathsFromVisiblePanels).not.toHaveBeenCalled();
   });
 

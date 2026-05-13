@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useDialogStore } from "./dialogStore";
+import {
+  getCopyMoveDialogKind,
+  isCopyMoveDialog,
+  isPasteCopyMoveDialogState,
+  useDialogStore,
+} from "./dialogStore";
 
 beforeEach(() => {
   useDialogStore.setState(useDialogStore.getInitialState());
@@ -110,5 +115,32 @@ describe("dialogStore — openDragCopyDialog", () => {
     closeDialog();
 
     expect(useDialogStore.getState().dragCopyRequest).toBeNull();
+  });
+});
+
+describe("dialogStore — dialog mode helpers", () => {
+  it("identifies copy and move dialogs as file-operation dialogs", () => {
+    expect(isCopyMoveDialog("copy")).toBe(true);
+    expect(isCopyMoveDialog("move")).toBe(true);
+    expect(isCopyMoveDialog("delete")).toBe(false);
+    expect(isCopyMoveDialog(null)).toBe(false);
+  });
+
+  it("returns a copy/move kind only for copy and move dialogs", () => {
+    expect(getCopyMoveDialogKind("copy")).toBe("copy");
+    expect(getCopyMoveDialogKind("move")).toBe("move");
+    expect(getCopyMoveDialogKind("preview")).toBeNull();
+  });
+
+  it("requires paste mode and a copy/move dialog for paste copy/move state", () => {
+    expect(
+      isPasteCopyMoveDialogState({ openDialog: "copy", isPasteMode: true })
+    ).toBe(true);
+    expect(
+      isPasteCopyMoveDialogState({ openDialog: "copy", isPasteMode: false })
+    ).toBe(false);
+    expect(
+      isPasteCopyMoveDialogState({ openDialog: "delete", isPasteMode: true })
+    ).toBe(false);
   });
 });

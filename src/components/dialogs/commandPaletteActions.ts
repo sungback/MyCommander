@@ -3,7 +3,7 @@ import {
   type FileOperationUndoOperation,
 } from "../../store/fileOperationUndoStore";
 import type { FileEntry, PanelId, PanelState } from "../../types/file";
-import { coalescePanelPath } from "../../utils/path";
+import { getPanelAccessPath } from "../../utils/panelPath";
 import { getPathDisplayName } from "../../utils/pathDisplay";
 
 export interface CommandTarget {
@@ -72,7 +72,7 @@ interface BuildCommandPaletteItemsArgs {
 }
 
 export const getPanelCommandPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
+  getPanelAccessPath(panel);
 
 export const getSelectedCommandPaths = (panel: PanelState): string[] => {
   const selectedPaths = Array.from(panel.selectedItems);

@@ -7,18 +7,18 @@ import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { useJobStore } from "../../store/jobStore";
 import { FileEntry } from "../../types/file";
+import {
+  submitZipDirectoryJob,
+  submitZipSelectionJob,
+} from "../../features/fileOperationJobs";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { formatSize } from "../../utils/format";
 import { writeClipboardText } from "../../utils/clipboard";
-import { coalescePanelPath } from "../../utils/path";
 import {
   buildNfcRenameTargetPath,
   hasDecomposedUnicodeFilename,
 } from "../../utils/unicodeFilename";
 import { showTransientToast } from "../../store/toastStore";
-
-const getPanelAccessPath = (panel: { currentPath: string; resolvedPath?: string }) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 const resolveContext = () => {
   const { panelId, targetPath, targetEntry } = useContextMenuStore.getState();
@@ -139,27 +139,14 @@ export const ContextMenu: React.FC = () => {
               const selectedPaths = [...panel.selectedItems];
               const submittedJob =
                 selectedPaths.length > 1
-                  ? await (async () => {
-                      const archiveName =
-                        panel.currentPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ??
-                        "Archive";
-                      return fs.submitJob({
-                        kind: "zipSelection",
-                        paths: selectedPaths,
-                        targetDir: getPanelAccessPath(panel),
-                        archiveName,
-                      });
-                    })()
+                  ? await submitZipSelectionJob(fs, selectedPaths, panel)
                   : await (async () => {
                       if (targetEntry.kind !== "directory") {
                         closeDialog();
                         return null;
                       }
 
-                      return fs.submitJob({
-                        kind: "zipDirectory",
-                        path: targetPath,
-                      });
+                      return submitZipDirectoryJob(fs, targetPath);
                     })();
 
               if (!submittedJob) {

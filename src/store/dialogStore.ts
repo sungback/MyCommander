@@ -20,6 +20,8 @@ export type DialogType =
   | "commandPalette"
   | null;
 
+export type CopyMoveDialogType = Extract<DialogType, "copy" | "move">;
+
 export interface DialogTarget {
   panelId: "left" | "right";
   path: string;
@@ -33,7 +35,7 @@ export interface DragCopyRequest {
   targetPath: string;
 }
 
-interface DialogState {
+export interface DialogState {
   openDialog: DialogType;
   dialogTarget: DialogTarget | null;
   dragCopyRequest: DragCopyRequest | null;
@@ -45,9 +47,21 @@ interface DialogState {
   openMultiRenameDialog: (session: MultiRenameSession) => void;
   openPreviewDialog: (target: DialogTarget) => void;
   openDragCopyDialog: (request: DragCopyRequest) => void;
-  openPasteDialog: (dialog: "copy" | "move") => void;
+  openPasteDialog: (dialog: CopyMoveDialogType) => void;
   closeDialog: () => void;
 }
+
+export const isCopyMoveDialog = (
+  dialog: DialogType
+): dialog is CopyMoveDialogType => dialog === "copy" || dialog === "move";
+
+export const getCopyMoveDialogKind = (
+  dialog: DialogType
+): CopyMoveDialogType | null => (isCopyMoveDialog(dialog) ? dialog : null);
+
+export const isPasteCopyMoveDialogState = (
+  state: Pick<DialogState, "openDialog" | "isPasteMode">
+) => state.isPasteMode && isCopyMoveDialog(state.openDialog);
 
 export const useDialogStore = create<DialogState>((set) => ({
   openDialog: null,

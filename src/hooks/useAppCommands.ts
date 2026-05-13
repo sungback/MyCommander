@@ -3,10 +3,12 @@ import { usePanelStore } from "../store/panelStore";
 import { useClipboardStore, ClipboardState } from "../store/clipboardStore";
 import { showTransientToast } from "../store/toastStore";
 import { writeClipboardText } from "../utils/clipboard";
-import { arePathsEquivalent, coalescePanelPath } from "../utils/path";
+import {
+  arePanelAccessPathsEquivalent,
+  getPanelAccessPath,
+} from "../utils/panelPath";
 import { isMacPlatform } from "../utils/platform";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
-import { PanelState } from "../types/file";
 
 export { isMacPlatform };
 
@@ -25,9 +27,6 @@ const getPrimaryTargetPath = () => {
 
   return cursorEntry.path;
 };
-
-const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   showTransientToast(message, { durationMs });
@@ -80,7 +79,7 @@ export function useAppCommands() {
       resolvedSourcePanelId === "left" ? state.leftPanel : state.rightPanel;
     const targetPanel = targetPanelId === "left" ? state.leftPanel : state.rightPanel;
 
-    if (arePathsEquivalent(getPanelAccessPath(sourcePanel), getPanelAccessPath(targetPanel))) {
+    if (arePanelAccessPathsEquivalent(sourcePanel, targetPanel)) {
       return;
     }
 

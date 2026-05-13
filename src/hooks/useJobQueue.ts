@@ -80,12 +80,18 @@ export const useJobQueue = () => {
 
       if (job.kind === "delete" && job.result.affectedEntryPaths.length > 0) {
         removeDeletedPathsFromVisiblePanels(job.result.affectedEntryPaths);
-        refreshPanelsForEntryPaths(job.result.affectedEntryPaths);
+        refreshPanelsForEntryPaths(
+          job.result.affectedEntryPaths,
+          "delete-completed"
+        );
         return;
       }
 
       if (job.result.affectedDirectories.length > 0) {
-        refreshPanelsForDirectories(job.result.affectedDirectories);
+        refreshPanelsForDirectories(
+          job.result.affectedDirectories,
+          "job-completed"
+        );
       }
     }).then((fn) => {
       if (cancelled) {

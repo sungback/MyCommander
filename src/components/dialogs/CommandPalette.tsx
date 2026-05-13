@@ -33,8 +33,12 @@ import {
 } from "../../store/locationHistoryStore";
 import {
   useFileOperationUndoStore,
-  type FileOperationUndoOperation,
 } from "../../store/fileOperationUndoStore";
+import {
+  getUndoRefreshDirectories,
+  submitZipSelectionJob,
+  undoFileOperation,
+} from "../../features/fileOperationJobs";
 import { refreshPanelsForDirectories } from "../../store/panelRefresh";
 import { usePanelStore } from "../../store/panelStore";
 import { showTransientToast } from "../../store/toastStore";
@@ -85,19 +89,6 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
 
 const getCommandIcon = (item: CommandPaletteItem) =>
   item.id.startsWith("open-location:") ? FolderOpen : ITEM_ICONS[item.id] ?? Command;
-
-const getArchiveStem = (path: string) =>
-  path.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean).pop() || "Archive";
-
-const getUndoRefreshDirectories = (operation: FileOperationUndoOperation) =>
-  Array.from(
-    new Set(
-      operation.entries.flatMap((entry) => [
-        getPathDirectoryName(entry.originalPath),
-        getPathDirectoryName(entry.currentPath),
-      ])
-    )
-  );
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === "object" &&
@@ -278,12 +269,7 @@ export const CommandPalette: React.FC = () => {
         }
         closeDialog();
         try {
-          const job = await fs.submitJob({
-            kind: "zipSelection",
-            paths: selectedPaths,
-            targetDir: activeAccessPath,
-            archiveName: getArchiveStem(activePanel.currentPath),
-          });
+          const job = await submitZipSelectionJob(fs, selectedPaths, activePanel);
           upsertJob(job);
           setOpenDialog("progress");
           showTransientToast("압축 작업이 대기열에 추가되었습니다.");
@@ -423,10 +409,7 @@ export const CommandPalette: React.FC = () => {
         closeDialog();
         const refreshDirectories = getUndoRefreshDirectories(operation);
         try {
-          for (const entry of [...operation.entries].reverse()) {
-            await fs.moveFiles([entry.currentPath], entry.originalPath);
-          }
-          useFileOperationUndoStore.getState().clearLastOperation();
+          await undoFileOperation(fs, operation);
           refreshPanelsForDirectories(refreshDirectories);
           showTransientToast("마지막 파일 작업을 되돌렸습니다.");
         } catch (error) {

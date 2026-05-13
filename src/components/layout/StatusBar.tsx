@@ -4,7 +4,7 @@ import { useDialogStore } from "../../store/dialogStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { PanelState } from "../../types/file";
 import { formatSize } from "../../utils/format";
-import { coalescePanelPath } from "../../utils/path";
+import { getPanelAccessPath } from "../../utils/panelPath";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { BottomActionDefinition, createBottomActionDefinitions } from "./bottomActions";
 import { Command, Settings } from "lucide-react";
@@ -53,9 +53,6 @@ const getAvailableSpaceText = (availableSpace: number | null | undefined) => {
 
   return `${formatSize(availableSpace, { base: 1000 })} available`;
 };
-
-const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 const PanelStatus: React.FC<PanelStatusProps> = ({
   panelId,

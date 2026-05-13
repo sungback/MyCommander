@@ -1,11 +1,14 @@
 import { ClipboardState } from "../../store/clipboardStore";
-import { DialogType, DragCopyRequest } from "../../store/dialogStore";
-import { PanelState } from "../../types/file";
 import {
-  coalescePanelPath,
-  isAbsolutePath,
-  joinPath,
-} from "../../utils/path";
+  DialogType,
+  DragCopyRequest,
+  isPasteCopyMoveDialogState,
+} from "../../store/dialogStore";
+import { PanelState } from "../../types/file";
+import { getPanelAccessPath } from "../../utils/panelPath";
+import { isAbsolutePath, joinPath } from "../../utils/path";
+
+export { getPanelAccessPath };
 
 export const getPathBaseName = (path: string) => {
   const normalized = path.replace(/[\\/]+$/, "");
@@ -24,9 +27,6 @@ export const getSelectedItemsText = (paths: string[]) => {
     paths.length - 2
   } more file(s)`;
 };
-
-export const getPanelAccessPath = (panel: PanelState) =>
-  coalescePanelPath(panel.resolvedPath, panel.currentPath);
 
 export const getDragCopyTargetPath = (
   dragCopyRequest: DragCopyRequest | null,
@@ -65,7 +65,7 @@ export const getSelectedPaths = ({
     return [...dragCopyRequest.sourcePaths];
   }
 
-  if (isPasteMode && clipboard) {
+  if (isPasteCopyMoveDialogState({ openDialog, isPasteMode }) && clipboard) {
     return [...clipboard.paths];
   }
 

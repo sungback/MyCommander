@@ -12,6 +12,20 @@ type PanelId = "left" | "right";
 type PanelKey = `${PanelId}Panel`;
 type PanelStoreSnapshot = ReturnType<typeof usePanelStore.getState>;
 
+export type PanelRefreshReason =
+  | "manual-refresh"
+  | "file-operation"
+  | "job-completed"
+  | "delete-completed"
+  | "filesystem-changed";
+
+export interface RefreshPanelsForChangesOptions {
+  reason: PanelRefreshReason;
+  directories?: string[];
+  entryPaths?: string[];
+  removeDeletedEntries?: boolean;
+}
+
 const PANEL_IDS: PanelId[] = ["left", "right"];
 
 const getPanelKey = (panelId: PanelId): PanelKey =>
@@ -67,7 +81,7 @@ const updateTabsAcrossPanels = (
   }
 };
 
-export const refreshPanelsForDirectories = (directories: string[]) => {
+const applyDirectoryRefresh = (directories: string[]) => {
   const normalizedDirectories = new Set(
     directories
       .filter((directory) => directory.length > 0)
@@ -122,7 +136,7 @@ export const refreshPanelsForDirectories = (directories: string[]) => {
   });
 };
 
-export const refreshPanelsForEntryPaths = (paths: string[]) => {
+const applyEntryPathRefresh = (paths: string[]) => {
   const normalizedPaths = paths.filter((path) => path.length > 0);
 
   if (normalizedPaths.length === 0) {
@@ -170,7 +184,7 @@ export const refreshPanelsForEntryPaths = (paths: string[]) => {
   });
 };
 
-export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
+const applyDeletedPathRemoval = (paths: string[]) => {
   const normalizedRemovedPaths = new Set(
     paths
       .filter((path) => path.length > 0)
@@ -220,4 +234,43 @@ export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
       selectedItems: new Set(nextSelection),
     };
   });
+};
+
+export const refreshPanelsForChanges = ({
+  reason,
+  directories = [],
+  entryPaths = [],
+  removeDeletedEntries = false,
+}: RefreshPanelsForChangesOptions) => {
+  void reason;
+
+  if (removeDeletedEntries) {
+    applyDeletedPathRemoval(entryPaths);
+  }
+
+  if (entryPaths.length > 0) {
+    applyEntryPathRefresh(entryPaths);
+  }
+
+  if (directories.length > 0) {
+    applyDirectoryRefresh(directories);
+  }
+};
+
+export const refreshPanelsForDirectories = (
+  directories: string[],
+  reason: PanelRefreshReason = "manual-refresh"
+) => {
+  refreshPanelsForChanges({ reason, directories });
+};
+
+export const refreshPanelsForEntryPaths = (
+  paths: string[],
+  reason: PanelRefreshReason = "manual-refresh"
+) => {
+  refreshPanelsForChanges({ reason, entryPaths: paths });
+};
+
+export const removeDeletedPathsFromVisiblePanels = (paths: string[]) => {
+  applyDeletedPathRemoval(paths);
 };

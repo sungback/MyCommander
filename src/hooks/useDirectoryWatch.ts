@@ -88,10 +88,10 @@ export const useDirectoryWatch = () => {
         pendingDirectories.clear();
 
         if (paths.length > 0) {
-          refreshPanelsForEntryPaths(paths);
+          refreshPanelsForEntryPaths(paths, "filesystem-changed");
         }
 
-        refreshPanelsForDirectories(directories);
+        refreshPanelsForDirectories(directories, "filesystem-changed");
       }, REFRESH_DEBOUNCE_MS);
     };
 

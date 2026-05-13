@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  refreshPanelsForChanges,
   refreshPanelsForDirectories,
   refreshPanelsForEntryPaths,
   removeDeletedPathsFromVisiblePanels,
@@ -167,6 +168,54 @@ describe("panelRefresh", () => {
       "/shared/keep.txt",
     ]);
     expect(Array.from(usePanelStore.getState().leftPanel.selectedItems)).toEqual([]);
+  });
+
+  it("can remove deleted entries and refresh affected paths through one reasoned request", () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(4321);
+
+    usePanelStore.setState((state) => ({
+      ...state,
+      leftPanel: {
+        ...state.leftPanel,
+        currentPath: "/shared",
+        resolvedPath: "/shared",
+        files: [
+          { name: "..", path: "/", kind: "directory" },
+          { name: "remove.txt", path: "/shared/remove.txt", kind: "file", size: 1 },
+          { name: "keep.txt", path: "/shared/keep.txt", kind: "file", size: 1 },
+        ],
+        selectedItems: new Set<string>(["/shared/remove.txt"]),
+        tabs: state.leftPanel.tabs.map((tab) =>
+          tab.id === state.leftPanel.activeTabId
+            ? {
+                ...tab,
+                currentPath: "/shared",
+                resolvedPath: "/shared",
+                files: [
+                  { name: "..", path: "/", kind: "directory" },
+                  { name: "remove.txt", path: "/shared/remove.txt", kind: "file", size: 1 },
+                  { name: "keep.txt", path: "/shared/keep.txt", kind: "file", size: 1 },
+                ],
+                selectedItems: new Set<string>(["/shared/remove.txt"]),
+              }
+            : tab
+        ),
+      },
+    }));
+
+    refreshPanelsForChanges({
+      reason: "delete-completed",
+      entryPaths: ["/shared/remove.txt"],
+      removeDeletedEntries: true,
+    });
+
+    expect(usePanelStore.getState().leftPanel.lastUpdated).toBe(4321);
+    expect(usePanelStore.getState().leftPanel.files.map((entry) => entry.path)).toEqual([
+      "/",
+      "/shared/keep.txt",
+    ]);
+
+    nowSpy.mockRestore();
   });
 
   it("removes deleted entries from inactive tabs viewing the same directory", () => {

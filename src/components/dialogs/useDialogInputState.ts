@@ -4,6 +4,7 @@ import type {
   DialogType,
   DragCopyRequest,
 } from "../../store/dialogStore";
+import { isCopyMoveDialog } from "../../store/dialogStore";
 import type { FileType, PanelState } from "../../types/file";
 import { getPathBaseName } from "./dialogTargetPath";
 
@@ -62,7 +63,7 @@ export const useDialogInputState = ({
   useLayoutEffect(() => {
     if (openDialog === "copy" && dragCopyRequest) {
       setInputValue(dragCopyTargetPath);
-    } else if (openDialog === "copy" || openDialog === "move") {
+    } else if (isCopyMoveDialog(openDialog)) {
       setInputValue(isPasteMode ? activePanel.currentPath : targetPanel.currentPath);
     } else if (openDialog === "mkdir" || openDialog === "newfile") {
       setInputValue("");
