@@ -411,7 +411,7 @@ where
         if metadata.is_file() {
             accumulator.size = accumulator.size.saturating_add(metadata.len());
         } else if should_skip_directory_traversal(&metadata) {
-            accumulator.mark_partial();
+            continue;
         } else if metadata.is_dir() {
             scan_dir_size_recursive(&entry.path(), cancel_flag, accumulator, emit_progress)?;
         }
@@ -596,7 +596,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn scan_path_size_marks_symlinked_directories_partial_without_following() {
+    fn scan_path_size_skips_symlinked_directories_without_marking_partial() {
         let root = make_temp_dir("scan-symlink-dir");
         let outside = make_temp_dir("scan-symlink-outside");
         fs::write(outside.join("outside.bin"), [1_u8; 99]).unwrap();
@@ -608,8 +608,8 @@ mod tests {
             scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
 
         assert_eq!(result.size, 10);
-        assert!(result.is_partial);
-        assert_eq!(result.error_count, 1);
+        assert!(!result.is_partial);
+        assert_eq!(result.error_count, 0);
 
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(outside).unwrap();

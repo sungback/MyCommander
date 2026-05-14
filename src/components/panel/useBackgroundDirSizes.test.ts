@@ -171,7 +171,7 @@ describe("useBackgroundDirSizes", () => {
     ).toBe(false);
   });
 
-  it("does not promote partial estimates to automatic exact scans", () => {
+  it("promotes partial estimates to automatic exact scans for local directories", () => {
     expect(
       shouldQueueExactBackgroundScan(
         {
@@ -181,7 +181,7 @@ describe("useBackgroundDirSizes", () => {
         },
         false
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldQueueExactBackgroundScan(
         {
@@ -191,7 +191,7 @@ describe("useBackgroundDirSizes", () => {
         },
         true
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("runs an exact background scan for estimated directories outside roots", async () => {
@@ -245,6 +245,80 @@ describe("useBackgroundDirSizes", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(mockScanDirSize).not.toHaveBeenCalled();
+  });
+
+  it("runs an exact background scan for partial local directories outside roots", async () => {
+    const props = makeProps({
+      currentPath: "/Users/back",
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/back/Downloads",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/back/Downloads",
+        2048
+      )
+    );
+  });
+
+  it("does not requeue the same partial exact-scan result after a refresh tick", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 1024,
+      isPartial: true,
+      scannedEntries: 3,
+      errorCount: 1,
+    });
+    const props = makeProps({
+      currentPath: "/Users/back",
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalledTimes(1));
+
+    rerender({
+      ...props,
+      lastUpdated: 1,
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockScanDirSize).toHaveBeenCalledTimes(1);
   });
 
   it("revalidates stale cached directory sizes outside roots", async () => {

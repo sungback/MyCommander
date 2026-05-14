@@ -28,7 +28,7 @@ interface BackgroundSizeScheduler {
   queuedPaths: Set<string>;
   settledPaths: Set<string>;
   activeExactCount: number;
-  exactQueue: Array<{ path: string }>;
+  exactQueue: Array<{ attemptKey: string; path: string }>;
   queuedExactPaths: Set<string>;
   settledExactPaths: Set<string>;
   activeExactScans: Map<string, string>;
@@ -72,6 +72,14 @@ const createScheduler = (): BackgroundSizeScheduler => ({
   activeExactScans: new Map(),
 });
 
+const getExactAttemptKey = (entry: FileEntry, isStale: boolean) =>
+  [
+    entry.path.normalize("NFC"),
+    entry.size ?? "",
+    entry.sizeStatus ?? "",
+    isStale ? "stale" : "fresh",
+  ].join("|");
+
 export const getAutomaticEstimateOptions = (currentPath: string) => {
   const trimmed = currentPath.replace(/[\\/]+$/, "");
   return trimmed === "" || /^[A-Za-z]:$/.test(trimmed)
@@ -104,15 +112,11 @@ export const shouldQueueExactBackgroundScan = (
     return false;
   }
 
-  if (entry.sizeStatus === "partial") {
-    return false;
-  }
-
   if (isLikelyCloudStoragePath(entry.path)) {
     return false;
   }
 
-  return entry.sizeStatus === "estimated" || isStale;
+  return entry.sizeStatus === "estimated" || entry.sizeStatus === "partial" || isStale;
 };
 
 export const useBackgroundDirSizes = ({
@@ -129,9 +133,14 @@ export const useBackgroundDirSizes = ({
 }: UseBackgroundDirSizesProps) => {
   const fs = useFileSystem();
   const scanCounterRef = useRef(0);
+  const attemptedExactKeysRef = useRef(new Set<string>());
   const backgroundSchedulerRef = useRef<BackgroundSizeScheduler>(
     createScheduler()
   );
+
+  useEffect(() => {
+    attemptedExactKeysRef.current = new Set();
+  }, [activeTabId, currentPath, panelId]);
 
   useEffect(() => {
     const previousScheduler = backgroundSchedulerRef.current;
@@ -263,10 +272,16 @@ export const useBackgroundDirSizes = ({
     const scheduler = backgroundSchedulerRef.current;
     const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
     const pendingDirectories = files.filter(
-      (entry) =>
-        shouldQueueExactBackgroundScan(entry, isStale(entry.path)) &&
-        !scheduler.queuedExactPaths.has(entry.path) &&
-        !scheduler.settledExactPaths.has(entry.path)
+      (entry) => {
+        const stale = isStale(entry.path);
+        const attemptKey = getExactAttemptKey(entry, stale);
+        return (
+          shouldQueueExactBackgroundScan(entry, stale) &&
+          !scheduler.queuedExactPaths.has(entry.path) &&
+          !attemptedExactKeysRef.current.has(attemptKey) &&
+          !scheduler.settledExactPaths.has(entry.path)
+        );
+      }
     );
 
     if (pendingDirectories.length === 0) {
@@ -278,28 +293,28 @@ export const useBackgroundDirSizes = ({
         scheduler.activeExactCount < MAX_BACKGROUND_EXACT_WORKERS &&
         scheduler.exactQueue.length > 0
       ) {
-        const entry = scheduler.exactQueue.shift();
-        if (!entry) {
+        const queuedEntry = scheduler.exactQueue.shift();
+        if (!queuedEntry) {
           return;
         }
 
         scheduler.activeExactCount += 1;
         const scanId = `${panelId}-${Date.now()}-${scanCounterRef.current++}`;
-        scheduler.activeExactScans.set(scanId, entry.path);
-        setEntrySizeStatus(panelId, entry.path, "calculating");
+        scheduler.activeExactScans.set(scanId, queuedEntry.path);
+        setEntrySizeStatus(panelId, queuedEntry.path, "calculating");
 
         void fs
-          .scanDirSize(entry.path, scanId)
+          .scanDirSize(queuedEntry.path, scanId)
           .then((result) => {
             if (backgroundSchedulerRef.current !== scheduler) {
               return;
             }
 
-            scheduler.settledExactPaths.add(entry.path);
+            scheduler.settledExactPaths.add(queuedEntry.path);
             if (result.isPartial) {
-              updateEntrySizeEstimate(panelId, entry.path, result.size, "partial");
+              updateEntrySizeEstimate(panelId, queuedEntry.path, result.size, "partial");
             } else {
-              updateEntrySize(panelId, entry.path, result.size);
+              updateEntrySize(panelId, queuedEntry.path, result.size);
             }
           })
           .catch((error) => {
@@ -307,16 +322,16 @@ export const useBackgroundDirSizes = ({
               return;
             }
 
-            scheduler.settledExactPaths.add(entry.path);
-            setEntrySizeStatus(panelId, entry.path, "error");
+            scheduler.settledExactPaths.add(queuedEntry.path);
+            setEntrySizeStatus(panelId, queuedEntry.path, "error");
             console.error(
-              `Failed to scan background dir size for ${entry.path}:`,
+              `Failed to scan background dir size for ${queuedEntry.path}:`,
               error
             );
           })
           .finally(() => {
             scheduler.activeExactScans.delete(scanId);
-            scheduler.queuedExactPaths.delete(entry.path);
+            scheduler.queuedExactPaths.delete(queuedEntry.path);
             scheduler.activeExactCount -= 1;
 
             if (backgroundSchedulerRef.current === scheduler) {
@@ -327,8 +342,11 @@ export const useBackgroundDirSizes = ({
     };
 
     for (const entry of pendingDirectories) {
-      scheduler.exactQueue.push({ path: entry.path });
+      const stale = isStale(entry.path);
+      const attemptKey = getExactAttemptKey(entry, stale);
+      scheduler.exactQueue.push({ attemptKey, path: entry.path });
       scheduler.queuedExactPaths.add(entry.path);
+      attemptedExactKeysRef.current.add(attemptKey);
     }
 
     drainExactQueue();
