@@ -1,12 +1,17 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { DirectorySizeStatus, PanelId } from "../../types/file";
+import {
+  cancelManualDirectorySizeScan,
+  scanDirectorySizeWithProgress,
+} from "../../hooks/manualDirectorySizeScan";
+import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
 
 interface UseFileListKeyboardProps {
+  cancelDirSizeScan: (scanId: string) => Promise<void>;
   currentPath: string;
   cursorIndex: number;
   extendSelectionToRow: (targetIndex: number) => void;
-  getDirSize: (path: string) => Promise<number>;
   isActivePanel: boolean;
   moveSelectionToRow: (targetIndex: number) => void;
   onEnter: (entry: VisibleEntryRow["entry"]) => void;
@@ -14,6 +19,7 @@ interface UseFileListKeyboardProps {
   onSelect: (path: string, toggle: boolean) => void;
   openPreviewDialog: (request: { panelId: PanelId; path: string }) => void;
   panelId: PanelId;
+  scanDirSize: (path: string, scanId: string) => Promise<DirectorySizeScanResult>;
   setCursorIndex: (index: number) => void;
   setEntrySizeStatus: (
     panel: PanelId,
@@ -23,14 +29,21 @@ interface UseFileListKeyboardProps {
   setSelection: (panel: PanelId, paths: string[]) => void;
   showHiddenFiles: boolean;
   updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySizeEstimate: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
+  updateEntrySizeProgress: (panel: PanelId, path: string, size: number) => void;
   visibleRows: VisibleEntryRow[];
 }
 
 export const useFileListKeyboard = ({
+  cancelDirSizeScan,
   currentPath,
   cursorIndex,
   extendSelectionToRow,
-  getDirSize,
   isActivePanel,
   moveSelectionToRow,
   onEnter,
@@ -38,11 +51,14 @@ export const useFileListKeyboard = ({
   onSelect,
   openPreviewDialog,
   panelId,
+  scanDirSize,
   setCursorIndex,
   setEntrySizeStatus,
   setSelection,
   showHiddenFiles,
   updateEntrySize,
+  updateEntrySizeEstimate,
+  updateEntrySizeProgress,
   visibleRows,
 }: UseFileListKeyboardProps) => {
   const searchStringRef = useRef("");
@@ -135,9 +151,23 @@ export const useFileListKeyboard = ({
 
       onSelect(current.path, true);
       if (current.kind === "directory" && current.name !== "..") {
-        setEntrySizeStatus(panelId, current.path, "calculating");
-        getDirSize(current.path)
-          .then((size) => updateEntrySize(panelId, current.path, size))
+        cancelManualDirectorySizeScan(current.path)
+          .then((cancelled) => {
+            if (cancelled) {
+              return null;
+            }
+
+            return scanDirectorySizeWithProgress({
+              cancelDirSizeScan,
+              panelId,
+              path: current.path,
+              scanDirSize,
+              setEntrySizeStatus,
+              updateEntrySize,
+              updateEntrySizeEstimate,
+              updateEntrySizeProgress,
+            });
+          })
           .catch((error) => {
             setEntrySizeStatus(panelId, current.path, "error");
             console.error("Failed to calculate dir size:", error);

@@ -3,20 +3,33 @@ import { useDialogStore, type DialogType } from "../store/dialogStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { usePanelStore } from "../store/panelStore";
 import type { DirectorySizeStatus, PanelId, PanelState, ViewMode } from "../types/file";
+import {
+  scanDirectorySizeWithProgress,
+  type ManualDirectorySizeScanOutcome,
+} from "./manualDirectorySizeScan";
+import type { DirectorySizeScanResult } from "./tauriCommands/fileCommands";
 import { showTransientStatusMessage, type useAppCommands } from "./useAppCommands";
 
 type AppCommands = ReturnType<typeof useAppCommands>;
 
 interface CalculatePanelDirectoriesArgs {
+  cancelDirSizeScan: (scanId: string) => Promise<void>;
   panelId: PanelId;
   panel: PanelState;
-  getDirSize: (path: string) => Promise<number>;
+  scanDirSize: (path: string, scanId: string) => Promise<DirectorySizeScanResult>;
   setEntrySizeStatus?: (
     panelId: PanelId,
     path: string,
     status: DirectorySizeStatus
   ) => void;
   updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
+  updateEntrySizeEstimate?: (
+    panelId: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
+  updateEntrySizeProgress?: (panelId: PanelId, path: string, size: number) => void;
 }
 
 export interface DirectorySizeCalculationResult {
@@ -26,11 +39,14 @@ export interface DirectorySizeCalculationResult {
 }
 
 export const calculatePanelDirectories = async ({
+  cancelDirSizeScan,
   panelId,
   panel,
-  getDirSize,
+  scanDirSize,
   setEntrySizeStatus,
   updateEntrySize,
+  updateEntrySizeEstimate,
+  updateEntrySizeProgress,
 }: CalculatePanelDirectoriesArgs): Promise<DirectorySizeCalculationResult> => {
   const directories = panel.files.filter(
     (entry) => entry.kind === "directory" && entry.name !== ".."
@@ -49,10 +65,28 @@ export const calculatePanelDirectories = async ({
       }
 
       try {
-        setEntrySizeStatus?.(panelId, entry.path, "calculating");
-        const size = await getDirSize(entry.path);
-        updateEntrySize(panelId, entry.path, size);
-        result.completed += 1;
+        const outcome: ManualDirectorySizeScanOutcome =
+          await scanDirectorySizeWithProgress({
+            cancelDirSizeScan,
+            panelId,
+            path: entry.path,
+            scanDirSize,
+            setEntrySizeStatus:
+              setEntrySizeStatus ?? (() => undefined),
+            updateEntrySize,
+            updateEntrySizeEstimate:
+              updateEntrySizeEstimate ??
+              ((nextPanelId, path, size) =>
+                updateEntrySize(nextPanelId, path, size)),
+            updateEntrySizeProgress:
+              updateEntrySizeProgress ??
+              ((nextPanelId, path, size) =>
+                updateEntrySize(nextPanelId, path, size)),
+          });
+
+        if (outcome.status === "completed") {
+          result.completed += 1;
+        }
       } catch (error) {
         setEntrySizeStatus?.(panelId, entry.path, "error");
         result.failed += 1;
@@ -87,11 +121,12 @@ export interface KeyboardHandlerDependencies
     | "swapPanels"
     | "syncOtherPanelToCurrentPath"
   > {
+  cancelDirSizeScan: (scanId: string) => Promise<void>;
   isMac: boolean;
-  getDirSize: (path: string) => Promise<number>;
   goBack: (panelId: PanelId) => void;
   goForward: (panelId: PanelId) => void;
   openInfoDialog: (target: { panelId: PanelId; path: string }) => void;
+  scanDirSize: (path: string, scanId: string) => Promise<DirectorySizeScanResult>;
   setPanelViewMode: (panelId: PanelId, viewMode: ViewMode) => void;
   setEntrySizeStatus: (
     panelId: PanelId,
@@ -99,6 +134,13 @@ export interface KeyboardHandlerDependencies
     status: DirectorySizeStatus
   ) => void;
   updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
+  updateEntrySizeEstimate: (
+    panelId: PanelId,
+    path: string,
+    size: number,
+    status: Extract<DirectorySizeStatus, "estimated" | "partial">
+  ) => void;
+  updateEntrySizeProgress: (panelId: PanelId, path: string, size: number) => void;
 }
 
 const isInputFocused = () => document.activeElement?.tagName === "INPUT";
@@ -303,18 +345,24 @@ const handleModifiedShortcut = (
     const state = usePanelStore.getState();
     void Promise.all([
       calculatePanelDirectories({
+        cancelDirSizeScan: deps.cancelDirSizeScan,
         panelId: "left",
         panel: state.leftPanel,
-        getDirSize: deps.getDirSize,
+        scanDirSize: deps.scanDirSize,
         setEntrySizeStatus: deps.setEntrySizeStatus,
         updateEntrySize: deps.updateEntrySize,
+        updateEntrySizeEstimate: deps.updateEntrySizeEstimate,
+        updateEntrySizeProgress: deps.updateEntrySizeProgress,
       }),
       calculatePanelDirectories({
+        cancelDirSizeScan: deps.cancelDirSizeScan,
         panelId: "right",
         panel: state.rightPanel,
-        getDirSize: deps.getDirSize,
+        scanDirSize: deps.scanDirSize,
         setEntrySizeStatus: deps.setEntrySizeStatus,
         updateEntrySize: deps.updateEntrySize,
+        updateEntrySizeEstimate: deps.updateEntrySizeEstimate,
+        updateEntrySizeProgress: deps.updateEntrySizeProgress,
       }),
     ]);
     return true;

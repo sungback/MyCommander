@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useFileListKeyboard } from "./useFileListKeyboard";
 import type { VisibleEntryRow } from "./fileListRows";
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockResolvedValue(() => undefined),
+}));
 
 const makeRow = (name: string, kind: "file" | "directory" = "file"): VisibleEntryRow => ({
   entry: {
@@ -48,18 +52,26 @@ const defaultProps = () => ({
   currentPath: "/home",
   cursorIndex: 0,
   extendSelectionToRow: vi.fn(),
-  getDirSize: vi.fn().mockResolvedValue(1024),
+  cancelDirSizeScan: vi.fn().mockResolvedValue(undefined),
   isActivePanel: true,
   moveSelectionToRow: vi.fn(),
   onEnter: vi.fn(),
   onSelect: vi.fn(),
   openPreviewDialog: vi.fn(),
   panelId: "left" as const,
+  scanDirSize: vi.fn().mockResolvedValue({
+    size: 1024,
+    isPartial: false,
+    scannedEntries: 1,
+    errorCount: 0,
+  }),
   setCursorIndex: vi.fn(),
   setEntrySizeStatus: vi.fn(),
   setSelection: vi.fn(),
   showHiddenFiles: false,
   updateEntrySize: vi.fn(),
+  updateEntrySizeEstimate: vi.fn(),
+  updateEntrySizeProgress: vi.fn(),
   visibleRows: [makeRow("a.txt"), makeRow("b.txt"), makeRow("c.txt")],
 });
 
@@ -167,29 +179,28 @@ describe("useFileListKeyboard", () => {
       panelId: "left",
       path: "/home/a.txt",
     });
-    expect(props.getDirSize).not.toHaveBeenCalled();
+    expect(props.scanDirSize).not.toHaveBeenCalled();
   });
 
-  it("Space는 디렉터리면 onSelect를 호출하고 getDirSize를 시작한다", () => {
+  it("Space는 디렉터리면 onSelect를 호출하고 진행률 기반 scanDirSize를 시작한다", async () => {
     props.visibleRows = [makeRow("docs", "directory")];
     const { result } = renderHook(() => useFileListKeyboard(props));
     const event = makeKey(" ", { code: "Space" });
     result.current.handleKeyDown(event as unknown as React.KeyboardEvent<HTMLDivElement>);
     expect(props.onSelect).toHaveBeenCalledWith("/home/docs", true);
-    expect(props.setEntrySizeStatus).toHaveBeenCalledWith(
-      "left",
-      "/home/docs",
-      "calculating"
+    await waitFor(() =>
+      expect(props.scanDirSize).toHaveBeenCalledWith("/home/docs", expect.any(String))
     );
-    expect(props.getDirSize).toHaveBeenCalledWith("/home/docs");
+    expect(props.updateEntrySize).toHaveBeenCalledWith("left", "/home/docs", 1024);
   });
 
-  it("Space는 '..' 항목에서 getDirSize를 호출하지 않는다", () => {
+  it("Space는 '..' 항목에서 scanDirSize를 호출하지 않는다", async () => {
     props.visibleRows = [makeParentRow()];
     const { result } = renderHook(() => useFileListKeyboard(props));
     const event = makeKey(" ", { code: "Space" });
     result.current.handleKeyDown(event as unknown as React.KeyboardEvent<HTMLDivElement>);
-    expect(props.getDirSize).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(props.scanDirSize).not.toHaveBeenCalled();
   });
 
   it("Ctrl+A는 선택 가능한 모든 항목을 setSelection으로 설정한다", () => {

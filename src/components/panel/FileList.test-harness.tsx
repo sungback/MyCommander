@@ -14,12 +14,18 @@ vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => `asset://${path}`,
 }));
 
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn().mockResolvedValue(() => undefined),
+}));
+
 const fileListMocks = vi.hoisted(() => ({
   mockSubmitJob: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
+  mockCancelDirSizeScan: vi.fn(),
   mockEstimateDirSize: vi.fn(),
   mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
+  mockScanDirSize: vi.fn(),
   mockSetSelection: vi.fn(),
   mockSelectOnly: vi.fn(),
   mockClearSelection: vi.fn(),
@@ -48,9 +54,11 @@ const fileListMocks = vi.hoisted(() => ({
 
 export const mockSubmitJob = fileListMocks.mockSubmitJob;
 export const mockCheckCopyConflicts = fileListMocks.mockCheckCopyConflicts;
+export const mockCancelDirSizeScan = fileListMocks.mockCancelDirSizeScan;
 export const mockEstimateDirSize = fileListMocks.mockEstimateDirSize;
 export const mockGetDirSize = fileListMocks.mockGetDirSize;
 export const mockListDirectory = fileListMocks.mockListDirectory;
+export const mockScanDirSize = fileListMocks.mockScanDirSize;
 export const mockSetSelection = fileListMocks.mockSetSelection;
 export const mockSelectOnly = fileListMocks.mockSelectOnly;
 export const mockClearSelection = fileListMocks.mockClearSelection;
@@ -64,11 +72,13 @@ export const mockPanelState = fileListMocks.mockPanelState;
 vi.mock('../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     checkCopyConflicts: fileListMocks.mockCheckCopyConflicts,
+    cancelDirSizeScan: fileListMocks.mockCancelDirSizeScan,
     copyFiles: vi.fn().mockResolvedValue([]),
     submitJob: fileListMocks.mockSubmitJob,
     estimateDirSize: fileListMocks.mockEstimateDirSize,
     getDirSize: fileListMocks.mockGetDirSize,
     listDirectory: fileListMocks.mockListDirectory,
+    scanDirSize: fileListMocks.mockScanDirSize,
   }),
 }));
 
@@ -91,6 +101,7 @@ vi.mock('../../store/panelStore', () => ({
     selector({
       updateEntrySize: vi.fn(),
       updateEntrySizeEstimate: vi.fn(),
+      updateEntrySizeProgress: vi.fn(),
       setEntrySizeStatus: vi.fn(),
       setSelection: fileListMocks.mockSetSelection,
       selectOnly: fileListMocks.mockSelectOnly,
@@ -242,6 +253,7 @@ export const registerFileListTestLifecycle = () => {
       result: null,
     });
     mockCheckCopyConflicts.mockResolvedValue([]);
+    mockCancelDirSizeScan.mockResolvedValue(undefined);
     mockEstimateDirSize.mockResolvedValue({
       size: 0,
       isPartial: false,
@@ -249,6 +261,12 @@ export const registerFileListTestLifecycle = () => {
     });
     mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
+    mockScanDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+      errorCount: 0,
+    });
     mockSetSelection.mockReset();
     mockSelectOnly.mockReset();
     mockClearSelection.mockReset();

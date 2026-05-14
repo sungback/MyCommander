@@ -156,6 +156,12 @@ export const CommandPalette: React.FC = () => {
   const refreshPanel = usePanelStore((state) => state.refreshPanel);
   const setEntrySizeStatus = usePanelStore((state) => state.setEntrySizeStatus);
   const updateEntrySize = usePanelStore((state) => state.updateEntrySize);
+  const updateEntrySizeEstimate = usePanelStore(
+    (state) => state.updateEntrySizeEstimate
+  );
+  const updateEntrySizeProgress = usePanelStore(
+    (state) => state.updateEntrySizeProgress
+  );
   const locations = useLocationHistoryStore((state) => state.locations);
   const lastUndoOperation = useFileOperationUndoStore(
     (state) => state.lastOperation
@@ -215,11 +221,14 @@ export const CommandPalette: React.FC = () => {
         closeDialog();
         showTransientToast("폴더 용량 계산을 시작했습니다.");
         const result = await calculatePanelDirectories({
+          cancelDirSizeScan: fs.cancelDirSizeScan,
           panelId: activePanelId,
           panel: activePanel,
-          getDirSize: fs.getDirSize,
+          scanDirSize: fs.scanDirSize,
           setEntrySizeStatus,
           updateEntrySize,
+          updateEntrySizeEstimate,
+          updateEntrySizeProgress,
         });
 
         showTransientToast(
@@ -446,6 +455,8 @@ export const CommandPalette: React.FC = () => {
       swapPanels,
       upsertJob,
       updateEntrySize,
+      updateEntrySizeEstimate,
+      updateEntrySizeProgress,
     ]
   );
 

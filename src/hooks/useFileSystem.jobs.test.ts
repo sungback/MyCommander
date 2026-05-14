@@ -238,6 +238,7 @@ describe('useFileSystem', () => {
         canRename: true,
         canNormalizeFilename: true,
         canCalculateSize: true,
+        isCalculatingSize: false,
         canCreateZip: false,
         canExtractZip: true,
       });
@@ -250,6 +251,7 @@ describe('useFileSystem', () => {
           can_rename: true,
           can_normalize_filename: true,
           can_calculate_size: true,
+          is_calculating_size: false,
           can_create_zip: false,
           can_extract_zip: true,
         },

@@ -47,12 +47,18 @@ export const FileList: React.FC<FileListProps> = ({
   setCursorIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { estimateDirSize, getDirSize, listDirectory } = useFileSystem();
+  const {
+    cancelDirSizeScan,
+    estimateDirSize,
+    listDirectory,
+    scanDirSize,
+  } = useFileSystem();
   const {
     activeTab,
     setEntrySizeStatus,
     updateEntrySize,
     updateEntrySizeEstimate,
+    updateEntrySizeProgress,
     setSelection,
     selectOnly,
     clearSelection,
@@ -67,6 +73,7 @@ export const FileList: React.FC<FileListProps> = ({
         setEntrySizeStatus: s.setEntrySizeStatus,
         updateEntrySize: s.updateEntrySize,
         updateEntrySizeEstimate: s.updateEntrySizeEstimate,
+        updateEntrySizeProgress: s.updateEntrySizeProgress,
         setSelection: s.setSelection,
         selectOnly: s.selectOnly,
         clearSelection: s.clearSelection,
@@ -140,10 +147,10 @@ export const FileList: React.FC<FileListProps> = ({
   });
 
   const { handleKeyDown } = useFileListKeyboard({
+    cancelDirSizeScan,
     currentPath,
     cursorIndex,
     extendSelectionToRow,
-    getDirSize,
     isActivePanel,
     moveSelectionToRow,
     onEnter,
@@ -151,11 +158,14 @@ export const FileList: React.FC<FileListProps> = ({
     onSelect,
     openPreviewDialog,
     panelId,
+    scanDirSize,
     setCursorIndex,
     setEntrySizeStatus,
     setSelection,
     showHiddenFiles,
     updateEntrySize,
+    updateEntrySizeEstimate,
+    updateEntrySizeProgress,
     visibleRows,
   });
 

@@ -13,7 +13,8 @@ const {
   mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
   mockUpdateEntrySize, mockSetEntrySizeStatus, mockSetPanelViewMode,
-  mockGetDirSize, mockIsMacPlatform,
+  mockUpdateEntrySizeEstimate, mockUpdateEntrySizeProgress,
+  mockCancelDirSizeScan, mockScanDirSize, mockIsMacPlatform,
 } = vi.hoisted(() => ({
   mockOpenPreview:     vi.fn(),
   mockOpenEditor:      vi.fn().mockResolvedValue(undefined),
@@ -37,8 +38,16 @@ const {
     mockCloseDialog:     vi.fn(),
     mockUpdateEntrySize: vi.fn(),
     mockSetEntrySizeStatus: vi.fn(),
+    mockUpdateEntrySizeEstimate: vi.fn(),
+    mockUpdateEntrySizeProgress: vi.fn(),
   mockSetPanelViewMode: vi.fn(),
-  mockGetDirSize:      vi.fn().mockResolvedValue(0),
+  mockCancelDirSizeScan: vi.fn().mockResolvedValue(undefined),
+  mockScanDirSize:      vi.fn().mockResolvedValue({
+    size: 0,
+    isPartial: false,
+    scannedEntries: 0,
+    errorCount: 0,
+  }),
   mockIsMacPlatform:   vi.fn().mockReturnValue(false),
 }));
 
@@ -71,7 +80,10 @@ vi.mock('./useAppCommands', () => ({
 }));
 
 vi.mock('./useFileSystem', () => ({
-  useFileSystem: () => ({ getDirSize: mockGetDirSize }),
+  useFileSystem: () => ({
+    cancelDirSizeScan: mockCancelDirSizeScan,
+    scanDirSize: mockScanDirSize,
+  }),
 }));
 
 vi.mock('../store/panelStore', () => ({
@@ -79,6 +91,8 @@ vi.mock('../store/panelStore', () => ({
     (selector: (s: Record<string, unknown>) => unknown) =>
       selector({
         updateEntrySize: mockUpdateEntrySize,
+        updateEntrySizeEstimate: mockUpdateEntrySizeEstimate,
+        updateEntrySizeProgress: mockUpdateEntrySizeProgress,
         setEntrySizeStatus: mockSetEntrySizeStatus,
         setPanelViewMode: mockSetPanelViewMode,
       }),

@@ -1,11 +1,11 @@
-import { act, fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   TEST_FILES,
   getListEl,
   makeProps,
-  mockGetDirSize,
   mockOpenPreviewDialog,
+  mockScanDirSize,
   mockSetSelection,
   registerFileListTestLifecycle,
 } from './FileList.test-harness';
@@ -191,23 +191,33 @@ describe('FileList', () => {
         panelId: 'left',
         path: '/home/user/notes.txt',
       });
-      expect(mockGetDirSize).not.toHaveBeenCalled();
+      expect(mockScanDirSize).not.toHaveBeenCalled();
     });
 
-    it('Space → 디렉토리에 대해 getDirSize 호출', () => {
+    it('Space → 디렉토리에 대해 scanDirSize 호출', async () => {
       render(<FileList {...makeProps({ cursorIndex: 1 })} />); // Documents (dir)
       fireEvent.keyDown(getListEl(), { key: ' ', code: 'Space' });
-      expect(mockGetDirSize).toHaveBeenCalledWith('/home/user/Documents');
+      await waitFor(() =>
+        expect(mockScanDirSize).toHaveBeenCalledWith(
+          '/home/user/Documents',
+          expect.any(String)
+        )
+      );
     });
 
-    it('Space → getDirSize 에러 시 조용히 실패한다', async () => {
-      mockGetDirSize.mockRejectedValueOnce(new Error('disk error'));
+    it('Space → scanDirSize 에러 시 조용히 실패한다', async () => {
+      mockScanDirSize.mockRejectedValueOnce(new Error('disk error'));
       render(<FileList {...makeProps({ cursorIndex: 1 })} />);
       await act(async () => {
         fireEvent.keyDown(getListEl(), { key: ' ', code: 'Space' });
       });
       // 에러가 throw되지 않고 console.error로 처리됨
-      expect(mockGetDirSize).toHaveBeenCalledWith('/home/user/Documents');
+      await waitFor(() =>
+        expect(mockScanDirSize).toHaveBeenCalledWith(
+          '/home/user/Documents',
+          expect.any(String)
+        )
+      );
     });
   });
 

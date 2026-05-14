@@ -7,6 +7,13 @@ import type { PanelState } from '../types/file';
 const mockPanelStoreGetState = vi.hoisted(() => vi.fn());
 const mockClipboardStoreGetState = vi.hoisted(() => vi.fn());
 const mockDialogStoreGetState = vi.hoisted(() => vi.fn());
+const mockListen = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(() => undefined)
+);
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: mockListen,
+}));
 
 vi.mock('../store/panelStore', () => ({
   usePanelStore: { getState: mockPanelStoreGetState },
@@ -53,12 +60,20 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
   syncOtherPanelToCurrentPath: vi.fn(),
+  cancelDirSizeScan: vi.fn().mockResolvedValue(undefined),
   setEntrySizeStatus: vi.fn(),
   setPanelViewMode: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
-  getDirSize: vi.fn().mockResolvedValue(0),
+  scanDirSize: vi.fn().mockResolvedValue({
+    size: 0,
+    isPartial: false,
+    scannedEntries: 0,
+    errorCount: 0,
+  }),
   updateEntrySize: vi.fn(),
+  updateEntrySizeEstimate: vi.fn(),
+  updateEntrySizeProgress: vi.fn(),
   ...overrides,
 });
 
@@ -92,35 +107,65 @@ beforeEach(() => {
 
 // ── calculatePanelDirectories ─────────────────────────────────────────────────
 describe('calculatePanelDirectories', () => {
-  it('calls getDirSize for each directory entry (excluding "..")', async () => {
-    const getDirSize = vi.fn().mockResolvedValue(100);
+  it('calls scanDirSize for each directory entry (excluding "..")', async () => {
+    const scanDirSize = vi.fn().mockResolvedValue({
+      size: 100,
+      isPartial: false,
+      scannedEntries: 1,
+      errorCount: 0,
+    });
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
     const updateEntrySize = vi.fn();
     const panel = makePanel([
       { name: 'docs', path: '/home/docs', kind: 'directory' },
       { name: 'images', path: '/home/images', kind: 'directory' },
     ]);
 
-    await calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize });
+    await calculatePanelDirectories({
+      cancelDirSizeScan,
+      panelId: 'left',
+      panel,
+      scanDirSize,
+      updateEntrySize,
+    });
 
-    expect(getDirSize).toHaveBeenCalledTimes(2);
-    expect(getDirSize).toHaveBeenCalledWith('/home/docs');
-    expect(getDirSize).toHaveBeenCalledWith('/home/images');
+    expect(scanDirSize).toHaveBeenCalledTimes(2);
+    expect(scanDirSize).toHaveBeenCalledWith('/home/docs', expect.any(String));
+    expect(scanDirSize).toHaveBeenCalledWith('/home/images', expect.any(String));
   });
 
   it('calls updateEntrySize with resolved size', async () => {
-    const getDirSize = vi.fn().mockResolvedValue(512);
+    const scanDirSize = vi.fn().mockResolvedValue({
+      size: 512,
+      isPartial: false,
+      scannedEntries: 1,
+      errorCount: 0,
+    });
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
     const updateEntrySize = vi.fn();
     const panel = makePanel([
       { name: 'docs', path: '/home/docs', kind: 'directory' },
     ]);
 
-    await calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize });
+    await calculatePanelDirectories({
+      cancelDirSizeScan,
+      panelId: 'left',
+      panel,
+      scanDirSize,
+      updateEntrySize,
+    });
 
     expect(updateEntrySize).toHaveBeenCalledWith('left', '/home/docs', 512);
   });
 
   it('marks directory entries as calculating before exact size work', async () => {
-    const getDirSize = vi.fn().mockResolvedValue(512);
+    const scanDirSize = vi.fn().mockResolvedValue({
+      size: 512,
+      isPartial: false,
+      scannedEntries: 1,
+      errorCount: 0,
+    });
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
     const setEntrySizeStatus = vi.fn();
     const updateEntrySize = vi.fn();
     const panel = makePanel([
@@ -128,9 +173,10 @@ describe('calculatePanelDirectories', () => {
     ]);
 
     await calculatePanelDirectories({
+      cancelDirSizeScan,
       panelId: 'left',
       panel,
-      getDirSize,
+      scanDirSize,
       setEntrySizeStatus,
       updateEntrySize,
     });
@@ -143,41 +189,72 @@ describe('calculatePanelDirectories', () => {
   });
 
   it('skips non-directory entries (kind === "file")', async () => {
-    const getDirSize = vi.fn().mockResolvedValue(0);
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
+    const scanDirSize = vi.fn().mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+      errorCount: 0,
+    });
     const updateEntrySize = vi.fn();
     const panel = makePanel([
       { name: 'readme.txt', path: '/home/readme.txt', kind: 'file' },
       { name: 'script.sh', path: '/home/script.sh', kind: 'file' },
     ]);
 
-    await calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize });
+    await calculatePanelDirectories({
+      cancelDirSizeScan,
+      panelId: 'left',
+      panel,
+      scanDirSize,
+      updateEntrySize,
+    });
 
-    expect(getDirSize).not.toHaveBeenCalled();
+    expect(scanDirSize).not.toHaveBeenCalled();
     expect(updateEntrySize).not.toHaveBeenCalled();
   });
 
   it('skips ".." entries (kind === "directory", name === "..")', async () => {
-    const getDirSize = vi.fn().mockResolvedValue(0);
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
+    const scanDirSize = vi.fn().mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+      errorCount: 0,
+    });
     const updateEntrySize = vi.fn();
     const panel = makePanel([
       { name: '..', path: '/home', kind: 'directory' },
     ]);
 
-    await calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize });
+    await calculatePanelDirectories({
+      cancelDirSizeScan,
+      panelId: 'left',
+      panel,
+      scanDirSize,
+      updateEntrySize,
+    });
 
-    expect(getDirSize).not.toHaveBeenCalled();
+    expect(scanDirSize).not.toHaveBeenCalled();
     expect(updateEntrySize).not.toHaveBeenCalled();
   });
 
   it('catches error from getDirSize without rethrowing — updateEntrySize not called for that entry', async () => {
-    const getDirSize = vi.fn().mockRejectedValue(new Error('permission denied'));
+    const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
+    const scanDirSize = vi.fn().mockRejectedValue(new Error('permission denied'));
     const updateEntrySize = vi.fn();
     const panel = makePanel([
       { name: 'secret', path: '/home/secret', kind: 'directory' },
     ]);
 
     await expect(
-      calculatePanelDirectories({ panelId: 'left', panel, getDirSize, updateEntrySize })
+      calculatePanelDirectories({
+        cancelDirSizeScan,
+        panelId: 'left',
+        panel,
+        scanDirSize,
+        updateEntrySize,
+      })
     ).resolves.toEqual({ total: 1, completed: 0, failed: 1 });
 
     expect(updateEntrySize).not.toHaveBeenCalled();

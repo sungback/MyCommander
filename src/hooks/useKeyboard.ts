@@ -27,8 +27,10 @@ export function useKeyboard() {
     cutToClipboard,
     pasteFromClipboard,
   } = useAppCommands();
-  const { getDirSize } = useFileSystem();
+  const { cancelDirSizeScan, scanDirSize } = useFileSystem();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
+  const updateEntrySizeProgress = usePanelStore((s) => s.updateEntrySizeProgress);
   const setEntrySizeStatus = usePanelStore((s) => s.setEntrySizeStatus);
   const setPanelViewMode = usePanelStore((s) => s.setPanelViewMode);
   const goBack = usePanelStore((s) => s.goBack);
@@ -41,7 +43,7 @@ export function useKeyboard() {
       copyCurrentPath,
       copyToClipboard,
       cutToClipboard,
-      getDirSize,
+      cancelDirSizeScan,
       goBack,
       goForward,
       openCopy,
@@ -57,18 +59,21 @@ export function useKeyboard() {
       openSearch,
       openSync,
       pasteFromClipboard,
+      scanDirSize,
       setEntrySizeStatus,
       setPanelViewMode,
       swapPanels,
       syncOtherPanelToCurrentPath,
       updateEntrySize,
+      updateEntrySizeEstimate,
+      updateEntrySizeProgress,
     });
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     closeApp,
-    getDirSize,
+    cancelDirSizeScan,
     goBack,
     goForward,
     openCopy,
@@ -92,5 +97,8 @@ export function useKeyboard() {
     copyToClipboard,
     cutToClipboard,
     pasteFromClipboard,
+    scanDirSize,
+    updateEntrySizeEstimate,
+    updateEntrySizeProgress,
   ]);
 }

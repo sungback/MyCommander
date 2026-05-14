@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
+import { isManualDirectorySizeScanActive } from "../../hooks/manualDirectorySizeScan";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import type { FileEntry, PanelId } from "../../types/file";
 import { hasDecomposedUnicodeFilename } from "../../utils/unicodeFilename";
@@ -124,6 +125,9 @@ export const usePanelContextMenu = ({
       const canCalculateSize = Boolean(
         targetEntry && targetEntry.name !== ".." && targetEntry.kind === "directory"
       );
+      const isCalculatingSize = Boolean(
+        entryPath && isManualDirectorySizeScanActive(entryPath)
+      );
 
       void fs
         .showContextMenu({
@@ -137,6 +141,7 @@ export const usePanelContextMenu = ({
               hasDecomposedUnicodeFilename(targetEntry.name)
           ),
           canCalculateSize,
+          isCalculatingSize,
           canCreateZip,
           canExtractZip,
         })

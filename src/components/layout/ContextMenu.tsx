@@ -12,6 +12,10 @@ import {
   submitZipSelectionJob,
 } from "../../features/fileOperationJobs";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import {
+  cancelManualDirectorySizeScan,
+  scanDirectorySizeWithProgress,
+} from "../../hooks/manualDirectorySizeScan";
 import { formatSize } from "../../utils/format";
 import { writeClipboardText } from "../../utils/clipboard";
 import {
@@ -69,6 +73,8 @@ export const ContextMenu: React.FC = () => {
           refreshPanel,
           setEntrySizeStatus,
           updateEntrySize,
+          updateEntrySizeEstimate,
+          updateEntrySizeProgress,
         } = usePanelStore.getState();
         const { closeContextMenu } = useContextMenuStore.getState();
 
@@ -102,12 +108,34 @@ export const ContextMenu: React.FC = () => {
               setActivePanel(panelId);
               closeContextMenu();
               if (targetPath && targetEntry?.kind === "directory" && targetEntry.name !== "..") {
+                if (await cancelManualDirectorySizeScan(targetPath)) {
+                  showTransientToast("폴더 용량 계산을 취소했습니다.", { tone: "warning" });
+                  return;
+                }
+
                 showTransientToast("폴더 용량 계산을 시작했습니다.");
-                setEntrySizeStatus(panelId, targetPath, "calculating");
                 try {
-                  const size = await fs.getDirSize(targetPath);
-                  updateEntrySize(panelId, targetPath, size);
-                  showTransientToast(`${targetEntry.name}: ${formatSize(size)}`);
+                  const result = await scanDirectorySizeWithProgress({
+                    cancelDirSizeScan: fs.cancelDirSizeScan,
+                    panelId,
+                    path: targetPath,
+                    scanDirSize: fs.scanDirSize,
+                    setEntrySizeStatus,
+                    updateEntrySize,
+                    updateEntrySizeEstimate,
+                    updateEntrySizeProgress,
+                  });
+
+                  if (result.status === "cancelled") {
+                    showTransientToast("폴더 용량 계산을 취소했습니다.", {
+                      tone: "warning",
+                    });
+                  } else if (typeof result.size === "number") {
+                    const suffix = result.isPartial ? "+" : "";
+                    showTransientToast(
+                      `${targetEntry.name}: ${formatSize(result.size)}${suffix}`
+                    );
+                  }
                 } catch (error) {
                   setEntrySizeStatus(panelId, targetPath, "error");
                   throw error;
@@ -118,11 +146,14 @@ export const ContextMenu: React.FC = () => {
               showTransientToast("폴더 용량 계산을 시작했습니다.");
               {
                 const result = await calculatePanelDirectories({
+                  cancelDirSizeScan: fs.cancelDirSizeScan,
                   panelId,
                   panel,
-                  getDirSize: fs.getDirSize,
+                  scanDirSize: fs.scanDirSize,
                   setEntrySizeStatus,
                   updateEntrySize,
+                  updateEntrySizeEstimate,
+                  updateEntrySizeProgress,
                 });
                 showTransientToast(
                   result.failed > 0

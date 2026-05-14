@@ -18,6 +18,7 @@ export interface ShowContextMenuRequest {
   canRename: boolean;
   canNormalizeFilename: boolean;
   canCalculateSize: boolean;
+  isCalculatingSize: boolean;
   canCreateZip: boolean;
   canExtractZip: boolean;
 }
@@ -105,6 +106,7 @@ export const systemCommands = {
         can_rename: request.canRename,
         can_normalize_filename: request.canNormalizeFilename,
         can_calculate_size: request.canCalculateSize,
+        is_calculating_size: request.isCalculatingSize,
         can_create_zip: request.canCreateZip,
         can_extract_zip: request.canExtractZip,
       },

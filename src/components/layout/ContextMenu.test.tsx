@@ -12,9 +12,13 @@ const {
   mockRefreshPanel,
   mockSetEntrySizeStatus,
   mockUpdateEntrySize,
+  mockUpdateEntrySizeEstimate,
+  mockUpdateEntrySizeProgress,
   mockSetActivePanel,
   mockSubmitJob,
+  mockCancelDirSizeScan,
   mockGetDirSize,
+  mockScanDirSize,
   mockRenameFile,
   mockOpenInTerminal,
   mockRevealItemInDir,
@@ -31,9 +35,13 @@ const {
   mockRefreshPanel: vi.fn(),
   mockSetEntrySizeStatus: vi.fn(),
   mockUpdateEntrySize: vi.fn(),
+  mockUpdateEntrySizeEstimate: vi.fn(),
+  mockUpdateEntrySizeProgress: vi.fn(),
   mockSetActivePanel: vi.fn(),
   mockSubmitJob: vi.fn(),
+  mockCancelDirSizeScan: vi.fn(),
   mockGetDirSize: vi.fn(),
+  mockScanDirSize: vi.fn(),
   mockRenameFile: vi.fn(),
   mockOpenInTerminal: vi.fn(),
   mockRevealItemInDir: vi.fn(),
@@ -88,6 +96,8 @@ const mockPanelState = {
   refreshPanel: mockRefreshPanel,
   setEntrySizeStatus: mockSetEntrySizeStatus,
   updateEntrySize: mockUpdateEntrySize,
+  updateEntrySizeEstimate: mockUpdateEntrySizeEstimate,
+  updateEntrySizeProgress: mockUpdateEntrySizeProgress,
   setActivePanel: mockSetActivePanel,
 };
 
@@ -114,10 +124,12 @@ vi.mock("../../store/toastStore", () => ({
 
 vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
+    cancelDirSizeScan: mockCancelDirSizeScan,
     extractZip: mockExtractZip,
     getDirSize: mockGetDirSize,
     openInTerminal: mockOpenInTerminal,
     renameFile: mockRenameFile,
+    scanDirSize: mockScanDirSize,
     submitJob: mockSubmitJob,
   }),
 }));
@@ -180,7 +192,14 @@ describe("ContextMenu", () => {
       result: null,
     });
     mockExtractZip.mockResolvedValue(undefined);
+    mockCancelDirSizeScan.mockResolvedValue(undefined);
     mockGetDirSize.mockResolvedValue(42);
+    mockScanDirSize.mockResolvedValue({
+      size: 42,
+      isPartial: false,
+      scannedEntries: 1,
+      errorCount: 0,
+    });
     mockOpenInTerminal.mockResolvedValue(undefined);
     mockRenameFile.mockResolvedValue(undefined);
     mockRevealItemInDir.mockResolvedValue(undefined);
@@ -332,7 +351,10 @@ describe("ContextMenu", () => {
       "/home/user/Documents",
       "calculating"
     );
-    expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/Documents");
+    expect(mockScanDirSize).toHaveBeenCalledWith(
+      "/home/user/Documents",
+      expect.any(String)
+    );
     expect(mockUpdateEntrySize).toHaveBeenCalledWith(
       "left",
       "/home/user/Documents",

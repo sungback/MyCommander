@@ -31,6 +31,7 @@ pub struct ShowContextMenuRequest {
     pub can_rename: bool,
     pub can_normalize_filename: bool,
     pub can_calculate_size: bool,
+    pub is_calculating_size: bool,
     pub can_create_zip: bool,
     pub can_extract_zip: bool,
 }
@@ -63,6 +64,7 @@ pub fn show_context_menu(window: Window, request: ShowContextMenuRequest) -> Res
             request.can_rename,
             request.can_normalize_filename,
             request.can_calculate_size,
+            request.is_calculating_size,
             request.can_create_zip,
             request.can_extract_zip,
         )?
@@ -83,6 +85,7 @@ fn build_target_context_menu(
     can_rename: bool,
     can_normalize_filename: bool,
     can_calculate_size: bool,
+    is_calculating_size: bool,
     can_create_zip: bool,
     can_extract_zip: bool,
 ) -> Result<Menu<tauri::Wry>, String> {
@@ -102,7 +105,11 @@ fn build_target_context_menu(
     let calculate_size = context_menu_item(
         window,
         CONTEXT_CALCULATE_SIZE_MENU_ITEM_ID,
-        "용량 계산",
+        if is_calculating_size {
+            "용량 계산 취소"
+        } else {
+            "용량 계산"
+        },
         can_calculate_size,
     )?;
     let create_zip = context_menu_item(
