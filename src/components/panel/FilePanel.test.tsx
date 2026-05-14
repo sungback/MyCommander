@@ -231,7 +231,7 @@ describe('FilePanel', () => {
     );
     expect(usePanelStore.getState().leftPanel.files).toEqual([
       resolvedEntries[0],
-      { ...resolvedEntries[1], size: 0, sizeStatus: "exact" },
+      { ...resolvedEntries[1], size: 0, sizeStatus: "estimated" },
     ]);
     expect(alertSpy).not.toHaveBeenCalled();
   });
@@ -258,7 +258,7 @@ describe('FilePanel', () => {
     await waitFor(() => {
       expect(usePanelStore.getState().leftPanel.files).toEqual([
         homeEntries[0],
-        { ...homeEntries[1], size: 0, sizeStatus: "exact" },
+        { ...homeEntries[1], size: 0, sizeStatus: "estimated" },
       ]);
     });
 

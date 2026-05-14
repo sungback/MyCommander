@@ -8,6 +8,19 @@ const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
 const MAX_BACKGROUND_EXACT_WORKERS = 1;
 const DEFAULT_ESTIMATE_OPTIONS = { maxDepth: 1, maxEntries: 200 };
 const ROOT_ESTIMATE_OPTIONS = { maxDepth: 0, maxEntries: 100 };
+const CLOUD_STORAGE_PATH_MARKERS = [
+  "cloudstorage",
+  "drivefs",
+  "dropbox",
+  "google drive",
+  "icloud drive",
+  "iclouddrive",
+  "my drive",
+  "onedrive",
+  "shared drives",
+  "공유 드라이브",
+  "내 드라이브",
+];
 
 interface BackgroundSizeScheduler {
   activeCount: number;
@@ -66,8 +79,22 @@ export const getAutomaticEstimateOptions = (currentPath: string) => {
     : DEFAULT_ESTIMATE_OPTIONS;
 };
 
+export const isLikelyCloudStoragePath = (path: string) => {
+  const normalized = path
+    .replace(/[\\/]+/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .join("/")
+    .toLowerCase();
+
+  return CLOUD_STORAGE_PATH_MARKERS.some((marker) =>
+    normalized.includes(marker.toLowerCase())
+  );
+};
+
 export const shouldAutoScanExactSizes = (currentPath: string) =>
-  getAutomaticEstimateOptions(currentPath) !== ROOT_ESTIMATE_OPTIONS;
+  getAutomaticEstimateOptions(currentPath) !== ROOT_ESTIMATE_OPTIONS &&
+  !isLikelyCloudStoragePath(currentPath);
 
 export const shouldQueueExactBackgroundScan = (
   entry: FileEntry,
@@ -78,6 +105,10 @@ export const shouldQueueExactBackgroundScan = (
   }
 
   if (entry.sizeStatus === "partial") {
+    return false;
+  }
+
+  if (isLikelyCloudStoragePath(entry.path)) {
     return false;
   }
 

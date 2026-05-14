@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileEntry } from "../../types/file";
 import {
   getAutomaticEstimateOptions,
+  isLikelyCloudStoragePath,
   shouldAutoScanExactSizes,
   shouldQueueExactBackgroundScan,
   useBackgroundDirSizes,
@@ -151,6 +152,25 @@ describe("useBackgroundDirSizes", () => {
     expect(shouldAutoScanExactSizes("/Users/sam")).toBe(true);
   });
 
+  it("does not automatically exact-scan likely cloud storage paths", () => {
+    expect(isLikelyCloudStoragePath("G:\\내 드라이브")).toBe(true);
+    expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Google Drive")).toBe(true);
+    expect(isLikelyCloudStoragePath("/Users/sam/Library/CloudStorage/Dropbox")).toBe(true);
+    expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Projects")).toBe(false);
+
+    expect(shouldAutoScanExactSizes("G:\\내 드라이브")).toBe(false);
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("G:\\내 드라이브"),
+          size: 1024,
+          sizeStatus: "estimated",
+        },
+        false
+      )
+    ).toBe(false);
+  });
+
   it("does not promote partial estimates to automatic exact scans", () => {
     expect(
       shouldQueueExactBackgroundScan(
@@ -201,9 +221,30 @@ describe("useBackgroundDirSizes", () => {
       expect(props.updateEntrySize).toHaveBeenCalledWith(
         "left",
         "/Users/sam/Projects",
-        2048
+      2048
       )
     );
+  });
+
+  it("does not run an exact background scan for estimated cloud directories", async () => {
+    const props = makeProps({
+      currentPath: "C:\\Users\\sam",
+      files: [
+        {
+          ...makeDirectory("C:\\Users\\sam\\Google Drive"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockScanDirSize).not.toHaveBeenCalled();
   });
 
   it("revalidates stale cached directory sizes outside roots", async () => {
