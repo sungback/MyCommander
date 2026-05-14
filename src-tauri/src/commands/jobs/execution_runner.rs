@@ -57,11 +57,13 @@ async fn execute_move_job(
     context: &JobExecutionContext<'_>,
     source_paths: &[String],
     target_dir: &str,
+    overwrite: Option<bool>,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<JobResult, String> {
     fs_api::move_files_with_cancel_and_progress(
         source_paths.to_owned(),
         target_dir.to_string(),
+        overwrite,
         Some(cancel_flag),
         context.progress_emitter(),
     )
@@ -166,7 +168,8 @@ pub(super) async fn execute_job(
         JobSubmission::Move {
             source_paths,
             target_dir,
-        } => execute_move_job(&context, source_paths, target_dir, cancel_flag).await,
+            overwrite,
+        } => execute_move_job(&context, source_paths, target_dir, *overwrite, cancel_flag).await,
         JobSubmission::Delete { paths, permanent } => {
             execute_delete_job(&context, paths, *permanent, cancel_flag).await
         }

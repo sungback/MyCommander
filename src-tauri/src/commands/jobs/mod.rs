@@ -86,6 +86,7 @@ pub enum JobSubmission {
         source_paths: Vec<String>,
         #[serde(alias = "targetDir")]
         target_dir: String,
+        overwrite: Option<bool>,
     },
     Delete {
         paths: Vec<String>,

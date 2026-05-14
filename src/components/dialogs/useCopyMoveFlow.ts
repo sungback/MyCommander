@@ -116,6 +116,7 @@ export const useCopyMoveFlow = ({
           sourcePaths: paths,
           targetDir: targetPath,
           targetIsDirectory: isDirectoryMoveTarget(paths, targetPath),
+          overwrite,
         });
       } else {
         await submitCopyJob(fs, {

@@ -104,10 +104,15 @@ export const fileCommands = {
     });
   },
 
-  moveFiles: async (sourcePaths: string[], targetDir: string): Promise<void> => {
+  moveFiles: async (
+    sourcePaths: string[],
+    targetDir: string,
+    overwrite: boolean = false
+  ): Promise<void> => {
     await invoke("move_files", {
       source_paths: sourcePaths,
       target_dir: targetDir,
+      ...(overwrite ? { overwrite: true } : {}),
     });
   },
 

@@ -69,6 +69,21 @@ export const getAutomaticEstimateOptions = (currentPath: string) => {
 export const shouldAutoScanExactSizes = (currentPath: string) =>
   getAutomaticEstimateOptions(currentPath) !== ROOT_ESTIMATE_OPTIONS;
 
+export const shouldQueueExactBackgroundScan = (
+  entry: FileEntry,
+  isStale: boolean
+) => {
+  if (entry.kind !== "directory" || entry.name === "..") {
+    return false;
+  }
+
+  if (entry.sizeStatus === "partial") {
+    return false;
+  }
+
+  return entry.sizeStatus === "estimated" || isStale;
+};
+
 export const useBackgroundDirSizes = ({
   activeTabId,
   currentPath,
@@ -218,11 +233,7 @@ export const useBackgroundDirSizes = ({
     const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
     const pendingDirectories = files.filter(
       (entry) =>
-        entry.kind === "directory" &&
-        entry.name !== ".." &&
-        (entry.sizeStatus === "estimated" ||
-          entry.sizeStatus === "partial" ||
-          isStale(entry.path)) &&
+        shouldQueueExactBackgroundScan(entry, isStale(entry.path)) &&
         !scheduler.queuedExactPaths.has(entry.path) &&
         !scheduler.settledExactPaths.has(entry.path)
     );

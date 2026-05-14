@@ -13,7 +13,11 @@ export interface FileOperationJobClient {
 }
 
 export interface FileOperationMoveClient {
-  moveFiles: (sourcePaths: string[], targetDir: string) => Promise<void>;
+  moveFiles: (
+    sourcePaths: string[],
+    targetDir: string,
+    overwrite?: boolean
+  ) => Promise<void>;
 }
 
 export interface SubmitCopyJobArgs {
@@ -28,6 +32,7 @@ export interface SubmitMoveJobWithUndoArgs {
   sourcePaths: string[];
   targetDir: string;
   targetIsDirectory: boolean;
+  overwrite?: boolean;
 }
 
 export const getArchiveStem = (path: string) =>
@@ -82,11 +87,13 @@ export const submitMoveJobWithUndo = async ({
   sourcePaths,
   targetDir,
   targetIsDirectory,
+  overwrite,
 }: SubmitMoveJobWithUndoArgs) => {
   const job = await client.submitJob({
     kind: "move",
     sourcePaths,
     targetDir,
+    ...(overwrite ? { overwrite: true } : {}),
   });
 
   if (job?.id) {

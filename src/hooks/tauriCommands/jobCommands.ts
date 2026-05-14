@@ -13,6 +13,7 @@ type TauriJobSubmission =
       kind: "move";
       source_paths: string[];
       target_dir: string;
+      overwrite?: boolean;
     }
   | {
       kind: "delete";
@@ -45,6 +46,7 @@ const toTauriJobSubmission = (job: JobSubmission): TauriJobSubmission => {
         kind: "move",
         source_paths: job.sourcePaths,
         target_dir: job.targetDir,
+        ...(job.overwrite ? { overwrite: true } : {}),
       };
     case "delete":
       return {

@@ -138,6 +138,7 @@ fn restore_job_engine_state_marks_running_jobs_as_failed() {
             submission: JobSubmission::Move {
                 source_paths: vec!["/tmp/a".into()],
                 target_dir: "/tmp/b".into(),
+                overwrite: None,
             },
         }],
     };
@@ -211,6 +212,51 @@ fn build_retry_submission_skips_completed_copy_items() {
 }
 
 #[test]
+fn build_retry_submission_preserves_move_overwrite() {
+    let job = InternalJobRecord {
+        record: JobRecord {
+            id: "job-1".into(),
+            kind: JobKind::Move,
+            status: JobStatus::Failed,
+            created_at: 1,
+            updated_at: 2,
+            progress: JobProgress {
+                current: 1,
+                total: 3,
+                current_file: "b.txt".into(),
+                unit: "items".into(),
+            },
+            error: Some("Target path already exists".into()),
+            result: None,
+        },
+        submission: JobSubmission::Move {
+            source_paths: vec![
+                "/tmp/a.txt".into(),
+                "/tmp/b.txt".into(),
+                "/tmp/c.txt".into(),
+            ],
+            target_dir: "/dest".into(),
+            overwrite: Some(true),
+        },
+    };
+
+    let retry = build_retry_submission(&job).expect("retry submission");
+
+    match retry {
+        JobSubmission::Move {
+            source_paths,
+            target_dir,
+            overwrite,
+        } => {
+            assert_eq!(source_paths, vec!["/tmp/b.txt", "/tmp/c.txt"]);
+            assert_eq!(target_dir, "/dest");
+            assert_eq!(overwrite, Some(true));
+        }
+        other => panic!("unexpected retry submission: {other:?}"),
+    }
+}
+
+#[test]
 fn schedule_next_job_uses_tauri_runtime_spawn() {
     let source = include_str!("execution.rs");
 
@@ -245,6 +291,30 @@ fn job_submission_deserializes_camel_case_copy_fields() {
             assert_eq!(source_paths, vec!["/tmp/a.txt"]);
             assert_eq!(target_path, "/tmp/dest");
             assert_eq!(keep_both, Some(true));
+            assert_eq!(overwrite, Some(true));
+        }
+        other => panic!("unexpected submission: {other:?}"),
+    }
+}
+
+#[test]
+fn job_submission_deserializes_move_overwrite() {
+    let submission = serde_json::from_value::<JobSubmission>(serde_json::json!({
+        "kind": "move",
+        "sourcePaths": ["/tmp/a.txt"],
+        "targetDir": "/tmp/dest",
+        "overwrite": true,
+    }))
+    .expect("camelCase move payload should deserialize");
+
+    match submission {
+        JobSubmission::Move {
+            source_paths,
+            target_dir,
+            overwrite,
+        } => {
+            assert_eq!(source_paths, vec!["/tmp/a.txt"]);
+            assert_eq!(target_dir, "/tmp/dest");
             assert_eq!(overwrite, Some(true));
         }
         other => panic!("unexpected submission: {other:?}"),

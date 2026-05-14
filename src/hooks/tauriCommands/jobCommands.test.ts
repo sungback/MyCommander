@@ -98,6 +98,7 @@ describe("jobCommands", () => {
         kind: "move",
         sourcePaths: ["/a/file.txt"],
         targetDir: "/b/",
+        overwrite: true,
       });
 
       expect(mockInvoke).toHaveBeenCalledWith("submit_job", {
@@ -105,6 +106,7 @@ describe("jobCommands", () => {
           kind: "move",
           source_paths: ["/a/file.txt"],
           target_dir: "/b/",
+          overwrite: true,
         },
       });
     });

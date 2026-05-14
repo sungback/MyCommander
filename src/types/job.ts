@@ -44,6 +44,7 @@ export type JobSubmission =
       kind: "move";
       sourcePaths: string[];
       targetDir: string;
+      overwrite?: boolean;
     }
   | {
       kind: "delete";

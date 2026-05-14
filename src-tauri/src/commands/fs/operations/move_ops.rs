@@ -13,31 +13,41 @@ pub async fn move_files(
     app: tauri::AppHandle,
     source_paths: Vec<String>,
     target_dir: String,
+    overwrite: Option<bool>,
 ) -> Result<(), String> {
-    move_files_with_cancel(app, source_paths, target_dir, None).await
+    move_files_with_cancel(app, source_paths, target_dir, overwrite, None).await
 }
 
 pub async fn move_files_with_cancel(
     app: tauri::AppHandle,
     source_paths: Vec<String>,
     target_dir: String,
+    overwrite: Option<bool>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<(), String> {
-    move_files_with_cancel_and_progress(source_paths, target_dir, cancel_flag, move |payload| {
-        let _ = app.emit("fs-progress", payload);
-    })
+    move_files_with_cancel_and_progress(
+        source_paths,
+        target_dir,
+        overwrite,
+        cancel_flag,
+        move |payload| {
+            let _ = app.emit("fs-progress", payload);
+        },
+    )
     .await
 }
 
 pub async fn move_files_with_cancel_and_progress<F>(
     source_paths: Vec<String>,
     target_dir: String,
+    overwrite: Option<bool>,
     cancel_flag: Option<Arc<AtomicBool>>,
     emit_progress: F,
 ) -> Result<(), String>
 where
     F: Fn(ProgressPayload) + Send + 'static,
 {
+    let overwrite = overwrite.unwrap_or(false);
     let total = source_paths.len() as u64;
     let multiple_sources = source_paths.len() > 1;
 
@@ -52,9 +62,9 @@ where
         let file_name_str = file_name.to_string_lossy().to_string();
         let dest = resolve_move_destination(src, &target_dir, multiple_sources)?;
 
-        ensure_move_destination_valid(src, &dest, &file_name_str)?;
+        ensure_move_destination_valid(src, &dest, &file_name_str, overwrite)?;
 
-        move_path_to_destination(src, &dest, cancel_flag.as_deref())?;
+        move_path_to_destination(src, &dest, overwrite, cancel_flag.as_deref())?;
         emit_progress(ProgressPayload {
             operation: "move".to_string(),
             current: (index + 1) as u64,
@@ -69,14 +79,56 @@ where
 fn move_path_to_destination(
     source: &Path,
     destination: &Path,
+    overwrite: bool,
     cancel_flag: Option<&AtomicBool>,
 ) -> Result<(), String> {
+    if overwrite && destination.exists() {
+        return move_path_to_existing_destination(source, destination, cancel_flag);
+    }
+
     move_path_to_destination_with_rename(
         source,
         destination,
         |source, destination| fs::rename(source, destination),
         cancel_flag,
     )
+}
+
+fn move_path_to_existing_destination(
+    source: &Path,
+    destination: &Path,
+    cancel_flag: Option<&AtomicBool>,
+) -> Result<(), String> {
+    if is_operation_cancelled(cancel_flag) {
+        return Err("Operation cancelled.".to_string());
+    }
+
+    let backup_destination = get_temporary_move_path(destination)?;
+    fs::rename(destination, &backup_destination).map_err(|e| e.to_string())?;
+
+    match move_path_to_destination_with_rename(
+        source,
+        destination,
+        |source, destination| fs::rename(source, destination),
+        cancel_flag,
+    ) {
+        Ok(()) => {
+            remove_path(&backup_destination)?;
+            Ok(())
+        }
+        Err(move_error) => {
+            if !destination.exists() {
+                if let Err(restore_error) = fs::rename(&backup_destination, destination) {
+                    return Err(format!(
+                        "{move_error}; additionally failed to restore overwritten target: {restore_error}"
+                    ));
+                }
+            } else {
+                let _ = remove_path(&backup_destination);
+            }
+            Err(move_error)
+        }
+    }
 }
 
 pub(crate) fn move_path_to_destination_with_rename<F>(
@@ -174,6 +226,7 @@ fn ensure_move_destination_valid(
     source: &Path,
     destination: &Path,
     file_name_str: &str,
+    overwrite: bool,
 ) -> Result<(), String> {
     if source == destination {
         return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
@@ -186,10 +239,12 @@ fn ensure_move_destination_valid(
             return Err(format!("이미 같은 위치에 있습니다: {file_name_str}"));
         }
 
-        return Err(format!(
-            "Target path already exists: {}",
-            destination.display()
-        ));
+        if !overwrite {
+            return Err(format!(
+                "Target path already exists: {}",
+                destination.display()
+            ));
+        }
     }
 
     if source.is_dir() {

@@ -115,6 +115,16 @@ describe("fileCommands", () => {
         target_dir: "/dst",
       });
     });
+
+    it("passes overwrite only when requested", async () => {
+      mockInvoke.mockResolvedValue(undefined);
+      await fileCommands.moveFiles(["/src/a.txt"], "/dst/a.txt", true);
+      expect(mockInvoke).toHaveBeenCalledWith("move_files", {
+        source_paths: ["/src/a.txt"],
+        target_dir: "/dst/a.txt",
+        overwrite: true,
+      });
+    });
   });
 
   describe("checkCopyConflicts", () => {

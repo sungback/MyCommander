@@ -258,6 +258,21 @@ describe("useCopyMoveFlow", () => {
         expect.objectContaining({ kind: "copy", overwrite: true })
       );
     });
+
+    it("이동 conflictAction이 있으면 move job에도 overwrite=true를 전달한다", async () => {
+      mockResolveConflictAction.mockReturnValue({
+        isMove: true,
+        sourcePaths: ["/source/a.txt"],
+        targetPath: "/target",
+      });
+      const { result } = renderHook(() => useCopyMoveFlow(props));
+      await act(async () => {
+        await result.current.handleOverwriteAll();
+      });
+      expect(mockSubmitJob).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "move", overwrite: true })
+      );
+    });
   });
 
   describe("handleSkipExisting", () => {

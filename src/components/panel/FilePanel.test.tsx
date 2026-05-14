@@ -181,11 +181,12 @@ describe('FilePanel', () => {
 
     await waitFor(() => {
       const files = usePanelStore.getState().leftPanel.files;
-      expect(files.find((entry) => entry.name === "Documents")?.size).toBe(84);
-      expect(files.find((entry) => entry.name === "Documents")?.sizeStatus).toBe("exact");
-      expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(84);
-      expect(files.find((entry) => entry.name === "Downloads")?.sizeStatus).toBe("exact");
+      expect(files.find((entry) => entry.name === "Documents")?.size).toBe(42);
+      expect(files.find((entry) => entry.name === "Documents")?.sizeStatus).toBe("partial");
+      expect(files.find((entry) => entry.name === "Downloads")?.size).toBe(42);
+      expect(files.find((entry) => entry.name === "Downloads")?.sizeStatus).toBe("partial");
     });
+    expect(mockScanDirSize).not.toHaveBeenCalled();
   });
 
   it("retries with the resolved path when a symlinked folder load fails", async () => {

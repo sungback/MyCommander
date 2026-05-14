@@ -79,6 +79,32 @@ describe("fileOperationJobs", () => {
       });
   });
 
+  it("passes overwrite intent through move jobs", async () => {
+    const submitJob = vi.fn().mockResolvedValue({
+      id: "job-1",
+      kind: "move",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 1, currentFile: "", unit: "items" },
+    });
+
+    await submitMoveJobWithUndo({
+      client: { submitJob },
+      sourcePaths: ["/source/a.txt"],
+      targetDir: "/target",
+      targetIsDirectory: true,
+      overwrite: true,
+    });
+
+    expect(submitJob).toHaveBeenCalledWith({
+      kind: "move",
+      sourcePaths: ["/source/a.txt"],
+      targetDir: "/target",
+      overwrite: true,
+    });
+  });
+
   it("undoes file operations in reverse order and reports refresh directories", async () => {
     const operation = {
       id: "move-1",

@@ -25,6 +25,7 @@ async fn move_single_path_allows_target_file_path() {
         vec![source.to_string_lossy().to_string()],
         target.to_string_lossy().to_string(),
         None,
+        None,
         |_| {},
     )
     .await;
@@ -60,6 +61,7 @@ async fn move_multiple_paths_requires_existing_target_directory() {
         ],
         invalid_target.to_string_lossy().to_string(),
         None,
+        None,
         |_| {},
     )
     .await;
@@ -92,6 +94,7 @@ async fn move_single_path_rejects_existing_target_without_overwriting() {
         vec![source.to_string_lossy().to_string()],
         target.to_string_lossy().to_string(),
         None,
+        None,
         |_| {},
     )
     .await;
@@ -120,6 +123,7 @@ async fn move_into_directory_rejects_existing_child_without_overwriting() {
         vec![source.to_string_lossy().to_string()],
         target_dir.to_string_lossy().to_string(),
         None,
+        None,
         |_| {},
     )
     .await;
@@ -127,6 +131,38 @@ async fn move_into_directory_rejects_existing_child_without_overwriting() {
     assert!(result.is_err());
     assert_eq!(fs::read(&source).unwrap(), b"source");
     assert_eq!(fs::read(&target).unwrap(), b"target");
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[tokio::test]
+async fn move_single_path_overwrites_existing_target_when_requested() {
+    let tmp = create_test_dir("move_existing_target_with_overwrite");
+    let source_dir = tmp.join("source");
+    let target_dir = tmp.join("target");
+    fs::create_dir_all(&source_dir).unwrap();
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let source = source_dir.join("source.zip");
+    let target = target_dir.join("KeyboardFlag.zip");
+    fs::write(&source, b"source archive").unwrap();
+    fs::write(&target, b"old archive").unwrap();
+
+    let result = move_files_with_cancel_and_progress(
+        vec![source.to_string_lossy().to_string()],
+        target.to_string_lossy().to_string(),
+        Some(true),
+        None,
+        |_| {},
+    )
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "expected overwrite move to succeed: {result:?}"
+    );
+    assert!(!source.exists());
+    assert_eq!(fs::read(&target).unwrap(), b"source archive");
 
     let _ = fs::remove_dir_all(&tmp);
 }

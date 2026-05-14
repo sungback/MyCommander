@@ -4,6 +4,7 @@ import type { FileEntry } from "../../types/file";
 import {
   getAutomaticEstimateOptions,
   shouldAutoScanExactSizes,
+  shouldQueueExactBackgroundScan,
   useBackgroundDirSizes,
 } from "./useBackgroundDirSizes";
 
@@ -150,6 +151,29 @@ describe("useBackgroundDirSizes", () => {
     expect(shouldAutoScanExactSizes("/Users/sam")).toBe(true);
   });
 
+  it("does not promote partial estimates to automatic exact scans", () => {
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("C:\\Users\\sam\\AppData"),
+          size: 1024,
+          sizeStatus: "partial",
+        },
+        false
+      )
+    ).toBe(false);
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("C:\\Users\\sam\\anaconda3"),
+          size: 1024,
+          sizeStatus: "partial",
+        },
+        true
+      )
+    ).toBe(false);
+  });
+
   it("runs an exact background scan for estimated directories outside roots", async () => {
     const props = makeProps({
       currentPath: "/Users/sam",
@@ -229,7 +253,7 @@ describe("useBackgroundDirSizes", () => {
         {
           ...makeDirectory("/Users/sam/Projects"),
           size: 1024,
-          sizeStatus: "partial" as const,
+          sizeStatus: "estimated" as const,
         },
       ],
     });

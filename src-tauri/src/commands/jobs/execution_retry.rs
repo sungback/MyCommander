@@ -36,9 +36,11 @@ pub(crate) fn build_retry_submission(job: &InternalJobRecord) -> Result<JobSubmi
         JobSubmission::Move {
             source_paths,
             target_dir,
+            overwrite,
         } => Ok(JobSubmission::Move {
             source_paths: remaining_items_after_progress(source_paths, completed_items)?,
             target_dir: target_dir.clone(),
+            overwrite: *overwrite,
         }),
         JobSubmission::Delete { paths, permanent } => Ok(JobSubmission::Delete {
             paths: remaining_items_after_progress(paths, completed_items)?,
