@@ -4,6 +4,7 @@ import type { FileEntry } from "../../types/file";
 import {
   getAutomaticEstimateOptions,
   isLikelyCloudStoragePath,
+  isLikelyVolatileAutoScanPath,
   shouldAutoScanExactSizes,
   shouldQueueExactBackgroundScan,
   useBackgroundDirSizes,
@@ -171,7 +172,13 @@ describe("useBackgroundDirSizes", () => {
     ).toBe(false);
   });
 
-  it("promotes partial estimates to automatic exact scans for local directories", () => {
+  it("does not automatically exact-scan volatile Windows profile paths", () => {
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\AppData")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("C:/Users/sam/AppData/Local")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\AppData\\Local")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("/Users/sam/AppData/Local")).toBe(false);
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\ApplicationData")).toBe(false);
+    expect(shouldAutoScanExactSizes("C:\\Users\\sam\\AppData")).toBe(false);
     expect(
       shouldQueueExactBackgroundScan(
         {
@@ -181,7 +188,10 @@ describe("useBackgroundDirSizes", () => {
         },
         false
       )
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("promotes partial estimates to automatic exact scans for stable local directories", () => {
     expect(
       shouldQueueExactBackgroundScan(
         {

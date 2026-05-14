@@ -99,6 +99,10 @@ fn emit_filesystem_changed(app: &AppHandle, event: Event) {
 }
 
 fn should_ignore_noisy_metadata_event_path(path: &Path, event_kind: &EventKind) -> bool {
+    if is_windows_app_data_descendant(path) {
+        return true;
+    }
+
     if is_vcs_metadata_descendant(path) {
         return true;
     }
@@ -127,6 +131,27 @@ fn is_vcs_metadata_directory(path: &Path) -> bool {
 
 fn is_vcs_metadata_name(name: &std::ffi::OsStr) -> bool {
     name.to_string_lossy().eq_ignore_ascii_case(".git")
+}
+
+fn is_windows_app_data_descendant(path: &Path) -> bool {
+    let raw_path = path.to_string_lossy();
+    let is_windows_like_path =
+        raw_path.contains('\\') || raw_path.as_bytes().get(1).is_some_and(|byte| *byte == b':');
+
+    if !is_windows_like_path {
+        return false;
+    }
+
+    let normalized = raw_path.replace('\\', "/");
+    let components: Vec<&str> = normalized
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
+
+    components
+        .iter()
+        .position(|component| component.eq_ignore_ascii_case("AppData"))
+        .is_some_and(|index| index + 1 < components.len())
 }
 
 fn collect_watchable_paths(paths: Vec<String>) -> HashSet<PathBuf> {
@@ -262,6 +287,34 @@ mod tests {
         assert!(!should_ignore_noisy_metadata_event_path(
             &git_dir,
             &EventKind::Remove(RemoveKind::Folder)
+        ));
+    }
+
+    #[test]
+    fn noisy_metadata_filter_ignores_windows_app_data_descendants() {
+        let app_data = PathBuf::from(r"C:\Users\sam\AppData");
+        let app_data_child = PathBuf::from(r"C:\Users\sam\AppData\Local\Temp\cache.bin");
+        let app_data_child_with_slashes = PathBuf::from(r"C:/Users/sam/AppData/Local/cache.bin");
+        let unix_app_data_child = PathBuf::from("/Users/sam/AppData/Local/cache.bin");
+        let similarly_named_dir = PathBuf::from(r"C:\Users\sam\AppDataBackup\cache.bin");
+        let modify = EventKind::Modify(ModifyKind::Data(DataChange::Any));
+
+        assert!(!should_ignore_noisy_metadata_event_path(&app_data, &modify));
+        assert!(should_ignore_noisy_metadata_event_path(
+            &app_data_child,
+            &modify
+        ));
+        assert!(should_ignore_noisy_metadata_event_path(
+            &app_data_child_with_slashes,
+            &modify
+        ));
+        assert!(!should_ignore_noisy_metadata_event_path(
+            &unix_app_data_child,
+            &modify
+        ));
+        assert!(!should_ignore_noisy_metadata_event_path(
+            &similarly_named_dir,
+            &modify
         ));
     }
 }

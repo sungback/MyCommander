@@ -21,6 +21,9 @@ const CLOUD_STORAGE_PATH_MARKERS = [
   "공유 드라이브",
   "내 드라이브",
 ];
+const VOLATILE_AUTO_SCAN_PATH_COMPONENTS = [
+  "appdata",
+];
 
 interface BackgroundSizeScheduler {
   activeCount: number;
@@ -100,9 +103,26 @@ export const isLikelyCloudStoragePath = (path: string) => {
   );
 };
 
+export const isLikelyVolatileAutoScanPath = (path: string) => {
+  if (!path.includes("\\") && !/^[A-Za-z]:[\\/]/.test(path)) {
+    return false;
+  }
+
+  const components = path
+    .replace(/[\\/]+/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .map((component) => component.toLowerCase());
+
+  return VOLATILE_AUTO_SCAN_PATH_COMPONENTS.some((component) =>
+    components.includes(component)
+  );
+};
+
 export const shouldAutoScanExactSizes = (currentPath: string) =>
   getAutomaticEstimateOptions(currentPath) !== ROOT_ESTIMATE_OPTIONS &&
-  !isLikelyCloudStoragePath(currentPath);
+  !isLikelyCloudStoragePath(currentPath) &&
+  !isLikelyVolatileAutoScanPath(currentPath);
 
 export const shouldQueueExactBackgroundScan = (
   entry: FileEntry,
@@ -113,6 +133,10 @@ export const shouldQueueExactBackgroundScan = (
   }
 
   if (isLikelyCloudStoragePath(entry.path)) {
+    return false;
+  }
+
+  if (isLikelyVolatileAutoScanPath(entry.path)) {
     return false;
   }
 
