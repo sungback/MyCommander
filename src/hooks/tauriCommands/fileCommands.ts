@@ -87,7 +87,11 @@ export const fileCommands = {
   },
 
   deleteFiles: async (paths: string[], permanent: boolean = false): Promise<void> => {
-    await invoke("delete_files", { paths, permanent });
+    await invoke("delete_files", {
+      paths,
+      permanent,
+      confirmed_path_count: permanent ? paths.length : undefined,
+    });
   },
 
   copyFiles: async (

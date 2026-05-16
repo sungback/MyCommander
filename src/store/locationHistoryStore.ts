@@ -18,6 +18,7 @@ interface LocationHistoryState {
 
 const LOCATION_HISTORY_STORAGE_KEY = "total-commander:location-history";
 const MAX_LOCATION_HISTORY_ENTRIES = 50;
+const MAX_ENTRY_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const getLocationName = (path: string) => getPathDisplayName(path);
 
@@ -59,8 +60,10 @@ const readLocations = (): LocationHistoryEntry[] => {
       return [];
     }
 
+    const now = Date.now();
     return parsed
       .filter(isLocationHistoryEntry)
+      .filter((entry) => now - entry.lastVisited < MAX_ENTRY_AGE_MS)
       .sort((left, right) => right.lastVisited - left.lastVisited)
       .slice(0, MAX_LOCATION_HISTORY_ENTRIES);
   } catch {
@@ -119,7 +122,10 @@ export const useLocationHistoryStore = create<LocationHistoryState>((set) => ({
       const normalizedPath = normalizeLocationPath(trimmedPath);
       const now = Date.now();
       const nextEntryName = name?.trim() || getLocationName(trimmedPath);
-      const existing = state.locations.find(
+      const fresh = state.locations.filter(
+        (entry) => now - entry.lastVisited < MAX_ENTRY_AGE_MS
+      );
+      const existing = fresh.find(
         (entry) => normalizeLocationPath(entry.path) === normalizedPath
       );
 
@@ -130,7 +136,7 @@ export const useLocationHistoryStore = create<LocationHistoryState>((set) => ({
           lastVisited: now,
           visitCount: (existing?.visitCount ?? 0) + 1,
         },
-        ...state.locations.filter(
+        ...fresh.filter(
           (entry) => normalizeLocationPath(entry.path) !== normalizedPath
         ),
       ]).slice(0, MAX_LOCATION_HISTORY_ENTRIES);

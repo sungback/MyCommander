@@ -4,6 +4,7 @@ pub(crate) mod move_ops;
 mod path_utils;
 pub(crate) mod rename;
 
+use crate::commands::fs::shared::validate_fs_path;
 use std::fs;
 
 pub(crate) use copy::copy_files_with_cancel_and_progress;
@@ -22,6 +23,7 @@ pub(crate) use rename::{create_file, rename_file};
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_directory(path: String) -> Result<(), String> {
+    validate_fs_path(&path)?;
     fs::create_dir_all(&path).map_err(|e| e.to_string())
 }
 

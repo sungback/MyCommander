@@ -147,6 +147,7 @@ describe('useFileSystem', () => {
       expect(mockInvoke).toHaveBeenCalledWith('delete_files', {
         paths: ['/home/user/file.txt'],
         permanent: true,
+        confirmed_path_count: 1,
       });
     });
 

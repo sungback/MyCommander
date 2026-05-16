@@ -77,6 +77,7 @@ describe("fileCommands", () => {
       expect(mockInvoke).toHaveBeenCalledWith("delete_files", {
         paths: ["/a.txt"],
         permanent: true,
+        confirmed_path_count: 1,
       });
     });
   });

@@ -126,6 +126,7 @@ describe("jobCommands", () => {
           kind: "delete",
           paths: ["/a/file.txt"],
           permanent: true,
+          confirmed_path_count: 1,
         },
       });
     });

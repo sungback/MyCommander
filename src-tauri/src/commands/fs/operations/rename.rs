@@ -1,3 +1,4 @@
+use crate::commands::fs::shared::{validate_fs_path, validate_fs_paths};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
@@ -20,11 +21,14 @@ struct PreparedBatchRenameOperation {
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_file(path: String) -> Result<(), String> {
+    validate_fs_path(&path)?;
     create_new_file(Path::new(&path))
 }
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    validate_fs_path(&old_path)?;
+    validate_fs_path(&new_path)?;
     let old_path = PathBuf::from(old_path);
     let new_path = PathBuf::from(new_path);
 
@@ -35,6 +39,11 @@ pub async fn rename_file(old_path: String, new_path: String) -> Result<(), Strin
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn apply_batch_rename(operations: Vec<BatchRenameOperation>) -> Result<(), String> {
+    let all_paths: Vec<String> = operations
+        .iter()
+        .flat_map(|op| [op.old_path.clone(), op.new_path.clone()])
+        .collect();
+    validate_fs_paths(&all_paths)?;
     tokio::task::spawn_blocking(move || apply_batch_rename_operations(operations))
         .await
         .map_err(|e| e.to_string())?

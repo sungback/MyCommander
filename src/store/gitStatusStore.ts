@@ -25,6 +25,7 @@ interface GitStatusStore {
   getCachedStatus: (path: string, ttlMs?: number) => GitStatusCacheResult;
   getStatus: (path: string, ttlMs?: number) => GitStatus | null;
   setFailure: (path: string) => void;
+  clearFailure: (path: string) => void;
   hasFreshFailure: (path: string, ttlMs?: number) => boolean;
   setInFlight: (path: string, request: Promise<GitStatus | null>) => void;
   getInFlight: (path: string) => Promise<GitStatus | null> | null;
@@ -73,6 +74,13 @@ export const useGitStatusStore = create<GitStatusStore>((set, get) => ({
   setFailure: (path: string) => {
     const { failures } = get();
     failures.set(path, Date.now());
+    set({ failures: new Map(failures) });
+  },
+
+  clearFailure: (path: string) => {
+    const { failures } = get();
+    if (!failures.has(path)) return;
+    failures.delete(path);
     set({ failures: new Map(failures) });
   },
 

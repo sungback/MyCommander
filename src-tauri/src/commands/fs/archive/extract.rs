@@ -23,6 +23,11 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
 
     fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
+    if let Err(e) = validate_zip_entry_paths(archive_path) {
+        let _ = fs::remove_dir_all(&target_dir);
+        return Err(e);
+    }
+
     #[cfg(target_os = "macos")]
     {
         let ditto_output = Command::new("ditto")
@@ -174,5 +179,22 @@ fn move_directory_contents(source_dir: &Path, target_dir: &Path) -> Result<(), S
         fs::rename(entry.path(), destination).map_err(|e| e.to_string())?;
     }
 
+    Ok(())
+}
+
+fn validate_zip_entry_paths(archive_path: &Path) -> Result<(), String> {
+    let file = fs::File::open(archive_path).map_err(|e| e.to_string())?;
+    let mut zip = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Failed to open archive for validation: {e}"))?;
+
+    for i in 0..zip.len() {
+        let entry = zip.by_index(i).map_err(|e| e.to_string())?;
+        if entry.enclosed_name().is_none() {
+            return Err(format!(
+                "Archive contains unsafe path entry: {}",
+                entry.name()
+            ));
+        }
+    }
     Ok(())
 }

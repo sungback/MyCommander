@@ -42,10 +42,19 @@ pub(crate) fn build_retry_submission(job: &InternalJobRecord) -> Result<JobSubmi
             target_dir: target_dir.clone(),
             overwrite: *overwrite,
         }),
-        JobSubmission::Delete { paths, permanent } => Ok(JobSubmission::Delete {
-            paths: remaining_items_after_progress(paths, completed_items)?,
-            permanent: *permanent,
-        }),
+        JobSubmission::Delete {
+            paths,
+            permanent,
+            confirmed_path_count,
+        } => {
+            let remaining = remaining_items_after_progress(paths, completed_items)?;
+            let count = remaining.len();
+            Ok(JobSubmission::Delete {
+                paths: remaining,
+                permanent: *permanent,
+                confirmed_path_count: confirmed_path_count.map(|_| count),
+            })
+        }
         JobSubmission::ZipDirectory { path } => {
             Ok(JobSubmission::ZipDirectory { path: path.clone() })
         }

@@ -81,3 +81,27 @@ pub(crate) fn indicates_invalid_zip_message(message: &str) -> bool {
 pub(crate) fn is_operation_cancelled(cancel_flag: Option<&AtomicBool>) -> bool {
     cancel_flag.is_some_and(|flag| flag.load(Ordering::SeqCst))
 }
+
+pub(crate) fn validate_fs_path(path: &str) -> Result<(), String> {
+    if path.contains('\0') {
+        return Err(format!("Path contains null byte: {path:?}"));
+    }
+    let p = std::path::Path::new(path);
+    if !p.is_absolute() {
+        return Err(format!("Path must be absolute: {path:?}"));
+    }
+    use std::path::Component;
+    for component in p.components() {
+        if component == Component::ParentDir {
+            return Err(format!("Path must not contain '..' traversal: {path:?}"));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_fs_paths(paths: &[String]) -> Result<(), String> {
+    for path in paths {
+        validate_fs_path(path)?;
+    }
+    Ok(())
+}

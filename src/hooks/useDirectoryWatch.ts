@@ -6,6 +6,7 @@ import {
   refreshPanelsForEntryPaths,
 } from "../store/panelRefresh";
 import { collectWatchDirectories } from "../store/panelWatch";
+import { useGitStatusStore } from "../store/gitStatusStore";
 import { useFileSystem } from "./useFileSystem";
 import { getPathDirectoryName, normalizePathForComparison } from "../utils/path";
 
@@ -86,6 +87,11 @@ export const useDirectoryWatch = () => {
         const directories = Array.from(pendingDirectories);
         pendingPaths.clear();
         pendingDirectories.clear();
+
+        const { clearFailure } = useGitStatusStore.getState();
+        for (const dir of directories) {
+          clearFailure(dir);
+        }
 
         if (paths.length > 0) {
           refreshPanelsForEntryPaths(paths, "filesystem-changed");

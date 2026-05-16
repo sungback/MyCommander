@@ -1,4 +1,4 @@
-use crate::commands::fs::shared::{is_operation_cancelled, ProgressPayload};
+use crate::commands::fs::shared::{is_operation_cancelled, validate_fs_paths, ProgressPayload};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -13,7 +13,21 @@ pub async fn delete_files(
     app: tauri::AppHandle,
     paths: Vec<String>,
     permanent: bool,
+    confirmed_path_count: Option<usize>,
 ) -> Result<(), String> {
+    validate_fs_paths(&paths)?;
+    if permanent {
+        match confirmed_path_count {
+            Some(count) if count == paths.len() => {}
+            _ => {
+                return Err(format!(
+                    "Permanent deletion requires confirmed_path_count={}, got {:?}",
+                    paths.len(),
+                    confirmed_path_count
+                ))
+            }
+        }
+    }
     delete_files_with_cancel(app, paths, permanent, None).await
 }
 

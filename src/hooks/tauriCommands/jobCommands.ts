@@ -19,6 +19,7 @@ type TauriJobSubmission =
       kind: "delete";
       paths: string[];
       permanent?: boolean;
+      confirmed_path_count?: number;
     }
   | {
       kind: "zipDirectory";
@@ -53,6 +54,7 @@ const toTauriJobSubmission = (job: JobSubmission): TauriJobSubmission => {
         kind: "delete",
         paths: job.paths,
         permanent: job.permanent,
+        confirmed_path_count: job.permanent ? job.paths.length : undefined,
       };
     case "zipDirectory":
       return {

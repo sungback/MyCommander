@@ -4,6 +4,10 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
+use tokio::sync::mpsc;
+use tokio::time::Duration;
+
+const DEBOUNCE_DURATION: Duration = Duration::from_millis(200);
 
 #[derive(Default)]
 pub struct FileWatcherState {
@@ -14,6 +18,7 @@ pub struct FileWatcherState {
 struct FileWatcherManager {
     watcher: Option<RecommendedWatcher>,
     watched_paths: HashSet<PathBuf>,
+    _event_tx: Option<mpsc::UnboundedSender<Event>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -36,7 +41,9 @@ pub fn sync_watched_directories(
         .map_err(|_| "Failed to lock file watcher state".to_string())?;
 
     if manager.watcher.is_none() {
-        manager.watcher = Some(build_watcher(app)?);
+        let (watcher, tx) = build_watcher(app)?;
+        manager.watcher = Some(watcher);
+        manager._event_tx = Some(tx);
     }
 
     let currently_watched = manager.watched_paths.clone();
@@ -70,25 +77,61 @@ pub fn sync_watched_directories(
     Ok(())
 }
 
-fn build_watcher(app: AppHandle) -> Result<RecommendedWatcher, String> {
-    notify::recommended_watcher(move |event: notify::Result<Event>| match event {
-        Ok(event) => emit_filesystem_changed(&app, event),
+fn build_watcher(
+    app: AppHandle,
+) -> Result<(RecommendedWatcher, mpsc::UnboundedSender<Event>), String> {
+    let (tx, rx) = mpsc::unbounded_channel::<Event>();
+
+    tauri::async_runtime::spawn(run_debounce_task(app, rx));
+
+    let tx_clone = tx.clone();
+    let watcher = notify::recommended_watcher(move |event: notify::Result<Event>| match event {
+        Ok(event) if !matches!(event.kind, EventKind::Access(_)) => {
+            let _ = tx_clone.send(event);
+        }
         Err(error) => eprintln!("file watcher error: {error}"),
+        _ => {}
     })
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string())?;
+
+    Ok((watcher, tx))
 }
 
-fn emit_filesystem_changed(app: &AppHandle, event: Event) {
-    if matches!(event.kind, EventKind::Access(_)) {
-        return;
-    }
+async fn run_debounce_task(app: AppHandle, mut rx: mpsc::UnboundedReceiver<Event>) {
+    let mut pending: Vec<Event> = Vec::new();
 
-    let filtered_paths: Vec<PathBuf> = event
-        .paths
-        .iter()
-        .filter(|path| !should_ignore_noisy_metadata_event_path(path, &event.kind))
-        .cloned()
+    loop {
+        match rx.recv().await {
+            None => break,
+            Some(event) => pending.push(event),
+        }
+
+        loop {
+            match tokio::time::timeout(DEBOUNCE_DURATION, rx.recv()).await {
+                Ok(Some(event)) => pending.push(event),
+                Ok(None) => {
+                    emit_batched_events(&app, std::mem::take(&mut pending));
+                    return;
+                }
+                Err(_) => break,
+            }
+        }
+
+        emit_batched_events(&app, std::mem::take(&mut pending));
+    }
+}
+
+fn emit_batched_events(app: &AppHandle, events: Vec<Event>) {
+    let filtered_paths: Vec<PathBuf> = events
+        .into_iter()
+        .flat_map(|e| {
+            let kind = e.kind.clone();
+            e.paths.into_iter().map(move |p| (p, kind.clone()))
+        })
+        .filter(|(path, kind)| !should_ignore_noisy_metadata_event_path(path, kind))
+        .map(|(path, _)| path)
         .collect();
+
     let (directories, paths) = collect_changed_directories_and_paths(&filtered_paths);
     if directories.is_empty() && paths.is_empty() {
         return;

@@ -91,6 +91,8 @@ pub enum JobSubmission {
     Delete {
         paths: Vec<String>,
         permanent: Option<bool>,
+        #[serde(alias = "confirmedPathCount")]
+        confirmed_path_count: Option<usize>,
     },
     ZipDirectory {
         path: String,

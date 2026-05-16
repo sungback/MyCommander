@@ -9,6 +9,10 @@ pub(super) fn run_shell_command_for_path(path: &Path, command: &str) -> Result<(
         return Err("Command is empty".to_string());
     }
 
+    if command.contains(['\n', '\r', '\0']) {
+        return Err("Command must not contain control characters".to_string());
+    }
+
     #[cfg(target_os = "macos")]
     {
         let shell_path = shell_escape_single_quotes(&working_directory.to_string_lossy());
@@ -34,7 +38,8 @@ pub(super) fn run_shell_command_for_path(path: &Path, command: &str) -> Result<(
     #[cfg(target_os = "windows")]
     {
         let cwd = working_directory.to_string_lossy().replace('"', "\"\"");
-        let cmdline = format!("cd /d \"{}\" && {}", cwd, command);
+        let escaped_command = escape_cmd_command(command);
+        let cmdline = format!("cd /d \"{}\" && {}", cwd, escaped_command);
 
         Command::new("cmd")
             .args(["/C", "start", "", "cmd.exe", "/K", &cmdline])
@@ -89,4 +94,9 @@ fn shell_escape_single_quotes(value: &str) -> String {
 #[cfg(target_os = "macos")]
 fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+#[cfg(target_os = "windows")]
+fn escape_cmd_command(value: &str) -> String {
+    value.replace('^', "^^").replace('"', "^\"")
 }

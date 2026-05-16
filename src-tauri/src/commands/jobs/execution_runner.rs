@@ -81,11 +81,25 @@ async fn execute_delete_job(
     context: &JobExecutionContext<'_>,
     paths: &[String],
     permanent: Option<bool>,
+    confirmed_path_count: Option<usize>,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<JobResult, String> {
+    let is_permanent = permanent.unwrap_or(false);
+    if is_permanent {
+        match confirmed_path_count {
+            Some(count) if count == paths.len() => {}
+            _ => {
+                return Err(format!(
+                    "Permanent deletion requires confirmed_path_count={}, got {:?}",
+                    paths.len(),
+                    confirmed_path_count
+                ))
+            }
+        }
+    }
     fs_api::delete_files_with_cancel_and_progress(
         paths.to_owned(),
-        permanent.unwrap_or(false),
+        is_permanent,
         Some(cancel_flag),
         context.progress_emitter(),
     )
@@ -170,9 +184,11 @@ pub(super) async fn execute_job(
             target_dir,
             overwrite,
         } => execute_move_job(&context, source_paths, target_dir, *overwrite, cancel_flag).await,
-        JobSubmission::Delete { paths, permanent } => {
-            execute_delete_job(&context, paths, *permanent, cancel_flag).await
-        }
+        JobSubmission::Delete {
+            paths,
+            permanent,
+            confirmed_path_count,
+        } => execute_delete_job(&context, paths, *permanent, *confirmed_path_count, cancel_flag).await,
         JobSubmission::ZipDirectory { path } => {
             execute_zip_directory_job(app, path, cancel_flag).await
         }

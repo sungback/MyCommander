@@ -44,6 +44,7 @@ fn clear_finished_jobs_keeps_only_active_queue_entries() {
             submission: JobSubmission::Delete {
                 paths: vec!["/tmp/a".into()],
                 permanent: None,
+                confirmed_path_count: None,
             },
         },
     );
@@ -99,6 +100,7 @@ fn persisted_snapshot_roundtrips_and_requeues_queued_jobs() {
             submission: JobSubmission::Delete {
                 paths: vec!["/tmp/a".into()],
                 permanent: None,
+                confirmed_path_count: None,
             },
         },
     );
