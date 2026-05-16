@@ -125,8 +125,8 @@ fn emit_batched_events(app: &AppHandle, events: Vec<Event>) {
     let filtered_paths: Vec<PathBuf> = events
         .into_iter()
         .flat_map(|e| {
-            let kind = e.kind.clone();
-            e.paths.into_iter().map(move |p| (p, kind.clone()))
+            let kind = e.kind;
+            e.paths.into_iter().map(move |p| (p, kind))
         })
         .filter(|(path, kind)| !should_ignore_noisy_metadata_event_path(path, kind))
         .map(|(path, _)| path)
