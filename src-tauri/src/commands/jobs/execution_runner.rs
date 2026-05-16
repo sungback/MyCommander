@@ -188,7 +188,16 @@ pub(super) async fn execute_job(
             paths,
             permanent,
             confirmed_path_count,
-        } => execute_delete_job(&context, paths, *permanent, *confirmed_path_count, cancel_flag).await,
+        } => {
+            execute_delete_job(
+                &context,
+                paths,
+                *permanent,
+                *confirmed_path_count,
+                cancel_flag,
+            )
+            .await
+        }
         JobSubmission::ZipDirectory { path } => {
             execute_zip_directory_job(app, path, cancel_flag).await
         }
