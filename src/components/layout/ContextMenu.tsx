@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { calculatePanelDirectories } from "../../hooks/keyboardShortcuts";
+import { calculatePanelDirectories } from "../../hooks/calculatePanelDirectories";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";

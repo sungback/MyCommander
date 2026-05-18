@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { calculatePanelDirectories, createKeyboardHandler } from './keyboardShortcuts';
+import { calculatePanelDirectories } from './calculatePanelDirectories';
+import { createKeyboardHandler } from './keyboardShortcuts';
 import type { KeyboardHandlerDependencies } from './keyboardShortcuts';
 import type { PanelState } from '../types/file';
 

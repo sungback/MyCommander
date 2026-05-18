@@ -1,4 +1,4 @@
-#[path = "metadata/dir_size.rs"]
+#[path = "metadata/dir_size/mod.rs"]
 mod dir_size;
 #[path = "metadata/listing.rs"]
 mod listing;
