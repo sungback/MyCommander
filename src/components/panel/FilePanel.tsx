@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -13,6 +13,7 @@ import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveE
 import type { FileEntry } from "../../types/file";
 import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
 import { useDirectoryLoader } from "./useDirectoryLoader";
+import { FileListSkeleton } from "./FileListSkeleton";
 import { usePanelContextMenu } from "./usePanelContextMenu";
 import { QuickFilterBar } from "./QuickFilterBar";
 import {
@@ -28,6 +29,9 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const [quickFilterQuery, setQuickFilterQuery] = useState("");
+  const [isDirLoading, setIsDirLoading] = useState(true);
+  const onLoadStart = useCallback(() => setIsDirLoading(true), []);
+  const onLoadEnd = useCallback(() => setIsDirLoading(false), []);
   const panelState = usePanelStore((s) => id === "left" ? s.leftPanel : s.rightPanel);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
@@ -116,6 +120,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
     setPath,
     setResolvedPath,
     showHiddenFiles,
+    onLoadStart,
+    onLoadEnd,
   });
 
   useBackgroundDirSizes({
@@ -257,21 +263,25 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           onSort={(field) => usePanelStore.getState().setSort(id, field)}
         />
       ) : null}
-      <FileList
-        currentPath={panelState.currentPath}
-        accessPath={getPanelAccessPath(panelState)}
-        files={filteredFiles}
-        selectedItems={panelState.selectedItems}
-        cursorIndex={panelState.cursorIndex}
-        isActivePanel={isActive}
-        panelId={id}
-        viewMode={viewMode}
-        emptyMessage={isQuickFilterActive ? "일치하는 항목 없음" : undefined}
-        onOpenFilter={focusQuickFilter}
-        onSelect={(path, _toggle) => toggleSelection(id, path)}
-        onEnter={handleEnter}
-        setCursorIndex={(idx) => setCursor(id, idx)}
-      />
+      {isDirLoading && panelState.files.length === 0 ? (
+        <FileListSkeleton />
+      ) : (
+        <FileList
+          currentPath={panelState.currentPath}
+          accessPath={getPanelAccessPath(panelState)}
+          files={filteredFiles}
+          selectedItems={panelState.selectedItems}
+          cursorIndex={panelState.cursorIndex}
+          isActivePanel={isActive}
+          panelId={id}
+          viewMode={viewMode}
+          emptyMessage={isQuickFilterActive ? "일치하는 항목 없음" : undefined}
+          onOpenFilter={focusQuickFilter}
+          onSelect={(path, _toggle) => toggleSelection(id, path)}
+          onEnter={handleEnter}
+          setCursorIndex={(idx) => setCursor(id, idx)}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DirectorySizeStatus, FileEntry, PanelId } from "../../types/file";
 import type { DirectorySizeEstimate } from "../../hooks/tauriCommands/fileCommands";
+import { showTransientToast } from "../../store/toastStore";
 
 interface UseExpandedDirectoriesProps {
   currentPath: string;
@@ -180,6 +181,10 @@ export const useExpandedDirectories = ({
         });
       } catch (error) {
         console.error(`Failed to preview child entries for ${entry.path}:`, error);
+        showTransientToast(`폴더를 열 수 없습니다: ${entry.name}`, {
+          tone: "error",
+          durationMs: 2500,
+        });
         return;
       }
     }

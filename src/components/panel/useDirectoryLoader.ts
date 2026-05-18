@@ -11,6 +11,8 @@ interface UseDirectoryLoaderProps {
   setPath: (panel: PanelId, path: string, pendingCursorName?: string) => void;
   setResolvedPath: (panel: PanelId, path: string) => void;
   showHiddenFiles: boolean;
+  onLoadStart?: () => void;
+  onLoadEnd?: () => void;
 }
 
 const getLeafName = (path: string) =>
@@ -25,6 +27,8 @@ export const useDirectoryLoader = ({
   setPath,
   setResolvedPath,
   showHiddenFiles,
+  onLoadStart,
+  onLoadEnd,
 }: UseDirectoryLoaderProps) => {
   const fs = useFileSystem();
   const lastLoadedPathRef = useRef<string | null>(null);
@@ -33,6 +37,8 @@ export const useDirectoryLoader = ({
   useEffect(() => {
     let cancelled = false;
     let activePath = currentPath;
+
+    onLoadStart?.();
 
     const commitLoadedEntries = (
       path: string,
@@ -50,6 +56,7 @@ export const useDirectoryLoader = ({
       setFiles(panelId, entries);
       lastLoadedPathRef.current = path;
       lastResolvedPathRef.current = resolvedPath;
+      onLoadEnd?.();
     };
 
     const loadDir = async () => {
@@ -68,6 +75,7 @@ export const useDirectoryLoader = ({
           return;
         }
         console.error("Failed loading dir: ", error);
+        onLoadEnd?.();
 
         const previousPath = lastLoadedPathRef.current;
         const previousResolvedPath = lastResolvedPathRef.current;
@@ -92,6 +100,8 @@ export const useDirectoryLoader = ({
     currentPath,
     fs,
     lastUpdated,
+    onLoadEnd,
+    onLoadStart,
     panelId,
     setFiles,
     setPath,

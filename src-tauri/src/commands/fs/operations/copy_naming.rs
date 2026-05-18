@@ -1,4 +1,13 @@
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+static COPY_N_RE: OnceLock<regex::Regex> = OnceLock::new();
+
+fn copy_n_re() -> &'static regex::Regex {
+    COPY_N_RE.get_or_init(|| {
+        regex::Regex::new(r"^(.*) copy(?: (\d+))?$").expect("hardcoded regex is valid")
+    })
+}
 
 pub(super) fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
     let file_name = source
@@ -25,8 +34,7 @@ pub(super) fn make_copy_name(source: &Path, target_dir: &Path) -> PathBuf {
     };
 
     let base_stem = {
-        let copy_n_re = regex::Regex::new(r"^(.*) copy(?: (\d+))?$").unwrap();
-        if let Some(caps) = copy_n_re.captures(&stem) {
+        if let Some(caps) = copy_n_re().captures(&stem) {
             caps.get(1)
                 .map(|m| m.as_str().to_string())
                 .unwrap_or(stem.clone())
