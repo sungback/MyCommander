@@ -23,15 +23,23 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
 
     fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
+    let pre_meta = fs::metadata(archive_path).map_err(|e| e.to_string())?;
     if let Err(e) = validate_zip_entry_paths(archive_path) {
         let _ = fs::remove_dir_all(&target_dir);
         return Err(e);
+    }
+    let post_meta = fs::metadata(archive_path).map_err(|e| e.to_string())?;
+    if pre_meta.len() != post_meta.len()
+        || pre_meta.modified().ok() != post_meta.modified().ok()
+    {
+        let _ = fs::remove_dir_all(&target_dir);
+        return Err("Archive was modified during security validation".to_string());
     }
 
     #[cfg(target_os = "macos")]
     {
         let ditto_output = Command::new("ditto")
-            .args(["-x", "-k"])
+            .args(["-x", "-k", "--"])
             .arg(archive_path)
             .arg(&target_dir)
             .output()

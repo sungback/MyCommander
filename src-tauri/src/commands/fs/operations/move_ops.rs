@@ -1,6 +1,6 @@
 use super::copy::copy_path_to_destination;
 use super::path_utils::{normalize_target_path, remove_path};
-use crate::commands::fs::shared::{is_operation_cancelled, ProgressPayload};
+use crate::commands::fs::shared::{is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -15,6 +15,8 @@ pub async fn move_files(
     target_dir: String,
     overwrite: Option<bool>,
 ) -> Result<(), String> {
+    validate_fs_paths(&source_paths)?;
+    validate_fs_path(&target_dir)?;
     move_files_with_cancel(app, source_paths, target_dir, overwrite, None).await
 }
 

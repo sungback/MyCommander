@@ -1,4 +1,4 @@
-use crate::commands::fs::shared::{is_operation_cancelled, ProgressPayload};
+use crate::commands::fs::shared::{is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -27,6 +27,8 @@ pub async fn copy_files(
     keep_both: Option<bool>,
     overwrite: Option<bool>,
 ) -> Result<Vec<String>, String> {
+    validate_fs_paths(&source_paths)?;
+    validate_fs_path(&target_path)?;
     copy_files_with_cancel_and_progress(
         source_paths,
         target_path,
