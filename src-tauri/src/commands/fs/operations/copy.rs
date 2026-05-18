@@ -1,4 +1,6 @@
-use crate::commands::fs::shared::{is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload};
+use crate::commands::fs::shared::{
+    is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload,
+};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;

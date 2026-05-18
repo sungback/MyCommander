@@ -1,6 +1,8 @@
 use super::copy::copy_path_to_destination;
 use super::path_utils::{normalize_target_path, remove_path};
-use crate::commands::fs::shared::{is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload};
+use crate::commands::fs::shared::{
+    is_operation_cancelled, validate_fs_path, validate_fs_paths, ProgressPayload,
+};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};

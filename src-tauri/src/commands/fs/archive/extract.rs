@@ -29,9 +29,7 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
         return Err(e);
     }
     let post_meta = fs::metadata(archive_path).map_err(|e| e.to_string())?;
-    if pre_meta.len() != post_meta.len()
-        || pre_meta.modified().ok() != post_meta.modified().ok()
-    {
+    if pre_meta.len() != post_meta.len() || pre_meta.modified().ok() != post_meta.modified().ok() {
         let _ = fs::remove_dir_all(&target_dir);
         return Err("Archive was modified during security validation".to_string());
     }
