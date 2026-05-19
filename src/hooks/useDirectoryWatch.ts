@@ -7,6 +7,7 @@ import {
 } from "../store/panelRefresh";
 import { collectWatchDirectories } from "../store/panelWatch";
 import { useGitStatusStore } from "../store/gitStatusStore";
+import { showTransientToast } from "../store/toastStore";
 import { useFileSystem } from "./useFileSystem";
 import { getPathDirectoryName, normalizePathForComparison } from "../utils/path";
 
@@ -45,6 +46,10 @@ export const useDirectoryWatch = () => {
     void fs.syncWatchedDirectories(watchedDirectories).catch((error) => {
       if (!cancelled) {
         console.error("Failed to sync watched directories:", error);
+        showTransientToast("폴더 변경 감시를 갱신하지 못했습니다.", {
+          tone: "warning",
+          durationMs: 2500,
+        });
       }
     });
 
@@ -147,6 +152,10 @@ export const useDirectoryWatch = () => {
     () => () => {
       void fs.syncWatchedDirectories([]).catch((error) => {
         console.error("Failed to clear watched directories:", error);
+        showTransientToast("폴더 변경 감시를 정리하지 못했습니다.", {
+          tone: "warning",
+          durationMs: 2500,
+        });
       });
     },
     [fs]

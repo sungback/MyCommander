@@ -3,12 +3,20 @@ import {
   type PersistentDirectorySizeCacheEntry,
   type PersistentDirectorySizeCacheUpdate,
 } from "../hooks/tauriCommands/fileCommands";
+import { showTransientToast } from "./toastStore";
 
 const PERSIST_DEBOUNCE_MS = 500;
 
 const pendingUpserts = new Map<string, PersistentDirectorySizeCacheUpdate>();
 const pendingDeletes = new Set<string>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let loadFailureNotified = false;
+let persistFailureNotified = false;
+
+export const __resetPersistentSizeCacheNotificationsForTests = () => {
+  loadFailureNotified = false;
+  persistFailureNotified = false;
+};
 
 const isTauriRuntime = () => {
   if (typeof window === "undefined") {
@@ -45,6 +53,13 @@ export const loadPersistentSizeCache = async (): Promise<
     return await fileCommands.loadDirSizeCache();
   } catch (error) {
     console.error("Failed to load directory size cache:", error);
+    if (!loadFailureNotified) {
+      loadFailureNotified = true;
+      showTransientToast("저장된 폴더 크기 캐시를 불러오지 못했습니다.", {
+        tone: "warning",
+        durationMs: 2500,
+      });
+    }
     return [];
   }
 };
@@ -103,5 +118,12 @@ export const flushPersistentSizeCacheWrites = async () => {
     }
   } catch (error) {
     console.error("Failed to persist directory size cache:", error);
+    if (!persistFailureNotified) {
+      persistFailureNotified = true;
+      showTransientToast("폴더 크기 캐시를 저장하지 못했습니다.", {
+        tone: "warning",
+        durationMs: 2500,
+      });
+    }
   }
 };

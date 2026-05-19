@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDirectoryWatch } from "./useDirectoryWatch";
 import { usePanelStore } from "../store/panelStore";
+import { useToastStore } from "../store/toastStore";
 
 const { listenHandlers, mockSyncWatchedDirectories } = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
@@ -29,6 +30,7 @@ describe("useDirectoryWatch", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     usePanelStore.setState(usePanelStore.getInitialState());
+    useToastStore.getState().clearToasts();
     listenHandlers.clear();
     mockSyncWatchedDirectories.mockReset();
     mockSyncWatchedDirectories.mockResolvedValue(undefined);
@@ -61,5 +63,24 @@ describe("useDirectoryWatch", () => {
     });
 
     expect(usePanelStore.getState().leftPanel.lastUpdated).toBeGreaterThan(beforeRefresh);
+  });
+
+  it("shows a warning toast when watched directories cannot be synced", async () => {
+    mockSyncWatchedDirectories.mockRejectedValueOnce(new Error("watch unavailable"));
+
+    renderHook(() => useDirectoryWatch());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(useToastStore.getState().toasts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "폴더 변경 감시를 갱신하지 못했습니다.",
+          tone: "warning",
+        }),
+      ])
+    );
   });
 });
