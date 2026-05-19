@@ -208,6 +208,8 @@ export const FileList: React.FC<FileListProps> = ({
         }
       )}
       data-panel-id={panelId}
+      role="listbox"
+      aria-label={`${panelId} file list`}
       tabIndex={0}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}

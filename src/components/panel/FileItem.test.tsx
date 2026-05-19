@@ -108,5 +108,25 @@ describe("FileItem", () => {
 
     expect(screen.getByText("~1.0 KB")).toBeInTheDocument();
     expect(screen.getByText("2.0 KB+")).toBeInTheDocument();
+    expect(screen.getByLabelText(/빠른 추정 크기입니다/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
+  });
+
+  it("labels directory size calculation errors", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "broken",
+          path: "/tmp/broken",
+          kind: "directory",
+          sizeStatus: "error",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText(/크기를 계산하지 못했습니다/)).toBeInTheDocument();
   });
 });

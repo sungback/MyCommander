@@ -3,10 +3,16 @@ import React from "react";
 const SKELETON_ROW_COUNT = 10;
 
 export const FileListSkeleton: React.FC = () => (
-  <div className="flex flex-col w-full px-1 py-0.5 gap-0.5" aria-hidden="true">
+  <div
+    className="flex flex-col w-full px-1 py-0.5 gap-0.5"
+    role="status"
+    aria-live="polite"
+  >
+    <span className="sr-only">폴더를 불러오는 중입니다.</span>
     {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
       <div
         key={i}
+        aria-hidden="true"
         className="flex items-center gap-2 px-2 rounded"
         style={{ height: "var(--app-row-height, 28px)" }}
       >

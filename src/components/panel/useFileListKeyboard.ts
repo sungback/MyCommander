@@ -5,6 +5,7 @@ import {
   scanDirectorySizeWithProgress,
 } from "../../hooks/manualDirectorySizeScan";
 import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
+import { showTransientToast } from "../../store/toastStore";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
 
 interface UseFileListKeyboardProps {
@@ -171,6 +172,11 @@ export const useFileListKeyboard = ({
           .catch((error) => {
             setEntrySizeStatus(panelId, current.path, "error");
             console.error("Failed to calculate dir size:", error);
+            const message = error instanceof Error ? error.message : String(error);
+            showTransientToast(`폴더 크기를 계산하지 못했습니다: ${message}`, {
+              tone: "error",
+              durationMs: 2500,
+            });
           });
       }
       return;

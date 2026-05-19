@@ -235,6 +235,8 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   return (
     <div
       ref={panelRef}
+      aria-busy={isDirLoading}
+      aria-label={`${id} file panel`}
       className={clsx(
         "flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-opacity bg-bg-panel"
       )}

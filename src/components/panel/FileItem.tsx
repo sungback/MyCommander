@@ -47,6 +47,31 @@ const getEntrySizeText = (entry: FileEntry) => {
   }
 };
 
+const getEntrySizeTitle = (entry: FileEntry) => {
+  if (entry.kind !== "directory" || entry.name === "..") {
+    return undefined;
+  }
+
+  switch (entry.sizeStatus) {
+    case "estimating":
+      return "크기를 추정하는 중입니다.";
+    case "calculating":
+      return "정확한 크기를 계산하는 중입니다.";
+    case "estimated":
+      return "빠른 추정 크기입니다.";
+    case "partial":
+      return "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
+    case "exact":
+      return "정확히 계산된 크기입니다.";
+    case "error":
+      return "크기를 계산하지 못했습니다.";
+    case "unknown":
+      return "아직 계산되지 않은 크기입니다.";
+    default:
+      return undefined;
+  }
+};
+
 interface ThumbnailImgProps {
   path: string;
   fallback: React.ReactNode;
@@ -126,6 +151,11 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
   const overlayClassName = visual.overlayClassName;
   const extensionLabel = visual.extensionLabel;
   const extensionLabelClassName = visual.extensionLabelClassName;
+  const entrySizeText = getEntrySizeText(entry);
+  const entrySizeTitle = getEntrySizeTitle(entry);
+  const isSizeBusy =
+    entry.kind === "directory" &&
+    (entry.sizeStatus === "estimating" || entry.sizeStatus === "calculating");
   const renderIconContents = () => (
     <>
       <Icon
@@ -156,6 +186,8 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
     <div
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      role="option"
+      aria-selected={Boolean(isSelected)}
       className={clsx(
         "flex items-center border-b border-transparent group select-none font-mono cursor-default",
         {
@@ -255,8 +287,11 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
               "w-24 px-2 text-right border-r border-border-color/30",
               secondaryTextClass
             )}
+            title={entrySizeTitle}
+            aria-label={entrySizeTitle ? `Size: ${entrySizeText}. ${entrySizeTitle}` : undefined}
+            aria-busy={isSizeBusy || undefined}
           >
-            {getEntrySizeText(entry)}
+            {entrySizeText}
           </div>
           <div className={clsx("w-36 px-2 whitespace-nowrap", secondaryTextClass)}>
             {formatDate(entry.lastModified)}

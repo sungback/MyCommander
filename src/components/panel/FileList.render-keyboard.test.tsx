@@ -7,6 +7,7 @@ import {
   mockOpenPreviewDialog,
   mockScanDirSize,
   mockSetSelection,
+  mockShowTransientToast,
   registerFileListTestLifecycle,
 } from './FileList.test-harness';
 import { useClipboardStore } from '../../store/clipboardStore';
@@ -205,7 +206,7 @@ describe('FileList', () => {
       );
     });
 
-    it('Space → scanDirSize 에러 시 조용히 실패한다', async () => {
+    it('Space → scanDirSize 에러 시 상태와 토스트로 실패를 표시한다', async () => {
       mockScanDirSize.mockRejectedValueOnce(new Error('disk error'));
       render(<FileList {...makeProps({ cursorIndex: 1 })} />);
       await act(async () => {
@@ -217,6 +218,13 @@ describe('FileList', () => {
           '/home/user/Documents',
           expect.any(String)
         )
+      );
+      expect(mockShowTransientToast).toHaveBeenCalledWith(
+        "폴더 크기를 계산하지 못했습니다: disk error",
+        {
+          tone: "error",
+          durationMs: 2500,
+        }
       );
     });
   });
