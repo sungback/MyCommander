@@ -70,6 +70,20 @@ describe("SyncDialog", () => {
     });
   });
 
+  it("separates an empty comparison from a failed comparison", async () => {
+    mockCompareDirectories.mockResolvedValue([]);
+
+    render(<SyncDialog />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+
+    expect(await screen.findByText("No differences found.")).toBeInTheDocument();
+    expect(
+      screen.getByText("The selected folders have no actionable sync items.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Synchronize" })).toBeDisabled();
+  });
+
   it("preserves relative paths when synchronizing changed files", async () => {
     mockCompareDirectories.mockResolvedValue([
       {
@@ -98,6 +112,47 @@ describe("SyncDialog", () => {
         false,
         true
       );
+    });
+  });
+
+  it("exposes synchronization progress while a copy is running", async () => {
+    let resolveCopy: (value: unknown[]) => void = () => {};
+    mockCompareDirectories.mockResolvedValue([
+      {
+        relPath: "docs/report.md",
+        leftPath: "/left/docs/report.md",
+        rightPath: "/right/docs/report.md",
+        leftKind: "file",
+        rightKind: "file",
+        status: "LeftNewer",
+        direction: "toRight",
+      },
+    ]);
+    mockCopyFiles.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCopy = resolve;
+      })
+    );
+
+    render(<SyncDialog />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+
+    await screen.findByText("Found 1 item(s) to compare");
+
+    fireEvent.click(screen.getByRole("button", { name: "Synchronize" }));
+
+    const progress = await screen.findByRole("progressbar", {
+      name: "Synchronization progress",
+    });
+    expect(progress).toHaveAttribute("aria-valuemin", "0");
+    expect(progress).toHaveAttribute("aria-valuemax", "1");
+    expect(progress).toHaveAttribute("aria-valuenow", "0");
+
+    resolveCopy([]);
+
+    await waitFor(() => {
+      expect(mockCloseDialog).toHaveBeenCalled();
     });
   });
 

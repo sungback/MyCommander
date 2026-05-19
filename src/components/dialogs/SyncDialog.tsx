@@ -44,12 +44,17 @@ export const SyncDialog: React.FC = () => {
     refreshPanel,
     closeDialog,
   });
+  const isBusy = stage === "analyzing" || stage === "executing" || executing;
+  const actionableItemCount = syncItems.filter((item) => item.direction !== "skip").length;
 
   return (
     <Dialog.Root open={openDialog === "sync"} onOpenChange={(open) => !open && closeDialog()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[700px] max-h-[80vh] z-50 p-4 focus:outline-none text-text-primary flex flex-col">
+        <Dialog.Content
+          aria-busy={isBusy}
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[700px] max-h-[80vh] z-50 p-4 focus:outline-none text-text-primary flex flex-col"
+        >
           <Dialog.Title className="text-sm font-bold border-b border-border-color pb-2 mb-4">
             Folder Synchronization
           </Dialog.Title>
@@ -85,13 +90,21 @@ export const SyncDialog: React.FC = () => {
                     className="w-full bg-bg-primary border border-border-color rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent-color"
                   />
                 </div>
-                {error && <p className="text-xs text-red-400">{error}</p>}
+                {error && (
+                  <p className="text-xs text-red-400" role="alert">
+                    {error}
+                  </p>
+                )}
               </div>
             )}
 
             {/* Stage: Analyzing */}
             {stage === "analyzing" && (
-              <div className="flex flex-col items-center justify-center py-12">
+              <div
+                className="flex flex-col items-center justify-center py-12"
+                role="status"
+                aria-live="polite"
+              >
                 <Loader2 className="w-8 h-8 animate-spin text-accent-color mb-4" />
                 <p className="text-sm text-text-secondary">Comparing directories...</p>
               </div>
@@ -104,79 +117,101 @@ export const SyncDialog: React.FC = () => {
                   Found {syncItems.length} item(s) to compare
                 </div>
 
-                {/* Control buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => handleSelectAll("toRight")}
-                    className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
+                {syncItems.length === 0 ? (
+                  <div
+                    className="rounded border border-border-color bg-bg-primary px-4 py-8 text-center"
+                    role="status"
                   >
-                    All →
-                  </button>
-                  <button
-                    onClick={() => handleSelectAll("toLeft")}
-                    className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
-                  >
-                    All ←
-                  </button>
-                  <button
-                    onClick={handleExcludeSame}
-                    className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
-                  >
-                    Exclude Same
-                  </button>
-                </div>
-
-                {/* Results table */}
-                <div className="border border-border-color rounded overflow-hidden">
-                  <div className="grid grid-cols-4 gap-0 bg-bg-secondary border-b border-border-color text-xs font-semibold sticky top-0">
-                    <div className="px-2 py-1.5">File</div>
-                    <div className="px-2 py-1.5">Status</div>
-                    <div className="px-2 py-1.5 col-span-2">Direction</div>
+                    <p className="text-sm font-medium text-text-primary">
+                      No differences found.
+                    </p>
+                    <p className="mt-1 text-xs text-text-secondary">
+                      The selected folders have no actionable sync items.
+                    </p>
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {syncItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-4 gap-0 border-b border-border-color text-xs hover:bg-bg-hover transition-colors"
+                ) : (
+                  <>
+                    {/* Control buttons */}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleSelectAll("toRight")}
+                        className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
                       >
-                        <div className="px-2 py-1.5 truncate" title={item.relPath}>
-                          {item.relPath}
-                        </div>
-                        <div className={`px-2 py-1.5 ${getStatusColor(item.status)}`}>
-                          {getStatusLabel(item.status)}
-                        </div>
-                        <div className="px-2 py-1.5 col-span-2">
-                          {item.status === "Same" ? (
-                            <span className="text-text-secondary">skip</span>
-                          ) : (
-                            <select
-                              value={item.direction}
-                              onChange={(e) =>
-                                handleUpdateDirection(
-                                  idx,
-                                  e.target.value as SyncDirection
-                                )
-                              }
-                              className="bg-bg-primary border border-border-color rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-accent-color"
-                            >
-                              <option value="skip">skip</option>
-                              <option value="toRight">→</option>
-                              <option value="toLeft">←</option>
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                        All →
+                      </button>
+                      <button
+                        onClick={() => handleSelectAll("toLeft")}
+                        className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
+                      >
+                        All ←
+                      </button>
+                      <button
+                        onClick={handleExcludeSame}
+                        className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
+                      >
+                        Exclude Same
+                      </button>
+                    </div>
 
-                {error && <p className="text-xs text-red-400">{error}</p>}
+                    {/* Results table */}
+                    <div className="border border-border-color rounded overflow-hidden" role="table">
+                      <div className="grid grid-cols-4 gap-0 bg-bg-secondary border-b border-border-color text-xs font-semibold sticky top-0" role="row">
+                        <div className="px-2 py-1.5" role="columnheader">File</div>
+                        <div className="px-2 py-1.5" role="columnheader">Status</div>
+                        <div className="px-2 py-1.5 col-span-2" role="columnheader">Direction</div>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto" role="rowgroup">
+                        {syncItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="grid grid-cols-4 gap-0 border-b border-border-color text-xs hover:bg-bg-hover transition-colors"
+                            role="row"
+                          >
+                            <div className="px-2 py-1.5 truncate" title={item.relPath} role="cell">
+                              {item.relPath}
+                            </div>
+                            <div className={`px-2 py-1.5 ${getStatusColor(item.status)}`} role="cell">
+                              {getStatusLabel(item.status)}
+                            </div>
+                            <div className="px-2 py-1.5 col-span-2" role="cell">
+                              {item.status === "Same" ? (
+                                <span className="text-text-secondary">skip</span>
+                              ) : (
+                                <select
+                                  aria-label={`Sync direction for ${item.relPath}`}
+                                  value={item.direction}
+                                  onChange={(e) =>
+                                    handleUpdateDirection(
+                                      idx,
+                                      e.target.value as SyncDirection
+                                    )
+                                  }
+                                  className="bg-bg-primary border border-border-color rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-accent-color"
+                                >
+                                  <option value="skip">skip</option>
+                                  <option value="toRight">→</option>
+                                  <option value="toLeft">←</option>
+                                </select>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {error && (
+                  <p className="text-xs text-red-400" role="alert">
+                    {error}
+                  </p>
+                )}
               </div>
             )}
 
             {/* Stage: Executing */}
             {stage === "executing" && (
-              <div className="space-y-4">
+              <div className="space-y-4" role="status" aria-live="polite">
                 <div className="flex items-center gap-2 mb-4">
                   <Loader2 className="w-4 h-4 animate-spin text-accent-color" />
                   <span className="text-sm text-text-secondary">
@@ -186,6 +221,11 @@ export const SyncDialog: React.FC = () => {
                 <div className="w-full bg-bg-secondary rounded h-2 overflow-hidden">
                   <div
                     className="bg-accent-color h-full transition-all"
+                    role="progressbar"
+                    aria-label="Synchronization progress"
+                    aria-valuemin={0}
+                    aria-valuemax={executionProgress.total}
+                    aria-valuenow={executionProgress.done}
                     style={{
                       width: `${
                         executionProgress.total > 0
@@ -234,7 +274,7 @@ export const SyncDialog: React.FC = () => {
                 </button>
                 <button
                   onClick={handleExecuteSync}
-                  disabled={executing}
+                  disabled={executing || actionableItemCount === 0}
                   className="px-4 py-1.5 min-w-[100px] text-sm bg-bg-selected hover:opacity-90 rounded border border-transparent focus:outline-none focus:ring-1 focus:ring-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {executing ? "Syncing..." : "Synchronize"}
