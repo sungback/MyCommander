@@ -129,6 +129,7 @@ interface QuickPreviewBodyProps {
   fileName: string;
   showSource: boolean;
   sourceHighlightHtml: string | null;
+  sourceHighlightError: string | null;
 }
 
 export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
@@ -137,6 +138,7 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
   fileName,
   showSource,
   sourceHighlightHtml,
+  sourceHighlightError,
 }) => (
   <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
     {previewStatus && <QuickPreviewStatusView status={previewStatus} />}
@@ -187,9 +189,19 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
           />
         </pre>
       ) : (
-        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
-          {preview.content}
-        </pre>
+        <div className="flex-1 min-h-0 flex flex-col">
+          {sourceHighlightError ? (
+            <div
+              role="status"
+              className="border-b border-amber-400/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-100"
+            >
+              소스 하이라이트를 적용하지 못해 원문으로 표시합니다: {sourceHighlightError}
+            </div>
+          ) : null}
+          <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
+            {preview.content}
+          </pre>
+        </div>
       )
     )}
 

@@ -17,10 +17,12 @@ export const useQuickPreviewState = ({
   const [preview, setPreview] = useState<PreviewState>({ type: "loading" });
   const [showSource, setShowSource] = useState(false);
   const [sourceHighlightHtml, setSourceHighlightHtml] = useState<string | null>(null);
+  const [sourceHighlightError, setSourceHighlightError] = useState<string | null>(null);
 
   useEffect(() => {
     setShowSource(false);
     setSourceHighlightHtml(null);
+    setSourceHighlightError(null);
   }, [filePath]);
 
   const loadPreview = useCallback(async (path: string) => {
@@ -52,6 +54,7 @@ export const useQuickPreviewState = ({
 
     if (!canToggleSource || !showSource || !preview.content) {
       setSourceHighlightHtml(null);
+      setSourceHighlightError(null);
       return () => {
         cancelled = true;
       };
@@ -61,12 +64,16 @@ export const useQuickPreviewState = ({
       .then((html) => {
         if (!cancelled) {
           setSourceHighlightHtml(html);
+          setSourceHighlightError(null);
         }
       })
       .catch((error) => {
         console.error("QuickPreview: failed to highlight preview source", error);
         if (!cancelled) {
           setSourceHighlightHtml(null);
+          setSourceHighlightError(
+            error instanceof Error ? error.message : String(error)
+          );
         }
       });
 
@@ -83,6 +90,7 @@ export const useQuickPreviewState = ({
     preview,
     showSource,
     sourceHighlightHtml,
+    sourceHighlightError,
     isRendered,
     canToggleSource,
     toggleSource,

@@ -90,6 +90,36 @@ describe("useQuickPreviewState", () => {
     expect(mockLoadSourceHighlightHtml).toHaveBeenCalledWith("# Title", "markdown");
   });
 
+  it("reports source highlighting failures while keeping raw source visible", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "rendered",
+      content: "# Title",
+      renderedHtml: "<h1>Title</h1>",
+      renderExt: "markdown",
+    });
+    mockLoadSourceHighlightHtml.mockRejectedValue(new Error("highlighter unavailable"));
+
+    const { result } = renderHook(() =>
+      useQuickPreviewState({ isOpen: true, filePath: "/tmp/readme.md" })
+    );
+
+    await waitFor(() => {
+      expect(result.current.canToggleSource).toBe(true);
+    });
+
+    act(() => {
+      result.current.toggleSource();
+    });
+
+    await waitFor(() => {
+      expect(result.current.sourceHighlightError).toBe("highlighter unavailable");
+    });
+    expect(result.current.sourceHighlightHtml).toBeNull();
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("resets source state when the file path changes", async () => {
     mockLoadPreviewForPath.mockResolvedValue({
       type: "rendered",

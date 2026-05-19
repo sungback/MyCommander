@@ -20,6 +20,7 @@ export const QuickPreviewDialog: React.FC = () => {
     preview,
     showSource,
     sourceHighlightHtml,
+    sourceHighlightError,
     isRendered,
     canToggleSource,
     toggleSource,
@@ -91,6 +92,7 @@ export const QuickPreviewDialog: React.FC = () => {
             fileName={fileName}
             showSource={showSource}
             sourceHighlightHtml={sourceHighlightHtml}
+            sourceHighlightError={sourceHighlightError}
           />
           <QuickPreviewFooter filePath={filePath} />
         </Dialog.Content>

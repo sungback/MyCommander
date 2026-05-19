@@ -83,6 +83,28 @@ describe("QuickPreviewDialog status messages", () => {
     expect(sourceText.closest("code")).toHaveClass("select-text");
   });
 
+  it("shows a source-highlight warning and raw source fallback", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "rendered",
+      content: "# Title",
+      renderedHtml: "<h1>Title</h1>",
+      renderExt: "markdown",
+    });
+    mockLoadSourceHighlightHtml.mockRejectedValue(new Error("highlighter unavailable"));
+
+    render(<QuickPreviewDialog />);
+
+    fireEvent.click(await screen.findByTitle("소스 보기"));
+
+    expect(
+      await screen.findByText(/소스 하이라이트를 적용하지 못해 원문으로 표시합니다/)
+    ).toBeInTheDocument();
+    expect(screen.getByText("# Title")).toBeInTheDocument();
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("allows selecting plain text preview contents for copy", async () => {
     mockLoadPreviewForPath.mockResolvedValue({
       type: "text",
