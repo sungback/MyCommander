@@ -6,6 +6,7 @@ import {
   PDF_EXTENSIONS,
   PPTX_EXTENSIONS,
   RENDER_EXTENSIONS,
+  SQLITE_EXTENSIONS,
   TEXT_EXTENSIONS,
   VIDEO_EXTENSIONS,
   XLSX_EXTENSIONS,
@@ -97,6 +98,19 @@ const officePreviewHandler: QuickPreviewHandler = async (path, context) => {
   return null;
 };
 
+const sqlitePreviewHandler: QuickPreviewHandler = async (path, context) => {
+  if (!SQLITE_EXTENSIONS.has(context.extension)) {
+    return null;
+  }
+
+  const renderer = await context.loadSqliteRenderer();
+  return {
+    type: "rendered",
+    renderedHtml: await renderer.renderSqlite(path),
+    renderExt: "sqlite",
+  };
+};
+
 const notebookPreviewHandler: QuickPreviewHandler = async (path, context) => {
   if (!NOTEBOOK_EXTENSIONS.has(context.extension)) {
     return null;
@@ -162,6 +176,7 @@ const textPreviewHandler: QuickPreviewHandler = async (path, context) => {
 export const QUICK_PREVIEW_HANDLERS: QuickPreviewHandler[] = [
   assetPreviewHandler,
   officePreviewHandler,
+  sqlitePreviewHandler,
   notebookPreviewHandler,
   renderedTextPreviewHandler,
   textPreviewHandler,

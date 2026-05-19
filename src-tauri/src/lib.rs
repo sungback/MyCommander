@@ -58,6 +58,7 @@ pub fn run() {
             commands::jobs::commands::retry_job,
             commands::jobs::commands::clear_finished_jobs,
             commands::fs::metadata::read_file_content,
+            commands::fs::metadata::preview_sqlite_database,
             commands::search_commands::search_files,
             commands::fs::metadata::get_dir_size,
             commands::fs::metadata::estimate_dir_size,

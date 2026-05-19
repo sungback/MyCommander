@@ -43,7 +43,7 @@
 | Backend | Rust, Tauri custom commands |
 | UI | Radix UI Dialog, Lucide React, `react-resizable-panels`, `re-resizable` |
 | Virtualized List | `@tanstack/react-virtual` |
-| Preview Helpers | `highlight.js`, `marked`, `read-excel-file`, `jszip` |
+| Preview Helpers | `highlight.js`, `marked`, `read-excel-file`, `jszip`, `rusqlite` |
 | Utilities | `date-fns`, `clsx`, `tailwind-merge` |
 | Testing | Vitest, Testing Library |
 
@@ -64,6 +64,7 @@
 - **프런트엔드 Tauri IPC 경계:** 프런트엔드의 직접 `invoke()` 호출은 `src/hooks/tauriCommands/` 하위 명령 클라이언트에만 둡니다. 컴포넌트와 일반 훅은 `useFileSystem()` facade를 통해 Tauri 명령을 호출합니다.
 - **탭-패널 상태 동기화:** 활성 탭 상태를 패널 상단 상태로 반영하는 계약은 `src/utils/panelHelpers.ts`의 `syncPanelWithActiveTab`이 담당합니다. `panelRefresh` 같은 갱신 경로에서 별도 동기화 복사본을 만들지 않습니다.
 - **렌더러 복구 (`useRendererRecovery`):** 30초마다 틱을 체크하여 2분 이상 간격이 감지되면 macOS sleep/wake 후 화면 고착으로 판단합니다. 포그라운드 전환 시 CSS pulse + Tauri 창/WebView `show()`로 복구를 시도하고, 고착 상태가 지속되면 1.5초 후 페이지 리로드합니다(쿨다운 1분). 사용자에게 투명하게 동작합니다.
+- **SQLite 빠른 미리보기:** `.db`, `.sqlite`, `.sqlite3`는 텍스트로 읽지 않고 Rust command `preview_sqlite_database`가 read-only로 열어 사용자 테이블/뷰의 컬럼과 제한된 샘플 행만 반환합니다. 민감 홈 경로 차단 정책은 일반 파일 미리보기와 동일하게 적용합니다.
 - **Git 상태 표시 (`useGitStatus`):** 경로별 Git 상태를 `gitStatusStore`에 캐싱하고 패널 파일 리스트에 M/A/D/? 마킹으로 표시합니다. 이전에 실패한 경로는 `hasFreshFailure` 체크로 재시도 없이 null을 반환합니다(Windows noisy probe 억제).
 - **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
 - **디렉터리 크기 계산:** `useBackgroundDirSizes`가 디렉터리 크기를 빠르게 추정하고, 일반 로컬 경로는 백그라운드 정확 계산으로 보강합니다. CloudStorage/Windows `AppData` 같은 경로는 자동 정확 계산을 피합니다. 수동 계산은 `manualDirectorySizeScan.ts`가 진행 이벤트와 취소를 관리합니다.

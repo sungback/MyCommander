@@ -56,7 +56,7 @@ pub(crate) fn read_preview_file_content_for_test(
     read_preview_file_content(path, preview_read_limit(max_bytes))
 }
 
-fn validate_preview_read_path(path: &Path) -> Result<PathBuf, String> {
+pub(super) fn validate_preview_read_path(path: &Path) -> Result<PathBuf, String> {
     let resolved_path = path.canonicalize().map_err(|e| e.to_string())?;
 
     if is_asset_denied_home_path(&resolved_path) {

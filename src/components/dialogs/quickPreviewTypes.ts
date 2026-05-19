@@ -3,6 +3,7 @@ import type {
   MarkdownRendererModule,
   NotebookRendererModule,
   PptxRendererModule,
+  SqliteRendererModule,
   TextHighlighterModule,
   XlsxRendererModule,
 } from "./quickPreviewRenderers/shared";
@@ -47,5 +48,6 @@ export interface QuickPreviewLoaderOptions {
   loadPptxRenderer?: () => Promise<PptxRendererModule>;
   loadHwpxRenderer?: () => Promise<HwpxRendererModule>;
   loadXlsxRenderer?: () => Promise<XlsxRendererModule>;
+  loadSqliteRenderer?: () => Promise<SqliteRendererModule>;
   loadDocxRenderer?: () => Promise<DocxRendererModule>;
 }

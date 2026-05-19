@@ -34,6 +34,10 @@ export interface XlsxRendererModule {
   renderXlsx: (filePath: string) => MaybePromise<string>;
 }
 
+export interface SqliteRendererModule {
+  renderSqlite: (filePath: string) => MaybePromise<string>;
+}
+
 export const EXT_TO_LANG: Record<string, string> = {
   ts: "typescript",
   tsx: "typescript",

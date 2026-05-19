@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { BatchRenameOperation } from "../../features/multiRename";
 import type { DirectorySizeStatus, FileEntry } from "../../types/file";
+import type { SqliteDatabasePreview } from "../../types/sqlitePreview";
 
 export type PersistentDirectorySizeStatus = Extract<
   DirectorySizeStatus,
@@ -151,6 +152,10 @@ export const fileCommands = {
       path,
       ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
     });
+  },
+
+  previewSqliteDatabase: async (path: string): Promise<SqliteDatabasePreview> => {
+    return await invoke<SqliteDatabasePreview>("preview_sqlite_database", { path });
   },
 
   getDirSize: async (path: string): Promise<number> => {

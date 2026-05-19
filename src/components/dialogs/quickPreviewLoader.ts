@@ -5,6 +5,7 @@ import {
   type NotebookRendererModule,
   type PptxRendererModule,
   type HwpxRendererModule,
+  type SqliteRendererModule,
   type XlsxRendererModule,
   type TextHighlighterModule,
 } from "./quickPreviewRenderers/shared";
@@ -76,6 +77,14 @@ const defaultLoadXlsxRenderer = async (): Promise<XlsxRendererModule> => {
   return loadRenderer();
 };
 
+const defaultLoadSqliteRenderer = async (): Promise<SqliteRendererModule> => {
+  const { defaultLoadSqliteRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/sqliteRenderer"
+  );
+
+  return loadRenderer();
+};
+
 export const loadSourceHighlightHtml = async (
   content: string,
   renderExt: string,
@@ -105,6 +114,7 @@ export const loadPreviewForPath = async (
   const loadPptxRenderer = options.loadPptxRenderer ?? defaultLoadPptxRenderer;
   const loadHwpxRenderer = options.loadHwpxRenderer ?? defaultLoadHwpxRenderer;
   const loadXlsxRenderer = options.loadXlsxRenderer ?? defaultLoadXlsxRenderer;
+  const loadSqliteRenderer = options.loadSqliteRenderer ?? defaultLoadSqliteRenderer;
   const loadDocxRenderer = options.loadDocxRenderer ?? defaultLoadDocxRenderer;
 
   return loadPreviewFromHandlers(path, {
@@ -117,6 +127,7 @@ export const loadPreviewForPath = async (
     loadPptxRenderer,
     loadHwpxRenderer,
     loadXlsxRenderer,
+    loadSqliteRenderer,
     loadDocxRenderer,
   });
 };

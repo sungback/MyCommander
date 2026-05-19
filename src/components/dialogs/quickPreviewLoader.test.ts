@@ -10,6 +10,7 @@ describe("loadPreviewForPath", () => {
     const loadPptxRenderer = vi.fn();
     const loadHwpxRenderer = vi.fn();
     const loadXlsxRenderer = vi.fn();
+    const loadSqliteRenderer = vi.fn();
 
     const result = await loadPreviewForPath("/tmp/photo.png", {
       convertFileSrcImpl: (path) => `asset://${path}`,
@@ -19,6 +20,7 @@ describe("loadPreviewForPath", () => {
       loadPptxRenderer,
       loadHwpxRenderer,
       loadXlsxRenderer,
+      loadSqliteRenderer,
     });
 
     expect(result).toEqual({
@@ -31,6 +33,7 @@ describe("loadPreviewForPath", () => {
     expect(loadPptxRenderer).not.toHaveBeenCalled();
     expect(loadHwpxRenderer).not.toHaveBeenCalled();
     expect(loadXlsxRenderer).not.toHaveBeenCalled();
+    expect(loadSqliteRenderer).not.toHaveBeenCalled();
   });
 
   it("loads the text highlighter only for text previews", async () => {
@@ -214,6 +217,33 @@ describe("loadPreviewForPath", () => {
       type: "rendered",
       renderedHtml: "<html><body>docx</body></html>",
       renderExt: "docx",
+    });
+  });
+
+  it("loads the sqlite renderer only for sqlite database previews", async () => {
+    const renderSqlite = vi.fn().mockResolvedValue("<html><body>database</body></html>");
+    const loadSqliteRenderer = vi.fn().mockResolvedValue({ renderSqlite });
+    const invokeImpl = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/app.db", {
+      invokeImpl,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadSqliteRenderer,
+      loadDocxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).not.toHaveBeenCalled();
+    expect(loadSqliteRenderer).toHaveBeenCalledTimes(1);
+    expect(renderSqlite).toHaveBeenCalledWith("/tmp/app.db");
+    expect(result).toEqual({
+      type: "rendered",
+      renderedHtml: "<html><body>database</body></html>",
+      renderExt: "sqlite",
     });
   });
 });

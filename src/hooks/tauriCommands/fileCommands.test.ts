@@ -193,6 +193,30 @@ describe("fileCommands", () => {
     });
   });
 
+  describe("previewSqliteDatabase", () => {
+    it("calls preview_sqlite_database and returns preview data", async () => {
+      const preview = {
+        fileSize: 4096,
+        pageSize: 4096,
+        pageCount: 1,
+        tables: [],
+        truncatedTables: false,
+        maxTables: 20,
+        maxRowsPerTable: 20,
+        maxColumnsPerTable: 40,
+        maxCellChars: 500,
+      };
+      mockInvoke.mockResolvedValue(preview);
+
+      const result = await fileCommands.previewSqliteDatabase("/some/app.db");
+
+      expect(mockInvoke).toHaveBeenCalledWith("preview_sqlite_database", {
+        path: "/some/app.db",
+      });
+      expect(result).toBe(preview);
+    });
+  });
+
   describe("getDirSize", () => {
     it("calls get_dir_size and returns number", async () => {
       mockInvoke.mockResolvedValue(1024);

@@ -53,6 +53,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - Markdown 렌더링
 - HTML 렌더링
 - Excel (`.xlsx`)
+- SQLite (`.db`, `.sqlite`, `.sqlite3`) 테이블/뷰 샘플
 - Word (`.docx`)
 - Jupyter Notebook (`.ipynb`)
 - PowerPoint (`.pptx`)

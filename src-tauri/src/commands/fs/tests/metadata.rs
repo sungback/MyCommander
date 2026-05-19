@@ -1,8 +1,9 @@
 use super::super::metadata::{
     decode_preview_bytes, is_hidden_entry, path_matches_denied_home_path,
-    read_preview_file_content_for_test,
+    preview_sqlite_database_for_test, read_preview_file_content_for_test,
 };
 use encoding_rs::EUC_KR;
+use rusqlite::Connection;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -146,4 +147,64 @@ fn preview_read_policy_allows_similar_but_non_denied_paths() {
         Path::new("/Users/other/.ssh/config"),
         home
     ));
+}
+
+#[test]
+fn sqlite_preview_reads_schema_and_limited_sample_rows() {
+    let file_path = unique_preview_test_path("sample.db");
+    {
+        let connection = Connection::open(&file_path).unwrap();
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE notes (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    body TEXT,
+                    payload BLOB
+                );
+                INSERT INTO notes (title, body, payload)
+                VALUES ('first', 'hello', X'010203'), ('second', NULL, X'');
+                CREATE VIEW note_titles AS SELECT id, title FROM notes;
+                "#,
+            )
+            .unwrap();
+    }
+
+    let preview = preview_sqlite_database_for_test(&file_path).unwrap();
+
+    assert_eq!(preview.file_size, fs::metadata(&file_path).unwrap().len());
+    assert_eq!(preview.max_rows_per_table, 20);
+    assert!(!preview.truncated_tables);
+    assert!(preview.page_size.is_some());
+    assert!(preview.page_count.is_some());
+
+    let notes = preview
+        .tables
+        .iter()
+        .find(|table| table.name == "notes")
+        .unwrap();
+    assert_eq!(notes.kind, "table");
+    assert_eq!(
+        notes
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["id", "title", "body", "payload"]
+    );
+    assert_eq!(notes.rows.len(), 2);
+    assert_eq!(notes.rows[0][1], "first");
+    assert_eq!(notes.rows[1][2], "NULL");
+    assert_eq!(notes.rows[0][3], "<BLOB 3 bytes>");
+
+    let view = preview
+        .tables
+        .iter()
+        .find(|table| table.name == "note_titles")
+        .unwrap();
+    assert_eq!(view.kind, "view");
+    assert_eq!(view.rows[0], vec!["1", "first"]);
+
+    fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
 }

@@ -80,6 +80,18 @@ export const createMockInvoke = () =>
       case 'extract_zip':         return Promise.resolve('/home/user/archive');
       case 'create_zip':          return Promise.resolve('/home/user/Downloads.zip');
       case 'read_file_content':   return Promise.resolve('file content here');
+      case 'preview_sqlite_database':
+        return Promise.resolve({
+          fileSize: 4096,
+          pageSize: 4096,
+          pageCount: 1,
+          tables: [],
+          truncatedTables: false,
+          maxTables: 20,
+          maxRowsPerTable: 20,
+          maxColumnsPerTable: 40,
+          maxCellChars: 500,
+        });
       case 'search_files':        return Promise.resolve(mockSearchResults);
       case 'open_in_terminal':    return Promise.resolve(undefined);
       case 'open_in_editor':      return Promise.resolve(undefined);

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-preview-sqlite-database"
+description = "Enables the preview_sqlite_database command without any pre-configured scope."
+commands.allow = ["preview_sqlite_database"]
+
+[[permission]]
+identifier = "deny-preview-sqlite-database"
+description = "Denies the preview_sqlite_database command without any pre-configured scope."
+commands.deny = ["preview_sqlite_database"]
