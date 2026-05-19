@@ -181,6 +181,16 @@ describe("fileCommands", () => {
       expect(mockInvoke).toHaveBeenCalledWith("read_file_content", { path: "/some/file.txt" });
       expect(result).toBe("hello world");
     });
+
+    it("passes an optional max_bytes limit", async () => {
+      mockInvoke.mockResolvedValue("notebook");
+      const result = await fileCommands.readFileContent("/some/~.ipynb", 5 * 1024 * 1024);
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_content", {
+        path: "/some/~.ipynb",
+        max_bytes: 5 * 1024 * 1024,
+      });
+      expect(result).toBe("notebook");
+    });
   });
 
   describe("getDirSize", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { loadPreviewForPath } from "./quickPreviewLoader";
+import { MAX_NOTEBOOK_BYTES } from "./quickPreviewRenderers/shared";
 
 describe("loadPreviewForPath", () => {
   it("returns image previews without loading heavyweight renderers", async () => {
@@ -113,6 +114,43 @@ describe("loadPreviewForPath", () => {
       content: "# Doc",
       renderedHtml: "<html><body><h1>Doc</h1></body></html>",
       renderExt: "markdown",
+    });
+  });
+
+  it("loads Windows tilde notebook paths through IPC instead of asset fetch", async () => {
+    const windowsPath = "C:\\Users\\me\\Documents\\~.ipynb";
+    const notebookJson = JSON.stringify({
+      cells: [],
+      metadata: { kernelspec: { language: "python" } },
+    });
+    const renderNotebook = vi.fn().mockResolvedValue("<html><body>notebook</body></html>");
+    const loadNotebookRenderer = vi.fn().mockResolvedValue({ renderNotebook });
+    const invokeImpl = vi.fn().mockResolvedValue(notebookJson);
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+
+    const result = await loadPreviewForPath(windowsPath, {
+      invokeImpl,
+      fetchImpl,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer,
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", {
+      path: windowsPath,
+      max_bytes: MAX_NOTEBOOK_BYTES,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(loadNotebookRenderer).toHaveBeenCalledTimes(1);
+    expect(renderNotebook).toHaveBeenCalledWith(notebookJson);
+    expect(result).toEqual({
+      type: "rendered",
+      content: notebookJson,
+      renderedHtml: "<html><body>notebook</body></html>",
+      renderExt: "ipynb",
     });
   });
 

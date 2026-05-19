@@ -146,8 +146,11 @@ export const fileCommands = {
     });
   },
 
-  readFileContent: async (path: string): Promise<string> => {
-    return await invoke<string>("read_file_content", { path });
+  readFileContent: async (path: string, maxBytes?: number): Promise<string> => {
+    return await invoke<string>("read_file_content", {
+      path,
+      ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
+    });
   },
 
   getDirSize: async (path: string): Promise<number> => {

@@ -91,12 +91,14 @@ export const loadPreviewForPath = async (
   options: QuickPreviewLoaderOptions = {}
 ): Promise<PreviewState> => {
   const extension = getExtension(path);
-  const readFileContent = (filePath: string) =>
+  const readFileContent = (filePath: string, maxBytes?: number) =>
     options.invokeImpl
-      ? options.invokeImpl<string>("read_file_content", { path: filePath })
-      : useFileSystem().readFileContent(filePath);
+      ? options.invokeImpl<string>("read_file_content", {
+          path: filePath,
+          ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
+        })
+      : useFileSystem().readFileContent(filePath, maxBytes);
   const convertFileSrcImpl = options.convertFileSrcImpl ?? convertFileSrc;
-  const fetchImpl = options.fetchImpl ?? fetch;
   const loadTextHighlighter = options.loadTextHighlighter ?? defaultLoadTextHighlighter;
   const loadMarkdownRenderer = options.loadMarkdownRenderer ?? defaultLoadMarkdownRenderer;
   const loadNotebookRenderer = options.loadNotebookRenderer ?? defaultLoadNotebookRenderer;
@@ -109,7 +111,6 @@ export const loadPreviewForPath = async (
     extension,
     readFileContent,
     convertFileSrcImpl,
-    fetchImpl,
     loadTextHighlighter,
     loadMarkdownRenderer,
     loadNotebookRenderer,

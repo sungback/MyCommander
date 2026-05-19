@@ -15,7 +15,9 @@ pub use size_cache::{DirectorySizeCacheEntryUpdate, DirectorySizeCacheLoadResult
 #[cfg(test)]
 pub(crate) use dir_size::compute_path_size;
 #[cfg(test)]
-pub(crate) use preview::{decode_preview_bytes, path_matches_denied_home_path};
+pub(crate) use preview::{
+    decode_preview_bytes, path_matches_denied_home_path, read_preview_file_content_for_test,
+};
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
@@ -23,8 +25,8 @@ pub async fn list_directory(path: String, show_hidden: bool) -> Result<Vec<FileE
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn read_file_content(path: String) -> Result<String, String> {
-    preview::read_file_content(path).await
+pub async fn read_file_content(path: String, max_bytes: Option<u64>) -> Result<String, String> {
+    preview::read_file_content(path, max_bytes).await
 }
 
 #[tauri::command(rename_all = "snake_case")]

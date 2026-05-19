@@ -1,9 +1,25 @@
 use super::super::metadata::{
     decode_preview_bytes, is_hidden_entry, path_matches_denied_home_path,
+    read_preview_file_content_for_test,
 };
 use encoding_rs::EUC_KR;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn unique_preview_test_path(file_name: &str) -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "mycommander-preview-test-{}-{}",
+        std::process::id(),
+        suffix
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    dir.join(file_name)
+}
 
 #[test]
 fn hidden_entry_dot_prefix() {
@@ -60,6 +76,32 @@ fn decode_preview_bytes_decodes_euc_kr_text() {
 
     let decoded = decode_preview_bytes(bytes.as_ref());
     assert_eq!(decoded, "안녕하세요");
+}
+
+#[test]
+fn explicit_preview_read_limit_allows_tilde_notebook_names() {
+    let file_path = unique_preview_test_path("~.ipynb");
+    let content = r#"{"cells":[],"metadata":{}}"#;
+    fs::write(&file_path, content).unwrap();
+
+    let decoded = read_preview_file_content_for_test(&file_path, Some(5 * 1024 * 1024)).unwrap();
+
+    assert_eq!(decoded, content);
+    fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn explicit_preview_read_limit_rejects_files_over_limit() {
+    let file_path = unique_preview_test_path("large.ipynb");
+    fs::write(&file_path, "abcd").unwrap();
+
+    let error = read_preview_file_content_for_test(&file_path, Some(3)).unwrap_err();
+
+    assert_eq!(
+        error,
+        "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다."
+    );
+    fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
 }
 
 #[test]

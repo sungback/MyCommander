@@ -19,11 +19,11 @@ import type {
 
 export interface QuickPreviewHandlerContext
   extends Required<
-    Omit<QuickPreviewLoaderOptions, "invokeImpl" | "convertFileSrcImpl">
+    Omit<QuickPreviewLoaderOptions, "invokeImpl" | "convertFileSrcImpl" | "fetchImpl">
   > {
   extension: string;
   convertFileSrcImpl: (path: string) => string;
-  readFileContent: (path: string) => Promise<string>;
+  readFileContent: (path: string, maxBytes?: number) => Promise<string>;
   loadDocxRenderer: () => Promise<DocxRendererModule>;
 }
 
@@ -31,27 +31,6 @@ type QuickPreviewHandler = (
   path: string,
   context: QuickPreviewHandlerContext
 ) => Promise<PreviewState | null>;
-
-const fetchPreviewText = async (
-  path: string,
-  fetchImpl: typeof fetch,
-  convertFileSrcImpl: (path: string) => string
-) => {
-  const url = convertFileSrcImpl(path);
-  const response = await fetchImpl(url);
-  const contentLength = response.headers.get("content-length");
-
-  if (contentLength && Number.parseInt(contentLength, 10) > MAX_NOTEBOOK_BYTES) {
-    throw new Error("파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.");
-  }
-
-  const content = await response.text();
-  if (content.length > MAX_NOTEBOOK_BYTES) {
-    throw new Error("파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.");
-  }
-
-  return content;
-};
 
 const assetPreviewHandler: QuickPreviewHandler = async (path, context) => {
   if (IMAGE_EXTENSIONS.has(context.extension)) {
@@ -123,11 +102,7 @@ const notebookPreviewHandler: QuickPreviewHandler = async (path, context) => {
     return null;
   }
 
-  const content = await fetchPreviewText(
-    path,
-    context.fetchImpl,
-    context.convertFileSrcImpl
-  );
+  const content = await context.readFileContent(path, MAX_NOTEBOOK_BYTES);
   const renderer = await context.loadNotebookRenderer();
   return {
     type: "rendered",

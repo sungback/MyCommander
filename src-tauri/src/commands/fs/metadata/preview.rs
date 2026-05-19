@@ -4,17 +4,56 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const MAX_PREVIEW_BYTES: u64 = 100 * 1024;
+const MAX_EXPLICIT_PREVIEW_BYTES: u64 = 5 * 1024 * 1024;
+const TOO_LARGE_PREVIEW_ERROR: &str =
+    "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.";
 
-pub async fn read_file_content(path: String) -> Result<String, String> {
-    let path = validate_preview_read_path(Path::new(&path))?;
+pub async fn read_file_content(path: String, max_bytes: Option<u64>) -> Result<String, String> {
+    read_preview_file_content(Path::new(&path), preview_read_limit(max_bytes))
+}
+
+#[derive(Clone, Copy)]
+struct PreviewReadLimit {
+    bytes: u64,
+    enforce: bool,
+}
+
+fn preview_read_limit(max_bytes: Option<u64>) -> PreviewReadLimit {
+    match max_bytes {
+        Some(bytes) => PreviewReadLimit {
+            bytes: bytes.clamp(1, MAX_EXPLICIT_PREVIEW_BYTES),
+            enforce: true,
+        },
+        None => PreviewReadLimit {
+            bytes: MAX_PREVIEW_BYTES,
+            enforce: false,
+        },
+    }
+}
+
+fn read_preview_file_content(path: &Path, limit: PreviewReadLimit) -> Result<String, String> {
+    let path = validate_preview_read_path(path)?;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
 
     let mut buffer = Vec::new();
-    file.take(MAX_PREVIEW_BYTES)
+    let read_limit = limit.bytes + u64::from(limit.enforce);
+    file.take(read_limit)
         .read_to_end(&mut buffer)
         .map_err(|e| e.to_string())?;
 
+    if limit.enforce && buffer.len() as u64 > limit.bytes {
+        return Err(TOO_LARGE_PREVIEW_ERROR.to_string());
+    }
+
     Ok(decode_preview_bytes(&buffer))
+}
+
+#[cfg(test)]
+pub(crate) fn read_preview_file_content_for_test(
+    path: &Path,
+    max_bytes: Option<u64>,
+) -> Result<String, String> {
+    read_preview_file_content(path, preview_read_limit(max_bytes))
 }
 
 fn validate_preview_read_path(path: &Path) -> Result<PathBuf, String> {
