@@ -1,6 +1,6 @@
 [package]
 name = "mycommander"
-version = "1.2.12"
+version = "1.2.13"
 description = "MyCommander desktop file manager"
 authors = ["you"]
 edition = "2021"
