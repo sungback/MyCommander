@@ -2,8 +2,8 @@
 
 이 문서는 MyCommander의 사용자/기여자용 시작 안내입니다. 구현 컨텍스트와 설계 정책은 [`CLAUDE.md`](./CLAUDE.md), 에이전트 작업 규칙과 검증 기준은 [`AGENTS.md`](./AGENTS.md)를 참고합니다.
 
-MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.  
-현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교 기능, 패널 간 드래그 드롭 복사 UX, 파일 작업 Undo, 토스트 기반 피드백까지 포함합니다.
+MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼 데스크톱 파일 매니저입니다.
+현재 구현은 듀얼 패널 탐색을 중심으로, **고급 검색**, 빠른 미리보기, 일괄 이름 변경, ZIP 작업, 폴더 비교/동기화 보조, 패널/외부 드래그 드롭 복사 UX, 파일 작업 Undo, 디렉터리 크기 계산, 토스트 기반 피드백까지 포함합니다.
 
 ![MyCommander](public/screenshot.png)
 
@@ -11,14 +11,17 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 
 - 좌/우 **듀얼 패널** 파일 탐색
 - 패널별 **탭**, 뒤로/앞으로 이동, breadcrumb 경로 이동
+- 패널별 **brief / detailed 보기 모드**와 이름 / 크기 / 날짜 정렬
 - **즐겨찾기 패널** 추가 / 이름 변경 / 재정렬 / 접기
 - 사이드바와 Command Palette의 **최근 위치 / 자주 쓰는 위치** 빠른 이동
 - 폴더 **트리 확장(Expand)** 및 **하위 항목별 컨텍스트 메뉴(이름 변경, 정보 보기 등) 지원**
 - 파일/폴더 **생성, 삭제, 이름 변경, 복사, 이동**
 - Command Palette에서 마지막 **이름 변경 / 이동 작업 Undo**
 - 패널 간 **드래그 드롭 복사**
+- Finder/Explorer 등 앱 밖에서 끌어온 **외부 파일 드롭 복사**
 - 같은 패널 안에서 폴더만 선택한 경우 **드래그 이동**
 - 같은 폴더를 보는 양쪽 패널의 **자동 동기 갱신**
+- 파일시스템 변경 감시 기반 **자동 패널 갱신**
 - macOS에서 **Dropbox / iCloud Drive / CloudStorage symlink 경로 탐색 지원**
 - **빠른 미리보기**와 텍스트/문서 계열 렌더링
 - 정규식 / 대소문자 / 숨김 파일 / 파일 유형 / 확장자 / 크기 / 수정일 범위를 지원하는 **고급 파일 검색**
@@ -26,12 +29,16 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - **일괄 이름 변경**
 - **ZIP 생성 / ZIP 압축 해제**
 - **폴더 비교** 기반 동기화 보조 다이얼로그
+- 디렉터리 크기 **추정 / 정확 계산 / 취소 / 캐시 복원**
 - 현재 폴더 기준 **터미널 명령 실행**
 - **Command Palette**로 주요 파일 작업과 설정을 검색 실행
 - **현재 폴더 빠른 필터**로 파일 리스트 즉시 좁히기
 - 파일 리스트 내 **Git 상태 마킹** (M/A/D/? 인라인 표시)
 - 앱 메뉴 / 컨텍스트 메뉴 / 단축키 연동
+- 글꼴, 글자 크기, 패널 비율, 창 크기 프리셋을 조정하는 **설정 다이얼로그**
 - 짧은 사용자 피드백을 위한 **토스트 알림**
+- 앱 충돌 시 새로고침 동선을 제공하는 **React ErrorBoundary**
+- 창 위치/크기 복원과 macOS sleep/wake 후 렌더러 복구
 - **자동 테마 전환**: 07:00–19:00 light, 그 외 dark 자동 적용. 수동으로 light / dark / auto 선택 가능
 
 ## 미리보기 지원 예시
@@ -110,13 +117,16 @@ npm run dev
 | 앱 전체 개발 모드 | `npm run tauri dev` |
 | 프런트엔드만 실행 | `npm run dev` |
 | 프런트엔드 빌드 | `npm run build` |
-| TypeScript 타입 체크 | `./node_modules/.bin/tsc --noEmit` |
+| TypeScript 타입 체크 | `npm run typecheck` |
 | 프런트엔드 테스트 | `npm run test` |
 | Rust 테스트 | `npm run test:rust` |
 | 전체 테스트 | `npm run test:all` |
 | 테스트 커버리지 | `npm run test:coverage` |
-| Rust 체크 | `cargo check --manifest-path src-tauri/Cargo.toml` |
-| 배포 빌드 | `npm run tauri build` |
+| 프런트엔드 전체 검증 | `npm run verify:frontend` |
+| Rust/Tauri 전체 검증 | `npm run verify:rust` |
+| Tauri command/permission 정합성 | `npm run verify:tauri-commands` |
+| 전체 검증 | `npm run verify` |
+| 릴리즈 검증/빌드 | `npm run verify:release` |
 
 ## 단축키 / 주요 액션
 
@@ -131,8 +141,18 @@ npm run dev
 - `F7`: 새 폴더
 - `Alt+F7` / `Option+F7`: 검색
 - `F8`: 삭제
+- `F11`: 폴더 동기화
 - `Cmd+Q` / `Alt+F4`: 앱 종료
+- `Alt+Left` / `Alt+Right`: 활성 패널 뒤로 / 앞으로
+- `CmdOrCtrl+F`: 검색
+- `CmdOrCtrl+F1`: 활성 패널 brief 보기
+- `CmdOrCtrl+F2`: 활성 패널 detailed 보기
+- `CmdOrCtrl+C` / `CmdOrCtrl+X` / `CmdOrCtrl+V`: 파일 복사 / 잘라내기 / 붙여넣기
+- `CmdOrCtrl+D`: 현재 경로 즐겨찾기 추가
+- `CmdOrCtrl+I`: 선택 항목 정보 보기
+- `CmdOrCtrl+L`: 양쪽 패널 디렉터리 크기 계산
 - `CmdOrCtrl+Shift+.`: 숨김 파일 표시 토글
+- `CmdOrCtrl+Shift+C`: 현재 경로 복사
 - `CmdOrCtrl+Shift+M`: 반대 패널을 현재 경로로 동기화
 - `CmdOrCtrl+Shift+P`: Command Palette 열기
 - `CmdOrCtrl+U`: 패널 교환
@@ -143,6 +163,7 @@ npm run dev
 - 같은 패널 안에서 **파일 드래그**는 복사합니다.
 - 같은 패널 안에서 **폴더만 선택한 드래그**는 이동으로 처리합니다.
 - 왼쪽 패널에서 오른쪽 패널, 또는 반대로 드롭하면 대상 패널 현재 폴더로 복사합니다.
+- 앱 밖에서 파일을 패널로 드롭하면 대상 패널 현재 폴더로 복사합니다.
 - 이름 충돌이 없으면 즉시 복사합니다.
 - 이름 충돌이 있으면 복사 확인 다이얼로그를 열어 후속 동작을 선택합니다.
 - 파일 생성, 삭제, 이름 변경, 복사, 이동 후 양쪽 패널이 같은 폴더를 보고 있으면 함께 갱신됩니다.
@@ -162,6 +183,16 @@ npm run dev
   - 최대 결과 수
 - 검색 결과는 스트리밍 방식으로 누적 표시되며, 선택한 결과를 바로 복사 / 이동 / 삭제할 수 있습니다.
 
+## 보기 / 크기 계산 / 설정
+
+- detailed 보기에서는 컬럼 헤더로 이름 / 크기 / 날짜 정렬을 전환합니다.
+- brief 보기는 컬럼 헤더 없이 더 촘촘한 파일 리스트를 표시합니다.
+- 디렉터리 크기는 먼저 빠르게 추정하고, 일반 로컬 경로는 백그라운드에서 정확 계산을 보강합니다.
+- Space 키로 선택한 디렉터리 크기 계산을 수동으로 시작하거나 진행 중인 계산을 취소할 수 있습니다.
+- 계산된 디렉터리 크기는 캐시에 저장되어 다음 실행 때 복원됩니다.
+- 설정 다이얼로그에서 글자 크기, 앱 글꼴, 좌/우 패널 비율, 창 크기 프리셋을 조정할 수 있습니다.
+- 창 위치와 크기는 Tauri window-state 플러그인으로 복원됩니다.
+
 ## 피드백 표시
 
 - 짧은 작업 피드백(예: 경로 복사, 복사 완료, 경고, 오류)은 **토스트 알림**으로 표시됩니다.
@@ -172,9 +203,13 @@ npm run dev
 
 ```text
 src/
-  components/      # 앱 UI
+  components/
+    dialogs/       # 파일 작업, 검색, 미리보기, 작업 센터, 설정 UI
+    favorites/     # 즐겨찾기 / 최근 위치 사이드 패널
+    layout/        # 상태바, 컨텍스트 메뉴, 토스트, 툴바
+    panel/         # 듀얼 패널, 파일 리스트, 탭, 주소창, 드라이브, 드래그/크기 계산
   features/        # 기능 단위 로직
-  hooks/           # 키보드 및 Tauri command wrapper
+  hooks/           # 앱 생명주기, 키보드, Tauri command facade
   store/           # Zustand 스토어와 영속화/갱신 보조 로직
   test/            # 테스트 설정과 mock
   types/           # 타입 정의
