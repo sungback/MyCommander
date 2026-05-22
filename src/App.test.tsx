@@ -64,11 +64,11 @@ vi.mock('./components/panel/DualPanel',          () => ({ DualPanel:          ()
 vi.mock('./components/layout/StatusBar',         () => ({ StatusBar:          () => null }));
 vi.mock('./components/layout/ToastViewport',     () => ({ ToastViewport:      () => null }));
 vi.mock('./components/dialogs/DialogContainer',  () => ({ DialogContainer:    () => null }));
-vi.mock('./components/dialogs/ProgressDialog',   () => ({ ProgressDialog:     () => null }));
-vi.mock('./components/dialogs/JobCenterDialog',  () => ({ JobCenterDialog:    () => null }));
+vi.mock('./components/dialogs/jobs/ProgressDialog', () => ({ ProgressDialog:   () => null }));
+vi.mock('./components/dialogs/jobs/JobCenterDialog', () => ({ JobCenterDialog: () => null }));
 vi.mock('./components/dialogs/MultiRenameDialog', () => ({ MultiRenameDialog: () => null }));
-vi.mock('./components/dialogs/SearchPreviewDialogs', () => ({ SearchPreviewDialogs: () => null }));
-vi.mock('./components/dialogs/SyncDialog',       () => ({ SyncDialog:         () => null }));
+vi.mock('./components/dialogs/search/SearchPreviewDialogs', () => ({ SearchPreviewDialogs: () => null }));
+vi.mock('./components/dialogs/sync/SyncDialog',  () => ({ SyncDialog:         () => null }));
 vi.mock('./components/layout/ContextMenu',       () => ({ ContextMenu:        () => null }));
 
 // ── 테스트 ────────────────────────────────────────────────────────────────────

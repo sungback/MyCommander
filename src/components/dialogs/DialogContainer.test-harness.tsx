@@ -43,7 +43,7 @@ vi.mock('../../store/panelRefresh', () => ({
   refreshPanelsForDirectories: dialogContainerMocks.mockRefreshPanelsForDirectories,
 }));
 
-vi.mock('./QuickPreviewDialog', () => ({
+vi.mock('./preview/QuickPreviewDialog', () => ({
   QuickPreviewDialog: () => null,
 }));
 
