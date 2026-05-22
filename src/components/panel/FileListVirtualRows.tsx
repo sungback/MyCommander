@@ -5,7 +5,7 @@ import type { GitStatus } from "../../store/gitStatusStore";
 import { FileItem } from "./FileItem";
 import { getFileEntryDataAttributes } from "./fileEntryElement";
 import { getGitMarkForEntry } from "./fileListGitMark";
-import type { FileListDropUiState } from "./useFileListDropUiState";
+import type { FileListDropUiState } from "./drag/useFileListDropUiState";
 import type { VisibleEntryRow } from "./fileListRows";
 
 interface FileListVirtualRowsProps {

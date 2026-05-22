@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { formatDate, formatSize } from "../../utils/format";
 import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
-import { resolveEntryVisual } from "./fileVisuals";
+import { resolveEntryVisual } from "./visuals/fileVisuals";
 
 const THUMBNAIL_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "avif",

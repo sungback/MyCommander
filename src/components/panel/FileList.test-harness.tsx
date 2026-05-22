@@ -7,7 +7,7 @@ import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
 import {
   resetSharedDragState,
   sharedPanelPaths,
-} from './fileListDragSharedState';
+} from "./drag/fileListDragSharedState";
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),

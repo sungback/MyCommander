@@ -4,10 +4,10 @@ import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { CopyConflictDialog } from "./CopyConflictDialog";
-import { CommandPalette } from "./CommandPalette";
+import { CommandPalette } from "./palette/CommandPalette";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
-import { QuickPreviewDialog } from "./QuickPreviewDialog";
+import { QuickPreviewDialog } from "./preview/QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { TextInputOperationDialog } from "./TextInputOperationDialog";
 import {

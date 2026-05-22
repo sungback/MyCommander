@@ -11,7 +11,7 @@ import { getParentPath } from "../../utils/path";
 import { getPanelAccessPath } from "../../utils/panelPath";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
 import type { FileEntry } from "../../types/file";
-import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import { useBackgroundDirSizes } from "./size/useBackgroundDirSizes";
 import { useDirectoryLoader } from "./useDirectoryLoader";
 import { FileListSkeleton } from "./FileListSkeleton";
 import { usePanelContextMenu } from "./usePanelContextMenu";

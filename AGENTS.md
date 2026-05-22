@@ -56,6 +56,7 @@
 - 변경은 현재 기능 또는 버그 범위 안에서 작고 국소적으로 유지합니다.
 - 새로운 패턴을 들여오기보다, 기존 코드 스타일과 파일 배치를 최대한 따릅니다.
 - `README.md`는 사용자용, `CLAUDE.md`는 구현 컨텍스트용, `AGENTS.md`는 작업 규칙용으로 유지합니다.
+- 리팩토링 트리거와 디렉터리 구조 유지 기준은 [`docs/REFACTORING.md`](./docs/REFACTORING.md)를 따르되, 검증·커밋 절차는 이 문서를 우선합니다.
 - 프런트엔드 스타일링에는 Tailwind 유틸리티 클래스를 사용합니다.
 - 공유 프런트엔드 상태에는 Zustand를 사용합니다.
 - 새 Tauri command 추가 시 아래 4단계를 순서대로 완료합니다:
@@ -114,6 +115,22 @@ Plan → Modify → Verify → Fix → Re-verify → Report → Commit
 - 테스트를 먼저 작성하기 어려운 UI 배치, 문서, 설정, 단순 타입 정리 작업은 예외로 둘 수 있습니다.
 - 예외를 둔 경우에는 최종 보고에 이유와 대체 검증 방법을 명시합니다.
 - 사용자가 TDD를 명시적으로 요청한 작업은 `Red → Green → Refactor` 순서를 엄격히 따릅니다.
+
+### 테스트 하네스 아키텍처 규칙
+
+프로젝트 내에서 테스트 코드의 일관성과 격리를 확보하기 위해 **테스트 하네스 패턴**을 강제 적용합니다.
+
+1. **하네스 파일 역할 정의 (`[ModuleName].test-harness.tsx` 또는 `*.test-harness.ts`)**
+   - 비즈니스 로직, Zustand 스토어, 또는 Tauri IPC가 다수 연동되는 모듈의 테스트 파일이 여러 개로 분할될 경우, 반드시 독립된 `test-harness` 파일을 먼저 구축합니다.
+   - **수집 대상**:
+     - Tauri core 및 이벤트에 대한 글로벌 Mock (`vi.mock('@tauri-apps/api/core', ...)`)
+     - Zustand 스토어의 reset 및 mock 정의
+     - 테스트에 공통으로 필요한 픽스처 데이터 (`TEST_FILES` 등) 및 Props 빌더 (`makeProps`)
+     - 마우스 드래그, 외부 드롭 등 복잡한 UI 이벤트 시뮬레이션 헬퍼
+2. **테스트 상태 격리 (Isolation)**
+   - 각 테스트 케이스가 다른 테스트 케이스에 영향을 주지 않도록, `register[Module]TestLifecycle`과 같은 헬퍼를 정의하여 `beforeEach`와 `afterEach`에서 스토어의 상태를 완벽히 리셋하고 Mock을 초기화(`vi.clearAllMocks()`)해야 합니다.
+3. **테스트 파일 분리 규칙**
+   - 실제 테스트 파일(`.test.tsx` 또는 `.test.ts`)은 직접 ad-hoc mock을 수행하지 않고, 반드시 해당 모듈의 `test-harness`를 import하여 assertions(검증)에만 전념하도록 작성합니다.
 
 ### 하네스 체크포인트
 

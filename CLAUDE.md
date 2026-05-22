@@ -69,7 +69,7 @@
 - **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
 - **디렉터리 크기 계산:** `useBackgroundDirSizes`가 디렉터리 크기를 빠르게 추정하고, 일반 로컬 경로는 백그라운드 정확 계산으로 보강합니다. CloudStorage/Windows `AppData` 같은 경로는 자동 정확 계산을 피합니다. 수동 계산은 `manualDirectorySizeScan.ts`가 진행 이벤트와 취소를 관리합니다.
 - **디렉터리 크기 캐시:** `directorySizeCachePersistence.ts`와 `usePersistentSizeCache`가 안정적인 크기 결과를 localStorage에 보관/복원합니다. 오래된 exact 값은 estimated/stale 상태로 되돌려 재검증 대상으로 취급합니다.
-- **Command Palette:** `Cmd/Ctrl+Shift+P`로 열고 `src/components/dialogs/commandPaletteActions.ts`에서 현재 패널 상태 기반 명령 목록과 비활성 사유를 계산합니다. 실행은 `CommandPalette.tsx`에서 기존 dialog/store/Tauri facade를 호출합니다. 마지막 이름 변경/이동 Undo는 `fileOperationUndoStore.ts`에 세션 단위로 보관하고 Palette 명령에서 실행합니다.
+- **Command Palette:** `Cmd/Ctrl+Shift+P`로 열고 `src/components/dialogs/palette/commandPaletteActions.ts`에서 현재 패널 상태 기반 명령 목록과 비활성 사유를 계산합니다. 실행은 `CommandPalette.tsx`에서 기존 dialog/store/Tauri facade를 호출합니다. 마지막 이름 변경/이동 Undo는 `fileOperationUndoStore.ts`에 세션 단위로 보관하고 Palette 명령에서 실행합니다.
 - **현재 폴더 빠른 필터:** 각 `FilePanel`은 패널 로컬 상태로 필터 문자열을 보관하고 `quickFilter.ts` 헬퍼로 현재 폴더 파일 목록만 좁힙니다. `/` 키는 활성 패널의 필터 입력으로 포커스를 이동하며, 필터 적용 중 숨겨진 선택 항목은 안전하게 해제합니다.
 - **최근 위치 / 자주 쓰는 위치:** `locationHistoryStore.ts`가 패널 경로 이동을 localStorage에 기록합니다. 즐겨찾기 패널은 최근/자주 쓰는 위치 섹션을 표시하고, Command Palette는 위치 항목을 검색 가능한 명령으로 추가합니다.
 - **외부 파일 드롭:** `useExternalFileDrop`은 앱 밖에서 끌어온 파일 경로를 `FileList` 드롭 대상으로 받아 기존 복사/충돌 처리 흐름으로 넘깁니다. 내부 드래그가 진행 중이면 외부 드롭 처리를 건너뜁니다.
@@ -83,10 +83,19 @@
 ```text
 src/
   components/
-    dialogs/     # 복사/이동/검색/미리보기/동기화/일괄이름변경 UI + preview/dialog helper modules
+    dialogs/     # 공통 다이얼로그와 파일 작업 UI
+      jobs/      # ProgressDialog, JobCenterDialog, 작업 큐 표시 보조 로직
+      palette/   # Command Palette UI, 검색, 실행 액션
+      preview/   # Quick Preview UI, 파일 타입 판별, 문서/DB 렌더러
+      search/    # 검색 옵션, 검색 실행, 결과 선택/작업 UI
+      sync/      # 디렉터리 동기화 다이얼로그와 상태 보조 로직
     favorites/   # 즐겨찾기 사이드 패널
     layout/      # 상태바, 컨텍스트 메뉴, 하단 액션
-    panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록 + drag/size/view helper modules
+    panel/       # 듀얼 패널, 파일 리스트, 주소창, 탭 바, 드라이브 목록
+      drag/      # 패널/외부 드래그 드롭 규칙, 상태, 액션, 테스트
+      selection/ # 파일 리스트 선택 상태 관리
+      size/      # 디렉터리 크기 계산/표시 훅
+      visuals/   # 파일 아이콘/색상/시각 카탈로그
   features/      # 기능 단위 로직 (multiRename, syncExecution, fileOperationJobs)
   hooks/
     tauriCommands/     # IPC 클라이언트: archiveCommands / fileCommands / gitCommands / jobCommands / searchCommands / syncCommands / systemCommands

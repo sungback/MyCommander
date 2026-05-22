@@ -7,12 +7,12 @@ import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { useShallow } from "zustand/react/shallow";
 import { clsx } from "clsx";
-import { useFileListDrag } from "./useFileListDrag";
+import { useFileListDrag } from "./drag/useFileListDrag";
 import { getVisibleRows } from "./fileListRows";
 import { FileListVirtualRows } from "./FileListVirtualRows";
 import { useExpandedDirectories } from "./useExpandedDirectories";
 import { useFileListKeyboard } from "./useFileListKeyboard";
-import { useFileListSelection } from "./useFileListSelection";
+import { useFileListSelection } from "./selection/useFileListSelection";
 import { useFileListVirtualizer } from "./useFileListVirtualizer";
 
 interface FileListProps {
