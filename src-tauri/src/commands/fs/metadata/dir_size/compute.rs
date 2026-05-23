@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+
 use super::scan::scan_path_size_with_progress;
 use super::types::DirectorySizeEstimate;
 
@@ -39,6 +42,7 @@ pub(crate) fn estimate_path_size(
     let metadata = fs::symlink_metadata(target).map_err(|e| e.to_string())?;
     let max_depth = max_depth.min(MAX_ESTIMATE_DEPTH);
     let max_entries = max_entries.clamp(1, MAX_ESTIMATE_ENTRIES);
+    let root_device = metadata_device(&metadata);
     let mut estimate = DirectorySizeEstimate {
         size: 0,
         is_partial: false,
@@ -61,7 +65,14 @@ pub(crate) fn estimate_path_size(
         return Ok(estimate);
     }
 
-    scan_estimate_dir(target, 0, max_depth, max_entries, &mut estimate);
+    scan_estimate_dir(
+        target,
+        root_device,
+        0,
+        max_depth,
+        max_entries,
+        &mut estimate,
+    );
     Ok(estimate)
 }
 
@@ -87,8 +98,7 @@ fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
     use std::process::Command;
 
     let output = Command::new("du")
-        .arg("-sk")
-        .arg(path)
+        .args(du_size_command_args(path))
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -106,6 +116,11 @@ fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(super) fn du_size_command_args(path: &str) -> [&str; 2] {
+    ["-skx", path]
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn parse_du_size_bytes(stdout: &str) -> Option<u64> {
     stdout
         .split_whitespace()
@@ -115,6 +130,31 @@ pub(super) fn parse_du_size_bytes(stdout: &str) -> Option<u64> {
         .map(|size_kb| size_kb.saturating_mul(1024))
 }
 
+#[cfg(unix)]
+pub(super) fn is_same_filesystem_device(root_device: Option<u64>, child_device: u64) -> bool {
+    root_device.is_none_or(|device| device == child_device)
+}
+
+#[cfg(unix)]
+pub(super) fn metadata_device(metadata: &fs::Metadata) -> Option<u64> {
+    Some(metadata.dev())
+}
+
+#[cfg(not(unix))]
+pub(super) fn metadata_device(_metadata: &fs::Metadata) -> Option<u64> {
+    None
+}
+
+#[cfg(unix)]
+pub(super) fn is_same_filesystem(root_device: Option<u64>, metadata: &fs::Metadata) -> bool {
+    is_same_filesystem_device(root_device, metadata.dev())
+}
+
+#[cfg(not(unix))]
+pub(super) fn is_same_filesystem(_root_device: Option<u64>, _metadata: &fs::Metadata) -> bool {
+    true
+}
+
 fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
     let cancel_flag = AtomicBool::new(false);
     scan_path_size_with_progress(path, &cancel_flag, |_| {}).map(|result| result.size)
@@ -122,6 +162,7 @@ fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
 
 fn scan_estimate_dir(
     path: &Path,
+    root_device: Option<u64>,
     depth: usize,
     max_depth: usize,
     max_entries: usize,
@@ -174,12 +215,24 @@ fn scan_estimate_dir(
         }
 
         if metadata.is_dir() {
+            if !is_same_filesystem(root_device, &metadata) {
+                estimate.is_partial = true;
+                continue;
+            }
+
             if depth >= max_depth {
                 estimate.is_partial = true;
                 continue;
             }
 
-            scan_estimate_dir(&entry.path(), depth + 1, max_depth, max_entries, estimate);
+            scan_estimate_dir(
+                &entry.path(),
+                root_device,
+                depth + 1,
+                max_depth,
+                max_entries,
+                estimate,
+            );
         }
     }
 }

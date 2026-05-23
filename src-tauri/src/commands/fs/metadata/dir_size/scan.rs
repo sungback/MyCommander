@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use super::compute::should_skip_directory_traversal;
+use super::compute::{is_same_filesystem, metadata_device, should_skip_directory_traversal};
 use super::types::DirectorySizeScanResult;
 
 const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
@@ -108,13 +108,20 @@ where
         return Ok(accumulator.into_result());
     }
 
-    scan_dir_size_recursive(target, cancel_flag, &mut accumulator, &mut emit_progress)?;
+    scan_dir_size_recursive(
+        target,
+        metadata_device(&metadata),
+        cancel_flag,
+        &mut accumulator,
+        &mut emit_progress,
+    )?;
     accumulator.maybe_emit(true, &mut emit_progress);
     Ok(accumulator.into_result())
 }
 
 fn scan_dir_size_recursive<F>(
     path: &Path,
+    root_device: Option<u64>,
     cancel_flag: &AtomicBool,
     accumulator: &mut ScanAccumulator,
     emit_progress: &mut F,
@@ -166,7 +173,19 @@ where
         } else if should_skip_directory_traversal(&metadata) {
             continue;
         } else if metadata.is_dir() {
-            scan_dir_size_recursive(&entry.path(), cancel_flag, accumulator, emit_progress)?;
+            if !is_same_filesystem(root_device, &metadata) {
+                accumulator.mark_partial();
+                accumulator.maybe_emit(false, emit_progress);
+                continue;
+            }
+
+            scan_dir_size_recursive(
+                &entry.path(),
+                root_device,
+                cancel_flag,
+                accumulator,
+                emit_progress,
+            )?;
         }
 
         accumulator.maybe_emit(false, emit_progress);

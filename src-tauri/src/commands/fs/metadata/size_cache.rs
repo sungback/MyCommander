@@ -6,8 +6,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-const CACHE_VERSION: u8 = 1;
-const CACHE_FILE_NAME: &str = "size-cache-v1.json";
+const CACHE_VERSION: u8 = 2;
+const CACHE_FILE_NAME: &str = "size-cache-v2.json";
 const DEFAULT_MAX_ENTRIES: usize = 10_000;
 const EXACT_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1000;
 const ESTIMATE_TTL_MS: u64 = 24 * 60 * 60 * 1000;
@@ -155,6 +155,10 @@ fn read_snapshot_from_path(file_path: &Path) -> Result<DirectorySizeCacheSnapsho
 
 fn parse_snapshot(content: &str) -> Result<DirectorySizeCacheSnapshot, serde_json::Error> {
     let mut snapshot: DirectorySizeCacheSnapshot = serde_json::from_str(content)?;
+    if snapshot.version != CACHE_VERSION {
+        return Ok(empty_snapshot());
+    }
+
     sanitize_snapshot(&mut snapshot);
     Ok(snapshot)
 }
@@ -279,7 +283,7 @@ fn now_ms() -> u64 {
 mod tests {
     use super::{
         build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, write_snapshot_to_path,
-        DirectorySizeCacheEntry, DirectorySizeCacheSnapshot,
+        DirectorySizeCacheEntry, DirectorySizeCacheSnapshot, CACHE_VERSION,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -289,7 +293,7 @@ mod tests {
     fn parse_snapshot_drops_unstable_or_empty_entries() {
         let snapshot = parse_snapshot(
             r#"{
-              "version": 1,
+              "version": 2,
               "entries": {
                 "/exact": {
                   "size": 10,
@@ -314,9 +318,30 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(snapshot.version, 1);
+        assert_eq!(snapshot.version, CACHE_VERSION);
         assert_eq!(snapshot.entries.len(), 1);
         assert!(snapshot.entries.contains_key("/exact"));
+    }
+
+    #[test]
+    fn parse_snapshot_drops_entries_from_old_cache_versions() {
+        let snapshot = parse_snapshot(
+            r#"{
+              "version": 0,
+              "entries": {
+                "/system": {
+                  "size": 9007199254740992,
+                  "status": "partial",
+                  "scannedAt": 100,
+                  "lastUsedAt": 100
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(snapshot.version, CACHE_VERSION);
+        assert!(snapshot.entries.is_empty());
     }
 
     #[test]
@@ -362,7 +387,7 @@ mod tests {
     #[test]
     fn prune_snapshot_keeps_most_recently_used_entries() {
         let mut snapshot = DirectorySizeCacheSnapshot {
-            version: 1,
+            version: CACHE_VERSION,
             entries: HashMap::from([
                 ("/old".to_string(), entry(1, "exact", 100)),
                 ("/middle".to_string(), entry(2, "exact", 200)),
@@ -380,7 +405,7 @@ mod tests {
     #[test]
     fn write_snapshot_to_path_creates_parent_and_roundtrips_json() {
         let root = make_temp_dir("size-cache-write");
-        let file_path = root.join("nested").join("size-cache-v1.json");
+        let file_path = root.join("nested").join("size-cache-v2.json");
         let mut snapshot = empty_snapshot();
         snapshot
             .entries

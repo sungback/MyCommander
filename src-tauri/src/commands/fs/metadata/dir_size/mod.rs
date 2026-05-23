@@ -73,7 +73,11 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    use super::compute::du_size_command_args;
     use super::compute::estimate_path_size;
+    #[cfg(unix)]
+    use super::compute::is_same_filesystem_device;
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     use super::compute::parse_du_size_bytes;
     use super::scan::scan_path_size_with_progress;
@@ -94,6 +98,20 @@ mod tests {
     fn parse_du_size_bytes_returns_none_for_unparseable_output() {
         assert_eq!(parse_du_size_bytes(""), None);
         assert_eq!(parse_du_size_bytes("du: cannot read directory"), None);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn du_size_command_stays_on_current_filesystem() {
+        assert_eq!(du_size_command_args("/System"), ["-skx", "/System"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn filesystem_boundary_check_rejects_different_devices() {
+        assert!(is_same_filesystem_device(Some(7), 7));
+        assert!(!is_same_filesystem_device(Some(7), 8));
+        assert!(is_same_filesystem_device(None, 8));
     }
 
     #[test]
