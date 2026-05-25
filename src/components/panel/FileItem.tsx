@@ -32,7 +32,9 @@ const getEntrySizeText = (entry: FileEntry) => {
     case "partial":
       return entry.size === undefined || entry.size === null
         ? "-"
-        : `${formatSize(entry.size)}+`;
+        : entry.size === 0
+          ? "..."
+          : `${formatSize(entry.size)}+`;
     case "exact":
       return entry.size === undefined || entry.size === null
         ? "-"

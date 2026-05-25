@@ -161,6 +161,47 @@ describe("panelStore — updateEntrySize", () => {
     expect(usePanelStore.getState().sizeStatusCache["/estimated/dir"]).toBe("partial");
   });
 
+  it("does not cache partial zero directory sizes as stable values", () => {
+    const { setFiles, updateEntrySizeEstimate } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dir", path: "/cloud/dir", kind: "directory" },
+    ]);
+
+    updateEntrySizeEstimate("left", "/cloud/dir", 0, "partial");
+
+    const file = usePanelStore
+      .getState()
+      .leftPanel.files.find((entry) => entry.name === "dir");
+
+    expect(file?.size).toBe(0);
+    expect(file?.sizeStatus).toBe("partial");
+    expect(usePanelStore.getState().sizeCache["/cloud/dir"]).toBeUndefined();
+    expect(usePanelStore.getState().sizeStatusCache["/cloud/dir"]).toBeUndefined();
+  });
+
+  it("ignores partial zero entries when hydrating persistent directory size cache", () => {
+    const { hydrateEntrySizesFromCache, setFiles } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      {
+        path: "/cloud/dir",
+        size: 0,
+        status: "partial",
+        isStale: false,
+      },
+    ]);
+
+    setFiles("left", [
+      { name: "dir", path: "/cloud/dir", kind: "directory" },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/cloud/dir"]).toBeUndefined();
+    expect(state.sizeStatusCache["/cloud/dir"]).toBeUndefined();
+    expect(state.leftPanel.files.find((entry) => entry.name === "dir")?.size).toBeUndefined();
+  });
+
   it("hydrates persistent cached directory sizes and marks stale exact values as estimated", () => {
     const { hydrateEntrySizesFromCache, setFiles } = usePanelStore.getState();
 

@@ -112,6 +112,26 @@ describe("FileItem", () => {
     expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
   });
 
+  it("does not render partial zero directory sizes as a known 0 B value", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "cloud-empty-looking",
+          path: "/tmp/cloud-empty-looking",
+          kind: "directory",
+          size: 0,
+          sizeStatus: "partial",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("0 B+")).not.toBeInTheDocument();
+    expect(screen.getByText("...")).toBeInTheDocument();
+  });
+
   it("labels directory size calculation errors", () => {
     render(
       <FileItem

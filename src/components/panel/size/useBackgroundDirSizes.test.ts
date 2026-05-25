@@ -257,6 +257,66 @@ describe("useBackgroundDirSizes", () => {
     expect(mockScanDirSize).not.toHaveBeenCalled();
   });
 
+  it("promotes partial zero cloud child estimates with a bounded follow-up estimate", async () => {
+    mockEstimateDirSize
+      .mockResolvedValueOnce({
+        size: 0,
+        isPartial: true,
+        scannedEntries: 1,
+      })
+      .mockResolvedValueOnce({
+        size: 4096,
+        isPartial: false,
+        scannedEntries: 4,
+      });
+    const cloudFolder = makeDirectory("G:\\내 드라이브\\Photos");
+    const props = makeProps({
+      currentPath: "G:\\내 드라이브",
+      files: [cloudFolder],
+    });
+
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() =>
+      expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
+        "left",
+        "G:\\내 드라이브\\Photos",
+        0,
+        "partial"
+      )
+    );
+
+    rerender({
+      ...props,
+      files: [
+        {
+          ...cloudFolder,
+          size: 0,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(mockEstimateDirSize).toHaveBeenCalledWith(
+        "G:\\내 드라이브\\Photos",
+        { maxDepth: 4, maxEntries: 2000 }
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "G:\\내 드라이브\\Photos",
+        4096
+      )
+    );
+    expect(mockScanDirSize).not.toHaveBeenCalled();
+  });
+
   it("runs an exact background scan for partial local directories outside roots", async () => {
     const props = makeProps({
       currentPath: "/Users/back",

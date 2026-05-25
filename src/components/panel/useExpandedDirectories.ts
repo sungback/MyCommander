@@ -2,8 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { DirectorySizeStatus, FileEntry, PanelId } from "../../types/file";
 import type { DirectorySizeEstimate } from "../../hooks/tauriCommands/fileCommands";
 import { showTransientToast } from "../../store/toastStore";
+import {
+  getEstimateOptionsForDirectory,
+  shouldPromoteEstimateToExact,
+} from "../../utils/directorySizePolicy";
 
 interface UseExpandedDirectoriesProps {
+  accessPath?: string;
   currentPath: string;
   expandedChildrenVersion: number;
   files: FileEntry[];
@@ -27,6 +32,7 @@ interface UseExpandedDirectoriesProps {
     size: number,
     status: Extract<DirectorySizeStatus, "estimated" | "partial">
   ) => void;
+  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
   focusContainer: () => void;
 }
 
@@ -34,6 +40,7 @@ const filterParentEntry = (entries: FileEntry[]) =>
   entries.filter((entry) => entry.name !== "..");
 
 export const useExpandedDirectories = ({
+  accessPath,
   currentPath,
   expandedChildrenVersion,
   files,
@@ -45,6 +52,7 @@ export const useExpandedDirectories = ({
   setCursorIndex,
   setEntrySizeStatus,
   updateEntrySizeEstimate,
+  updateEntrySize,
   focusContainer,
 }: UseExpandedDirectoriesProps) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -128,16 +136,22 @@ export const useExpandedDirectories = ({
   }, [currentPath, expandedChildrenVersion, files, listDirectory, refreshKey, showHiddenFiles]);
 
   const estimateDirectorySize = (path: string, message: string) => {
+    const contextPaths = accessPath ? [currentPath, accessPath] : [currentPath];
     setEntrySizeStatus(panelId, path, "estimating");
-    estimateDirSize(path, { maxDepth: 1, maxEntries: 200 })
-      .then((estimate) =>
+    estimateDirSize(path, getEstimateOptionsForDirectory(path, contextPaths))
+      .then((estimate) => {
+        if (shouldPromoteEstimateToExact(path, contextPaths, estimate.isPartial)) {
+          updateEntrySize(panelId, path, estimate.size);
+          return;
+        }
+
         updateEntrySizeEstimate(
           panelId,
           path,
           estimate.size,
           estimate.isPartial ? "partial" : "estimated"
-        )
-      )
+        );
+      })
       .catch((error) => {
         setEntrySizeStatus(panelId, path, "error");
         console.error(message, error);

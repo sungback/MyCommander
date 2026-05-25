@@ -125,6 +125,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   });
 
   useBackgroundDirSizes({
+    accessPath: getPanelAccessPath(panelState),
     activeTabId: panelState.activeTabId,
     currentPath: panelState.currentPath,
     files: panelState.files,

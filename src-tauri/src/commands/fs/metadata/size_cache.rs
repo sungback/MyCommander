@@ -83,7 +83,7 @@ pub async fn upsert_dir_size_cache_entries(
 
         for entry in entries {
             let path = entry.path.trim();
-            if path.is_empty() || !is_stable_status(&entry.status) {
+            if path.is_empty() || !is_stable_update(&entry) {
                 continue;
             }
 
@@ -167,7 +167,7 @@ fn sanitize_snapshot(snapshot: &mut DirectorySizeCacheSnapshot) {
     snapshot.version = CACHE_VERSION;
     snapshot
         .entries
-        .retain(|path, entry| !path.trim().is_empty() && is_stable_status(&entry.status));
+        .retain(|path, entry| !path.trim().is_empty() && is_stable_entry(entry));
 }
 
 fn empty_snapshot() -> DirectorySizeCacheSnapshot {
@@ -248,6 +248,14 @@ fn is_stable_status(status: &str) -> bool {
     matches!(status, "exact" | "estimated" | "partial")
 }
 
+fn is_stable_entry(entry: &DirectorySizeCacheEntry) -> bool {
+    is_stable_status(&entry.status) && !(entry.status == "partial" && entry.size == 0)
+}
+
+fn is_stable_update(entry: &DirectorySizeCacheEntryUpdate) -> bool {
+    is_stable_status(&entry.status) && !(entry.status == "partial" && entry.size == 0)
+}
+
 fn write_snapshot_to_path(
     file_path: &Path,
     snapshot: &DirectorySizeCacheSnapshot,
@@ -321,6 +329,33 @@ mod tests {
         assert_eq!(snapshot.version, CACHE_VERSION);
         assert_eq!(snapshot.entries.len(), 1);
         assert!(snapshot.entries.contains_key("/exact"));
+    }
+
+    #[test]
+    fn parse_snapshot_drops_partial_zero_entries() {
+        let snapshot = parse_snapshot(
+            r#"{
+              "version": 2,
+              "entries": {
+                "/partial-zero": {
+                  "size": 0,
+                  "status": "partial",
+                  "scannedAt": 100,
+                  "lastUsedAt": 100
+                },
+                "/exact-zero": {
+                  "size": 0,
+                  "status": "exact",
+                  "scannedAt": 100,
+                  "lastUsedAt": 100
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+
+        assert!(!snapshot.entries.contains_key("/partial-zero"));
+        assert!(snapshot.entries.contains_key("/exact-zero"));
     }
 
     #[test]

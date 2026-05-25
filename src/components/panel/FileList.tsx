@@ -101,6 +101,7 @@ export const FileList: React.FC<FileListProps> = ({
     expandedPaths,
     toggleExpanded,
   } = useExpandedDirectories({
+    accessPath,
     currentPath,
     estimateDirSize,
     expandedChildrenVersion,
@@ -111,6 +112,7 @@ export const FileList: React.FC<FileListProps> = ({
     showHiddenFiles,
     setCursorIndex,
     setEntrySizeStatus,
+    updateEntrySize,
     updateEntrySizeEstimate,
     focusContainer,
   });
