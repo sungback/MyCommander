@@ -80,6 +80,7 @@ mod tests {
     use super::compute::is_same_filesystem_device;
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     use super::compute::parse_du_size_bytes;
+    use super::compute::should_skip_directory_traversal_for_reparse_tag;
     use super::scan::scan_path_size_with_progress;
     use std::fs;
     #[cfg(unix)]
@@ -235,6 +236,28 @@ mod tests {
 
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
+    fn reparse_policy_skips_name_surrogates_but_allows_cloud_placeholders() {
+        const IO_REPARSE_TAG_SYMLINK: u32 = 0xA000_000C;
+        const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
+        const IO_REPARSE_TAG_CLOUD: u32 = 0x9000_001A;
+        const IO_REPARSE_TAG_ONEDRIVE: u32 = 0x8000_0021;
+
+        assert!(should_skip_directory_traversal_for_reparse_tag(Some(
+            IO_REPARSE_TAG_SYMLINK
+        )));
+        assert!(should_skip_directory_traversal_for_reparse_tag(Some(
+            IO_REPARSE_TAG_MOUNT_POINT
+        )));
+        assert!(!should_skip_directory_traversal_for_reparse_tag(Some(
+            IO_REPARSE_TAG_CLOUD
+        )));
+        assert!(!should_skip_directory_traversal_for_reparse_tag(Some(
+            IO_REPARSE_TAG_ONEDRIVE
+        )));
+        assert!(should_skip_directory_traversal_for_reparse_tag(None));
     }
 
     fn make_temp_dir(label: &str) -> std::path::PathBuf {

@@ -4,6 +4,8 @@ use std::sync::atomic::AtomicBool;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(target_os = "windows")]
+use std::os::windows::{ffi::OsStrExt, fs::MetadataExt};
 
 use super::scan::scan_path_size_with_progress;
 use super::types::DirectorySizeEstimate;
@@ -55,7 +57,7 @@ pub(crate) fn estimate_path_size(
         return Ok(estimate);
     }
 
-    if should_skip_directory_traversal(&metadata) {
+    if should_skip_directory_traversal(target, &metadata) {
         estimate.is_partial = true;
         estimate.scanned_entries = 1;
         return Ok(estimate);
@@ -76,14 +78,29 @@ pub(crate) fn estimate_path_size(
     Ok(estimate)
 }
 
-pub(super) fn should_skip_directory_traversal(metadata: &fs::Metadata) -> bool {
-    metadata.file_type().is_symlink() || is_windows_reparse_point(metadata)
+pub(super) fn should_skip_directory_traversal(path: &Path, metadata: &fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+
+    if is_windows_reparse_point(metadata) {
+        return should_skip_directory_traversal_for_reparse_tag(windows_reparse_tag(path));
+    }
+
+    false
+}
+
+pub(super) fn should_skip_directory_traversal_for_reparse_tag(reparse_tag: Option<u32>) -> bool {
+    reparse_tag.is_none_or(is_name_surrogate_reparse_tag)
+}
+
+fn is_name_surrogate_reparse_tag(reparse_tag: u32) -> bool {
+    const IO_REPARSE_TAG_NAME_SURROGATE: u32 = 0x2000_0000;
+    reparse_tag & IO_REPARSE_TAG_NAME_SURROGATE != 0
 }
 
 #[cfg(target_os = "windows")]
 fn is_windows_reparse_point(metadata: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
     metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
@@ -91,6 +108,29 @@ fn is_windows_reparse_point(metadata: &fs::Metadata) -> bool {
 #[cfg(not(target_os = "windows"))]
 fn is_windows_reparse_point(_metadata: &fs::Metadata) -> bool {
     false
+}
+
+#[cfg(target_os = "windows")]
+fn windows_reparse_tag(path: &Path) -> Option<u32> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Storage::FileSystem::{FindClose, FindFirstFileW, WIN32_FIND_DATAW};
+
+    let mut find_data = WIN32_FIND_DATAW::default();
+    let path_wide = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+
+    let handle = unsafe { FindFirstFileW(PCWSTR(path_wide.as_ptr()), &mut find_data) }.ok()?;
+
+    let _ = unsafe { FindClose(handle) };
+    Some(find_data.dwReserved0)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn windows_reparse_tag(_path: &Path) -> Option<u32> {
+    None
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -209,7 +249,7 @@ fn scan_estimate_dir(
             continue;
         }
 
-        if should_skip_directory_traversal(&metadata) {
+        if should_skip_directory_traversal(&entry.path(), &metadata) {
             estimate.is_partial = true;
             continue;
         }

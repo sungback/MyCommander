@@ -97,7 +97,7 @@ where
         return Ok(accumulator.into_result());
     }
 
-    if should_skip_directory_traversal(&metadata) {
+    if should_skip_directory_traversal(target, &metadata) {
         accumulator.mark_partial();
         accumulator.maybe_emit(true, &mut emit_progress);
         return Ok(accumulator.into_result());
@@ -170,7 +170,7 @@ where
 
         if metadata.is_file() {
             accumulator.size = accumulator.size.saturating_add(metadata.len());
-        } else if should_skip_directory_traversal(&metadata) {
+        } else if should_skip_directory_traversal(&entry.path(), &metadata) {
             continue;
         } else if metadata.is_dir() {
             if !is_same_filesystem(root_device, &metadata) {

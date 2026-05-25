@@ -155,15 +155,17 @@ describe("useBackgroundDirSizes", () => {
 
   it("does not automatically exact-scan likely cloud storage paths", () => {
     expect(isLikelyCloudStoragePath("G:\\내 드라이브")).toBe(true);
+    expect(isLikelyCloudStoragePath("C:\\Users\\sam\\내 드라이브")).toBe(true);
     expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Google Drive")).toBe(true);
     expect(isLikelyCloudStoragePath("/Users/sam/Library/CloudStorage/Dropbox")).toBe(true);
     expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Projects")).toBe(false);
 
     expect(shouldAutoScanExactSizes("G:\\내 드라이브")).toBe(false);
+    expect(shouldAutoScanExactSizes("C:\\Users\\sam\\내 드라이브")).toBe(false);
     expect(
       shouldQueueExactBackgroundScan(
         {
-          ...makeDirectory("G:\\내 드라이브"),
+          ...makeDirectory("C:\\Users\\sam\\내 드라이브"),
           size: 1024,
           sizeStatus: "estimated",
         },
@@ -269,9 +271,9 @@ describe("useBackgroundDirSizes", () => {
         isPartial: false,
         scannedEntries: 4,
       });
-    const cloudFolder = makeDirectory("G:\\내 드라이브\\Photos");
+    const cloudFolder = makeDirectory("C:\\Users\\sam\\내 드라이브\\Photos");
     const props = makeProps({
-      currentPath: "G:\\내 드라이브",
+      currentPath: "C:\\Users\\sam\\내 드라이브",
       files: [cloudFolder],
     });
 
@@ -284,7 +286,7 @@ describe("useBackgroundDirSizes", () => {
     await waitFor(() =>
       expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
         "left",
-        "G:\\내 드라이브\\Photos",
+        "C:\\Users\\sam\\내 드라이브\\Photos",
         0,
         "partial"
       )
@@ -303,14 +305,14 @@ describe("useBackgroundDirSizes", () => {
 
     await waitFor(() =>
       expect(mockEstimateDirSize).toHaveBeenCalledWith(
-        "G:\\내 드라이브\\Photos",
+        "C:\\Users\\sam\\내 드라이브\\Photos",
         { maxDepth: 4, maxEntries: 2000 }
       )
     );
     await waitFor(() =>
       expect(props.updateEntrySize).toHaveBeenCalledWith(
         "left",
-        "G:\\내 드라이브\\Photos",
+        "C:\\Users\\sam\\내 드라이브\\Photos",
         4096
       )
     );

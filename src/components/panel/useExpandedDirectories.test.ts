@@ -11,8 +11,8 @@ const makeDirectory = (path: string): FileEntry => ({
 
 describe("useExpandedDirectories", () => {
   it("uses a bounded cloud estimate for expanded children under My Drive", async () => {
-    const parent = makeDirectory("G:\\내 드라이브\\Projects");
-    const child = makeDirectory("G:\\내 드라이브\\Projects\\Archive");
+    const parent = makeDirectory("C:\\Users\\sam\\내 드라이브\\Projects");
+    const child = makeDirectory("C:\\Users\\sam\\내 드라이브\\Projects\\Archive");
     const estimateDirSize = vi.fn().mockResolvedValue({
       size: 4096,
       isPartial: false,
@@ -22,7 +22,7 @@ describe("useExpandedDirectories", () => {
     const updateEntrySize = vi.fn();
     const updateEntrySizeEstimate = vi.fn();
     const props = {
-      currentPath: "G:\\내 드라이브",
+      currentPath: "C:\\Users\\sam\\내 드라이브",
       expandedChildrenVersion: 0,
       files: [parent],
       estimateDirSize,
@@ -47,20 +47,20 @@ describe("useExpandedDirectories", () => {
 
     await waitFor(() =>
       expect(estimateDirSize).toHaveBeenCalledWith(
-        "G:\\내 드라이브\\Projects\\Archive",
+        "C:\\Users\\sam\\내 드라이브\\Projects\\Archive",
         { maxDepth: 4, maxEntries: 2000 }
       )
     );
     await waitFor(() =>
       expect(updateEntrySize).toHaveBeenCalledWith(
         "left",
-        "G:\\내 드라이브\\Projects\\Archive",
+        "C:\\Users\\sam\\내 드라이브\\Projects\\Archive",
         4096
       )
     );
     expect(updateEntrySizeEstimate).not.toHaveBeenCalledWith(
       "left",
-      "G:\\내 드라이브\\Projects\\Archive",
+      "C:\\Users\\sam\\내 드라이브\\Projects\\Archive",
       4096,
       "estimated"
     );
