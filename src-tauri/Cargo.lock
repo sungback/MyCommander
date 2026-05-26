@@ -2358,7 +2358,7 @@ dependencies = [
 
 [[package]]
 name = "mycommander"
-version = "1.2.18"
+version = "1.2.19"
 dependencies = [
  "cocoa",
  "dirs",
