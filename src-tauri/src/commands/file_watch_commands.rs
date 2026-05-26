@@ -1,11 +1,19 @@
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
 use tokio::time::Duration;
+
+#[path = "file_watch/filter.rs"]
+mod filter;
+#[path = "file_watch/paths.rs"]
+mod paths;
+
+use filter::should_ignore_noisy_metadata_event_path;
+use paths::{collect_changed_directories_and_paths, collect_watchable_paths};
 
 const DEBOUNCE_DURATION: Duration = Duration::from_millis(200);
 
@@ -141,117 +149,11 @@ fn emit_batched_events(app: &AppHandle, events: Vec<Event>) {
     let _ = app.emit("filesystem-changed", payload);
 }
 
-fn should_ignore_noisy_metadata_event_path(path: &Path, event_kind: &EventKind) -> bool {
-    if is_windows_app_data_descendant(path) {
-        return true;
-    }
-
-    if is_vcs_metadata_descendant(path) {
-        return true;
-    }
-
-    is_vcs_metadata_directory(path)
-        && !matches!(event_kind, EventKind::Create(_) | EventKind::Remove(_))
-}
-
-fn is_vcs_metadata_descendant(path: &Path) -> bool {
-    let mut inside_vcs_metadata = false;
-
-    for component in path.components() {
-        if inside_vcs_metadata {
-            return true;
-        }
-
-        inside_vcs_metadata = is_vcs_metadata_name(component.as_os_str());
-    }
-
-    false
-}
-
-fn is_vcs_metadata_directory(path: &Path) -> bool {
-    path.file_name().map(is_vcs_metadata_name).unwrap_or(false)
-}
-
-fn is_vcs_metadata_name(name: &std::ffi::OsStr) -> bool {
-    name.to_string_lossy().eq_ignore_ascii_case(".git")
-}
-
-fn is_windows_app_data_descendant(path: &Path) -> bool {
-    let raw_path = path.to_string_lossy();
-    let is_windows_like_path =
-        raw_path.contains('\\') || raw_path.as_bytes().get(1).is_some_and(|byte| *byte == b':');
-
-    if !is_windows_like_path {
-        return false;
-    }
-
-    let normalized = raw_path.replace('\\', "/");
-    let components: Vec<&str> = normalized
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect();
-
-    components
-        .iter()
-        .position(|component| component.eq_ignore_ascii_case("AppData"))
-        .is_some_and(|index| index + 1 < components.len())
-}
-
-fn collect_watchable_paths(paths: Vec<String>) -> HashSet<PathBuf> {
-    paths
-        .into_iter()
-        .filter_map(|raw_path| {
-            let trimmed = raw_path.trim();
-            if trimmed.is_empty() {
-                return None;
-            }
-
-            let candidate = PathBuf::from(trimmed);
-            if !candidate.is_absolute() || !candidate.is_dir() {
-                return None;
-            }
-
-            Some(std::fs::canonicalize(&candidate).unwrap_or(candidate))
-        })
-        .collect()
-}
-
-fn collect_changed_directories_and_paths(event_paths: &[PathBuf]) -> (Vec<String>, Vec<String>) {
-    let mut directory_set = HashSet::new();
-    let mut path_set = HashSet::new();
-
-    for path in event_paths {
-        if let Some(path_text) = path_to_string(path) {
-            path_set.insert(path_text.clone());
-            directory_set.insert(path_text);
-        }
-
-        if let Some(parent) = path.parent().and_then(path_to_string) {
-            directory_set.insert(parent);
-        }
-    }
-
-    let mut directories: Vec<String> = directory_set.into_iter().collect();
-    let mut paths: Vec<String> = path_set.into_iter().collect();
-    directories.sort_unstable();
-    paths.sort_unstable();
-
-    (directories, paths)
-}
-
-fn path_to_string(path: &Path) -> Option<String> {
-    if path.as_os_str().is_empty() {
-        return None;
-    }
-
-    Some(path.to_string_lossy().to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_changed_directories_and_paths, collect_watchable_paths,
-        should_ignore_noisy_metadata_event_path,
+        filter::should_ignore_noisy_metadata_event_path,
+        paths::{collect_changed_directories_and_paths, collect_watchable_paths},
     };
     use notify::event::{CreateKind, DataChange, ModifyKind, RemoveKind};
     use notify::EventKind;

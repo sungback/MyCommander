@@ -1,10 +1,16 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+
+#[path = "size_cache/snapshot.rs"]
+mod snapshot;
+#[path = "size_cache/storage.rs"]
+mod storage;
+
+use snapshot::{build_load_result, is_stable_update, prune_snapshot};
+use storage::{cache_file_path, read_snapshot_from_path, write_snapshot_to_path};
 
 const CACHE_VERSION: u8 = 2;
 const CACHE_FILE_NAME: &str = "size-cache-v2.json";
@@ -135,151 +141,6 @@ pub async fn delete_dir_size_cache_entries(
     .map_err(|error| error.to_string())?
 }
 
-fn cache_file_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
-    Ok(app_dir.join(CACHE_FILE_NAME))
-}
-
-fn read_snapshot_from_path(file_path: &Path) -> Result<DirectorySizeCacheSnapshot, String> {
-    if !file_path.exists() {
-        return Ok(empty_snapshot());
-    }
-
-    let content = fs::read_to_string(file_path)
-        .map_err(|error| format!("Failed to read directory size cache: {error}"))?;
-    Ok(parse_snapshot(&content).unwrap_or_else(|_| empty_snapshot()))
-}
-
-fn parse_snapshot(content: &str) -> Result<DirectorySizeCacheSnapshot, serde_json::Error> {
-    let mut snapshot: DirectorySizeCacheSnapshot = serde_json::from_str(content)?;
-    if snapshot.version != CACHE_VERSION {
-        return Ok(empty_snapshot());
-    }
-
-    sanitize_snapshot(&mut snapshot);
-    Ok(snapshot)
-}
-
-fn sanitize_snapshot(snapshot: &mut DirectorySizeCacheSnapshot) {
-    snapshot.version = CACHE_VERSION;
-    snapshot
-        .entries
-        .retain(|path, entry| !path.trim().is_empty() && is_stable_entry(entry));
-}
-
-fn empty_snapshot() -> DirectorySizeCacheSnapshot {
-    DirectorySizeCacheSnapshot {
-        version: CACHE_VERSION,
-        entries: HashMap::new(),
-    }
-}
-
-fn build_load_result(
-    mut snapshot: DirectorySizeCacheSnapshot,
-    now_ms: u64,
-    max_entries: usize,
-) -> DirectorySizeCacheLoadResult {
-    prune_snapshot(&mut snapshot, max_entries);
-
-    let mut entries = snapshot
-        .entries
-        .into_iter()
-        .map(|(path, entry)| DirectorySizeCacheLoadedEntry {
-            is_stale: is_entry_stale(&entry, now_ms),
-            path,
-            size: entry.size,
-            status: entry.status,
-            scanned_at: entry.scanned_at,
-            last_used_at: entry.last_used_at,
-        })
-        .collect::<Vec<_>>();
-
-    entries.sort_by(|a, b| a.path.cmp(&b.path));
-
-    DirectorySizeCacheLoadResult {
-        version: CACHE_VERSION,
-        entries,
-        loaded_at: now_ms,
-    }
-}
-
-fn prune_snapshot(snapshot: &mut DirectorySizeCacheSnapshot, max_entries: usize) {
-    sanitize_snapshot(snapshot);
-
-    if max_entries == 0 {
-        snapshot.entries.clear();
-        return;
-    }
-
-    if snapshot.entries.len() <= max_entries {
-        return;
-    }
-
-    let mut entries_by_age = snapshot
-        .entries
-        .iter()
-        .map(|(path, entry)| (path.clone(), entry.last_used_at))
-        .collect::<Vec<_>>();
-    entries_by_age.sort_by_key(|(_, last_used_at)| *last_used_at);
-
-    let remove_count = snapshot.entries.len().saturating_sub(max_entries);
-    for (path, _) in entries_by_age.into_iter().take(remove_count) {
-        snapshot.entries.remove(&path);
-    }
-}
-
-fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
-    let ttl = match entry.status.as_str() {
-        "exact" => EXACT_TTL_MS,
-        "estimated" | "partial" => ESTIMATE_TTL_MS,
-        _ => return true,
-    };
-
-    match entry.scanned_at.checked_add(ttl) {
-        Some(expires_at) => expires_at <= now_ms,
-        None => true,
-    }
-}
-
-fn is_stable_status(status: &str) -> bool {
-    matches!(status, "exact" | "estimated" | "partial")
-}
-
-fn is_stable_entry(entry: &DirectorySizeCacheEntry) -> bool {
-    is_stable_status(&entry.status) && !(entry.status == "partial" && entry.size == 0)
-}
-
-fn is_stable_update(entry: &DirectorySizeCacheEntryUpdate) -> bool {
-    is_stable_status(&entry.status) && !(entry.status == "partial" && entry.size == 0)
-}
-
-fn write_snapshot_to_path(
-    file_path: &Path,
-    snapshot: &DirectorySizeCacheSnapshot,
-) -> Result<(), String> {
-    if let Some(parent) = file_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Failed to create directory size cache dir: {error}"))?;
-    }
-
-    let content = serde_json::to_string_pretty(snapshot)
-        .map_err(|error| format!("Failed to encode directory size cache: {error}"))?;
-    let temp_path = file_path.with_extension("json.tmp");
-    fs::write(&temp_path, content)
-        .map_err(|error| format!("Failed to write directory size cache temp file: {error}"))?;
-
-    if file_path.exists() {
-        fs::remove_file(file_path)
-            .map_err(|error| format!("Failed to replace directory size cache: {error}"))?;
-    }
-
-    fs::rename(&temp_path, file_path)
-        .map_err(|error| format!("Failed to finalize directory size cache: {error}"))
-}
-
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -290,7 +151,8 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, write_snapshot_to_path,
+        snapshot::{build_load_result, empty_snapshot, parse_snapshot, prune_snapshot},
+        storage::write_snapshot_to_path,
         DirectorySizeCacheEntry, DirectorySizeCacheSnapshot, CACHE_VERSION,
     };
     use std::collections::HashMap;

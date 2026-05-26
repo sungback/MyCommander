@@ -1,9 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { DirectorySizeStatus, PanelId } from "../../types/file";
-import {
-  cancelManualDirectorySizeScan,
-  scanDirectorySizeWithProgress,
-} from "../../hooks/manualDirectorySizeScan";
+import { toggleDirectorySizeScan } from "../../hooks/directorySizeActions";
 import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
 import { showTransientToast } from "../../store/toastStore";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
@@ -152,25 +149,17 @@ export const useFileListKeyboard = ({
 
       onSelect(current.path, true);
       if (current.kind === "directory" && current.name !== "..") {
-        cancelManualDirectorySizeScan(current.path)
-          .then((cancelled) => {
-            if (cancelled) {
-              return null;
-            }
-
-            return scanDirectorySizeWithProgress({
-              cancelDirSizeScan,
-              panelId,
-              path: current.path,
-              scanDirSize,
-              setEntrySizeStatus,
-              updateEntrySize,
-              updateEntrySizeEstimate,
-              updateEntrySizeProgress,
-            });
-          })
+        toggleDirectorySizeScan({
+          cancelDirSizeScan,
+          panelId,
+          path: current.path,
+          scanDirSize,
+          setEntrySizeStatus,
+          updateEntrySize,
+          updateEntrySizeEstimate,
+          updateEntrySizeProgress,
+        })
           .catch((error) => {
-            setEntrySizeStatus(panelId, current.path, "error");
             console.error("Failed to calculate dir size:", error);
             const message = error instanceof Error ? error.message : String(error);
             showTransientToast(`폴더 크기를 계산하지 못했습니다: ${message}`, {

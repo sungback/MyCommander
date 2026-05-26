@@ -1,6 +1,9 @@
 import { useMemo } from "react";
-import { calculatePanelDirectories } from "../../../hooks/calculatePanelDirectories";
 import { getErrorMessage, useFileSystem } from "../../../hooks/useFileSystem";
+import {
+  calculatePanelDirectorySizes,
+  getPanelDirectorySizeCompletionMessage,
+} from "../../../hooks/directorySizeActions";
 import { useClipboardStore } from "../../../store/clipboardStore";
 import { useDialogStore } from "../../../store/dialogStore";
 import { useJobStore } from "../../../store/jobStore";
@@ -66,7 +69,7 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
       calculateFolderSizes: async () => {
         closeDialog();
         showTransientToast("폴더 용량 계산을 시작했습니다.");
-        const result = await calculatePanelDirectories({
+        const result = await calculatePanelDirectorySizes({
           cancelDirSizeScan: fs.cancelDirSizeScan,
           panelId: activePanelId,
           panel: activePanel,
@@ -77,11 +80,7 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
           updateEntrySizeProgress,
         });
 
-        showTransientToast(
-          result.failed > 0
-            ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
-            : `폴더 용량 계산 완료: ${result.completed}개`
-        );
+        showTransientToast(getPanelDirectorySizeCompletionMessage(result));
       },
       closeApp: async () => {
         closeDialog();

@@ -4,12 +4,14 @@ import { useFileSystem } from "../../../hooks/useFileSystem";
 import type { DirectorySizeProgressEvent } from "../../../hooks/tauriCommands/fileCommands";
 import type { DirectorySizeStatus, FileEntry, PanelId } from "../../../types/file";
 import {
-  CLOUD_BOUNDED_ESTIMATE_OPTIONS,
-  getAutomaticEstimateOptions,
-  shouldAutoScanExactSizes,
-  shouldQueueCloudBoundedEstimate,
-  shouldQueueExactBackgroundScan,
-} from "../../../utils/directorySizePolicy";
+  createScheduler,
+  type BackgroundSizeScheduler,
+} from "./backgroundDirSizeScheduler";
+import {
+  queueAutomaticDirSizeEstimates,
+  queueCloudBoundedDirSizeEstimates,
+  queueExactDirSizeScans,
+} from "./backgroundDirSizeQueueRunners";
 
 export {
   getAutomaticEstimateOptions,
@@ -18,26 +20,6 @@ export {
   shouldAutoScanExactSizes,
   shouldQueueExactBackgroundScan,
 } from "../../../utils/directorySizePolicy";
-
-const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
-const MAX_BACKGROUND_EXACT_WORKERS = 1;
-const MAX_BACKGROUND_CLOUD_WORKERS = 1;
-
-interface BackgroundSizeScheduler {
-  activeCount: number;
-  queue: Array<{ path: string }>;
-  queuedPaths: Set<string>;
-  settledPaths: Set<string>;
-  activeExactCount: number;
-  exactQueue: Array<{ attemptKey: string; path: string }>;
-  queuedExactPaths: Set<string>;
-  settledExactPaths: Set<string>;
-  activeExactScans: Map<string, string>;
-  activeCloudCount: number;
-  cloudQueue: Array<{ attemptKey: string; path: string }>;
-  queuedCloudPaths: Set<string>;
-  settledCloudPaths: Set<string>;
-}
 
 interface UseBackgroundDirSizesProps {
   accessPath?: string;
@@ -65,43 +47,6 @@ interface UseBackgroundDirSizesProps {
     size: number
   ) => void;
 }
-
-const createScheduler = (): BackgroundSizeScheduler => ({
-  activeCount: 0,
-  queue: [],
-  queuedPaths: new Set(),
-  settledPaths: new Set(),
-  activeExactCount: 0,
-  exactQueue: [],
-  queuedExactPaths: new Set(),
-  settledExactPaths: new Set(),
-  activeExactScans: new Map(),
-  activeCloudCount: 0,
-  cloudQueue: [],
-  queuedCloudPaths: new Set(),
-  settledCloudPaths: new Set(),
-});
-
-const getExactAttemptKey = (entry: FileEntry, isStale: boolean) =>
-  [
-    entry.path.normalize("NFC"),
-    entry.size ?? "",
-    entry.sizeStatus ?? "",
-    isStale ? "stale" : "fresh",
-  ].join("|");
-
-const getCloudAttemptKey = (
-  entry: FileEntry,
-  isStale: boolean,
-  contextPaths: string[]
-) =>
-  [
-    entry.path.normalize("NFC"),
-    entry.size ?? "",
-    entry.sizeStatus ?? "",
-    isStale ? "stale" : "fresh",
-    ...contextPaths.map((path) => path.normalize("NFC")),
-  ].join("|");
 
 export const useBackgroundDirSizes = ({
   accessPath,
@@ -170,77 +115,18 @@ export const useBackgroundDirSizes = ({
 
   useEffect(() => {
     const scheduler = backgroundSchedulerRef.current;
-    const estimateOptions = getAutomaticEstimateOptions(currentPath);
-    const pendingDirectories = files.filter(
-      (entry) =>
-        entry.kind === "directory" &&
-        entry.name !== ".." &&
-        (entry.size === undefined || entry.size === null) &&
-        !scheduler.queuedPaths.has(entry.path) &&
-        !scheduler.settledPaths.has(entry.path)
-    );
-
-    if (pendingDirectories.length === 0) {
-      return;
-    }
-
-    const drainQueue = () => {
-      while (
-        scheduler.activeCount < MAX_BACKGROUND_DIR_SIZE_WORKERS &&
-        scheduler.queue.length > 0
-      ) {
-        const entry = scheduler.queue.shift();
-        if (!entry) {
-          return;
-        }
-
-        scheduler.activeCount += 1;
-        setEntrySizeStatus(panelId, entry.path, "estimating");
-
-        void fs
-          .estimateDirSize(entry.path, estimateOptions)
-          .then((estimate) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledPaths.add(entry.path);
-            updateEntrySizeEstimate(
-              panelId,
-              entry.path,
-              estimate.size,
-              estimate.isPartial ? "partial" : "estimated"
-            );
-          })
-          .catch((error) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledPaths.add(entry.path);
-            setEntrySizeStatus(panelId, entry.path, "error");
-            console.error(
-              `Failed to estimate background dir size for ${entry.path}:`,
-              error
-            );
-          })
-          .finally(() => {
-            scheduler.queuedPaths.delete(entry.path);
-            scheduler.activeCount -= 1;
-
-            if (backgroundSchedulerRef.current === scheduler) {
-              drainQueue();
-            }
-          });
-      }
-    };
-
-    for (const entry of pendingDirectories) {
-      scheduler.queue.push({ path: entry.path });
-      scheduler.queuedPaths.add(entry.path);
-    }
-
-    drainQueue();
+    queueAutomaticDirSizeEstimates({
+      currentPath,
+      estimateDirSize: fs.estimateDirSize,
+      files,
+      isCurrentScheduler: () => backgroundSchedulerRef.current === scheduler,
+      panelId,
+      scheduler,
+      setEntrySizeStatus,
+      sizeCacheStale,
+      updateEntrySize,
+      updateEntrySizeEstimate,
+    });
   }, [
     currentPath,
     files,
@@ -253,87 +139,20 @@ export const useBackgroundDirSizes = ({
 
   useEffect(() => {
     const scheduler = backgroundSchedulerRef.current;
-    const contextPaths = accessPath ? [currentPath, accessPath] : [currentPath];
-    const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
-    const pendingDirectories = files.filter((entry) => {
-      const stale = isStale(entry.path);
-      const attemptKey = getCloudAttemptKey(entry, stale, contextPaths);
-      return (
-        shouldQueueCloudBoundedEstimate(entry, stale, contextPaths) &&
-        !scheduler.queuedCloudPaths.has(entry.path) &&
-        !attemptedCloudKeysRef.current.has(attemptKey) &&
-        !scheduler.settledCloudPaths.has(entry.path)
-      );
+    queueCloudBoundedDirSizeEstimates({
+      accessPath,
+      attemptedCloudKeys: attemptedCloudKeysRef.current,
+      currentPath,
+      estimateDirSize: fs.estimateDirSize,
+      files,
+      isCurrentScheduler: () => backgroundSchedulerRef.current === scheduler,
+      panelId,
+      scheduler,
+      setEntrySizeStatus,
+      sizeCacheStale,
+      updateEntrySize,
+      updateEntrySizeEstimate,
     });
-
-    if (pendingDirectories.length === 0) {
-      return;
-    }
-
-    const drainCloudQueue = () => {
-      while (
-        scheduler.activeCloudCount < MAX_BACKGROUND_CLOUD_WORKERS &&
-        scheduler.cloudQueue.length > 0
-      ) {
-        const queuedEntry = scheduler.cloudQueue.shift();
-        if (!queuedEntry) {
-          return;
-        }
-
-        scheduler.activeCloudCount += 1;
-        setEntrySizeStatus(panelId, queuedEntry.path, "estimating");
-
-        void fs
-          .estimateDirSize(queuedEntry.path, CLOUD_BOUNDED_ESTIMATE_OPTIONS)
-          .then((estimate) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledCloudPaths.add(queuedEntry.path);
-            if (estimate.isPartial) {
-              updateEntrySizeEstimate(
-                panelId,
-                queuedEntry.path,
-                estimate.size,
-                "partial"
-              );
-            } else {
-              updateEntrySize(panelId, queuedEntry.path, estimate.size);
-            }
-          })
-          .catch((error) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledCloudPaths.add(queuedEntry.path);
-            setEntrySizeStatus(panelId, queuedEntry.path, "error");
-            console.error(
-              `Failed to estimate bounded cloud dir size for ${queuedEntry.path}:`,
-              error
-            );
-          })
-          .finally(() => {
-            scheduler.queuedCloudPaths.delete(queuedEntry.path);
-            scheduler.activeCloudCount -= 1;
-
-            if (backgroundSchedulerRef.current === scheduler) {
-              drainCloudQueue();
-            }
-          });
-      }
-    };
-
-    for (const entry of pendingDirectories) {
-      const stale = isStale(entry.path);
-      const attemptKey = getCloudAttemptKey(entry, stale, contextPaths);
-      scheduler.cloudQueue.push({ attemptKey, path: entry.path });
-      scheduler.queuedCloudPaths.add(entry.path);
-      attemptedCloudKeysRef.current.add(attemptKey);
-    }
-
-    drainCloudQueue();
   }, [
     accessPath,
     currentPath,
@@ -348,91 +167,22 @@ export const useBackgroundDirSizes = ({
   ]);
 
   useEffect(() => {
-    if (!shouldAutoScanExactSizes(accessPath ?? currentPath)) {
-      return;
-    }
-
     const scheduler = backgroundSchedulerRef.current;
-    const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
-    const pendingDirectories = files.filter(
-      (entry) => {
-        const stale = isStale(entry.path);
-        const attemptKey = getExactAttemptKey(entry, stale);
-        return (
-          shouldQueueExactBackgroundScan(entry, stale) &&
-          !scheduler.queuedExactPaths.has(entry.path) &&
-          !attemptedExactKeysRef.current.has(attemptKey) &&
-          !scheduler.settledExactPaths.has(entry.path)
-        );
-      }
-    );
-
-    if (pendingDirectories.length === 0) {
-      return;
-    }
-
-    const drainExactQueue = () => {
-      while (
-        scheduler.activeExactCount < MAX_BACKGROUND_EXACT_WORKERS &&
-        scheduler.exactQueue.length > 0
-      ) {
-        const queuedEntry = scheduler.exactQueue.shift();
-        if (!queuedEntry) {
-          return;
-        }
-
-        scheduler.activeExactCount += 1;
-        const scanId = `${panelId}-${Date.now()}-${scanCounterRef.current++}`;
-        scheduler.activeExactScans.set(scanId, queuedEntry.path);
-        setEntrySizeStatus(panelId, queuedEntry.path, "calculating");
-
-        void fs
-          .scanDirSize(queuedEntry.path, scanId)
-          .then((result) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledExactPaths.add(queuedEntry.path);
-            if (result.isPartial) {
-              updateEntrySizeEstimate(panelId, queuedEntry.path, result.size, "partial");
-            } else {
-              updateEntrySize(panelId, queuedEntry.path, result.size);
-            }
-          })
-          .catch((error) => {
-            if (backgroundSchedulerRef.current !== scheduler) {
-              return;
-            }
-
-            scheduler.settledExactPaths.add(queuedEntry.path);
-            setEntrySizeStatus(panelId, queuedEntry.path, "error");
-            console.error(
-              `Failed to scan background dir size for ${queuedEntry.path}:`,
-              error
-            );
-          })
-          .finally(() => {
-            scheduler.activeExactScans.delete(scanId);
-            scheduler.queuedExactPaths.delete(queuedEntry.path);
-            scheduler.activeExactCount -= 1;
-
-            if (backgroundSchedulerRef.current === scheduler) {
-              drainExactQueue();
-            }
-          });
-      }
-    };
-
-    for (const entry of pendingDirectories) {
-      const stale = isStale(entry.path);
-      const attemptKey = getExactAttemptKey(entry, stale);
-      scheduler.exactQueue.push({ attemptKey, path: entry.path });
-      scheduler.queuedExactPaths.add(entry.path);
-      attemptedExactKeysRef.current.add(attemptKey);
-    }
-
-    drainExactQueue();
+    queueExactDirSizeScans({
+      accessPath,
+      attemptedExactKeys: attemptedExactKeysRef.current,
+      currentPath,
+      files,
+      isCurrentScheduler: () => backgroundSchedulerRef.current === scheduler,
+      nextScanId: () => `${panelId}-${Date.now()}-${scanCounterRef.current++}`,
+      panelId,
+      scanDirSize: fs.scanDirSize,
+      scheduler,
+      setEntrySizeStatus,
+      sizeCacheStale,
+      updateEntrySize,
+      updateEntrySizeEstimate,
+    });
   }, [
     accessPath,
     currentPath,

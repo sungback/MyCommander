@@ -8,10 +8,7 @@ import {
   updateEntrySizeStatusAcrossPanels,
 } from "./panelStoreReducers";
 import { persistPanelUpdate } from "./panelStorePersistence";
-import {
-  queuePersistentSizeCacheDelete,
-  queuePersistentSizeCacheUpsert,
-} from "./directorySizeCachePersistence";
+import { queuePersistentSizeCacheDelete } from "./directorySizeCachePersistence";
 import {
   panelUpdate,
   type PanelStoreActions,
@@ -19,7 +16,16 @@ import {
 } from "./panelStoreActionTypes";
 import { isUsefulPersistentDirectorySize } from "../utils/directorySizePolicy";
 import { normalizePathKey } from "../utils/panelHelpers";
-import type { DirectorySizeStatus } from "../types/file";
+import {
+  buildProgressSizeCachePatch,
+  buildSizeStatusCachePatch,
+  buildStableSizeCachePatch,
+  buildUnstableSizeCacheRemoval,
+  queueStableSizeCacheWrite,
+  shouldCacheSizeStatus,
+  stableSizeCacheMatches,
+  toHydratedStatus,
+} from "./panelStoreSizeCache";
 
 type FileActions = Pick<
   PanelStoreActions,
@@ -32,38 +38,6 @@ type FileActions = Pick<
   | "updateEntrySizeProgress"
   | "hydrateEntrySizesFromCache"
 >;
-
-const shouldCacheSizeStatus = (status: unknown) =>
-  status === "estimated" || status === "partial" || status === "exact";
-
-const hasOwnCacheEntry = (cache: Record<string, unknown>, key: string) =>
-  Object.prototype.hasOwnProperty.call(cache, key);
-
-const toHydratedStatus = (
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">,
-  isStale: boolean
-) => (isStale && status === "exact" ? "estimated" : status);
-
-const queueStableSizeCacheWrite = (
-  path: string,
-  size: number,
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
-) => {
-  const normalizedPath = normalizePathKey(path);
-  if (!isUsefulPersistentDirectorySize(size, status)) {
-    queuePersistentSizeCacheDelete([normalizedPath]);
-    return;
-  }
-
-  const timestamp = Date.now();
-  queuePersistentSizeCacheUpsert({
-    path: normalizedPath,
-    size,
-    status,
-    scannedAt: timestamp,
-    lastUsedAt: timestamp,
-  });
-};
 
 export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => ({
   setFiles: (panel, files) =>
@@ -102,14 +76,9 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         size,
         "exact"
       );
-      const cachedSize = state.sizeCache[nextPanels.normalizedPath];
-      const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
-      const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
 
       if (
-        cachedSize === size &&
-        cachedStatus === "exact" &&
-        !cachedStale &&
+        stableSizeCacheMatches(state, nextPanels.normalizedPath, size, "exact") &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -117,30 +86,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       }
 
       return {
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
-        ...(cachedStatus === "exact"
-          ? {}
-          : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: "exact",
-              },
-            }),
-        ...(cachedStale
-          ? {
-              sizeCacheStale: {
-                ...state.sizeCacheStale,
-                [nextPanels.normalizedPath]: false,
-              },
-            }
-          : {}),
+        ...buildStableSizeCachePatch(
+          state,
+          nextPanels.normalizedPath,
+          size,
+          "exact"
+        ),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
@@ -159,53 +110,28 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         status
       );
       if (!isUsefulPersistentDirectorySize(size, status)) {
-        const hasCachedSize = hasOwnCacheEntry(
-          state.sizeCache,
-          nextPanels.normalizedPath
-        );
-        const hasCachedStatus = hasOwnCacheEntry(
-          state.sizeStatusCache,
-          nextPanels.normalizedPath
-        );
-        const hasCachedStale = hasOwnCacheEntry(
-          state.sizeCacheStale,
+        const cacheRemoval = buildUnstableSizeCacheRemoval(
+          state,
           nextPanels.normalizedPath
         );
 
         if (
-          !hasCachedSize &&
-          !hasCachedStatus &&
-          !hasCachedStale &&
+          !cacheRemoval.changed &&
           nextPanels.leftPanel === state.leftPanel &&
           nextPanels.rightPanel === state.rightPanel
         ) {
           return state;
         }
 
-        const nextSizeCache = { ...state.sizeCache };
-        const nextStatusCache = { ...state.sizeStatusCache };
-        const nextStaleCache = { ...state.sizeCacheStale };
-        delete nextSizeCache[nextPanels.normalizedPath];
-        delete nextStatusCache[nextPanels.normalizedPath];
-        delete nextStaleCache[nextPanels.normalizedPath];
-
         return {
-          ...(hasCachedSize ? { sizeCache: nextSizeCache } : {}),
-          ...(hasCachedStatus ? { sizeStatusCache: nextStatusCache } : {}),
-          ...(hasCachedStale ? { sizeCacheStale: nextStaleCache } : {}),
+          ...cacheRemoval.patch,
           leftPanel: nextPanels.leftPanel,
           rightPanel: nextPanels.rightPanel,
         };
       }
 
-      const cachedSize = state.sizeCache[nextPanels.normalizedPath];
-      const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
-      const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
-
       if (
-        cachedSize === size &&
-        cachedStatus === status &&
-        !cachedStale &&
+        stableSizeCacheMatches(state, nextPanels.normalizedPath, size, status) &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -213,30 +139,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       }
 
       return {
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
-        ...(cachedStatus === status
-          ? {}
-          : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: status,
-              },
-            }),
-        ...(cachedStale
-          ? {
-              sizeCacheStale: {
-                ...state.sizeCacheStale,
-                [nextPanels.normalizedPath]: false,
-              },
-            }
-          : {}),
+        ...buildStableSizeCachePatch(
+          state,
+          nextPanels.normalizedPath,
+          size,
+          status
+        ),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
@@ -252,10 +160,9 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         size,
         "calculating"
       );
-      const cachedSize = state.sizeCache[nextPanels.normalizedPath];
 
       if (
-        cachedSize === size &&
+        state.sizeCache[nextPanels.normalizedPath] === size &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -263,14 +170,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       }
 
       return {
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
+        ...buildProgressSizeCachePatch(state, nextPanels.normalizedPath, size),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
@@ -284,19 +184,14 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         path,
         status
       );
-      const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
-      const nextSizeStatusCache = shouldCacheSizeStatus(status)
-        ? {
-            ...state.sizeStatusCache,
-            [nextPanels.normalizedPath]: status,
-          }
-        : state.sizeStatusCache;
-      const nextCachedStatus = shouldCacheSizeStatus(status)
-        ? status
-        : cachedStatus;
+      const statusPatch = buildSizeStatusCachePatch(
+        state,
+        nextPanels.normalizedPath,
+        status
+      );
 
       if (
-        nextCachedStatus === cachedStatus &&
+        !statusPatch.changed &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -304,11 +199,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       }
 
       return {
-        ...(nextCachedStatus === cachedStatus
-          ? {}
-          : {
-              sizeStatusCache: nextSizeStatusCache,
-            }),
+        ...statusPatch.patch,
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
