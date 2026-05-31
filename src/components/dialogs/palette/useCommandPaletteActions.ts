@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { calculatePanelDirectories } from "../../../hooks/calculatePanelDirectories";
+import { calculatePanelDirectorySizesWithToast } from "../../../hooks/directorySizeActions";
 import { getErrorMessage, useFileSystem } from "../../../hooks/useFileSystem";
 import { useClipboardStore } from "../../../store/clipboardStore";
-import { useDialogStore } from "../../../store/dialogStore";
+import { type DialogTarget, useDialogStore } from "../../../store/dialogStore";
 import { useJobStore } from "../../../store/jobStore";
 import { useFileOperationUndoStore } from "../../../store/fileOperationUndoStore";
 import {
@@ -19,8 +19,26 @@ import {
   getPanelCommandPath,
   getPrimaryCommandTarget,
   getSelectedCommandPaths,
+  type CommandTarget,
   type CommandPaletteActions,
 } from "./commandPaletteActions";
+
+const openPrimaryTargetDialog = (
+  primaryTarget: CommandTarget | null,
+  setActivePanel: (panelId: CommandTarget["panelId"]) => void,
+  openDialog: (target: DialogTarget) => void
+) => {
+  if (!primaryTarget) {
+    return;
+  }
+
+  setActivePanel(primaryTarget.panelId);
+  openDialog({
+    panelId: primaryTarget.panelId,
+    path: primaryTarget.path,
+    entry: primaryTarget.entry,
+  });
+};
 
 export const useCommandPaletteActions = (): CommandPaletteActions => {
   const closeDialog = useDialogStore((state) => state.closeDialog);
@@ -65,23 +83,15 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
     () => ({
       calculateFolderSizes: async () => {
         closeDialog();
-        showTransientToast("폴더 용량 계산을 시작했습니다.");
-        const result = await calculatePanelDirectories({
-          cancelDirSizeScan: fs.cancelDirSizeScan,
+        await calculatePanelDirectorySizesWithToast({
+          client: fs,
           panelId: activePanelId,
           panel: activePanel,
-          scanDirSize: fs.scanDirSize,
           setEntrySizeStatus,
           updateEntrySize,
           updateEntrySizeEstimate,
           updateEntrySizeProgress,
         });
-
-        showTransientToast(
-          result.failed > 0
-            ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
-            : `폴더 용량 계산 완료: ${result.completed}개`
-        );
       },
       closeApp: async () => {
         closeDialog();
@@ -179,15 +189,7 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
         }
       },
       openInfo: () => {
-        if (!primaryTarget) {
-          return;
-        }
-        setActivePanel(primaryTarget.panelId);
-        openInfoDialog({
-          panelId: primaryTarget.panelId,
-          path: primaryTarget.path,
-          entry: primaryTarget.entry,
-        });
+        openPrimaryTargetDialog(primaryTarget, setActivePanel, openInfoDialog);
       },
       openJobCenter: () => setOpenDialog("jobcenter"),
       openLocation: (path: string) => {
@@ -198,26 +200,10 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
       openMove: () => setOpenDialog("move"),
       openNewFile: () => setOpenDialog("newfile"),
       openPreview: () => {
-        if (!primaryTarget) {
-          return;
-        }
-        setActivePanel(primaryTarget.panelId);
-        openPreviewDialog({
-          panelId: primaryTarget.panelId,
-          path: primaryTarget.path,
-          entry: primaryTarget.entry,
-        });
+        openPrimaryTargetDialog(primaryTarget, setActivePanel, openPreviewDialog);
       },
       openRename: () => {
-        if (!primaryTarget) {
-          return;
-        }
-        setActivePanel(primaryTarget.panelId);
-        openRenameDialog({
-          panelId: primaryTarget.panelId,
-          path: primaryTarget.path,
-          entry: primaryTarget.entry,
-        });
+        openPrimaryTargetDialog(primaryTarget, setActivePanel, openRenameDialog);
       },
       openSearch: () => setOpenDialog("search"),
       openSettings: () => setOpenDialog("settings"),

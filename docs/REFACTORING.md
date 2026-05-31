@@ -85,8 +85,8 @@ Rust 백엔드는 현재 `fs/`, `system/`, `jobs/` 등으로 모듈화가 잘 �
 - **과도한 중첩 (Deep Nesting):** 디렉터리 구조를 분할할 때 3단계를 초과하는 깊은 폴더 트리를 만들지 마세요.
 - **불필요한 Barrel Export:** Circular Dependency를 유발할 수 있는 무분별한 `index.ts` 생성을 피하세요.
 
-## 6. 현재 리팩토링 백로그 (2026-05 기준)
+## 6. 현재 리팩토링 백로그 (2026-06 기준)
 
-- **P1 (높음):** `components/panel/size/useBackgroundDirSizes.ts` (388줄), `store/panelStoreFileActions.ts` (370줄) - 컴포넌트 기능 개선 시 분할 우선 검토
-- **P2 (보통):** `components/panel/`, `components/dialogs/` 초기 하위 디렉터리 그룹화는 완료. 신규 파일 추가 시 현행 그룹 경계를 유지하고, 루트에 다시 대량 누적되지 않도록 점검
+- **완료:** `components/panel/size/useBackgroundDirSizes.ts`, `store/panelStoreFileActions.ts`, 커맨드 팔레트/컨텍스트 메뉴/키보드의 폴더 용량 계산 액션, Rust `size_cache.rs`/`file_watch_commands.rs` 테스트 모듈 분리를 완료했습니다.
+- **P2 (보통):** `utils/panelHelpers.ts`, `components/dialogs/sync/SyncDialog.tsx`, `components/panel/FileItem.tsx`, `components/dialogs/palette/CommandPalette.tsx`는 300줄을 조금 넘는 다음 분할 후보입니다. 기능 변경이나 버그 수정으로 해당 영역을 건드릴 때 우선 검토합니다.
 - **P3 (낮음):** 상태 바(`StatusBar.tsx`) 등 UI 컴포넌트 내부 렌더링 헬퍼 분리

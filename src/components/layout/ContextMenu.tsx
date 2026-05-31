@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { calculatePanelDirectories } from "../../hooks/calculatePanelDirectories";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
@@ -13,10 +12,9 @@ import {
 } from "../../features/fileOperationJobs";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import {
-  cancelManualDirectorySizeScan,
-  scanDirectorySizeWithProgress,
-} from "../../hooks/manualDirectorySizeScan";
-import { formatSize } from "../../utils/format";
+  calculateDirectoryEntrySizeWithToast,
+  calculatePanelDirectorySizesWithToast,
+} from "../../hooks/directorySizeActions";
 import { writeClipboardText } from "../../utils/clipboard";
 import {
   buildNfcRenameTargetPath,
@@ -108,59 +106,28 @@ export const ContextMenu: React.FC = () => {
               setActivePanel(panelId);
               closeContextMenu();
               if (targetPath && targetEntry?.kind === "directory" && targetEntry.name !== "..") {
-                if (await cancelManualDirectorySizeScan(targetPath)) {
-                  showTransientToast("폴더 용량 계산을 취소했습니다.", { tone: "warning" });
-                  return;
-                }
-
-                showTransientToast("폴더 용량 계산을 시작했습니다.");
-                try {
-                  const result = await scanDirectorySizeWithProgress({
-                    cancelDirSizeScan: fs.cancelDirSizeScan,
-                    panelId,
-                    path: targetPath,
-                    scanDirSize: fs.scanDirSize,
-                    setEntrySizeStatus,
-                    updateEntrySize,
-                    updateEntrySizeEstimate,
-                    updateEntrySizeProgress,
-                  });
-
-                  if (result.status === "cancelled") {
-                    showTransientToast("폴더 용량 계산을 취소했습니다.", {
-                      tone: "warning",
-                    });
-                  } else if (typeof result.size === "number") {
-                    const suffix = result.isPartial ? "+" : "";
-                    showTransientToast(
-                      `${targetEntry.name}: ${formatSize(result.size)}${suffix}`
-                    );
-                  }
-                } catch (error) {
-                  setEntrySizeStatus(panelId, targetPath, "error");
-                  throw error;
-                }
-                return;
-              }
-
-              showTransientToast("폴더 용량 계산을 시작했습니다.");
-              {
-                const result = await calculatePanelDirectories({
-                  cancelDirSizeScan: fs.cancelDirSizeScan,
+                await calculateDirectoryEntrySizeWithToast({
+                  client: fs,
                   panelId,
-                  panel,
-                  scanDirSize: fs.scanDirSize,
+                  path: targetPath,
+                  name: targetEntry.name,
                   setEntrySizeStatus,
                   updateEntrySize,
                   updateEntrySizeEstimate,
                   updateEntrySizeProgress,
                 });
-                showTransientToast(
-                  result.failed > 0
-                    ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
-                    : `폴더 용량 계산 완료: ${result.completed}개`
-                );
+                return;
               }
+
+              await calculatePanelDirectorySizesWithToast({
+                client: fs,
+                panelId,
+                panel,
+                setEntrySizeStatus,
+                updateEntrySize,
+                updateEntrySizeEstimate,
+                updateEntrySizeProgress,
+              });
               return;
             case "create-zip": {
               if (!targetPath || !targetEntry || targetEntry.name === "..") {
