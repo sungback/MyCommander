@@ -4,6 +4,7 @@ export const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
 export const MAX_BACKGROUND_EXACT_WORKERS = 1;
 export const DEFAULT_ESTIMATE_OPTIONS = { maxDepth: 1, maxEntries: 200 };
 export const ROOT_ESTIMATE_OPTIONS = { maxDepth: 0, maxEntries: 100 };
+export const DEEP_ESTIMATE_OPTIONS = { maxDepth: 3, maxEntries: 1500 };
 export const CLOUD_STORAGE_PATH_MARKERS = [
   "cloudstorage",
   "drivefs",
@@ -55,9 +56,23 @@ export const getExactAttemptKey = (entry: FileEntry, isStale: boolean) =>
 
 export const getAutomaticEstimateOptions = (currentPath: string) => {
   const trimmed = currentPath.replace(/[\\/]+$/, "");
-  return trimmed === "" || /^[A-Za-z]:$/.test(trimmed)
-    ? ROOT_ESTIMATE_OPTIONS
-    : DEFAULT_ESTIMATE_OPTIONS;
+  if (trimmed === "" || /^[A-Za-z]:$/.test(trimmed)) {
+    return ROOT_ESTIMATE_OPTIONS;
+  }
+
+  const pathLower = trimmed.toLowerCase();
+  if (
+    pathLower.includes("appdata") ||
+    pathLower.endsWith("내 드라이브") ||
+    pathLower.endsWith("my drive") ||
+    pathLower.includes("cloudstorage") ||
+    pathLower.includes("dropbox") ||
+    pathLower.includes("onedrive")
+  ) {
+    return DEEP_ESTIMATE_OPTIONS;
+  }
+
+  return DEFAULT_ESTIMATE_OPTIONS;
 };
 
 export const isLikelyCloudStoragePath = (path: string) => {

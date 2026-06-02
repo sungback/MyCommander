@@ -46,7 +46,7 @@ describe("backgroundDirSizeHelpers", () => {
     expect(keyStale).toBe("C:\\Users\\sam\\Projects|1024|estimated|stale");
   });
 
-  it("uses shallower estimates for filesystem roots", () => {
+  it("uses shallower estimates for filesystem roots and deeper estimates for complex directories", () => {
     expect(getAutomaticEstimateOptions("C:\\")).toEqual({
       maxDepth: 0,
       maxEntries: 100,
@@ -58,6 +58,14 @@ describe("backgroundDirSizeHelpers", () => {
     expect(getAutomaticEstimateOptions("/Users/sam")).toEqual({
       maxDepth: 1,
       maxEntries: 200,
+    });
+    expect(getAutomaticEstimateOptions("C:\\Users\\sam\\AppData")).toEqual({
+      maxDepth: 3,
+      maxEntries: 1500,
+    });
+    expect(getAutomaticEstimateOptions("G:\\내 드라이브")).toEqual({
+      maxDepth: 3,
+      maxEntries: 1500,
     });
     expect(shouldAutoScanExactSizes("C:\\")).toBe(false);
     expect(shouldAutoScanExactSizes("/Users/sam")).toBe(true);
