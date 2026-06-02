@@ -8,17 +8,18 @@ import {
   updateEntrySizeStatusAcrossPanels,
 } from "./panelStoreReducers";
 import { persistPanelUpdate } from "./panelStorePersistence";
-import {
-  queuePersistentSizeCacheDelete,
-  queuePersistentSizeCacheUpsert,
-} from "./directorySizeCachePersistence";
+import { queuePersistentSizeCacheDelete } from "./directorySizeCachePersistence";
 import {
   panelUpdate,
   type PanelStoreActions,
   type PanelStoreSet,
 } from "./panelStoreActionTypes";
 import { normalizePathKey } from "../utils/panelHelpers";
-import type { DirectorySizeStatus } from "../types/file";
+import {
+  shouldCacheSizeStatus,
+  toHydratedStatus,
+  queueStableSizeCacheWrite,
+} from "./panelStoreFileHelpers";
 
 type FileActions = Pick<
   PanelStoreActions,
@@ -31,29 +32,6 @@ type FileActions = Pick<
   | "updateEntrySizeProgress"
   | "hydrateEntrySizesFromCache"
 >;
-
-const shouldCacheSizeStatus = (status: unknown) =>
-  status === "estimated" || status === "partial" || status === "exact";
-
-const toHydratedStatus = (
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">,
-  isStale: boolean
-) => (isStale && status === "exact" ? "estimated" : status);
-
-const queueStableSizeCacheWrite = (
-  path: string,
-  size: number,
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
-) => {
-  const timestamp = Date.now();
-  queuePersistentSizeCacheUpsert({
-    path: normalizePathKey(path),
-    size,
-    status,
-    scannedAt: timestamp,
-    lastUsedAt: timestamp,
-  });
-};
 
 export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => ({
   setFiles: (panel, files) =>

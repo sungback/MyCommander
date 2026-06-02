@@ -1,14 +1,14 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileEntry } from "../../../types/file";
+import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
 import {
   getAutomaticEstimateOptions,
   isLikelyCloudStoragePath,
   isLikelyVolatileAutoScanPath,
   shouldAutoScanExactSizes,
   shouldQueueExactBackgroundScan,
-  useBackgroundDirSizes,
-} from "./useBackgroundDirSizes";
+} from "./backgroundDirSizeHelpers";
 
 const { listenHandlers, mockCancelDirSizeScan, mockEstimateDirSize, mockScanDirSize } =
 vi.hoisted(() => ({
