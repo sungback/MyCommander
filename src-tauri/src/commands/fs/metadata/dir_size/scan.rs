@@ -128,8 +128,10 @@ where
 
     let entries = match fs::read_dir(path) {
         Ok(entries) => entries,
-        Err(_) => {
-            accumulator.mark_partial();
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::PermissionDenied {
+                accumulator.mark_partial();
+            }
             accumulator.maybe_emit(false, emit_progress);
             return Ok(());
         }
@@ -142,8 +144,10 @@ where
 
         let entry = match entry {
             Ok(entry) => entry,
-            Err(_) => {
-                accumulator.mark_partial();
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::PermissionDenied {
+                    accumulator.mark_partial();
+                }
                 accumulator.maybe_emit(false, emit_progress);
                 continue;
             }
@@ -154,8 +158,10 @@ where
 
         let metadata = match fs::symlink_metadata(entry.path()) {
             Ok(metadata) => metadata,
-            Err(_) => {
-                accumulator.mark_partial();
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::PermissionDenied {
+                    accumulator.mark_partial();
+                }
                 accumulator.maybe_emit(false, emit_progress);
                 continue;
             }

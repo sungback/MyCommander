@@ -95,15 +95,13 @@ export const isLikelyHeavySystemPath = (path: string) => {
     .replace(/\/$/, "")
     .toLowerCase();
 
-  const pathWithoutDrive = normalized.replace(/^[a-z]:/, "");
-
   return (
-    pathWithoutDrive === "/users" ||
-    pathWithoutDrive === "/windows" ||
-    pathWithoutDrive === "/program files" ||
-    pathWithoutDrive === "/program files (x86)" ||
-    normalized === "/system" ||
-    normalized === "/usr"
+    normalized.endsWith("/users") ||
+    normalized.endsWith("/windows") ||
+    normalized.endsWith("/program files") ||
+    normalized.endsWith("/program files (x86)") ||
+    normalized.endsWith("/system") ||
+    normalized.endsWith("/usr")
   );
 };
 

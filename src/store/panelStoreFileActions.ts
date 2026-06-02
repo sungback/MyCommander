@@ -268,7 +268,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
           continue;
         }
 
-        const status = toHydratedStatus(entry.status, entry.isStale);
+        const status = toHydratedStatus(entry.status, entry.isStale, entry.path);
         const nextPanels = updateEntrySizeAcrossPanels(
           leftPanel,
           rightPanel,

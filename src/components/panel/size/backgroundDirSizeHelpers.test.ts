@@ -121,8 +121,11 @@ describe("backgroundDirSizeHelpers", () => {
     expect(isLikelyHeavySystemPath("C:\\Users\\sam")).toBe(false);
     expect(isLikelyHeavySystemPath("/system")).toBe(true);
     expect(isLikelyHeavySystemPath("/usr")).toBe(true);
+    expect(isLikelyHeavySystemPath("\\\\?\\C:\\Users")).toBe(true);
+    expect(isLikelyHeavySystemPath("\\\\?\\UNC\\server\\share\\Users")).toBe(true);
 
     expect(shouldAutoScanExactSizes("C:\\Users")).toBe(false);
+    expect(shouldAutoScanExactSizes("\\\\?\\C:\\Users")).toBe(false);
     expect(
       shouldQueueExactBackgroundScan(
         {

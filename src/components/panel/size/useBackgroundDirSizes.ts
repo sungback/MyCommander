@@ -143,7 +143,7 @@ export const useBackgroundDirSizes = ({
               panelId,
               entry.path,
               estimate.size,
-              estimate.isPartial ? "partial" : "estimated"
+              "estimated"
             );
           })
           .catch((error) => {
