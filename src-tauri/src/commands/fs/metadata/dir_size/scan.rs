@@ -3,6 +3,8 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "macos")]
+use super::compute::get_dir_size_with_du;
 use super::compute::should_skip_directory_traversal;
 use super::types::DirectorySizeScanResult;
 
@@ -108,9 +110,28 @@ where
         return Ok(accumulator.into_result());
     }
 
+    #[cfg(target_os = "macos")]
+    if is_macos_app_bundle_path(target, &metadata) {
+        if let Ok(size) = get_dir_size_with_du(path) {
+            accumulator.size = size;
+            accumulator.scanned_entries = 1;
+            accumulator.maybe_emit(true, &mut emit_progress);
+            return Ok(accumulator.into_result());
+        }
+    }
+
     scan_dir_size_recursive(target, cancel_flag, &mut accumulator, &mut emit_progress)?;
     accumulator.maybe_emit(true, &mut emit_progress);
     Ok(accumulator.into_result())
+}
+
+#[cfg(target_os = "macos")]
+fn is_macos_app_bundle_path(path: &Path, metadata: &fs::Metadata) -> bool {
+    metadata.is_dir()
+        && path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("app"))
 }
 
 fn scan_dir_size_recursive<F>(

@@ -83,7 +83,7 @@ fn is_windows_reparse_point(_metadata: &fs::Metadata) -> bool {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
+pub(super) fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
     use std::process::Command;
 
     let output = Command::new("du")

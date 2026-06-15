@@ -243,6 +243,60 @@ describe('FilePanel', () => {
     expect(alertSpy).not.toHaveBeenCalled();
   });
 
+  it("opens the parent entry path when entering '..' from a resolved directory", async () => {
+    const parentEntry = {
+      name: "..",
+      path: "/Users/back/Library/CloudStorage",
+      kind: "directory" as const,
+    };
+    const resolvedEntries = [
+      parentEntry,
+      {
+        name: "Docs",
+        path: "/Users/back/Library/CloudStorage/Dropbox/Docs",
+        kind: "directory" as const,
+        size: null,
+      },
+    ];
+
+    setLeftPanelPath("/Users/back/Dropbox");
+    mockListDirectory.mockImplementation(async (path: string) => {
+      if (path === "/Users/back/Library/CloudStorage/Dropbox") {
+        return resolvedEntries;
+      }
+
+      if (path === "/Users/back/Library/CloudStorage") {
+        return [];
+      }
+
+      throw new Error(`unexpected path: ${path}`);
+    });
+    mockResolvePath.mockImplementation(async (path: string) =>
+      path === "/Users/back/Dropbox"
+        ? "/Users/back/Library/CloudStorage/Dropbox"
+        : path
+    );
+    mockGetDirSize.mockResolvedValue(0);
+
+    render(<FilePanel id="left" />);
+
+    await waitFor(() => {
+      expect(lastFileListProps).not.toBeNull();
+      expect(usePanelStore.getState().leftPanel.currentPath).toBe("/Users/back/Dropbox");
+      expect(usePanelStore.getState().leftPanel.resolvedPath).toBe(
+        "/Users/back/Library/CloudStorage/Dropbox"
+      );
+    });
+
+    await act(async () => {
+      await lastFileListProps?.onEnter(parentEntry);
+    });
+
+    expect(usePanelStore.getState().leftPanel.currentPath).toBe(
+      "/Users/back/Library/CloudStorage"
+    );
+  });
+
   it("returns to the previous folder and shows the real error when loading fails", async () => {
     const homeEntries = [
       { name: "..", path: "/Users", kind: "directory" as const },

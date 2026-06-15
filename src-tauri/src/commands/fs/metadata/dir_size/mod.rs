@@ -73,6 +73,8 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
+    use super::compute::compute_path_size;
     use super::compute::estimate_path_size;
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     use super::compute::parse_du_size_bytes;
@@ -163,6 +165,32 @@ mod tests {
         assert!(!result.is_partial);
         assert_eq!(result.error_count, 0);
         assert!(progress_events.last().is_some_and(|event| event.completed));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn scan_path_size_with_progress_reports_app_bundle_disk_usage() {
+        let root = make_temp_dir("scan-app-bundle");
+        let app_bundle = root.join("Example.app");
+        let contents = app_bundle.join("Contents").join("Resources");
+        fs::create_dir_all(&contents).unwrap();
+        let sparse_file = contents.join("sparse.bin");
+        fs::File::create(&sparse_file)
+            .unwrap()
+            .set_len(8 * 1024 * 1024)
+            .unwrap();
+        let expected = compute_path_size(app_bundle.to_str().unwrap()).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let result =
+            scan_path_size_with_progress(app_bundle.to_str().unwrap(), &cancel_flag, |_| {})
+                .unwrap();
+
+        assert_eq!(result.size, expected);
+        assert!(!result.is_partial);
+        assert_eq!(result.error_count, 0);
 
         fs::remove_dir_all(root).unwrap();
     }

@@ -244,6 +244,59 @@ describe("useBackgroundDirSizes", () => {
     );
   });
 
+  it("promotes estimated app bundles under Applications to exact background scans", async () => {
+    mockEstimateDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: true,
+      scannedEntries: 2,
+    });
+    const appEntry = makeDirectory("/Applications/Example.app");
+    const props = makeProps({
+      currentPath: "/Applications",
+      files: [appEntry],
+    });
+
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() =>
+      expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
+        "left",
+        "/Applications/Example.app",
+        4096,
+        "estimated"
+      )
+    );
+
+    rerender({
+      ...props,
+      files: [
+        {
+          ...appEntry,
+          size: 4096,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Applications/Example.app",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Applications/Example.app",
+        2048
+      )
+    );
+  });
+
   it("does not run an exact background scan for estimated cloud directories", async () => {
     const props = makeProps({
       currentPath: "C:\\Users\\sam",
