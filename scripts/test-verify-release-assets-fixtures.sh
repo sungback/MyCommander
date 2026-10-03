@@ -29,10 +29,10 @@ required_assets=(
   "MyCommander-${version}-1.x86_64.rpm"
   "MyCommander_${version}_amd64.AppImage"
   "MyCommander_${version}_amd64.deb"
-  "MyCommander_${version}_universal.dmg"
+  "MyCommander_${version}_aarch64.dmg"
   "MyCommander_${version}_x64-setup.exe"
   "MyCommander_${version}_x64_en-US.msi"
-  "MyCommander_universal.app.tar.gz"
+  "MyCommander_aarch64.app.tar.gz"
 )
 
 write_fixture_assets() {

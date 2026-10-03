@@ -33,10 +33,10 @@ required_assets=(
   "MyCommander-${version}-1.x86_64.rpm"
   "MyCommander_${version}_amd64.AppImage"
   "MyCommander_${version}_amd64.deb"
-  "MyCommander_${version}_universal.dmg"
+  "MyCommander_${version}_aarch64.dmg"
   "MyCommander_${version}_x64-setup.exe"
   "MyCommander_${version}_x64_en-US.msi"
-  "MyCommander_universal.app.tar.gz"
+  "MyCommander_aarch64.app.tar.gz"
 )
 
 require_command awk
@@ -194,8 +194,8 @@ verify_macos_app() {
   [[ "$(plutil -extract CFBundleIdentifier raw -o - "$plist")" == "com.mycommander.desktop" ]] \
     || fail "$label bundle identifier is not com.mycommander.desktop"
 
-  lipo "$executable" -verify_arch x86_64 arm64 >/dev/null \
-    || fail "$label executable is not universal x86_64/arm64"
+  lipo "$executable" -verify_arch arm64 >/dev/null \
+    || fail "$label executable is not arm64"
   codesign --verify --deep --strict --verbose=2 "$app_path" \
     || fail "$label code signature is invalid"
   xcrun stapler validate "$app_path" \
@@ -207,10 +207,10 @@ verify_macos_app() {
 app_extract_dir="$smoke_dir/app-tar-extract"
 rm -rf "$app_extract_dir"
 mkdir -p "$app_extract_dir"
-tar -xzf "$smoke_dir/MyCommander_universal.app.tar.gz" -C "$app_extract_dir"
+tar -xzf "$smoke_dir/MyCommander_aarch64.app.tar.gz" -C "$app_extract_dir"
 verify_macos_app "$app_extract_dir/MyCommander.app" "app tarball"
 
-dmg_path="$smoke_dir/MyCommander_${version}_universal.dmg"
+dmg_path="$smoke_dir/MyCommander_${version}_aarch64.dmg"
 hdiutil verify "$dmg_path"
 
 dmg_mount_dir="$smoke_dir/dmg-mount"
