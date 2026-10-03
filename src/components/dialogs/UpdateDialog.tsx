@@ -1,6 +1,15 @@
 import React, { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { CheckCircle2, Download, ExternalLink, Rocket, TriangleAlert, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Download,
+  ExternalLink,
+  Loader2,
+  Rocket,
+  Sparkles,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { marked } from "marked";
 import { useDialogStore } from "../../store/dialogStore";
 import { useUpdateStore } from "../../store/updateStore";
@@ -15,14 +24,17 @@ export const UpdateDialog: React.FC = () => {
     status,
     errorMessage,
     updateInfo,
+    isUpdating,
+    updateStep,
     skipVersion,
     openDownloadUrl,
     openReleasePage,
+    applySelfUpdate,
   } = useUpdateStore();
 
   const [skipThisVersion, setSkipThisVersion] = useState(false);
 
-  const isResultView = status === "latest" || status === "error";
+  const isResultView = status === "latest" || (status === "error" && !updateInfo);
   const isOpen =
     openDialog === "update" &&
     (isResultView || (status === "available" && updateInfo !== null));
@@ -92,6 +104,7 @@ export const UpdateDialog: React.FC = () => {
   if (!updateInfo) return null;
 
   const handleClose = () => {
+    if (isUpdating) return;
     if (skipThisVersion && updateInfo) {
       skipVersion(updateInfo.version);
     }
@@ -99,8 +112,14 @@ export const UpdateDialog: React.FC = () => {
   };
 
   const handleDownload = async () => {
+    if (isUpdating) return;
     await openDownloadUrl();
     closeDialog();
+  };
+
+  const handleApplyUpdate = async () => {
+    if (isUpdating) return;
+    await applySelfUpdate();
   };
 
   const handleViewReleases = async () => {
@@ -130,7 +149,8 @@ export const UpdateDialog: React.FC = () => {
             </Dialog.Description>
             <button
               onClick={handleClose}
-              className="text-text-secondary hover:text-text-primary p-1 rounded hover:bg-hover-item transition-colors"
+              disabled={isUpdating}
+              className="text-text-secondary hover:text-text-primary p-1 rounded hover:bg-hover-item transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="닫기"
             >
               <X className="w-4 h-4" />
@@ -169,7 +189,9 @@ export const UpdateDialog: React.FC = () => {
                     dangerouslySetInnerHTML={{ __html: notesHtml }}
                   />
                 ) : (
-                  <p className="whitespace-pre-wrap">{updateInfo.releaseNotes || "새로운 변경 사항이 포함되어 있습니다."}</p>
+                  <p className="whitespace-pre-wrap">
+                    {updateInfo.releaseNotes || "새로운 변경 사항이 포함되어 있습니다."}
+                  </p>
                 )}
               </div>
             </div>
@@ -179,9 +201,17 @@ export const UpdateDialog: React.FC = () => {
               <p className="text-xs text-text-secondary">
                 다운로드 대상 파일:{" "}
                 <span className="font-mono font-medium text-text-primary">
-                  {updateInfo.assetName}
+                  {updateInfo.selfUpdateAssetName || updateInfo.assetName}
                 </span>
               </p>
+            )}
+
+            {/* Error banner if update failed */}
+            {errorMessage && (
+              <div className="flex items-center space-x-2 p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded text-xs">
+                <TriangleAlert className="w-4 h-4 flex-shrink-0" />
+                <span className="break-words">{errorMessage}</span>
+              </div>
             )}
 
             {/* Skip checkbox */}
@@ -189,8 +219,9 @@ export const UpdateDialog: React.FC = () => {
               <input
                 type="checkbox"
                 checked={skipThisVersion}
+                disabled={isUpdating}
                 onChange={(e) => setSkipThisVersion(e.target.checked)}
-                className="rounded border-border-color text-blue-500 focus:ring-0 cursor-pointer"
+                className="rounded border-border-color text-blue-500 focus:ring-0 cursor-pointer disabled:opacity-40"
               />
               <span>이 버전(v{updateInfo.version}) 알림 건너뛰기</span>
             </label>
@@ -200,7 +231,8 @@ export const UpdateDialog: React.FC = () => {
           <div className="flex items-center justify-between border-t border-border-color pt-4 mt-5">
             <button
               onClick={handleViewReleases}
-              className="flex items-center space-x-1.5 text-xs text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded hover:bg-hover-item transition-colors"
+              disabled={isUpdating}
+              className="flex items-center space-x-1.5 text-xs text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded hover:bg-hover-item transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>릴리즈 페이지</span>
@@ -209,17 +241,40 @@ export const UpdateDialog: React.FC = () => {
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleClose}
-                className="text-xs px-3.5 py-1.5 rounded border border-border-color hover:bg-hover-item transition-colors"
+                disabled={isUpdating}
+                className="text-xs px-3.5 py-1.5 rounded border border-border-color hover:bg-hover-item transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 나중에
               </button>
-              <button
-                onClick={handleDownload}
-                className="flex items-center space-x-1.5 text-xs px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>지금 다운로드</span>
-              </button>
+
+              {updateInfo.selfUpdateUrl ? (
+                <button
+                  onClick={handleApplyUpdate}
+                  disabled={isUpdating}
+                  className="flex items-center space-x-1.5 text-xs px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium shadow-sm transition-colors"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>{updateStep || "업데이트 설치 중..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>지금 업데이트 및 재시작</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleDownload}
+                  disabled={isUpdating}
+                  className="flex items-center space-x-1.5 text-xs px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>지금 다운로드</span>
+                </button>
+              )}
             </div>
           </div>
         </Dialog.Content>

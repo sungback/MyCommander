@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchLatestRelease,
   findPlatformAsset,
+  findSelfUpdateAsset,
   parseReleaseToUpdateInfo,
   RawGithubRelease,
 } from "./githubReleaseClient";
@@ -17,6 +18,11 @@ const mockRelease: RawGithubRelease = {
       name: "MyCommander_1.3.0_aarch64.dmg",
       browser_download_url: "https://github.com/.../MyCommander_1.3.0_aarch64.dmg",
       size: 1234567,
+    },
+    {
+      name: "MyCommander_aarch64.app.tar.gz",
+      browser_download_url: "https://github.com/.../MyCommander_aarch64.app.tar.gz",
+      size: 1111111,
     },
     {
       name: "MyCommander_1.3.0_x64-setup.exe",
@@ -41,6 +47,17 @@ describe("githubReleaseClient", () => {
 
     const linuxAsset = findPlatformAsset(mockRelease.assets, "linux");
     expect(linuxAsset?.name).toBe("MyCommander_1.3.0_amd64.AppImage");
+  });
+
+  it("selects correct self-update package per platform", () => {
+    const macSelfUpdate = findSelfUpdateAsset(mockRelease.assets, "macos");
+    expect(macSelfUpdate?.name).toBe("MyCommander_aarch64.app.tar.gz");
+
+    const winSelfUpdate = findSelfUpdateAsset(mockRelease.assets, "windows");
+    expect(winSelfUpdate?.name).toBe("MyCommander_1.3.0_x64-setup.exe");
+
+    const linuxSelfUpdate = findSelfUpdateAsset(mockRelease.assets, "linux");
+    expect(linuxSelfUpdate?.name).toBe("MyCommander_1.3.0_amd64.AppImage");
   });
 
   it("parses release info and determines if it is newer", () => {

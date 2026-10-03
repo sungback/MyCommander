@@ -19,9 +19,14 @@ describe("UpdateDialog", () => {
         releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v1.3.0",
         downloadUrl: "https://github.com/.../app.dmg",
         assetName: "app.dmg",
+        selfUpdateUrl: null,
+        selfUpdateAssetName: null,
         isNewer: true,
       },
       skippedVersion: null,
+      isUpdating: false,
+      updateStep: null,
+      errorMessage: null,
     });
   });
 
@@ -41,9 +46,23 @@ describe("UpdateDialog", () => {
     expect(screen.getByText("app.dmg")).toBeInTheDocument();
   });
 
-  it("handles download button click", async () => {
+  it("handles download button click when selfUpdateUrl is not available", async () => {
     const downloadSpy = vi.fn().mockResolvedValue(undefined);
-    useUpdateStore.setState({ openDownloadUrl: downloadSpy });
+    useUpdateStore.setState({
+      openDownloadUrl: downloadSpy,
+      updateInfo: {
+        version: "1.3.0",
+        releaseName: "v1.3.0",
+        releaseNotes: "Feature 1\nFeature 2",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v1.3.0",
+        downloadUrl: "https://github.com/.../app.dmg",
+        assetName: "app.dmg",
+        selfUpdateUrl: null,
+        selfUpdateAssetName: null,
+        isNewer: true,
+      },
+    });
 
     useDialogStore.getState().setOpenDialog("update");
     render(<UpdateDialog />);
@@ -55,6 +74,63 @@ describe("UpdateDialog", () => {
 
     expect(downloadSpy).toHaveBeenCalled();
     expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("handles self-update button click when selfUpdateUrl is available", async () => {
+    const applySpy = vi.fn().mockResolvedValue(undefined);
+    useUpdateStore.setState({
+      applySelfUpdate: applySpy,
+      updateInfo: {
+        version: "1.3.0",
+        releaseName: "v1.3.0",
+        releaseNotes: "Feature 1\nFeature 2",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v1.3.0",
+        downloadUrl: "https://github.com/.../app.dmg",
+        assetName: "app.dmg",
+        selfUpdateUrl: "https://github.com/.../MyCommander_aarch64.app.tar.gz",
+        selfUpdateAssetName: "MyCommander_aarch64.app.tar.gz",
+        isNewer: true,
+      },
+    });
+
+    useDialogStore.getState().setOpenDialog("update");
+    render(<UpdateDialog />);
+
+    const updateBtn = screen.getByRole("button", { name: /지금 업데이트 및 재시작/i });
+    await act(async () => {
+      fireEvent.click(updateBtn);
+    });
+
+    expect(applySpy).toHaveBeenCalled();
+  });
+
+  it("disables buttons and shows spinner when isUpdating is true", () => {
+    useUpdateStore.setState({
+      isUpdating: true,
+      updateStep: "다운로드 및 설치 중...",
+      updateInfo: {
+        version: "1.3.0",
+        releaseName: "v1.3.0",
+        releaseNotes: "Feature 1\nFeature 2",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v1.3.0",
+        downloadUrl: "https://github.com/.../app.dmg",
+        assetName: "app.dmg",
+        selfUpdateUrl: "https://github.com/.../MyCommander_aarch64.app.tar.gz",
+        selfUpdateAssetName: "MyCommander_aarch64.app.tar.gz",
+        isNewer: true,
+      },
+    });
+
+    useDialogStore.getState().setOpenDialog("update");
+    render(<UpdateDialog />);
+
+    const updateBtn = screen.getByRole("button", { name: /다운로드 및 설치 중\.\.\./i });
+    expect(updateBtn).toBeDisabled();
+
+    const laterBtn = screen.getByRole("button", { name: /나중에/i });
+    expect(laterBtn).toBeDisabled();
   });
 
   it("saves skipped version when checkbox is checked on close", () => {

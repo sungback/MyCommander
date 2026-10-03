@@ -8,6 +8,7 @@ fn main() {
         "open_in_editor",
         "open_file",
         "run_shell_command",
+        "apply_self_update",
         "quit_app",
         "show_context_menu",
         "set_show_hidden_menu_checked",

@@ -4,6 +4,7 @@ import packageJson from "../../package.json";
 import { fetchLatestRelease, UpdateInfo } from "../services/update/githubReleaseClient";
 import { useDialogStore } from "./dialogStore";
 import { getErrorMessage } from "../hooks/useFileSystem";
+import { systemCommands } from "../hooks/tauriCommands/systemCommands";
 
 export const STORAGE_KEY_LAST_CHECK = "mycommander-last-update-check";
 export const STORAGE_KEY_SKIPPED_VERSION = "mycommander-skipped-version";
@@ -28,10 +29,13 @@ export interface UpdateState {
   errorMessage: string | null;
   lastCheckedAt: number | null;
   skippedVersion: string | null;
+  isUpdating: boolean;
+  updateStep: string | null;
   checkForUpdates: (options?: CheckUpdateOptions) => Promise<void>;
   skipVersion: (version: string) => void;
   openDownloadUrl: () => Promise<void>;
   openReleasePage: () => Promise<void>;
+  applySelfUpdate: () => Promise<void>;
   reset: () => void;
 }
 
@@ -54,6 +58,8 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   errorMessage: null,
   lastCheckedAt: getInitialLastCheck(),
   skippedVersion: getInitialSkippedVersion(),
+  isUpdating: false,
+  updateStep: null,
 
   checkForUpdates: async (options?: CheckUpdateOptions) => {
     const { force = false, silent = false } = options || {};
@@ -150,11 +156,37 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     }
   },
 
+  applySelfUpdate: async () => {
+    const { updateInfo } = get();
+    if (!updateInfo?.selfUpdateUrl) {
+      set({
+        errorMessage: "자동 업데이트 가능한 파일이 없습니다. 릴리즈 페이지에서 다운로드해 주세요.",
+      });
+      return;
+    }
+
+    set({
+      isUpdating: true,
+      updateStep: "다운로드 및 설치 중...",
+      errorMessage: null,
+    });
+
+    try {
+      await systemCommands.applySelfUpdate(updateInfo.selfUpdateUrl);
+      set({ updateStep: "재시작 중..." });
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, "업데이트 적용에 실패했습니다.");
+      set({ isUpdating: false, updateStep: null, errorMessage: msg });
+    }
+  },
+
   reset: () => {
     set({
       status: "idle",
       updateInfo: null,
       errorMessage: null,
+      isUpdating: false,
+      updateStep: null,
     });
   },
 }));

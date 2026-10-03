@@ -75,6 +75,10 @@ export const systemCommands = {
     await invoke("quit_app");
   },
 
+  applySelfUpdate: async (assetUrl: string): Promise<void> => {
+    await invoke("apply_self_update", { asset_url: assetUrl });
+  },
+
   writeFilesToPasteboard: async (
     paths: string[],
     operation: "copy" | "cut"

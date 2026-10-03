@@ -34,6 +34,7 @@ pub fn run() {
             commands::system::launch::open_in_editor,
             commands::system::launch::open_file,
             commands::system::launch::run_shell_command,
+            commands::system::update::apply_self_update,
             commands::system::menu::quit_app,
             commands::system::context_menu::show_context_menu,
             commands::system::menu::set_show_hidden_menu_checked,

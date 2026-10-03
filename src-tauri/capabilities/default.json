@@ -20,6 +20,7 @@
     "allow-open-in-editor",
     "allow-open-file",
     "allow-run-shell-command",
+    "allow-apply-self-update",
     "allow-quit-app",
     "allow-show-context-menu",
     "allow-set-show-hidden-menu-checked",

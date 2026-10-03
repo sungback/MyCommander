@@ -3,6 +3,7 @@ import { useDialogStore } from "./dialogStore";
 import { useUpdateStore } from "./updateStore";
 import * as releaseClient from "../services/update/githubReleaseClient";
 import * as openerPlugin from "@tauri-apps/plugin-opener";
+import { systemCommands } from "../hooks/tauriCommands/systemCommands";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn().mockResolvedValue(undefined),
@@ -32,6 +33,8 @@ describe("updateStore", () => {
       releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v9.9.9",
       downloadUrl: "https://github.com/sungback/MyCommander/releases/download/v9.9.9/app.dmg",
       assetName: "app.dmg",
+      selfUpdateUrl: "https://github.com/sungback/MyCommander/releases/download/v9.9.9/MyCommander_aarch64.app.tar.gz",
+      selfUpdateAssetName: "MyCommander_aarch64.app.tar.gz",
       isNewer: true,
     });
 
@@ -52,6 +55,8 @@ describe("updateStore", () => {
       releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v1.0.0",
       downloadUrl: null,
       assetName: null,
+      selfUpdateUrl: null,
+      selfUpdateAssetName: null,
       isNewer: false,
     });
 
@@ -86,6 +91,8 @@ describe("updateStore", () => {
       releaseUrl: "https://github.com/...",
       downloadUrl: "https://github.com/.../app.dmg",
       assetName: "app.dmg",
+      selfUpdateUrl: "https://github.com/.../app.tar.gz",
+      selfUpdateAssetName: "app.tar.gz",
       isNewer: true,
     });
 
@@ -130,6 +137,8 @@ describe("updateStore", () => {
         releaseUrl: "https://github.com/sungback/MyCommander/releases/tag/v2.0.0",
         downloadUrl: "https://github.com/sungback/MyCommander/releases/download/v2.0.0/app.dmg",
         assetName: "app.dmg",
+        selfUpdateUrl: "https://github.com/sungback/MyCommander/releases/download/v2.0.0/app.tar.gz",
+        selfUpdateAssetName: "app.tar.gz",
         isNewer: true,
       },
     });
@@ -143,5 +152,49 @@ describe("updateStore", () => {
     expect(openerPlugin.openUrl).toHaveBeenCalledWith(
       "https://github.com/sungback/MyCommander/releases/tag/v2.0.0"
     );
+  });
+
+  it("applies self-update successfully", async () => {
+    const applySpy = vi.spyOn(systemCommands, "applySelfUpdate").mockResolvedValue(undefined);
+    useUpdateStore.setState({
+      updateInfo: {
+        version: "2.0.0",
+        releaseName: "v2.0.0",
+        releaseNotes: "Notes",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/...",
+        downloadUrl: "https://github.com/.../app.dmg",
+        assetName: "app.dmg",
+        selfUpdateUrl: "https://github.com/.../MyCommander_aarch64.app.tar.gz",
+        selfUpdateAssetName: "MyCommander_aarch64.app.tar.gz",
+        isNewer: true,
+      },
+    });
+
+    await useUpdateStore.getState().applySelfUpdate();
+    expect(applySpy).toHaveBeenCalledWith("https://github.com/.../MyCommander_aarch64.app.tar.gz");
+    expect(useUpdateStore.getState().updateStep).toBe("재시작 중...");
+  });
+
+  it("handles self-update failure gracefully", async () => {
+    vi.spyOn(systemCommands, "applySelfUpdate").mockRejectedValue(new Error("다운로드 실패"));
+    useUpdateStore.setState({
+      updateInfo: {
+        version: "2.0.0",
+        releaseName: "v2.0.0",
+        releaseNotes: "Notes",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/...",
+        downloadUrl: "https://github.com/.../app.dmg",
+        assetName: "app.dmg",
+        selfUpdateUrl: "https://github.com/.../MyCommander_aarch64.app.tar.gz",
+        selfUpdateAssetName: "MyCommander_aarch64.app.tar.gz",
+        isNewer: true,
+      },
+    });
+
+    await useUpdateStore.getState().applySelfUpdate();
+    expect(useUpdateStore.getState().isUpdating).toBe(false);
+    expect(useUpdateStore.getState().errorMessage).toBe("다운로드 실패");
   });
 });

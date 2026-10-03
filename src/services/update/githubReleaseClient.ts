@@ -24,8 +24,44 @@ export interface UpdateInfo {
   releaseUrl: string;
   downloadUrl: string | null;
   assetName: string | null;
+  selfUpdateUrl: string | null;
+  selfUpdateAssetName: string | null;
   isNewer: boolean;
 }
+
+export const findSelfUpdateAsset = (
+  assets: ReleaseAsset[],
+  platform: PlatformType
+): ReleaseAsset | null => {
+  if (!assets || assets.length === 0) {
+    return null;
+  }
+
+  if (platform === "macos") {
+    // Prefer .app.tar.gz for direct in-place bundle replacement
+    const tarGz = assets.find(
+      (a) => a.name.endsWith(".app.tar.gz") || a.name.endsWith(".tar.gz")
+    );
+    if (tarGz) return tarGz;
+    return null;
+  }
+
+  if (platform === "windows") {
+    // Prefer -setup.exe or .exe
+    const exe = assets.find((a) => a.name.endsWith("-setup.exe") || a.name.endsWith(".exe"));
+    if (exe) return exe;
+    return null;
+  }
+
+  if (platform === "linux") {
+    // Prefer .AppImage
+    const appImage = assets.find((a) => a.name.endsWith(".AppImage"));
+    if (appImage) return appImage;
+    return null;
+  }
+
+  return null;
+};
 
 export const findPlatformAsset = (
   assets: ReleaseAsset[],
@@ -72,6 +108,7 @@ export const parseReleaseToUpdateInfo = (
 ): UpdateInfo => {
   const version = release.tag_name.replace(/^[vV]/, "");
   const platformAsset = findPlatformAsset(release.assets || [], platform);
+  const selfUpdateAsset = findSelfUpdateAsset(release.assets || [], platform);
 
   return {
     version,
@@ -81,6 +118,8 @@ export const parseReleaseToUpdateInfo = (
     releaseUrl: release.html_url,
     downloadUrl: platformAsset ? platformAsset.browser_download_url : release.html_url,
     assetName: platformAsset ? platformAsset.name : null,
+    selfUpdateUrl: selfUpdateAsset ? selfUpdateAsset.browser_download_url : null,
+    selfUpdateAssetName: selfUpdateAsset ? selfUpdateAsset.name : null,
     isNewer: isNewerVersion(currentVersion, version),
   };
 };
