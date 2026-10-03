@@ -1,9 +1,7 @@
-use std::path::{Path, PathBuf};
-
 /// Finds the enclosing macOS .app bundle directory for a given executable path.
 #[cfg(any(target_os = "macos", test))]
 #[allow(dead_code)]
-pub fn find_app_bundle(current_exe: &Path) -> Option<PathBuf> {
+pub fn find_app_bundle(current_exe: &std::path::Path) -> Option<std::path::PathBuf> {
     let mut p = current_exe;
     while let Some(parent) = p.parent() {
         if parent.extension().and_then(|ext| ext.to_str()) == Some("app") {
@@ -219,7 +217,7 @@ async fn apply_windows_update(asset_url: &str) -> Result<(), String> {
 #[cfg(target_os = "linux")]
 async fn apply_linux_update(asset_url: &str) -> Result<(), String> {
     if let Ok(appimage_path) = std::env::var("APPIMAGE") {
-        let appimage = PathBuf::from(appimage_path);
+        let appimage = std::path::PathBuf::from(appimage_path);
         let temp_base =
             std::env::temp_dir().join(format!("mycommander_update_{}", std::process::id()));
         if temp_base.exists() {
@@ -277,7 +275,7 @@ async fn apply_linux_update(asset_url: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_find_app_bundle() {
