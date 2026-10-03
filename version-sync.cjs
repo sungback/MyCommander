@@ -28,6 +28,9 @@ try {
 
   const tauriConf = readJson(tauriConfPath);
   tauriConf.version = newVersion;
+  if (Array.isArray(tauriConf.app?.windows) && tauriConf.app.windows[0]) {
+    tauriConf.app.windows[0].title = `MyCommander v${newVersion}`;
+  }
   fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
 
   const cargoTomlPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
@@ -38,6 +41,13 @@ try {
 
   const cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
   fs.writeFileSync(cargoTomlPath, replaceCargoPackageVersion(cargoToml, newVersion));
+
+  const indexPath = path.join(rootDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    const indexHtml = fs.readFileSync(indexPath, 'utf8');
+    const updatedHtml = indexHtml.replace(/<title>.*?<\/title>/, `<title>MyCommander v${newVersion}</title>`);
+    fs.writeFileSync(indexPath, updatedHtml);
+  }
 
   console.log(`Release versions synced to ${newVersion}`);
 } catch (error) {

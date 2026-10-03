@@ -22,7 +22,7 @@
     "verify:release-version": "node scripts/verify-release-version.cjs",
     "verify:release": "npm run verify:release-version && npm run verify && npm run tauri build -- --bundles app",
     "release:push": "node scripts/push-release.cjs",
-    "version": "node version-sync.cjs && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml",
+    "version": "node version-sync.cjs && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml index.html",
     "postversion": "echo \"Version updated locally. Push branch and tags explicitly when ready.\""
   },
   "dependencies": {

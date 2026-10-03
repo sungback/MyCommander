@@ -50,6 +50,14 @@ expectEqual("package-lock root package version", packageLock.packages?.[""]?.ver
 expectEqual("src-tauri/tauri.conf.json version", tauriConfig.version, version);
 expectEqual("src-tauri/Cargo.toml package version", cargoVersion, version);
 
+const expectedTitle = `MyCommander v${version}`;
+const actualWindowTitle = tauriConfig.app?.windows?.[0]?.title;
+expectEqual("src-tauri/tauri.conf.json window title", actualWindowTitle, expectedTitle);
+
+const indexHtml = readText("index.html");
+const htmlTitleMatch = indexHtml.match(/<title>(.*?)<\/title>/);
+expectEqual("index.html title", htmlTitleMatch?.[1], expectedTitle);
+
 const requestedTagName = getRequestedTagName();
 if (requestedTagName) {
   expectEqual("release tag", requestedTagName, getExpectedTagName(version));

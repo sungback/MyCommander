@@ -16,6 +16,7 @@ describe("release configuration", () => {
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[""].version).toBe(packageJson.version);
     expect(tauriConfig.version).toBe(packageJson.version);
+    expect(tauriConfig.app.windows[0].title).toBe(`MyCommander v${packageJson.version}`);
     expect(getCargoPackageVersion()).toBe(packageJson.version);
   });
 
@@ -44,6 +45,8 @@ describe("release configuration", () => {
     expect(versionSyncSource).toContain("src-tauri");
     expect(versionSyncSource).toContain("tauri.conf.json");
     expect(versionSyncSource).toContain("Cargo.toml");
+    expect(versionSyncSource).toContain("index.html");
     expect(packageJson.scripts.version).toContain("src-tauri/Cargo.toml");
+    expect(packageJson.scripts.version).toContain("index.html");
   });
 });
