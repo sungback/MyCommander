@@ -1,4 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useFileSystem } from "../../../hooks/useFileSystem";
 
 const DOCX_BODY_EMPTY_MESSAGE = "표시할 텍스트를 찾을 수 없습니다.";
 
@@ -110,22 +111,42 @@ export const renderDocxDocumentXml = (xmlContent: string): string => {
   return blocks || `<p class="docx-empty">${DOCX_BODY_EMPTY_MESSAGE}</p>`;
 };
 
+export interface DocxRendererOptions {
+  readFileBinary?: (filePath: string) => Promise<ArrayBuffer | Uint8Array>;
+  convertFileSrcImpl?: (path: string) => string;
+  fetchImpl?: typeof fetch;
+}
+
+const readBuffer = async (
+  filePath: string,
+  options: DocxRendererOptions
+): Promise<ArrayBuffer | Uint8Array> => {
+  if (options.readFileBinary) {
+    return options.readFileBinary(filePath);
+  }
+
+  try {
+    return await useFileSystem().readFileBinary(filePath);
+  } catch (error) {
+    if (options.fetchImpl || options.convertFileSrcImpl) {
+      const convert = options.convertFileSrcImpl ?? convertFileSrc;
+      const fetchFn = options.fetchImpl ?? fetch;
+      const url = convert(filePath);
+      return await fetchFn(url).then((response) => response.arrayBuffer());
+    }
+    throw error;
+  }
+};
+
 export const renderDocx = async (
   filePath: string,
-  options: {
-    convertFileSrcImpl?: (path: string) => string;
-    fetchImpl?: typeof fetch;
-  } = {}
+  options: DocxRendererOptions = {}
 ): Promise<string> => {
   const [{ default: JSZip }] = await Promise.all([
     import("jszip"),
   ]);
 
-  const convertFileSrcImpl = options.convertFileSrcImpl ?? convertFileSrc;
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  const url = convertFileSrcImpl(filePath);
-  const buffer = await fetchImpl(url).then((response) => response.arrayBuffer());
+  const buffer = await readBuffer(filePath, options);
   const zip = await JSZip.loadAsync(buffer);
   const documentEntry = zip.file("word/document.xml");
 

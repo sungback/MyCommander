@@ -154,6 +154,13 @@ export const fileCommands = {
     });
   },
 
+  readFileBinary: async (path: string, maxBytes?: number): Promise<ArrayBuffer> => {
+    return await invoke<ArrayBuffer>("read_file_binary", {
+      path,
+      ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
+    });
+  },
+
   previewSqliteDatabase: async (path: string): Promise<SqliteDatabasePreview> => {
     return await invoke<SqliteDatabasePreview>("preview_sqlite_database", { path });
   },

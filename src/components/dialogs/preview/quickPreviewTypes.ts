@@ -42,6 +42,8 @@ export interface QuickPreviewLoaderOptions {
   convertFileSrcImpl?: (path: string) => string;
   invokeImpl?: InvokeImpl;
   fetchImpl?: typeof fetch;
+  readFileContent?: (path: string, maxBytes?: number) => Promise<string>;
+  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>;
   loadTextHighlighter?: () => Promise<TextHighlighterModule>;
   loadMarkdownRenderer?: () => Promise<MarkdownRendererModule>;
   loadNotebookRenderer?: () => Promise<NotebookRendererModule>;

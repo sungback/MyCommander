@@ -5,9 +5,37 @@ import {
   XlsxRendererModule,
 } from "./shared";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useFileSystem } from "../../../../hooks/useFileSystem";
 import type { Row, Sheet } from "read-excel-file/browser";
 
 const MAX_ROWS = 500;
+
+export interface XlsxRendererOptions {
+  readFileBinary?: (filePath: string) => Promise<ArrayBuffer | Uint8Array>;
+  fetchImpl?: typeof fetch;
+  convertFileSrcImpl?: (path: string) => string;
+}
+
+const readBuffer = async (
+  filePath: string,
+  options: XlsxRendererOptions
+): Promise<ArrayBuffer | Uint8Array> => {
+  if (options.readFileBinary) {
+    return options.readFileBinary(filePath);
+  }
+
+  try {
+    return await useFileSystem().readFileBinary(filePath);
+  } catch (error) {
+    if (options.fetchImpl || options.convertFileSrcImpl) {
+      const convert = options.convertFileSrcImpl ?? convertFileSrc;
+      const fetchFn = options.fetchImpl ?? fetch;
+      const url = convert(filePath);
+      return await fetchFn(url).then((response) => response.arrayBuffer());
+    }
+    throw error;
+  }
+};
 
 const formatCellValue = (value: unknown): string => {
   if (value instanceof Date) {
@@ -17,12 +45,14 @@ const formatCellValue = (value: unknown): string => {
   return String(value ?? "");
 };
 
-const buildXlsxHtml = async (filePath: string): Promise<string> => {
+export const buildXlsxHtml = async (
+  filePath: string,
+  options: XlsxRendererOptions = {}
+): Promise<string> => {
   const { default: readExcelFile } = await import("read-excel-file/browser");
   const theme = getPreviewTheme();
 
-  const url = convertFileSrc(filePath);
-  const buffer = await fetch(url).then((response) => response.arrayBuffer());
+  const buffer = await readBuffer(filePath, options);
   const sheets = await readExcelFile(buffer);
 
   const sheetsHtml = sheets.map(({ sheet: sheetName, data: rows }: Sheet) => {
@@ -87,6 +117,8 @@ const buildXlsxHtml = async (filePath: string): Promise<string> => {
   });
 };
 
-export const defaultLoadXlsxRenderer = async (): Promise<XlsxRendererModule> => ({
-  renderXlsx: (filePath) => buildXlsxHtml(filePath),
+export const defaultLoadXlsxRenderer = async (
+  options: XlsxRendererOptions = {}
+): Promise<XlsxRendererModule> => ({
+  renderXlsx: (filePath) => buildXlsxHtml(filePath, options),
 });

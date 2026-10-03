@@ -5,13 +5,43 @@ import {
   HwpxRendererModule,
 } from "./shared";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useFileSystem } from "../../../../hooks/useFileSystem";
 
-const buildHwpxHtml = async (filePath: string): Promise<string> => {
+export interface HwpxRendererOptions {
+  readFileBinary?: (filePath: string) => Promise<ArrayBuffer | Uint8Array>;
+  fetchImpl?: typeof fetch;
+  convertFileSrcImpl?: (path: string) => string;
+}
+
+const readBuffer = async (
+  filePath: string,
+  options: HwpxRendererOptions
+): Promise<ArrayBuffer | Uint8Array> => {
+  if (options.readFileBinary) {
+    return options.readFileBinary(filePath);
+  }
+
+  try {
+    return await useFileSystem().readFileBinary(filePath);
+  } catch (error) {
+    if (options.fetchImpl || options.convertFileSrcImpl) {
+      const convert = options.convertFileSrcImpl ?? convertFileSrc;
+      const fetchFn = options.fetchImpl ?? fetch;
+      const url = convert(filePath);
+      return await fetchFn(url).then((response) => response.arrayBuffer());
+    }
+    throw error;
+  }
+};
+
+export const buildHwpxHtml = async (
+  filePath: string,
+  options: HwpxRendererOptions = {}
+): Promise<string> => {
   const [{ default: JSZip }] = await Promise.all([import("jszip")]);
   const theme = getPreviewTheme();
 
-  const url = convertFileSrc(filePath);
-  const buffer = await fetch(url).then((response) => response.arrayBuffer());
+  const buffer = await readBuffer(filePath, options);
   const zip = await JSZip.loadAsync(buffer);
 
   const sectionEntries = Object.keys(zip.files)
@@ -87,6 +117,8 @@ const buildHwpxHtml = async (filePath: string): Promise<string> => {
   });
 };
 
-export const defaultLoadHwpxRenderer = async (): Promise<HwpxRendererModule> => ({
-  renderHwpx: (filePath) => buildHwpxHtml(filePath),
+export const defaultLoadHwpxRenderer = async (
+  options: HwpxRendererOptions = {}
+): Promise<HwpxRendererModule> => ({
+  renderHwpx: (filePath) => buildHwpxHtml(filePath, options),
 });

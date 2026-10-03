@@ -21,11 +21,13 @@ import type {
 export { getExtension, getFileName } from "./quickPreviewFileTypes";
 export type { PreviewState, PreviewType, QuickPreviewLoaderOptions };
 
-const defaultLoadDocxRenderer = async (): Promise<DocxRendererModule> => {
+const defaultLoadDocxRenderer = async (
+  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>
+): Promise<DocxRendererModule> => {
   const { renderDocx } = await import("./quickPreviewDocxRenderer");
 
   return {
-    renderDocx: (filePath) => renderDocx(filePath),
+    renderDocx: (filePath) => renderDocx(filePath, { readFileBinary }),
   };
 };
 
@@ -53,28 +55,34 @@ const defaultLoadNotebookRenderer = async (): Promise<NotebookRendererModule> =>
   return loadRenderer();
 };
 
-const defaultLoadPptxRenderer = async (): Promise<PptxRendererModule> => {
+const defaultLoadPptxRenderer = async (
+  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>
+): Promise<PptxRendererModule> => {
   const { defaultLoadPptxRenderer: loadRenderer } = await import(
     "./quickPreviewRenderers/pptxRenderer"
   );
 
-  return loadRenderer();
+  return loadRenderer({ readFileBinary });
 };
 
-const defaultLoadHwpxRenderer = async (): Promise<HwpxRendererModule> => {
+const defaultLoadHwpxRenderer = async (
+  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>
+): Promise<HwpxRendererModule> => {
   const { defaultLoadHwpxRenderer: loadRenderer } = await import(
     "./quickPreviewRenderers/hwpxRenderer"
   );
 
-  return loadRenderer();
+  return loadRenderer({ readFileBinary });
 };
 
-const defaultLoadXlsxRenderer = async (): Promise<XlsxRendererModule> => {
+const defaultLoadXlsxRenderer = async (
+  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>
+): Promise<XlsxRendererModule> => {
   const { defaultLoadXlsxRenderer: loadRenderer } = await import(
     "./quickPreviewRenderers/xlsxRenderer"
   );
 
-  return loadRenderer();
+  return loadRenderer({ readFileBinary });
 };
 
 const defaultLoadSqliteRenderer = async (): Promise<SqliteRendererModule> => {
@@ -106,20 +114,32 @@ export const loadPreviewForPath = async (
           path: filePath,
           ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
         })
-      : useFileSystem().readFileContent(filePath, maxBytes);
+      : (options.readFileContent ?? useFileSystem().readFileContent)(filePath, maxBytes);
+  const readFileBinary = (filePath: string, maxBytes?: number) =>
+    options.invokeImpl
+      ? options.invokeImpl<ArrayBuffer>("read_file_binary", {
+          path: filePath,
+          ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
+        })
+      : (options.readFileBinary ?? useFileSystem().readFileBinary)(filePath, maxBytes);
   const convertFileSrcImpl = options.convertFileSrcImpl ?? convertFileSrc;
   const loadTextHighlighter = options.loadTextHighlighter ?? defaultLoadTextHighlighter;
   const loadMarkdownRenderer = options.loadMarkdownRenderer ?? defaultLoadMarkdownRenderer;
   const loadNotebookRenderer = options.loadNotebookRenderer ?? defaultLoadNotebookRenderer;
-  const loadPptxRenderer = options.loadPptxRenderer ?? defaultLoadPptxRenderer;
-  const loadHwpxRenderer = options.loadHwpxRenderer ?? defaultLoadHwpxRenderer;
-  const loadXlsxRenderer = options.loadXlsxRenderer ?? defaultLoadXlsxRenderer;
+  const loadPptxRenderer =
+    options.loadPptxRenderer ?? (() => defaultLoadPptxRenderer(readFileBinary));
+  const loadHwpxRenderer =
+    options.loadHwpxRenderer ?? (() => defaultLoadHwpxRenderer(readFileBinary));
+  const loadXlsxRenderer =
+    options.loadXlsxRenderer ?? (() => defaultLoadXlsxRenderer(readFileBinary));
   const loadSqliteRenderer = options.loadSqliteRenderer ?? defaultLoadSqliteRenderer;
-  const loadDocxRenderer = options.loadDocxRenderer ?? defaultLoadDocxRenderer;
+  const loadDocxRenderer =
+    options.loadDocxRenderer ?? (() => defaultLoadDocxRenderer(readFileBinary));
 
   return loadPreviewFromHandlers(path, {
     extension,
     readFileContent,
+    readFileBinary,
     convertFileSrcImpl,
     loadTextHighlighter,
     loadMarkdownRenderer,

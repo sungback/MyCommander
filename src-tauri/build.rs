@@ -32,6 +32,7 @@ fn main() {
         "retry_job",
         "clear_finished_jobs",
         "read_file_content",
+        "read_file_binary",
         "preview_sqlite_database",
         "search_files",
         "get_dir_size",

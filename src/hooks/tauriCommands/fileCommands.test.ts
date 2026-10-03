@@ -193,6 +193,27 @@ describe("fileCommands", () => {
     });
   });
 
+  describe("readFileBinary", () => {
+    it("calls read_file_binary and returns array buffer", async () => {
+      const buffer = new ArrayBuffer(8);
+      mockInvoke.mockResolvedValue(buffer);
+      const result = await fileCommands.readFileBinary("/some/file.pptx");
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_binary", { path: "/some/file.pptx" });
+      expect(result).toBe(buffer);
+    });
+
+    it("passes an optional max_bytes limit", async () => {
+      const buffer = new ArrayBuffer(16);
+      mockInvoke.mockResolvedValue(buffer);
+      const result = await fileCommands.readFileBinary("/some/file.pptx", 20 * 1024 * 1024);
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_binary", {
+        path: "/some/file.pptx",
+        max_bytes: 20 * 1024 * 1024,
+      });
+      expect(result).toBe(buffer);
+    });
+  });
+
   describe("previewSqliteDatabase", () => {
     it("calls preview_sqlite_database and returns preview data", async () => {
       const preview = {

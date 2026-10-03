@@ -220,6 +220,29 @@ describe("loadPreviewForPath", () => {
     });
   });
 
+  it("loads the pptx renderer only for pptx previews", async () => {
+    const renderPptx = vi.fn().mockResolvedValue("<html><body>slides</body></html>");
+    const loadPptxRenderer = vi.fn().mockResolvedValue({ renderPptx });
+
+    const result = await loadPreviewForPath("/tmp/presentation.pptx", {
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer,
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadDocxRenderer: vi.fn(),
+    });
+
+    expect(loadPptxRenderer).toHaveBeenCalledTimes(1);
+    expect(renderPptx).toHaveBeenCalledWith("/tmp/presentation.pptx");
+    expect(result).toEqual({
+      type: "rendered",
+      renderedHtml: "<html><body>slides</body></html>",
+      renderExt: "pptx",
+    });
+  });
+
   it("loads the sqlite renderer only for sqlite database previews", async () => {
     const renderSqlite = vi.fn().mockResolvedValue("<html><body>database</body></html>");
     const loadSqliteRenderer = vi.fn().mockResolvedValue({ renderSqlite });

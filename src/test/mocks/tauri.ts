@@ -80,6 +80,7 @@ export const createMockInvoke = () =>
       case 'extract_zip':         return Promise.resolve('/home/user/archive');
       case 'create_zip':          return Promise.resolve('/home/user/Downloads.zip');
       case 'read_file_content':   return Promise.resolve('file content here');
+      case 'read_file_binary':    return Promise.resolve(new ArrayBuffer(0));
       case 'preview_sqlite_database':
         return Promise.resolve({
           fileSize: 4096,
