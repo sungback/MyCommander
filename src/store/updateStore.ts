@@ -3,6 +3,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import packageJson from "../../package.json";
 import { fetchLatestRelease, UpdateInfo } from "../services/update/githubReleaseClient";
 import { useDialogStore } from "./dialogStore";
+import { showTransientToast } from "./toastStore";
+import { getErrorMessage } from "../hooks/useFileSystem";
 
 export const STORAGE_KEY_LAST_CHECK = "mycommander-last-update-check";
 export const STORAGE_KEY_SKIPPED_VERSION = "mycommander-skipped-version";
@@ -66,6 +68,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       }
     }
 
+    if (!silent) {
+      showTransientToast("최신 버전을 확인하고 있습니다...", { tone: "info", durationMs: 2000 });
+    }
+
     set({ status: "checking", errorMessage: null });
 
     try {
@@ -96,11 +102,19 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
           lastCheckedAt: now,
           errorMessage: null,
         });
+
+        if (!silent) {
+          showTransientToast(`현재 최신 버전(v${state.currentVersion})을 사용하고 있습니다.`, {
+            tone: "success",
+            durationMs: 2500,
+          });
+        }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = getErrorMessage(err, "업데이트 정보를 가져오지 못했습니다.");
       if (!silent) {
         set({ status: "error", errorMessage: msg });
+        showTransientToast(`업데이트 확인 실패: ${msg}`, { tone: "error", durationMs: 3500 });
       } else {
         // In silent mode, restore idle so user is not bothered
         set({ status: "idle" });
