@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     outputs:
       release_id: ${{ steps.release.outputs.release_id }}
       tag: ${{ steps.release.outputs.tag }}
@@ -41,11 +41,16 @@ jobs:
           tag="v$version"
           npm run verify:release-version -- --tag "$tag"
 
-          mapfile -t matching_releases < <(
+          releases_raw="$(
             gh api "repos/$GITHUB_REPOSITORY/releases" \
               --paginate \
               --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | @tsv"
-          )
+          )"
+
+          matching_releases=()
+          if [ -n "$releases_raw" ]; then
+            mapfile -t matching_releases <<< "$releases_raw"
+          fi
 
           if [ "${#matching_releases[@]}" -gt 1 ]; then
             echo "Multiple releases already exist for $tag. Clean up duplicate draft releases before rerunning." >&2
@@ -100,9 +105,7 @@ jobs:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      # Fine-grained PAT is more reliable for release creation when GitHub blocks
-      # the default workflow token on specific release/tag edge cases.
-      RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -197,7 +200,7 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -229,7 +232,7 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
