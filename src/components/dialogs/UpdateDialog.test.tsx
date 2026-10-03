@@ -73,4 +73,23 @@ describe("UpdateDialog", () => {
     expect(skipSpy).toHaveBeenCalledWith("1.3.0");
     expect(useDialogStore.getState().openDialog).toBeNull();
   });
+
+  it("shows the latest-version message when status is latest", () => {
+    useUpdateStore.setState({ status: "latest" });
+    useDialogStore.getState().setOpenDialog("update");
+    render(<UpdateDialog />);
+
+    expect(screen.getByText("최신 버전입니다")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("shows the error message when status is error", () => {
+    useUpdateStore.setState({ status: "error", errorMessage: "Load failed", updateInfo: null });
+    useDialogStore.getState().setOpenDialog("update");
+    render(<UpdateDialog />);
+
+    expect(screen.getByText("업데이트 확인 실패")).toBeInTheDocument();
+    expect(screen.getByText("Load failed")).toBeInTheDocument();
+  });
 });

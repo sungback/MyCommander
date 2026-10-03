@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Download, ExternalLink, Rocket, X } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Rocket, TriangleAlert, X } from "lucide-react";
 import { marked } from "marked";
 import { useDialogStore } from "../../store/dialogStore";
 import { useUpdateStore } from "../../store/updateStore";
@@ -12,6 +12,8 @@ export const UpdateDialog: React.FC = () => {
 
   const {
     currentVersion,
+    status,
+    errorMessage,
     updateInfo,
     skipVersion,
     openDownloadUrl,
@@ -20,7 +22,10 @@ export const UpdateDialog: React.FC = () => {
 
   const [skipThisVersion, setSkipThisVersion] = useState(false);
 
-  const isOpen = openDialog === "update" && updateInfo !== null;
+  const isResultView = status === "latest" || status === "error";
+  const isOpen =
+    openDialog === "update" &&
+    (isResultView || (status === "available" && updateInfo !== null));
 
   const notesHtml = useMemo(() => {
     if (!updateInfo?.releaseNotes) return "";
@@ -31,6 +36,58 @@ export const UpdateDialog: React.FC = () => {
       return "";
     }
   }, [updateInfo?.releaseNotes]);
+
+  if (!isOpen) return null;
+
+  if (isResultView) {
+    const isError = status === "error";
+    return (
+      <Dialog.Root open onOpenChange={(open) => !open && closeDialog()}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded-lg shadow-2xl w-[420px] max-w-[90vw] z-50 p-5 focus:outline-none text-text-primary"
+            aria-describedby="update-result-description"
+          >
+            <div className="flex items-center space-x-2 mb-3">
+              {isError ? (
+                <TriangleAlert className="w-5 h-5 text-red-500" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              )}
+              <Dialog.Title className="text-base font-bold">
+                {isError ? "업데이트 확인 실패" : "최신 버전입니다"}
+              </Dialog.Title>
+            </div>
+            <Dialog.Description
+              id="update-result-description"
+              className="text-sm text-text-secondary break-words"
+            >
+              {isError
+                ? errorMessage || "업데이트 정보를 가져오지 못했습니다."
+                : `현재 최신 버전(v${currentVersion})을 사용하고 있습니다.`}
+            </Dialog.Description>
+            <div className="flex justify-end space-x-2 mt-5">
+              {isError && (
+                <button
+                  onClick={() => void openReleasePage()}
+                  className="text-xs px-3.5 py-1.5 rounded border border-border-color hover:bg-hover-item transition-colors"
+                >
+                  릴리즈 페이지
+                </button>
+              )}
+              <button
+                onClick={closeDialog}
+                className="text-xs px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
 
   if (!updateInfo) return null;
 

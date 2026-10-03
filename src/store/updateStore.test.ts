@@ -3,7 +3,6 @@ import { useDialogStore } from "./dialogStore";
 import { useUpdateStore } from "./updateStore";
 import * as releaseClient from "../services/update/githubReleaseClient";
 import * as openerPlugin from "@tauri-apps/plugin-opener";
-import * as toastStore from "./toastStore";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn().mockResolvedValue(undefined),
@@ -44,7 +43,7 @@ describe("updateStore", () => {
     expect(useDialogStore.getState().openDialog).toBe("update");
   });
 
-  it("sets latest status and notifies user when no newer version exists", async () => {
+  it("opens the dialog with latest status on manual check, but not on silent check", async () => {
     vi.spyOn(releaseClient, "fetchLatestRelease").mockResolvedValue({
       version: "1.0.0",
       releaseName: "v1.0.0",
@@ -55,16 +54,14 @@ describe("updateStore", () => {
       assetName: null,
       isNewer: false,
     });
-    const toastSpy = vi.spyOn(toastStore, "showTransientToast");
 
-    await useUpdateStore.getState().checkForUpdates({ force: true });
-
+    await useUpdateStore.getState().checkForUpdates({ force: true, silent: true });
     expect(useUpdateStore.getState().status).toBe("latest");
     expect(useDialogStore.getState().openDialog).toBeNull();
-    expect(toastSpy).toHaveBeenCalledWith(
-      expect.stringContaining("현재 최신 버전"),
-      expect.objectContaining({ tone: "success" })
-    );
+
+    await useUpdateStore.getState().checkForUpdates({ force: true });
+    expect(useUpdateStore.getState().status).toBe("latest");
+    expect(useDialogStore.getState().openDialog).toBe("update");
   });
 
   it("respects 24-hour cooldown for non-forced checks", async () => {
@@ -109,22 +106,18 @@ describe("updateStore", () => {
     vi.spyOn(releaseClient, "fetchLatestRelease").mockRejectedValue(
       new Error("Network failed")
     );
-    const toastSpy = vi.spyOn(toastStore, "showTransientToast");
 
     // Silent check (e.g. at startup)
     await useUpdateStore.getState().checkForUpdates({ silent: true, force: true });
     expect(useUpdateStore.getState().status).toBe("idle");
     expect(useUpdateStore.getState().errorMessage).toBeNull();
-    expect(toastSpy).not.toHaveBeenCalled();
+    expect(useDialogStore.getState().openDialog).toBeNull();
 
     // Manual check
     await useUpdateStore.getState().checkForUpdates({ silent: false, force: true });
     expect(useUpdateStore.getState().status).toBe("error");
     expect(useUpdateStore.getState().errorMessage).toBe("Network failed");
-    expect(toastSpy).toHaveBeenCalledWith(
-      expect.stringContaining("업데이트 확인 실패"),
-      expect.objectContaining({ tone: "error" })
-    );
+    expect(useDialogStore.getState().openDialog).toBe("update");
   });
 
   it("opens download URL and release page using opener plugin", async () => {

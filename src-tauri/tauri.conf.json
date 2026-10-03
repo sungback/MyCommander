@@ -51,6 +51,7 @@
           "'self'",
           "ipc:",
           "http://ipc.localhost",
+          "https://api.github.com",
           "asset:",
           "http://asset.localhost"
         ],
@@ -106,6 +107,7 @@
           "http://localhost:*",
           "ws://127.0.0.1:*",
           "ws://localhost:*",
+          "https://api.github.com",
           "asset:",
           "http://asset.localhost"
         ],
