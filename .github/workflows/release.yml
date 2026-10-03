@@ -98,6 +98,7 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     env:
+      CARGO_INCREMENTAL: 0
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -108,6 +109,16 @@ jobs:
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
+
+      - name: Windows Defender 감시 제외 설정 (디스크 I/O 가속)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.cargo" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "cargo.exe", "rustc.exe" -ErrorAction SilentlyContinue
+
 
       - name: 공통 JS 환경 준비
         uses: ./.github/actions/setup-js
