@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
 /// Finds the enclosing macOS .app bundle directory for a given executable path.
+#[cfg(any(target_os = "macos", test))]
+#[allow(dead_code)]
 pub fn find_app_bundle(current_exe: &Path) -> Option<PathBuf> {
     let mut p = current_exe;
     while let Some(parent) = p.parent() {
