@@ -305,6 +305,13 @@ export const buildCommandPaletteItems = ({
       run: actions.openSettings,
     },
     {
+      id: "check-updates",
+      title: "Check for Updates",
+      subtitle: "Check for new MyCommander release",
+      keywords: ["update", "version", "upgrade", "release", "github"],
+      run: actions.checkForUpdates,
+    },
+    {
       id: "quit",
       title: "Quit MyCommander",
       subtitle: "Close the app",

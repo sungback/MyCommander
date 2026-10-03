@@ -12,6 +12,7 @@ import {
 } from "../../../features/fileOperationJobs";
 import { refreshPanelsForDirectories } from "../../../store/panelRefresh";
 import { usePanelStore } from "../../../store/panelStore";
+import { useUpdateStore } from "../../../store/updateStore";
 import { showTransientToast } from "../../../store/toastStore";
 import { writeClipboardText } from "../../../utils/clipboard";
 import { getPathDirectoryName } from "../../../utils/path";
@@ -82,6 +83,10 @@ export const useCommandPaletteActions = (): CommandPaletteActions => {
             ? `폴더 용량 계산 완료: ${result.completed}/${result.total}개`
             : `폴더 용량 계산 완료: ${result.completed}개`
         );
+      },
+      checkForUpdates: async () => {
+        closeDialog();
+        await useUpdateStore.getState().checkForUpdates({ force: true });
       },
       closeApp: async () => {
         closeDialog();

@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { buildMultiRenameSession } from "../features/multiRename";
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
+import { useUpdateStore } from "../store/updateStore";
 import { ViewMode } from "../types/file";
 import { ThemePreference } from "../types/theme";
 import {
@@ -159,6 +160,13 @@ export const useAppCommandListeners = ({
   useTauriSignal("new-file-requested", () => setOpenDialog("newfile"), [setOpenDialog]);
   useTauriSignal("folder-sync-requested", () => setOpenDialog("sync"), [setOpenDialog]);
   useTauriSignal("settings-requested", () => setOpenDialog("settings"), [setOpenDialog]);
+  useTauriSignal(
+    "check-updates-requested",
+    () => {
+      void useUpdateStore.getState().checkForUpdates({ force: true });
+    },
+    []
+  );
   useTauriSignal(
     "target-equals-source-requested",
     syncOtherPanelToCurrentPath,

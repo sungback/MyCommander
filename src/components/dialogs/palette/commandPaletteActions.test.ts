@@ -35,6 +35,7 @@ const makePanel = (overrides: Partial<PanelState> = {}): PanelState =>
 
 const commandActions = {
   calculateFolderSizes: vi.fn(),
+  checkForUpdates: vi.fn(),
   closeApp: vi.fn(),
   copyCurrentPath: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -239,5 +240,24 @@ describe("commandPaletteActions", () => {
     expect(getCommandSelectionLabel([])).toBe("No selection");
     expect(getCommandSelectionLabel(["/home/user/notes.txt"])).toBe("notes.txt");
     expect(getCommandSelectionLabel(["/a", "/b", "/c"])).toBe("3 selected");
+  });
+
+  it("includes check for updates command item and invokes its action", () => {
+    const items = buildCommandPaletteItems({
+      activePanelId: "left",
+      activePanel: makePanel(),
+      isMac: false,
+      selectedPaths: [],
+      primaryTarget: null,
+      showHiddenFiles: false,
+      actions: commandActions,
+    });
+
+    const updateItem = items.find((item) => item.id === "check-updates");
+    expect(updateItem).toBeDefined();
+    expect(updateItem?.title).toBe("Check for Updates");
+
+    updateItem?.run();
+    expect(commandActions.checkForUpdates).toHaveBeenCalled();
   });
 });

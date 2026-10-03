@@ -51,6 +51,10 @@ vi.mock('./SettingsDialog', () => ({
   SettingsDialog: () => null,
 }));
 
+vi.mock('./UpdateDialog', () => ({
+  UpdateDialog: () => null,
+}));
+
 vi.mock('../../hooks/useAppCommands', () => ({
   isMacPlatform: () => false,
   showTransientStatusMessage: dialogContainerMocks.mockShowTransientStatusMessage,

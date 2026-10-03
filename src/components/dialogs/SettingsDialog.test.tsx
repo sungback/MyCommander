@@ -52,4 +52,12 @@ describe("SettingsDialog", () => {
 
     expect(screen.getByLabelText("글꼴")).toHaveValue("");
   });
+
+  it("displays current version and triggers update check", () => {
+    render(<SettingsDialog />);
+    expect(screen.getByText(/v\d+\.\d+\.\d+/)).toBeInTheDocument();
+
+    const checkBtn = screen.getByRole("button", { name: /업데이트 확인/i });
+    expect(checkBtn).toBeInTheDocument();
+  });
 });

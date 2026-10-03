@@ -26,7 +26,9 @@ export const formatSize = (size?: number | null, options: FormatSizeOptions = {}
   return `${value.toFixed(decimals)} ${units[unitIndex]}`;
 };
 
-export const formatDate = (ts?: number | null) => {
+export const formatDate = (ts?: number | string | Date | null) => {
   if (!ts) return "";
-  return format(new Date(ts), "yyyy.MM.dd HH:mm");
+  const date = typeof ts === "string" || typeof ts === "number" ? new Date(ts) : ts;
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy.MM.dd HH:mm");
 };

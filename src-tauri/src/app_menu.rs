@@ -27,6 +27,7 @@ pub(crate) const COMMANDS_MENU_ID: &str = "commands";
 pub(crate) const FOLDER_SYNC_MENU_ITEM_ID: &str = "folder_sync";
 pub(crate) const TARGET_EQUALS_SOURCE_MENU_ITEM_ID: &str = "target_equals_source";
 pub(crate) const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
+pub(crate) const CHECK_UPDATES_MENU_ITEM_ID: &str = "check_updates";
 
 fn app_menu_item<R: Runtime>(
     app: &AppHandle<R>,
@@ -173,6 +174,21 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         &[&folder_sync, &target_equals_source, &swap_panels],
     )?;
 
+    #[cfg(target_os = "macos")]
+    let macos_check_updates = app_menu_item(
+        app,
+        CHECK_UPDATES_MENU_ITEM_ID,
+        "업데이트 확인...",
+        None::<&str>,
+    )?;
+    #[cfg(not(target_os = "macos"))]
+    let check_updates = app_menu_item(
+        app,
+        CHECK_UPDATES_MENU_ITEM_ID,
+        "업데이트 확인...",
+        None::<&str>,
+    )?;
+
     Menu::with_items(
         app,
         &[
@@ -183,6 +199,7 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
                 true,
                 &[
                     &PredefinedMenuItem::about(app, None, Some(about_metadata.clone()))?,
+                    &macos_check_updates,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::services(app, None)?,
                     &PredefinedMenuItem::separator(app)?,
@@ -249,6 +266,10 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
                 "도움말",
                 true,
                 &[
+                    #[cfg(not(target_os = "macos"))]
+                    &check_updates,
+                    #[cfg(not(target_os = "macos"))]
+                    &PredefinedMenuItem::separator(app)?,
                     #[cfg(not(target_os = "macos"))]
                     &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
                 ],

@@ -25,6 +25,7 @@ export interface CommandPaletteLocation {
 
 export interface CommandPaletteActions {
   calculateFolderSizes: () => void | Promise<void>;
+  checkForUpdates: () => void | Promise<void>;
   closeApp: () => void | Promise<void>;
   copyCurrentPath: () => void | Promise<void>;
   copyToClipboard: () => void | Promise<void>;

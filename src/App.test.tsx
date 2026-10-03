@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { usePanelStore } from './store/panelStore';
 import { useDialogStore } from './store/dialogStore';
+import { useUpdateStore } from './store/updateStore';
 import {
   RENDERER_RECOVERY_RELOAD_ATTR,
   RENDERER_RECOVERY_RELOAD_DELAY_MS,
@@ -179,6 +180,22 @@ describe('App — Tab 키 패널 전환', () => {
     handler?.();
 
     expect(useDialogStore.getState().openDialog).toBe('settings');
+  });
+
+  it('check-updates-requested 이벤트 → 강제 업데이트 확인 실행', async () => {
+    const checkForUpdatesSpy = vi.spyOn(useUpdateStore.getState(), 'checkForUpdates').mockResolvedValue(undefined);
+
+    render(<App />);
+
+    await Promise.resolve();
+
+    const handler = listenHandlers.get('check-updates-requested');
+    expect(handler).toBeTypeOf('function');
+
+    handler?.();
+
+    expect(checkForUpdatesSpy).toHaveBeenCalledWith({ force: true });
+    checkForUpdatesSpy.mockRestore();
   });
 
   it('restores queued jobs by opening the progress dialog on startup', async () => {

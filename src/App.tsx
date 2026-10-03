@@ -20,6 +20,7 @@ import { buildFontFamilyStack } from "./constants/fontOptions";
 import { useJobQueue } from "./hooks/useJobQueue";
 import { useRendererRecovery } from "./hooks/useRendererRecovery";
 import { usePersistentSizeCache } from "./hooks/usePersistentSizeCache";
+import { useStartupUpdateCheck } from "./hooks/useStartupUpdateCheck";
 import {
   useAppCommandListeners,
   useAutoTheme,
@@ -48,6 +49,7 @@ function App() {
   useDirectoryWatch();
   useJobQueue();
   useRendererRecovery();
+  useStartupUpdateCheck();
   usePanelFocusShortcut(activePanelId, setActivePanel);
   useNativePreferenceListeners(setShowHiddenFiles, setThemePreference, setPanelViewMode);
   useAppCommandListeners({

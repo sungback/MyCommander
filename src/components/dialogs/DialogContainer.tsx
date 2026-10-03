@@ -10,6 +10,7 @@ import { FileInfoDialog } from "./FileInfoDialog";
 import { QuickPreviewDialog } from "./preview/QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { TextInputOperationDialog } from "./TextInputOperationDialog";
+import { UpdateDialog } from "./UpdateDialog";
 import {
   getDragCopyTargetPath,
   getSelectedItemsText,
@@ -267,6 +268,7 @@ export const DialogContainer: React.FC = () => {
       <QuickPreviewDialog />
       <SettingsDialog />
       <CommandPalette />
+      <UpdateDialog />
     </>
   );
 };

@@ -16,6 +16,7 @@ import {
   PanelsLeftRight,
   Search,
   Settings,
+  Sparkles,
   Terminal,
   Trash2,
   Undo2,
@@ -69,6 +70,7 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   "swap-panels": PanelsLeftRight,
   "job-center": ListChecks,
   settings: Settings,
+  "check-updates": Sparkles,
   quit: Keyboard,
 };
 
