@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "MyCommander",
+        "title": "MyCommander1",
         "width": 1120,
         "height": 720,
         "dragDropEnabled": true
