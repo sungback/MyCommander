@@ -1,6 +1,7 @@
 mod create;
 mod extract;
 mod paths;
+mod preview;
 mod process;
 mod progress;
 
@@ -9,6 +10,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use create::{create_zip_archive, create_zip_archive_from_paths};
 pub(crate) use extract::extract_zip_archive;
+pub(crate) use preview::preview_zip_archive_sync;
+pub use preview::ZipArchivePreview;
+#[allow(unused_imports)]
+pub use preview::ZipEntryPreview;
 
 #[cfg(test)]
 pub(crate) use extract::flatten_matching_archive_root_dir;
@@ -97,4 +102,11 @@ pub fn cancel_zip_operation() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn preview_zip_archive(path: String) -> Result<ZipArchivePreview, String> {
+    tokio::task::spawn_blocking(move || preview_zip_archive_sync(&path))
+        .await
+        .map_err(|e| e.to_string())?
 }

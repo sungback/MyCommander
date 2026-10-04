@@ -1,4 +1,5 @@
 import {
+  ARCHIVE_EXTENSIONS,
   DOCX_EXTENSIONS,
   HWPX_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -184,9 +185,25 @@ const textPreviewHandler: QuickPreviewHandler = async (path, context) => {
       };
 };
 
+const zipPreviewHandler: QuickPreviewHandler = async (path, context) => {
+  if (!ARCHIVE_EXTENSIONS.has(context.extension)) {
+    return null;
+  }
+
+  const renderer = await context.loadZipRenderer();
+  const { archive, renderedHtml } = await renderer.renderZip(path);
+  return {
+    type: "rendered",
+    archive,
+    renderedHtml,
+    renderExt: "zip",
+  };
+};
+
 export const QUICK_PREVIEW_HANDLERS: QuickPreviewHandler[] = [
   assetPreviewHandler,
   officePreviewHandler,
+  zipPreviewHandler,
   sqlitePreviewHandler,
   notebookPreviewHandler,
   renderedTextPreviewHandler,

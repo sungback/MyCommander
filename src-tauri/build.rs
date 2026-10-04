@@ -27,6 +27,7 @@ fn main() {
         "create_zip",
         "create_zip_from_paths",
         "cancel_zip_operation",
+        "preview_zip_archive",
         "submit_job",
         "list_jobs",
         "cancel_job",

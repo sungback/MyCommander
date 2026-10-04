@@ -6,7 +6,9 @@ import type {
   SqliteRendererModule,
   TextHighlighterModule,
   XlsxRendererModule,
+  ZipRendererModule,
 } from "./quickPreviewRenderers/shared";
+import type { ZipArchivePreview } from "../../../types/zipPreview";
 
 export type PreviewType =
   | "image"
@@ -27,6 +29,7 @@ export interface PreviewState {
   src?: string;
   error?: string;
   renderExt?: string;
+  archive?: ZipArchivePreview;
 }
 
 export type InvokeImpl = <T>(
@@ -52,4 +55,5 @@ export interface QuickPreviewLoaderOptions {
   loadXlsxRenderer?: () => Promise<XlsxRendererModule>;
   loadSqliteRenderer?: () => Promise<SqliteRendererModule>;
   loadDocxRenderer?: () => Promise<DocxRendererModule>;
+  loadZipRenderer?: () => Promise<ZipRendererModule>;
 }

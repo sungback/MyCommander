@@ -56,4 +56,23 @@ describe('archiveCommands', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('previewZipArchive', () => {
+    it('calls invoke with preview_zip_archive and returns preview data', async () => {
+      const mockPreview = {
+        fileName: 'test.zip',
+        fileSize: 1024,
+        totalEntries: 1,
+        totalFiles: 1,
+        totalDirs: 0,
+        totalUncompressedSize: 500,
+        totalCompressedSize: 250,
+        entries: [],
+      };
+      mockInvoke.mockResolvedValue(mockPreview);
+      const result = await archiveCommands.previewZipArchive('/path/to/test.zip');
+      expect(mockInvoke).toHaveBeenCalledWith('preview_zip_archive', { path: '/path/to/test.zip' });
+      expect(result).toEqual(mockPreview);
+    });
+  });
 });

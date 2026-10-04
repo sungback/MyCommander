@@ -6,8 +6,9 @@ import {
   type PptxRendererModule,
   type HwpxRendererModule,
   type SqliteRendererModule,
-  type XlsxRendererModule,
   type TextHighlighterModule,
+  type XlsxRendererModule,
+  type ZipRendererModule,
 } from "./quickPreviewRenderers/shared";
 import { getExtension } from "./quickPreviewFileTypes";
 import { loadPreviewFromHandlers } from "./quickPreviewHandlers";
@@ -93,6 +94,16 @@ const defaultLoadSqliteRenderer = async (): Promise<SqliteRendererModule> => {
   return loadRenderer();
 };
 
+const defaultLoadZipRenderer = async (
+  previewZipArchive?: (filePath: string) => Promise<import("../../../types/zipPreview").ZipArchivePreview>
+): Promise<ZipRendererModule> => {
+  const { defaultLoadZipRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/zipRenderer"
+  );
+
+  return loadRenderer({ previewZipArchive });
+};
+
 export const loadSourceHighlightHtml = async (
   content: string,
   renderExt: string,
@@ -122,6 +133,12 @@ export const loadPreviewForPath = async (
           ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
         })
       : (options.readFileBinary ?? useFileSystem().readFileBinary)(filePath, maxBytes);
+  const previewZipArchive = (filePath: string) =>
+    options.invokeImpl
+      ? options.invokeImpl<import("../../../types/zipPreview").ZipArchivePreview>("preview_zip_archive", {
+          path: filePath,
+        })
+      : useFileSystem().previewZipArchive(filePath);
   const convertFileSrcImpl = options.convertFileSrcImpl ?? convertFileSrc;
   const loadTextHighlighter = options.loadTextHighlighter ?? defaultLoadTextHighlighter;
   const loadMarkdownRenderer = options.loadMarkdownRenderer ?? defaultLoadMarkdownRenderer;
@@ -135,6 +152,8 @@ export const loadPreviewForPath = async (
   const loadSqliteRenderer = options.loadSqliteRenderer ?? defaultLoadSqliteRenderer;
   const loadDocxRenderer =
     options.loadDocxRenderer ?? (() => defaultLoadDocxRenderer(readFileBinary));
+  const loadZipRenderer =
+    options.loadZipRenderer ?? (() => defaultLoadZipRenderer(previewZipArchive));
 
   return loadPreviewFromHandlers(path, {
     extension,
@@ -149,5 +168,6 @@ export const loadPreviewForPath = async (
     loadXlsxRenderer,
     loadSqliteRenderer,
     loadDocxRenderer,
+    loadZipRenderer,
   });
 };

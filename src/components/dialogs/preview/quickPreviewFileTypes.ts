@@ -28,6 +28,7 @@ export const HWPX_EXTENSIONS = new Set(["hwpx"]);
 export const XLSX_EXTENSIONS = new Set(["xlsx"]);
 export const DOCX_EXTENSIONS = new Set(["docx"]);
 export const SQLITE_EXTENSIONS = new Set(["db", "sqlite", "sqlite3"]);
+export const ARCHIVE_EXTENSIONS = new Set(["zip"]);
 
 export const TEXT_EXTENSIONS = new Set([
   "txt",

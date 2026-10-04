@@ -328,4 +328,41 @@ describe("loadPreviewForPath", () => {
       language: "json",
     });
   });
+
+  it("loads the zip renderer for zip archives", async () => {
+    const mockArchive = {
+      fileName: "bundle.zip",
+      fileSize: 4096,
+      totalEntries: 1,
+      totalFiles: 1,
+      totalDirs: 0,
+      totalUncompressedSize: 100,
+      totalCompressedSize: 50,
+      entries: [],
+    };
+    const renderZip = vi.fn().mockResolvedValue({
+      archive: mockArchive,
+      renderedHtml: "<html><body>zip content</body></html>",
+    });
+    const loadZipRenderer = vi.fn().mockResolvedValue({ renderZip });
+
+    const result = await loadPreviewForPath("/tmp/bundle.zip", {
+      loadZipRenderer,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(loadZipRenderer).toHaveBeenCalledTimes(1);
+    expect(renderZip).toHaveBeenCalledWith("/tmp/bundle.zip");
+    expect(result).toEqual({
+      type: "rendered",
+      archive: mockArchive,
+      renderedHtml: "<html><body>zip content</body></html>",
+      renderExt: "zip",
+    });
+  });
 });

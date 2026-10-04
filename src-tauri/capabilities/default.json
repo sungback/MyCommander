@@ -39,6 +39,7 @@
     "allow-create-zip",
     "allow-create-zip-from-paths",
     "allow-cancel-zip-operation",
+    "allow-preview-zip-archive",
     "allow-submit-job",
     "allow-list-jobs",
     "allow-cancel-job",

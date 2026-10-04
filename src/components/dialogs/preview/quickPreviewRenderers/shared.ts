@@ -38,6 +38,15 @@ export interface SqliteRendererModule {
   renderSqlite: (filePath: string) => MaybePromise<string>;
 }
 
+export interface ZipRendererResult {
+  archive: import("../../../../types/zipPreview").ZipArchivePreview;
+  renderedHtml: string;
+}
+
+export interface ZipRendererModule {
+  renderZip: (filePath: string) => MaybePromise<ZipRendererResult>;
+}
+
 export const EXT_TO_LANG: Record<string, string> = {
   ts: "typescript",
   tsx: "typescript",

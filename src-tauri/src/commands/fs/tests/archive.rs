@@ -1,7 +1,7 @@
 use super::super::archive::{
     extract_zip_archive, flatten_matching_archive_root_dir, get_hidden_temp_archive_path,
     get_unique_archive_path, get_unique_archive_path_named, get_unique_extraction_dir,
-    validate_zip_source_directory,
+    preview_zip_archive_sync, validate_zip_source_directory,
 };
 use super::create_test_dir;
 use std::fs;
@@ -228,5 +228,64 @@ fn hidden_temp_archive_path_increments_when_partial_exists() {
     fs::write(tmp.join(".data.zip.partial"), b"").unwrap();
     let result = get_hidden_temp_archive_path(&archive).unwrap();
     assert_eq!(result, tmp.join(".data.zip.partial.2"));
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn preview_zip_archive_sync_reads_zip_metadata_and_entries() {
+    let tmp = create_test_dir("preview_zip_test");
+    let source_dir = tmp.join("content");
+    let nested_dir = source_dir.join("subfolder");
+    fs::create_dir_all(&nested_dir).unwrap();
+    fs::write(source_dir.join("document.txt"), b"Hello Zip World!").unwrap();
+    fs::write(nested_dir.join("data.json"), b"{\"key\":\"value\"}").unwrap();
+
+    let archive = tmp.join("test.zip");
+    let status = Command::new("zip")
+        .current_dir(&tmp)
+        .args(["-r", "-1", "test.zip", "content"])
+        .status()
+        .expect("zip command must be available");
+    assert!(status.success(), "zip creation failed");
+
+    let preview = preview_zip_archive_sync(archive.to_str().unwrap()).unwrap();
+    assert_eq!(preview.file_name, "test.zip");
+    assert!(preview.file_size > 0);
+    assert_eq!(preview.total_files, 2);
+    assert!(preview.total_dirs >= 1);
+    assert_eq!(preview.total_uncompressed_size, 16 + 15);
+
+    let doc_entry = preview
+        .entries
+        .iter()
+        .find(|e| e.name == "document.txt")
+        .expect("document.txt entry must exist");
+    assert!(!doc_entry.is_dir);
+    assert_eq!(doc_entry.size, 16);
+
+    let json_entry = preview
+        .entries
+        .iter()
+        .find(|e| e.name == "data.json")
+        .expect("data.json entry must exist");
+    assert!(!json_entry.is_dir);
+    assert_eq!(json_entry.size, 15);
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn preview_zip_archive_sync_rejects_non_zip_or_missing_file() {
+    let result = preview_zip_archive_sync("/nonexistent/file.zip");
+    assert!(result.is_err());
+
+    let tmp = create_test_dir("preview_not_zip");
+    fs::create_dir_all(&tmp).unwrap();
+    let invalid_file = tmp.join("not_zip.zip");
+    fs::write(&invalid_file, b"This is not a zip file").unwrap();
+
+    let result = preview_zip_archive_sync(invalid_file.to_str().unwrap());
+    assert!(result.is_err());
+
     let _ = fs::remove_dir_all(&tmp);
 }

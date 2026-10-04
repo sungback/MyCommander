@@ -53,6 +53,7 @@ pub fn run() {
             commands::fs::archive::create_zip,
             commands::fs::archive::create_zip_from_paths,
             commands::fs::archive::cancel_zip_operation,
+            commands::fs::archive::preview_zip_archive,
             commands::jobs::commands::submit_job,
             commands::jobs::commands::list_jobs,
             commands::jobs::commands::cancel_job,

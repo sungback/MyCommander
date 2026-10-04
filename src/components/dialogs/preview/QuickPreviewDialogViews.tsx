@@ -13,6 +13,7 @@ import {
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
 import { QuickPreviewJsonView } from "./QuickPreviewJsonView";
+import { QuickPreviewZipView } from "./QuickPreviewZipView";
 import type { PreviewState } from "./quickPreviewLoader";
 import type { PreviewStatusContent } from "./quickPreviewStatus";
 
@@ -86,7 +87,13 @@ export const QuickPreviewHeader: React.FC<QuickPreviewHeaderProps> = ({
         </span>
       )}
       {preview.renderExt && (
-        <span className="shrink-0 text-xs text-text-secondary bg-bg-secondary px-1.5 py-0.5 rounded font-mono">
+        <span
+          className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
+            preview.renderExt === "zip"
+              ? "text-sky-400 bg-sky-500/10 border border-sky-500/20"
+              : "text-text-secondary bg-bg-secondary"
+          }`}
+        >
           {preview.renderExt}
         </span>
       )}
@@ -286,13 +293,17 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
       <iframe src={preview.src} className="w-full flex-1 border-none" title="PDF preview" />
     )}
 
-    {preview.type === "rendered" && !showSource && preview.renderedHtml && (
-      <iframe
-        srcDoc={preview.renderedHtml}
-        className="w-full flex-1 border-none"
-        sandbox="allow-same-origin"
-        title="rendered preview"
-      />
+    {preview.type === "rendered" && !showSource && (
+      preview.renderExt === "zip" && preview.archive ? (
+        <QuickPreviewZipView archive={preview.archive} />
+      ) : preview.renderedHtml ? (
+        <iframe
+          srcDoc={preview.renderedHtml}
+          className="w-full flex-1 border-none"
+          sandbox="allow-same-origin"
+          title="rendered preview"
+        />
+      ) : null
     )}
 
     {preview.type === "rendered" && showSource && (

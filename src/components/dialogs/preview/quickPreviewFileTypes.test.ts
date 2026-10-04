@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARCHIVE_EXTENSIONS,
   getExtension,
   getFileName,
   getImageMimeType,
@@ -77,6 +78,10 @@ describe("extension sets", () => {
 
   it("HWPX_EXTENSIONS includes hwpx", () => {
     expect(HWPX_EXTENSIONS.has("hwpx")).toBe(true);
+  });
+
+  it("ARCHIVE_EXTENSIONS includes zip", () => {
+    expect(ARCHIVE_EXTENSIONS.has("zip")).toBe(true);
   });
 
   it("IMAGE_EXTENSIONS includes webp", () => {
