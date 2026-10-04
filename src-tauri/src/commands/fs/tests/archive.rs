@@ -1,7 +1,8 @@
 use super::super::archive::{
-    extract_zip_archive, extract_zip_entries_native, flatten_matching_archive_root_dir,
-    get_hidden_temp_archive_path, get_unique_archive_path, get_unique_archive_path_named,
-    get_unique_extraction_dir, preview_zip_archive_sync, validate_zip_source_directory,
+    decode_zip_entry_name, extract_zip_archive, extract_zip_entries_native,
+    flatten_matching_archive_root_dir, get_hidden_temp_archive_path, get_unique_archive_path,
+    get_unique_archive_path_named, get_unique_extraction_dir, preview_zip_archive_sync,
+    safe_enclosed_path, validate_zip_source_directory,
 };
 use super::create_test_dir;
 use std::fs;
@@ -346,4 +347,57 @@ fn preview_zip_archive_sync_rejects_non_zip_or_missing_file() {
     assert!(result.is_err());
 
     let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn test_decode_zip_entry_name_utf8_and_cp949() {
+    // 1. Valid UTF-8 byte sequence for "01-강의-데이터.txt"
+    let utf8_bytes = "01-강의-데이터.txt".as_bytes();
+    assert_eq!(
+        decode_zip_entry_name(utf8_bytes, "fallback"),
+        "01-강의-데이터.txt"
+    );
+
+    // 2. CP949 / EUC-KR bytes for "01-강의-데이터.txt"
+    let cp949_bytes: &[u8] = &[
+        0x30, 0x31, 0x2d, 0xb0, 0xad, 0xc0, 0xc7, 0x2d, 0xb5, 0xa5, 0xc0, 0xcc, 0xc5, 0xcd, 0x2e,
+        0x74, 0x78, 0x74,
+    ];
+    assert_eq!(
+        decode_zip_entry_name(cp949_bytes, "fallback"),
+        "01-강의-데이터.txt"
+    );
+
+    // 3. Fallback when invalid bytes
+    let invalid_bytes: &[u8] = &[0xff, 0xff];
+    assert_eq!(
+        decode_zip_entry_name(invalid_bytes, "fallback_name.txt"),
+        "fallback_name.txt"
+    );
+}
+
+#[test]
+fn test_safe_enclosed_path_validation() {
+    use std::path::PathBuf;
+
+    // Normal paths
+    assert_eq!(
+        safe_enclosed_path("data/강의_1004.txt"),
+        Some(PathBuf::from("data").join("강의_1004.txt"))
+    );
+    assert_eq!(
+        safe_enclosed_path("data\\강의_1004.txt"),
+        Some(PathBuf::from("data").join("강의_1004.txt"))
+    );
+
+    // Directory paths
+    assert_eq!(safe_enclosed_path("data/"), Some(PathBuf::from("data")));
+
+    // Unsafe Zip Slip paths
+    assert_eq!(safe_enclosed_path("../escape.txt"), None);
+    assert_eq!(safe_enclosed_path("data/../../escape.txt"), None);
+    assert_eq!(safe_enclosed_path("/absolute/path.txt"), None);
+    assert_eq!(safe_enclosed_path(""), None);
+    assert_eq!(safe_enclosed_path("."), None);
+    assert_eq!(safe_enclosed_path("null\0byte.txt"), None);
 }

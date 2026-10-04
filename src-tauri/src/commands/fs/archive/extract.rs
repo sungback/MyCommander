@@ -1,4 +1,4 @@
-use super::paths::get_unique_extraction_dir;
+use super::paths::{decode_zip_entry_name, get_unique_extraction_dir, safe_enclosed_path};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use crate::commands::fs::shared::{describe_invalid_zip_problem, format_command_failure};
 use std::fs;
@@ -177,12 +177,14 @@ pub(crate) fn extract_zip_entries_native(
             .by_index(i)
             .map_err(|e| format!("Failed to read archive entry #{i}: {e}"))?;
 
-        let enclosed = entry
-            .enclosed_name()
-            .ok_or_else(|| format!("Archive contains unsafe path entry: {}", entry.name()))?;
+        let entry_name = decode_zip_entry_name(entry.name_raw(), entry.name());
+        let enclosed = safe_enclosed_path(&entry_name)
+            .ok_or_else(|| format!("Archive contains unsafe path entry: {entry_name}"))?;
         let outpath = target_dir.join(enclosed);
 
-        if entry.is_dir() {
+        let is_dir = entry.is_dir() || entry_name.ends_with('/') || entry_name.ends_with('\\');
+
+        if is_dir {
             fs::create_dir_all(&outpath)
                 .map_err(|e| format!("Failed to create directory {}: {e}", outpath.display()))?;
         } else {
@@ -267,11 +269,9 @@ fn validate_zip_entry_paths(archive_path: &Path) -> Result<(), String> {
 
     for i in 0..zip.len() {
         let entry = zip.by_index(i).map_err(|e| e.to_string())?;
-        if entry.enclosed_name().is_none() {
-            return Err(format!(
-                "Archive contains unsafe path entry: {}",
-                entry.name()
-            ));
+        let entry_name = decode_zip_entry_name(entry.name_raw(), entry.name());
+        if safe_enclosed_path(&entry_name).is_none() {
+            return Err(format!("Archive contains unsafe path entry: {entry_name}"));
         }
     }
     Ok(())

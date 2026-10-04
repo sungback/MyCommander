@@ -118,3 +118,44 @@ pub(crate) fn get_hidden_temp_archive_path(archive_path: &Path) -> Result<PathBu
         archive_path.display()
     ))
 }
+
+pub(crate) fn decode_zip_entry_name(raw: &[u8], fallback: &str) -> String {
+    if let Ok(utf8_str) = std::str::from_utf8(raw) {
+        return utf8_str.to_string();
+    }
+
+    let (decoded, _, malformed) = encoding_rs::EUC_KR.decode(raw);
+    if !malformed {
+        return decoded.into_owned();
+    }
+
+    fallback.to_string()
+}
+
+pub(crate) fn safe_enclosed_path(decoded_name: &str) -> Option<PathBuf> {
+    if decoded_name.contains('\0') {
+        return None;
+    }
+
+    let normalized = decoded_name.replace('\\', "/");
+    let mut path = PathBuf::new();
+    let mut depth = 0usize;
+
+    for component in Path::new(&normalized).components() {
+        match component {
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => return None,
+            std::path::Component::ParentDir => depth = depth.checked_sub(1)?,
+            std::path::Component::Normal(c) => {
+                depth += 1;
+                path.push(c);
+            }
+            std::path::Component::CurDir => (),
+        }
+    }
+
+    if depth == 0 {
+        return None;
+    }
+
+    Some(path)
+}

@@ -1,3 +1,4 @@
+use super::paths::decode_zip_entry_name;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -63,8 +64,8 @@ pub(crate) fn preview_zip_archive_sync(path: &str) -> Result<ZipArchivePreview, 
         let entry = zip
             .by_index(i)
             .map_err(|e| format!("Failed to read zip entry #{i}: {e}"))?;
-        let entry_name = entry.name().to_string();
-        let is_dir = entry.is_dir();
+        let entry_name = decode_zip_entry_name(entry.name_raw(), entry.name());
+        let is_dir = entry.is_dir() || entry_name.ends_with('/') || entry_name.ends_with('\\');
         let size = entry.size();
         let compressed_size = entry.compressed_size();
 
@@ -76,18 +77,19 @@ pub(crate) fn preview_zip_archive_sync(path: &str) -> Result<ZipArchivePreview, 
             total_compressed_size = total_compressed_size.saturating_add(compressed_size);
         }
 
+        let normalized_entry_name = entry_name.replace('\\', "/");
         let display_name = if is_dir {
-            entry_name
+            normalized_entry_name
                 .trim_end_matches('/')
                 .rsplit('/')
                 .next()
-                .unwrap_or(&entry_name)
+                .unwrap_or(&normalized_entry_name)
                 .to_string()
         } else {
-            entry_name
+            normalized_entry_name
                 .rsplit('/')
                 .next()
-                .unwrap_or(&entry_name)
+                .unwrap_or(&normalized_entry_name)
                 .to_string()
         };
 
