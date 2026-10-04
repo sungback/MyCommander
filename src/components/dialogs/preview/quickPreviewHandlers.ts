@@ -157,19 +157,30 @@ const textPreviewHandler: QuickPreviewHandler = async (path, context) => {
   }
 
   const content = await context.readFileContent(path);
+
+  let formattedContent = content;
+  if (context.extension === "json" || context.extension === "jsonc") {
+    try {
+      const parsed = JSON.parse(content);
+      formattedContent = JSON.stringify(parsed, null, 2);
+    } catch {
+      // Keep original content if parsing fails
+    }
+  }
+
   const highlighter = await context.loadTextHighlighter();
-  const highlighted = await highlighter.highlightText(content, context.extension);
+  const highlighted = await highlighter.highlightText(formattedContent, context.extension);
 
   return highlighted
     ? {
         type: "text",
-        content,
+        content: formattedContent,
         highlightedHtml: highlighted.highlightedHtml,
         language: highlighted.language,
       }
     : {
         type: "text",
-        content,
+        content: formattedContent,
       };
 };
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
+import { QuickPreviewJsonView } from "./QuickPreviewJsonView";
 import type { PreviewState } from "./quickPreviewLoader";
 import type { PreviewStatusContent } from "./quickPreviewStatus";
 
@@ -74,7 +75,13 @@ export const QuickPreviewHeader: React.FC<QuickPreviewHeaderProps> = ({
         {fileName}
       </Dialog.Title>
       {preview.language && (
-        <span className="shrink-0 text-xs text-text-secondary bg-bg-secondary px-1.5 py-0.5 rounded font-mono">
+        <span
+          className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
+            preview.language === "json"
+              ? "text-amber-400 bg-amber-500/10 border border-amber-500/20"
+              : "text-text-secondary bg-bg-secondary"
+          }`}
+        >
           {preview.language}
         </span>
       )}
@@ -314,7 +321,12 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
     )}
 
     {preview.type === "text" && (
-      preview.highlightedHtml ? (
+      preview.language === "json" ? (
+        <QuickPreviewJsonView
+          content={preview.content ?? ""}
+          highlightedHtml={preview.highlightedHtml}
+        />
+      ) : preview.highlightedHtml ? (
         <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0 select-text">
           <code
             className="hljs block p-4 min-h-full select-text"

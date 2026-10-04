@@ -269,4 +269,63 @@ describe("loadPreviewForPath", () => {
       renderExt: "sqlite",
     });
   });
+
+  it("auto-formats minified JSON before highlighting for json previews", async () => {
+    const rawJson = '{"name":"app","count":1,"features":["alpha"]}';
+    const formatted = JSON.stringify(JSON.parse(rawJson), null, 2);
+
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: `<span>${formatted}</span>`,
+      language: "json",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue(rawJson);
+
+    const result = await loadPreviewForPath("/tmp/package.json", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", { path: "/tmp/package.json" });
+    expect(highlightText).toHaveBeenCalledWith(formatted, "json");
+    expect(result).toEqual({
+      type: "text",
+      content: formatted,
+      highlightedHtml: `<span>${formatted}</span>`,
+      language: "json",
+    });
+  });
+
+  it("keeps raw content if JSON parsing fails", async () => {
+    const brokenJson = "{ invalid json: 123 ";
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: `<span>${brokenJson}</span>`,
+      language: "json",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue(brokenJson);
+
+    const result = await loadPreviewForPath("/tmp/broken.json", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadPptxRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(highlightText).toHaveBeenCalledWith(brokenJson, "json");
+    expect(result).toEqual({
+      type: "text",
+      content: brokenJson,
+      highlightedHtml: `<span>${brokenJson}</span>`,
+      language: "json",
+    });
+  });
 });
