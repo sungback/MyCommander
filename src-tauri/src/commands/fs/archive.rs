@@ -16,7 +16,7 @@ pub use preview::ZipArchivePreview;
 pub use preview::ZipEntryPreview;
 
 #[cfg(test)]
-pub(crate) use extract::flatten_matching_archive_root_dir;
+pub(crate) use extract::{extract_zip_entries_native, flatten_matching_archive_root_dir};
 #[cfg(test)]
 pub(crate) use paths::{
     get_hidden_temp_archive_path, get_unique_archive_path, get_unique_archive_path_named,
