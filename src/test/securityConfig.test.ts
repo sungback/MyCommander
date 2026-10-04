@@ -73,6 +73,8 @@ describe("Tauri security config", () => {
     expect(csp).toContain("img-src");
     expect(csp).toContain("asset:");
     expect(csp).toContain("http://asset.localhost");
+    expect(csp).toContain("https://asset.localhost");
+    expect(csp).toContain("blob:");
     expect(csp).toContain("media-src");
     expect(csp).toContain("frame-src");
     expect(csp).toContain("object-src 'none'");

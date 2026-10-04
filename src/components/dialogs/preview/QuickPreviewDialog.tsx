@@ -90,6 +90,7 @@ export const QuickPreviewDialog: React.FC = () => {
             preview={preview}
             previewStatus={previewStatus}
             fileName={fileName}
+            filePath={filePath}
             showSource={showSource}
             sourceHighlightHtml={sourceHighlightHtml}
             sourceHighlightError={sourceHighlightError}

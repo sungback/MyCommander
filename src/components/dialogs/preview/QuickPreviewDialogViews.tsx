@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   AlertCircle,
@@ -10,6 +10,8 @@ import {
   VideoIcon,
   X,
 } from "lucide-react";
+import { useFileSystem } from "../../../hooks/useFileSystem";
+import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
 import type { PreviewState } from "./quickPreviewLoader";
 import type { PreviewStatusContent } from "./quickPreviewStatus";
 
@@ -123,35 +125,141 @@ const QuickPreviewStatusView: React.FC<QuickPreviewStatusViewProps> = ({ status 
   </div>
 );
 
+interface QuickPreviewImageViewProps {
+  initialSrc: string;
+  filePath?: string;
+  fileName: string;
+  readFileBinary?: (path: string) => Promise<ArrayBuffer>;
+}
+
+export const QuickPreviewImageView: React.FC<QuickPreviewImageViewProps> = ({
+  initialSrc,
+  filePath,
+  fileName,
+  readFileBinary,
+}) => {
+  const { readFileBinary: fsReadFileBinary } = useFileSystem();
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [isFallbackLoading, setIsFallbackLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const attemptedFallbackRef = useRef(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setCurrentSrc(initialSrc);
+    setIsFallbackLoading(false);
+    setHasError(false);
+    setErrorDetail(null);
+    attemptedFallbackRef.current = false;
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [initialSrc, filePath]);
+
+  const handleImageError = useCallback(async () => {
+    if (attemptedFallbackRef.current || !filePath) {
+      setHasError(true);
+      return;
+    }
+
+    attemptedFallbackRef.current = true;
+    setIsFallbackLoading(true);
+
+    try {
+      const readBinary = readFileBinary ?? fsReadFileBinary;
+      const buffer = await readBinary(filePath);
+      const ext = getExtension(filePath);
+      const mimeType = getImageMimeType(ext);
+      const blob = new Blob([buffer], { type: mimeType });
+      const objectUrl = URL.createObjectURL(blob);
+
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      objectUrlRef.current = objectUrl;
+      setCurrentSrc(objectUrl);
+      setIsFallbackLoading(false);
+    } catch (error) {
+      setIsFallbackLoading(false);
+      setHasError(true);
+      setErrorDetail(error instanceof Error ? error.message : String(error));
+    }
+  }, [filePath, readFileBinary, fsReadFileBinary]);
+
+  if (hasError) {
+    return (
+      <QuickPreviewStatusView
+        status={{
+          kind: "error",
+          title: "이미지를 불러오지 못했습니다",
+          description: "파일이 손상되었거나 접근 권한이 없습니다.",
+          detail: errorDetail ?? undefined,
+        }}
+      />
+    );
+  }
+
+  if (isFallbackLoading) {
+    return (
+      <QuickPreviewStatusView
+        status={{
+          kind: "loading",
+          title: "이미지를 불러오는 중입니다",
+          description: "파일 데이터를 직접 읽어오고 있습니다.",
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center p-4 overflow-auto flex-1">
+      <img
+        src={currentSrc}
+        alt={fileName}
+        className="max-w-full max-h-full object-contain rounded select-none"
+        draggable={false}
+        onError={() => void handleImageError()}
+      />
+    </div>
+  );
+};
+
 interface QuickPreviewBodyProps {
   preview: PreviewState;
   previewStatus: PreviewStatusContent | null;
   fileName: string;
+  filePath?: string;
   showSource: boolean;
   sourceHighlightHtml: string | null;
   sourceHighlightError: string | null;
+  readFileBinary?: (path: string) => Promise<ArrayBuffer>;
 }
 
 export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
   preview,
   previewStatus,
   fileName,
+  filePath,
   showSource,
   sourceHighlightHtml,
   sourceHighlightError,
+  readFileBinary,
 }) => (
   <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
     {previewStatus && <QuickPreviewStatusView status={previewStatus} />}
 
     {preview.type === "image" && preview.src && (
-      <div className="flex items-center justify-center p-4 overflow-auto flex-1">
-        <img
-          src={preview.src}
-          alt={fileName}
-          className="max-w-full max-h-full object-contain rounded select-none"
-          draggable={false}
-        />
-      </div>
+      <QuickPreviewImageView
+        initialSrc={preview.src}
+        filePath={filePath}
+        fileName={fileName}
+        readFileBinary={readFileBinary}
+      />
     )}
 
     {preview.type === "video" && preview.src && (

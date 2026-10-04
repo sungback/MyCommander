@@ -53,18 +53,23 @@
           "http://ipc.localhost",
           "https://api.github.com",
           "asset:",
-          "http://asset.localhost"
+          "http://asset.localhost",
+          "https://asset.localhost"
         ],
         "img-src": [
           "'self'",
           "asset:",
           "http://asset.localhost",
-          "data:"
+          "https://asset.localhost",
+          "data:",
+          "blob:"
         ],
         "media-src": [
           "'self'",
           "asset:",
-          "http://asset.localhost"
+          "http://asset.localhost",
+          "https://asset.localhost",
+          "blob:"
         ],
         "frame-src": [
           "'self'",

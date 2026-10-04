@@ -7,7 +7,10 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => undefined),
 }));
 
-const makeRow = (name: string, kind: "file" | "directory" = "file"): VisibleEntryRow => ({
+const makeRow = (
+  name: string,
+  kind: "file" | "directory" | "symlink" = "file"
+): VisibleEntryRow => ({
   entry: {
     name,
     path: `/home/${name}`,
@@ -180,6 +183,28 @@ describe("useFileListKeyboard", () => {
       path: "/home/a.txt",
     });
     expect(props.scanDirSize).not.toHaveBeenCalled();
+  });
+
+  it("Space는 event.key가 ' '일 때도 openPreviewDialog를 호출한다", () => {
+    props.visibleRows = [makeRow("image.webp", "file")];
+    const { result } = renderHook(() => useFileListKeyboard(props));
+    const event = makeKey(" ", { code: "" });
+    result.current.handleKeyDown(event as unknown as React.KeyboardEvent<HTMLDivElement>);
+    expect(props.openPreviewDialog).toHaveBeenCalledWith({
+      panelId: "left",
+      path: "/home/image.webp",
+    });
+  });
+
+  it("Space는 확장자가 있는 심볼릭 링크 파일이면 openPreviewDialog를 호출한다", () => {
+    props.visibleRows = [makeRow("link-to-photo.webp", "symlink")];
+    const { result } = renderHook(() => useFileListKeyboard(props));
+    const event = makeKey(" ", { code: "Space" });
+    result.current.handleKeyDown(event as unknown as React.KeyboardEvent<HTMLDivElement>);
+    expect(props.openPreviewDialog).toHaveBeenCalledWith({
+      panelId: "left",
+      path: "/home/link-to-photo.webp",
+    });
   });
 
   it("Space는 디렉터리면 onSelect를 호출하고 진행률 기반 scanDirSize를 시작한다", async () => {

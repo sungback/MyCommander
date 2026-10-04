@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDialogStore } from "../../../store/dialogStore";
 import { QuickPreviewDialog } from "./QuickPreviewDialog";
 
-const { mockLoadPreviewForPath, mockLoadSourceHighlightHtml } = vi.hoisted(() => ({
-  mockLoadPreviewForPath: vi.fn(),
-  mockLoadSourceHighlightHtml: vi.fn(),
-}));
+const { mockLoadPreviewForPath, mockLoadSourceHighlightHtml, mockReadFileBinary } =
+  vi.hoisted(() => ({
+    mockLoadPreviewForPath: vi.fn(),
+    mockLoadSourceHighlightHtml: vi.fn(),
+    mockReadFileBinary: vi.fn(),
+  }));
 
 vi.mock("./quickPreviewLoader", () => ({
   getFileName: (path: string) => path.split(/[\\/]/).pop() ?? path,
@@ -14,10 +16,26 @@ vi.mock("./quickPreviewLoader", () => ({
   loadSourceHighlightHtml: mockLoadSourceHighlightHtml,
 }));
 
+vi.mock("../../../hooks/useFileSystem", () => ({
+  useFileSystem: () => ({
+    readFileBinary: mockReadFileBinary,
+  }),
+}));
+
 describe("QuickPreviewDialog status messages", () => {
   beforeEach(() => {
     mockLoadPreviewForPath.mockReset();
     mockLoadSourceHighlightHtml.mockReset();
+    mockReadFileBinary.mockReset();
+    if (!window.URL.createObjectURL) {
+      window.URL.createObjectURL = vi.fn();
+    }
+    if (!window.URL.revokeObjectURL) {
+      window.URL.revokeObjectURL = vi.fn();
+    }
+    vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:mock-image-url");
+    vi.spyOn(window.URL, "revokeObjectURL").mockReturnValue(undefined);
+
     useDialogStore.setState(useDialogStore.getInitialState());
     useDialogStore.getState().openPreviewDialog({
       panelId: "left",
@@ -131,5 +149,56 @@ describe("QuickPreviewDialog status messages", () => {
     const highlightedText = await screen.findByText("const");
     expect(highlightedText.closest("pre")).toHaveClass("select-text");
     expect(highlightedText.closest("code")).toHaveClass("select-text");
+  });
+
+  it("renders image preview with initial asset src", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "image",
+      src: "asset:///tmp/photo.webp",
+    });
+
+    render(<QuickPreviewDialog />);
+
+    const img = (await screen.findByAltText("archive.bin")) as HTMLImageElement;
+    expect(img).toBeInTheDocument();
+    expect(img.src).toBe("asset:///tmp/photo.webp");
+  });
+
+  it("falls back to binary read when image fails to load via asset protocol", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "image",
+      src: "asset:///tmp/photo.webp",
+    });
+    const fakeBuffer = new Uint8Array([82, 73, 70, 70]).buffer;
+    mockReadFileBinary.mockResolvedValue(fakeBuffer);
+
+    render(<QuickPreviewDialog />);
+
+    const img = (await screen.findByAltText("archive.bin")) as HTMLImageElement;
+    expect(img).toBeInTheDocument();
+
+    // Trigger image error (e.g. 403 Forbidden on asset protocol)
+    fireEvent.error(img);
+
+    await waitFor(() => {
+      expect(mockReadFileBinary).toHaveBeenCalledWith("/tmp/archive.bin");
+      expect(screen.getByAltText<HTMLImageElement>("archive.bin").src).toBe("blob:mock-image-url");
+    });
+  });
+
+  it("shows error status when both asset protocol and binary fallback fail", async () => {
+    mockLoadPreviewForPath.mockResolvedValue({
+      type: "image",
+      src: "asset:///tmp/photo.webp",
+    });
+    mockReadFileBinary.mockRejectedValue(new Error("Permission denied"));
+
+    render(<QuickPreviewDialog />);
+
+    const img = (await screen.findByAltText("archive.bin")) as HTMLImageElement;
+    fireEvent.error(img);
+
+    expect(await screen.findByText("이미지를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(screen.getByText("Permission denied")).toBeInTheDocument();
   });
 });

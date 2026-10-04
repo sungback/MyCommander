@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getExtension,
   getFileName,
+  getImageMimeType,
   HWPX_EXTENSIONS,
   IMAGE_EXTENSIONS,
   RENDER_EXTENSIONS,
@@ -78,7 +79,21 @@ describe("extension sets", () => {
     expect(HWPX_EXTENSIONS.has("hwpx")).toBe(true);
   });
 
+  it("IMAGE_EXTENSIONS includes webp", () => {
+    expect(IMAGE_EXTENSIONS.has("webp")).toBe(true);
+  });
+
   it("IMAGE_EXTENSIONS does not include pdf", () => {
     expect(IMAGE_EXTENSIONS.has("pdf")).toBe(false);
+  });
+
+  it("getImageMimeType returns correct mime types for common image formats", () => {
+    expect(getImageMimeType("webp")).toBe("image/webp");
+    expect(getImageMimeType("png")).toBe("image/png");
+    expect(getImageMimeType("jpg")).toBe("image/jpeg");
+    expect(getImageMimeType("jpeg")).toBe("image/jpeg");
+    expect(getImageMimeType("svg")).toBe("image/svg+xml");
+    expect(getImageMimeType("WEBP")).toBe("image/webp");
+    expect(getImageMimeType("unknown")).toBe("application/octet-stream");
   });
 });

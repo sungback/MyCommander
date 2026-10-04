@@ -6,6 +6,7 @@ import {
 } from "../../hooks/manualDirectorySizeScan";
 import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
 import { showTransientToast } from "../../store/toastStore";
+import { getExtension } from "../dialogs/preview/quickPreviewFileTypes";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
 
 interface UseFileListKeyboardProps {
@@ -140,12 +141,19 @@ export const useFileListKeyboard = ({
       return;
     }
 
-    if (event.code === "Space") {
+    const isSpaceKey =
+      event.code === "Space" || event.key === " " || event.key === "Spacebar";
+
+    if (isSpaceKey) {
       event.preventDefault();
       event.stopPropagation();
       if (!current) return;
 
-      if (current.kind === "file") {
+      const isFileEntry =
+        current.kind === "file" ||
+        (current.kind === "symlink" && Boolean(getExtension(current.path)));
+
+      if (isFileEntry) {
         openPreviewDialog({ panelId, path: current.path });
         return;
       }

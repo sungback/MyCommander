@@ -90,3 +90,30 @@ export const getExtension = (path: string): string => {
 
 export const getFileName = (path: string): string =>
   path.split(/[\\/]/).pop() ?? path;
+
+export const getImageMimeType = (extension: string): string => {
+  const normalized = extension.toLowerCase();
+  switch (normalized) {
+    case "webp":
+      return "image/webp";
+    case "svg":
+      return "image/svg+xml";
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "avif":
+      return "image/avif";
+    case "bmp":
+      return "image/bmp";
+    case "ico":
+      return "image/x-icon";
+    case "tiff":
+      return "image/tiff";
+    default:
+      return "application/octet-stream";
+  }
+};
