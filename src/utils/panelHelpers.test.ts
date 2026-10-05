@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   sortEntries,
+  preserveCursorIndex,
   syncPanelWithActiveTab,
   updateTab,
   updateActiveTab,
@@ -154,6 +155,123 @@ describe("updatePanelEntrySize", () => {
 
     expect(result.files.map((entry) => entry.name)).toEqual(["first", "second"]);
     expect(result.files[0].size).toBe(999);
+  });
+
+  it("resorts a size-sorted panel when entry size is updated with exact or estimated status", () => {
+    const tab = makeTab({
+      files: [
+        makeDir("small", { size: 10, sizeStatus: "estimated" }),
+        makeDir("big", { size: 100, sizeStatus: "estimated" }),
+      ],
+      sortField: "size",
+      sortDirection: "desc",
+      cursorIndex: 1, // pointing to "big"
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    // "small" gets exact size 1000, becoming bigger than "big"
+    const result = updatePanelEntrySize(panel, "/test/small", 1000, "exact");
+
+    // In desc order, "small" (1000) should now be before "big" (100)
+    expect(result.files.map((entry) => entry.name)).toEqual(["small", "big"]);
+    expect(result.files[0].size).toBe(1000);
+    // Cursor was pointing to "big", which moved to index 1
+    expect(result.cursorIndex).toBe(1);
+    expect(result.files[result.cursorIndex].name).toBe("big");
+  });
+
+  it("resorts a size-sorted panel when entry size is updated with estimated status", () => {
+    const tab = makeTab({
+      files: [
+        makeDir("dirA", { size: undefined }),
+        makeDir("dirB", { size: undefined }),
+      ],
+      sortField: "size",
+      sortDirection: "desc",
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    // dirB gets estimated size 500, dirA remains undefined (0)
+    const result = updatePanelEntrySize(panel, "/test/dirB", 500, "estimated");
+
+    // dirB (500) > dirA (0) in desc order
+    expect(result.files.map((entry) => entry.name)).toEqual(["dirB", "dirA"]);
+  });
+
+  it("preserves cursor following the targeted entry when re-sorting moves it", () => {
+    const tab = makeTab({
+      files: [
+        makeDir("folderA", { size: 10, sizeStatus: "estimated" }),
+        makeDir("folderB", { size: 50, sizeStatus: "estimated" }),
+        makeDir("folderC", { size: 100, sizeStatus: "estimated" }),
+      ],
+      sortField: "size",
+      sortDirection: "asc",
+      cursorIndex: 0, // pointing to "folderA"
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    // "folderA" size updated to 200, so in "asc" it moves from index 0 to index 2
+    const result = updatePanelEntrySize(panel, "/test/folderA", 200, "estimated");
+
+    expect(result.files.map((entry) => entry.name)).toEqual(["folderB", "folderC", "folderA"]);
+    expect(result.cursorIndex).toBe(2);
+    expect(result.files[result.cursorIndex].name).toBe("folderA");
+  });
+
+  it("does not resort when sortField is not size", () => {
+    const tab = makeTab({
+      files: [
+        makeDir("alpha", { size: 10 }),
+        makeDir("beta", { size: 100 }),
+      ],
+      sortField: "name",
+      sortDirection: "asc",
+    });
+    const panel = syncPanelWithActiveTab({
+      ...defaultPanelState("left", "/test"),
+      tabs: [tab],
+      activeTabId: tab.id,
+    });
+
+    const result = updatePanelEntrySize(panel, "/test/alpha", 999, "exact");
+
+    expect(result.files.map((entry) => entry.name)).toEqual(["alpha", "beta"]);
+    expect(result.files[0].size).toBe(999);
+  });
+});
+
+describe("preserveCursorIndex", () => {
+  it("tracks the original entry by path when array order changes", () => {
+    const original = [makeFile("a"), makeFile("b"), makeFile("c")];
+    const sorted = [makeFile("c"), makeFile("a"), makeFile("b")];
+
+    // Cursor on 'b' (index 1) -> moves to index 2 in sorted
+    expect(preserveCursorIndex(original, 1, sorted)).toBe(2);
+    // Cursor on 'a' (index 0) -> moves to index 1 in sorted
+    expect(preserveCursorIndex(original, 0, sorted)).toBe(1);
+    // Cursor on 'c' (index 2) -> moves to index 0 in sorted
+    expect(preserveCursorIndex(original, 2, sorted)).toBe(0);
+  });
+
+  it("clamps cursor index if original entry is not found or cursor is out of bounds", () => {
+    const original = [makeFile("a"), makeFile("b")];
+    const sorted = [makeFile("x"), makeFile("y")];
+
+    expect(preserveCursorIndex(original, 5, sorted)).toBe(1);
+    expect(preserveCursorIndex([], 0, sorted)).toBe(0);
   });
 });
 

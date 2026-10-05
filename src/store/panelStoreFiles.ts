@@ -8,6 +8,7 @@ import { getPathDirectoryName } from "../utils/path";
 import {
   applyCachedSizes,
   normalizePathKey,
+  preserveCursorIndex,
   sortEntries,
   syncPanelWithActiveTab,
   updateActiveTab,
@@ -165,7 +166,22 @@ export const invalidateEntrySizesAcrossPanels = (
         return entry;
       });
 
-      return tabChanged ? { ...tab, files } : tab;
+      if (!tabChanged) {
+        return tab;
+      }
+
+      if (tab.sortField === "size") {
+        const sortedFiles = sortEntries(files, tab.sortField, tab.sortDirection);
+        const cursorIndex = preserveCursorIndex(tab.files, tab.cursorIndex, sortedFiles);
+
+        return {
+          ...tab,
+          files: sortedFiles,
+          cursorIndex,
+        };
+      }
+
+      return { ...tab, files };
     });
 
     return panelChanged

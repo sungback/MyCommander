@@ -235,6 +235,49 @@ describe("panelStore — updateEntrySize", () => {
     expect(state.sizeStatusCache["/cached/stale"]).toBeUndefined();
     expect(state.sizeCacheStale["/cached/stale"]).toBeUndefined();
   });
+
+  it("immediately resorts panel files when directory size is estimated or calculated in size-sorted panel", () => {
+    const { setFiles, setSort, updateEntrySizeEstimate, updateEntrySize } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dirA", path: "/test/dirA", kind: "directory" },
+      { name: "dirB", path: "/test/dirB", kind: "directory" },
+      { name: "dirC", path: "/test/dirC", kind: "directory" },
+    ]);
+    setSort("left", "size"); // asc
+    setSort("left", "size"); // desc
+
+    // Initially all undefined sizes (treated as 0)
+    expect(usePanelStore.getState().leftPanel.sortField).toBe("size");
+    expect(usePanelStore.getState().leftPanel.sortDirection).toBe("desc");
+
+    // dirB gets estimated size 50MB
+    updateEntrySizeEstimate("left", "/test/dirB", 50 * 1024 * 1024, "estimated");
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirB", "dirA", "dirC"]);
+
+    // dirC gets exact size 100MB -> moves to top in desc order
+    updateEntrySize("left", "/test/dirC", 100 * 1024 * 1024);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirC", "dirB", "dirA"]);
+  });
+
+  it("immediately resorts panel files when directory size is invalidated in size-sorted panel", () => {
+    const { setFiles, setSort, updateEntrySize, invalidateEntrySizes } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dirA", path: "/test/dirA", kind: "directory" },
+      { name: "dirB", path: "/test/dirB", kind: "directory" },
+    ]);
+    setSort("left", "size");
+    setSort("left", "size"); // desc
+
+    updateEntrySize("left", "/test/dirA", 200);
+    updateEntrySize("left", "/test/dirB", 100);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirA", "dirB"]);
+
+    // Invalidate dirA -> its size becomes undefined (0), so dirB (100) becomes top
+    invalidateEntrySizes(["/test/dirA/subfile.txt"]);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirB", "dirA"]);
+  });
 });
 
 describe("panelStore — setCursor", () => {
