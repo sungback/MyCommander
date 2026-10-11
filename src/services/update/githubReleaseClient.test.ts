@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchLatestRelease,
   findPlatformAsset,
+  findPortableUpdateAsset,
   findSelfUpdateAsset,
   parseReleaseToUpdateInfo,
   RawGithubRelease,
@@ -58,6 +59,32 @@ describe("githubReleaseClient", () => {
 
     const linuxSelfUpdate = findSelfUpdateAsset(mockRelease.assets, "linux");
     expect(linuxSelfUpdate?.name).toBe("MyCommander_1.3.0_amd64.AppImage");
+  });
+
+  it("keeps the installer as the Windows asset and exposes the portable exe separately", () => {
+    const assets = [
+      {
+        name: "MyCommander_1.3.0_x64-portable.exe",
+        browser_download_url: "https://github.com/.../MyCommander_1.3.0_x64-portable.exe",
+        size: 4_000_000,
+      },
+      ...mockRelease.assets,
+    ];
+
+    expect(findPlatformAsset(assets, "windows")?.name).toBe("MyCommander_1.3.0_x64-setup.exe");
+    expect(findSelfUpdateAsset(assets, "windows")?.name).toBe(
+      "MyCommander_1.3.0_x64-setup.exe"
+    );
+    expect(findPortableUpdateAsset(assets, "windows")?.name).toBe(
+      "MyCommander_1.3.0_x64-portable.exe"
+    );
+    expect(findPortableUpdateAsset(assets, "macos")).toBeNull();
+
+    const info = parseReleaseToUpdateInfo({ ...mockRelease, assets }, "1.2.0", "windows");
+    expect(info.portableUpdateUrl).toBe(
+      "https://github.com/.../MyCommander_1.3.0_x64-portable.exe"
+    );
+    expect(info.selfUpdateUrl).toBe("https://github.com/.../MyCommander_1.3.0_x64-setup.exe");
   });
 
   it("parses release info and determines if it is newer", () => {

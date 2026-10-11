@@ -75,8 +75,11 @@ export const systemCommands = {
     await invoke("quit_app");
   },
 
-  applySelfUpdate: async (assetUrl: string): Promise<void> => {
-    await invoke("apply_self_update", { asset_url: assetUrl });
+  applySelfUpdate: async (assetUrl: string, portableAssetUrl?: string): Promise<void> => {
+    await invoke("apply_self_update", {
+      asset_url: assetUrl,
+      ...(portableAssetUrl ? { portable_asset_url: portableAssetUrl } : {}),
+    });
   },
 
   writeFilesToPasteboard: async (

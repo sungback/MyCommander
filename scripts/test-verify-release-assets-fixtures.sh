@@ -30,6 +30,7 @@ required_assets=(
   "MyCommander_${version}_amd64.AppImage"
   "MyCommander_${version}_amd64.deb"
   "MyCommander_${version}_aarch64.dmg"
+  "MyCommander_${version}_x64-portable.exe"
   "MyCommander_${version}_x64-setup.exe"
   "MyCommander_${version}_x64_en-US.msi"
   "MyCommander_aarch64.app.tar.gz"

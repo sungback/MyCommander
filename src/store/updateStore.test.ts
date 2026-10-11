@@ -176,6 +176,31 @@ describe("updateStore", () => {
     expect(useUpdateStore.getState().updateStep).toBe("재시작 중...");
   });
 
+  it("passes the portable exe url along with the installer url", async () => {
+    const applySpy = vi.spyOn(systemCommands, "applySelfUpdate").mockResolvedValue(undefined);
+    useUpdateStore.setState({
+      updateInfo: {
+        version: "2.0.0",
+        releaseName: "v2.0.0",
+        releaseNotes: "Notes",
+        publishedAt: "2026-10-03T12:00:00Z",
+        releaseUrl: "https://github.com/...",
+        downloadUrl: "https://github.com/.../app-setup.exe",
+        assetName: "app-setup.exe",
+        selfUpdateUrl: "https://github.com/.../app-setup.exe",
+        selfUpdateAssetName: "app-setup.exe",
+        portableUpdateUrl: "https://github.com/.../app-portable.exe",
+        isNewer: true,
+      },
+    });
+
+    await useUpdateStore.getState().applySelfUpdate();
+    expect(applySpy).toHaveBeenCalledWith(
+      "https://github.com/.../app-setup.exe",
+      "https://github.com/.../app-portable.exe"
+    );
+  });
+
   it("handles self-update failure gracefully", async () => {
     vi.spyOn(systemCommands, "applySelfUpdate").mockRejectedValue(new Error("다운로드 실패"));
     useUpdateStore.setState({

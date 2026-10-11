@@ -26,8 +26,28 @@ export interface UpdateInfo {
   assetName: string | null;
   selfUpdateUrl: string | null;
   selfUpdateAssetName: string | null;
+  /** Windows 포터블 exe 교체용 자산. 설치판은 selfUpdateUrl(설치 프로그램)을 그대로 쓴다. */
+  portableUpdateUrl?: string | null;
   isNewer: boolean;
 }
+
+const PORTABLE_EXE_SUFFIX = "-portable.exe";
+
+export const findPortableUpdateAsset = (
+  assets: ReleaseAsset[],
+  platform: PlatformType
+): ReleaseAsset | null => {
+  if (platform !== "windows") {
+    return null;
+  }
+
+  return assets?.find((a) => a.name.endsWith(PORTABLE_EXE_SUFFIX)) ?? null;
+};
+
+// 포터블 exe는 설치 프로그램이 아니므로 설치 파일 선택에서 제외한다.
+const isInstallerExe = (name: string) =>
+  name.endsWith("-setup.exe") ||
+  (name.endsWith(".exe") && !name.endsWith(PORTABLE_EXE_SUFFIX));
 
 export const findSelfUpdateAsset = (
   assets: ReleaseAsset[],
@@ -48,7 +68,7 @@ export const findSelfUpdateAsset = (
 
   if (platform === "windows") {
     // Prefer -setup.exe or .exe
-    const exe = assets.find((a) => a.name.endsWith("-setup.exe") || a.name.endsWith(".exe"));
+    const exe = assets.find((a) => isInstallerExe(a.name));
     if (exe) return exe;
     return null;
   }
@@ -81,7 +101,7 @@ export const findPlatformAsset = (
 
   if (platform === "windows") {
     // Prefer -setup.exe or .exe
-    const exe = assets.find((a) => a.name.endsWith("-setup.exe") || a.name.endsWith(".exe"));
+    const exe = assets.find((a) => isInstallerExe(a.name));
     if (exe) return exe;
     // Fallback to .msi
     return assets.find((a) => a.name.endsWith(".msi")) ?? null;
@@ -109,6 +129,7 @@ export const parseReleaseToUpdateInfo = (
   const version = release.tag_name.replace(/^[vV]/, "");
   const platformAsset = findPlatformAsset(release.assets || [], platform);
   const selfUpdateAsset = findSelfUpdateAsset(release.assets || [], platform);
+  const portableAsset = findPortableUpdateAsset(release.assets || [], platform);
 
   return {
     version,
@@ -120,6 +141,7 @@ export const parseReleaseToUpdateInfo = (
     assetName: platformAsset ? platformAsset.name : null,
     selfUpdateUrl: selfUpdateAsset ? selfUpdateAsset.browser_download_url : null,
     selfUpdateAssetName: selfUpdateAsset ? selfUpdateAsset.name : null,
+    portableUpdateUrl: portableAsset ? portableAsset.browser_download_url : null,
     isNewer: isNewerVersion(currentVersion, version),
   };
 };

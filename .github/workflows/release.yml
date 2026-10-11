@@ -203,6 +203,28 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Windows 포터블 실행 파일 업로드
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ env.RELEASE_TOKEN }}
+          RELEASE_ID: ${{ needs.create-draft-release.outputs.release_id }}
+        run: |
+          # 설치 없이 exe 교체로 업데이트할 수 있도록 릴리스 빌드 실행 파일을 그대로 올립니다.
+          version="$(node -p "require('./package.json').version")"
+          exe="src-tauri/target/release/mycommander.exe"
+          if [ ! -f "$exe" ]; then
+            echo "Portable executable not found: $exe" >&2
+            exit 1
+          fi
+
+          asset="MyCommander_${version}_x64-portable.exe"
+          cp "$exe" "$asset"
+          gh api --method POST \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$asset" \
+            -H "Content-Type: application/octet-stream" \
+            --input "$asset"
+
   verify-release-assets:
     name: 릴리즈 산출물 스모크 테스트
     needs: publish-tauri

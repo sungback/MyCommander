@@ -34,6 +34,7 @@ required_assets=(
   "MyCommander_${version}_amd64.AppImage"
   "MyCommander_${version}_amd64.deb"
   "MyCommander_${version}_aarch64.dmg"
+  "MyCommander_${version}_x64-portable.exe"
   "MyCommander_${version}_x64-setup.exe"
   "MyCommander_${version}_x64_en-US.msi"
   "MyCommander_aarch64.app.tar.gz"
@@ -176,6 +177,8 @@ file "$smoke_dir/MyCommander_${version}_amd64.deb" | grep -q "Debian binary pack
   || fail "deb asset does not look like a Debian package"
 file "$smoke_dir/MyCommander_${version}_x64-setup.exe" | grep -q "PE32 executable" \
   || fail "exe asset does not look like a Windows installer"
+file "$smoke_dir/MyCommander_${version}_x64-portable.exe" | grep -Eq "PE32\+? executable" \
+  || fail "portable exe asset does not look like a Windows executable"
 file "$smoke_dir/MyCommander_${version}_x64_en-US.msi" | grep -q "MSI Installer" \
   || fail "msi asset does not look like a Windows installer"
 

@@ -172,7 +172,9 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     });
 
     try {
-      await systemCommands.applySelfUpdate(updateInfo.selfUpdateUrl);
+      await (updateInfo.portableUpdateUrl
+        ? systemCommands.applySelfUpdate(updateInfo.selfUpdateUrl, updateInfo.portableUpdateUrl)
+        : systemCommands.applySelfUpdate(updateInfo.selfUpdateUrl));
       set({ updateStep: "재시작 중..." });
     } catch (err: unknown) {
       const msg = getErrorMessage(err, "업데이트 적용에 실패했습니다.");
