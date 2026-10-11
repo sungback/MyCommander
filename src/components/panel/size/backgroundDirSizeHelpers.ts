@@ -1,5 +1,6 @@
 import type { FileEntry } from "../../../types/file";
 import { isSizeVerifiedThisSession } from "../../../store/panelStoreFileHelpers";
+import { getPathBelowVerifiedLocalRoot } from "./storageClassification";
 
 export const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
 export const MAX_BACKGROUND_EXACT_WORKERS = 1;
@@ -76,18 +77,27 @@ export const getAutomaticEstimateOptions = (currentPath: string) => {
   return DEFAULT_ESTIMATE_OPTIONS;
 };
 
-export const isLikelyCloudStoragePath = (path: string) => {
-  const normalized = path
+const normalizeForCloudMarkerMatch = (path: string) =>
+  path
     .replace(/[\\/]+/g, "/")
     .split("/")
     .filter(Boolean)
     .join("/")
     .toLowerCase();
 
-  return CLOUD_STORAGE_PATH_MARKERS.some((marker) =>
-    normalized.includes(marker.toLowerCase())
+const hasCloudStorageMarker = (normalizedLowerPath: string) =>
+  CLOUD_STORAGE_PATH_MARKERS.some((marker) =>
+    normalizedLowerPath.includes(marker.toLowerCase())
   );
-};
+
+/**
+ * 클라우드 폴더로 추정되면 true.
+ * 이름이 클라우드처럼 보여도 백엔드가 로컬 폴더로 확인한 경로(그 아래 구간에 클라우드 이름이 없는 경우)는 false다.
+ */
+export const isLikelyCloudStoragePath = (path: string) =>
+  hasCloudStorageMarker(
+    normalizeForCloudMarkerMatch(getPathBelowVerifiedLocalRoot(path) ?? path)
+  );
 
 export const isLikelyVolatileAutoScanPath = (path: string) => {
   if (!path.includes("\\") && !/^[A-Za-z]:[\\/]/.test(path)) {

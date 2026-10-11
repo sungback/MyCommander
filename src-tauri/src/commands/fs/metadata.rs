@@ -8,12 +8,15 @@ mod preview;
 mod size_cache;
 #[path = "metadata/sqlite_preview.rs"]
 mod sqlite_preview;
+#[path = "metadata/storage_kind.rs"]
+mod storage_kind;
 
 pub use dir_size::{DirSizeScanState, DirectorySizeEstimate, DirectorySizeScanResult};
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;
 pub use size_cache::{DirectorySizeCacheEntryUpdate, DirectorySizeCacheLoadResult};
 pub use sqlite_preview::SqliteDatabasePreview;
+pub use storage_kind::StorageKind;
 
 #[cfg(test)]
 pub(crate) use dir_size::compute_path_size;
@@ -46,6 +49,11 @@ pub async fn read_file_binary(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn preview_sqlite_database(path: String) -> Result<SqliteDatabasePreview, String> {
     sqlite_preview::preview_sqlite_database(path).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn classify_storage_paths(paths: Vec<String>) -> Result<Vec<StorageKind>, String> {
+    storage_kind::classify_storage_paths(paths).await
 }
 
 #[tauri::command(rename_all = "snake_case")]

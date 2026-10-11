@@ -8,6 +8,9 @@ export type PersistentDirectorySizeStatus = Extract<
   "exact" | "estimated" | "partial"
 >;
 
+// provider: 파일 제공자 폴더, local: 일반 로컬 폴더, unknown: 판단 불가
+export type StorageKind = "provider" | "local" | "unknown";
+
 export interface DirectorySizeEstimate {
   size: number;
   isPartial: boolean;
@@ -163,6 +166,10 @@ export const fileCommands = {
 
   previewSqliteDatabase: async (path: string): Promise<SqliteDatabasePreview> => {
     return await invoke<SqliteDatabasePreview>("preview_sqlite_database", { path });
+  },
+
+  classifyStoragePaths: async (paths: string[]): Promise<StorageKind[]> => {
+    return await invoke<StorageKind[]>("classify_storage_paths", { paths });
   },
 
   getDirSize: async (path: string): Promise<number> => {

@@ -50,6 +50,7 @@
     "allow-preview-sqlite-database",
     "allow-search-files",
     "allow-get-dir-size",
+    "allow-classify-storage-paths",
     "allow-estimate-dir-size",
     "allow-scan-dir-size",
     "allow-cancel-dir-size-scan",

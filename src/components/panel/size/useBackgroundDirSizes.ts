@@ -4,11 +4,17 @@ import { useFileSystem } from "../../../hooks/useFileSystem";
 import type { DirectorySizeProgressEvent } from "../../../hooks/tauriCommands/fileCommands";
 import type { DirectorySizeStatus, FileEntry, PanelId } from "../../../types/file";
 import {
+  hasRequestedStorageKind,
+  markStorageKindRequested,
+  recordStorageKind,
+} from "./storageClassification";
+import {
   MAX_BACKGROUND_DIR_SIZE_WORKERS,
   MAX_BACKGROUND_EXACT_WORKERS,
   createScheduler,
   getAutomaticEstimateOptions,
   getExactAttemptKey,
+  isLikelyCloudStoragePath,
   shouldAutoScanExactSizes,
   shouldQueueExactBackgroundScan,
   type BackgroundSizeScheduler,
@@ -89,6 +95,53 @@ export const useBackgroundDirSizes = ({
     scheduler.settledPaths.clear();
     scheduler.settledExactPaths.clear();
   }, [activeTabId, currentPath, lastUpdated, panelId]);
+
+  useEffect(() => {
+    // 이름만 클라우드처럼 보이는 경로는 실제 저장소 종류를 확인해, 일반 로컬 폴더면 자동 정확 계산을 허용한다.
+    const candidates = [
+      currentPath,
+      ...files
+        .filter((entry) => entry.kind === "directory" && entry.name !== "..")
+        .map((entry) => entry.path),
+    ].filter(
+      (path) =>
+        path.startsWith("/") &&
+        isLikelyCloudStoragePath(path) &&
+        !hasRequestedStorageKind(path)
+    );
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const uniqueCandidates = Array.from(new Set(candidates));
+    for (const path of uniqueCandidates) {
+      markStorageKindRequested(path);
+    }
+
+    let disposed = false;
+    void fs
+      .classifyStoragePaths(uniqueCandidates)
+      .then((kinds) => {
+        let changed = false;
+        kinds.forEach((kind, index) => {
+          if (recordStorageKind(uniqueCandidates[index], kind)) {
+            changed = true;
+          }
+        });
+
+        if (changed && !disposed) {
+          setRescanTick((tick) => tick + 1);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to classify storage paths:", error);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [currentPath, files, fs]);
 
   useEffect(() => {
     let disposed = false;

@@ -21,6 +21,7 @@ let mockExtraFileListRows: FileEntry[] = [];
 const mockFileSystem = {
   listDirectory: mockListDirectory,
   cancelDirSizeScan: mockCancelDirSizeScan,
+  classifyStoragePaths: vi.fn(async (paths: string[]) => paths.map(() => 'unknown')),
   getHomeDir: mockGetHomeDir,
   resolvePath: mockResolvePath,
   estimateDirSize: mockEstimateDirSize,

@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileEntry } from "../../../types/file";
 import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
 import {
+  __resetStorageClassificationForTests,
+  recordStorageKind,
+} from "./storageClassification";
+import {
   getAutomaticEstimateOptions,
   isLikelyCloudStoragePath,
   isLikelyVolatileAutoScanPath,
@@ -10,10 +14,16 @@ import {
   shouldQueueExactBackgroundScan,
 } from "./backgroundDirSizeHelpers";
 
-const { listenHandlers, mockCancelDirSizeScan, mockEstimateDirSize, mockScanDirSize } =
-vi.hoisted(() => ({
+const {
+  listenHandlers,
+  mockCancelDirSizeScan,
+  mockClassifyStoragePaths,
+  mockEstimateDirSize,
+  mockScanDirSize,
+} = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
   mockCancelDirSizeScan: vi.fn(),
+  mockClassifyStoragePaths: vi.fn(),
   mockEstimateDirSize: vi.fn(),
   mockScanDirSize: vi.fn(),
 }));
@@ -32,6 +42,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("../../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     cancelDirSizeScan: mockCancelDirSizeScan,
+    classifyStoragePaths: mockClassifyStoragePaths,
     estimateDirSize: mockEstimateDirSize,
     scanDirSize: mockScanDirSize,
   }),
@@ -63,6 +74,11 @@ describe("useBackgroundDirSizes", () => {
   beforeEach(() => {
     listenHandlers.clear();
     mockCancelDirSizeScan.mockReset();
+    __resetStorageClassificationForTests();
+    mockClassifyStoragePaths.mockReset();
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "unknown")
+    );
     mockEstimateDirSize.mockReset();
     mockScanDirSize.mockReset();
     mockScanDirSize.mockResolvedValue({
@@ -236,6 +252,76 @@ describe("useBackgroundDirSizes", () => {
         true
       )
     ).toBe(true);
+  });
+
+  it("treats a cloud-named path as local once the backend confirms it is a plain folder", () => {
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/업무")).toBe(true);
+
+    recordStorageKind("/Users/sam/내 드라이브", "local");
+
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브")).toBe(false);
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/업무")).toBe(false);
+    expect(shouldAutoScanExactSizes("/Users/sam/내 드라이브")).toBe(true);
+    // 로컬 루트 아래에 다시 클라우드 이름이 나타나면 여전히 클라우드로 본다.
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/Dropbox/자료")).toBe(true);
+    // 프로바이더로 확인되었거나 판단 불가인 경로는 바뀌지 않는다.
+    recordStorageKind("/Users/sam/Library/CloudStorage/GoogleDrive-a", "provider");
+    expect(isLikelyCloudStoragePath("/Users/sam/Library/CloudStorage/GoogleDrive-a")).toBe(
+      true
+    );
+  });
+
+  it("starts exact scans for a cloud-named local folder after classification", async () => {
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "local")
+    );
+    const props = makeProps({
+      currentPath: "/Users/sam/내 드라이브",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/내 드라이브/업무"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/sam/내 드라이브/업무",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    expect(mockClassifyStoragePaths).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps skipping exact scans for provider folders", async () => {
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "provider")
+    );
+    const props = makeProps({
+      currentPath: "/Users/sam/Library/CloudStorage/GoogleDrive-a/내 드라이브",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Library/CloudStorage/GoogleDrive-a/내 드라이브/업무"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() => expect(mockClassifyStoragePaths).toHaveBeenCalled());
+    expect(mockScanDirSize).not.toHaveBeenCalled();
   });
 
   it("runs an exact background scan for estimated directories outside roots", async () => {

@@ -37,6 +37,7 @@ fn main() {
         "read_file_binary",
         "preview_sqlite_database",
         "search_files",
+        "classify_storage_paths",
         "get_dir_size",
         "estimate_dir_size",
         "scan_dir_size",
