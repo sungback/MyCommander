@@ -5,6 +5,8 @@ use std::path::Path;
 /// 이름만으로 클라우드로 오인되는 로컬 폴더를 구분하기 위해 쓴다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+// macOS 외 플랫폼은 항상 Unknown만 반환하므로 나머지 변형은 사용되지 않는다.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub enum StorageKind {
     /// 파일 제공자(CloudStorage, iCloud 등) 아래에 있어 순회 시 네트워크 접근이 생길 수 있다.
     Provider,
@@ -116,9 +118,12 @@ fn has_file_provider_attribute(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "macos")]
     use std::fs;
+    #[cfg(target_os = "macos")]
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[cfg(target_os = "macos")]
     fn make_temp_dir(label: &str) -> std::path::PathBuf {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
