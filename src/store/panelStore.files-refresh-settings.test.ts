@@ -317,6 +317,43 @@ describe("panelStore — updateEntrySize", () => {
     expect(entry?.sizeStatus).toBe("exact");
   });
 
+  it("does not let a quick estimate overwrite a restored exact size", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySizeEstimate } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/AppData", size: 9_000, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [{ name: "AppData", path: "/work/AppData", kind: "directory" }]);
+
+    updateEntrySizeEstimate("left", "/work/AppData", 100, "estimated");
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/AppData"]).toBe(9_000);
+    expect(state.sizeStatusCache["/work/AppData"]).toBe("exact");
+    const entry = state.leftPanel.files.find((file) => file.name === "AppData");
+    expect(entry?.size).toBe(9_000);
+    expect(entry?.sizeStatus).toBe("exact");
+  });
+
+  it("prefers a restored exact size over an estimate computed before the cache loaded", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySizeEstimate } =
+      usePanelStore.getState();
+
+    setFiles("left", [{ name: "AppData", path: "/work/AppData", kind: "directory" }]);
+    updateEntrySizeEstimate("left", "/work/AppData", 100, "estimated");
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/AppData", size: 9_000, status: "exact", isStale: false },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/AppData"]).toBe(9_000);
+    expect(state.sizeStatusCache["/work/AppData"]).toBe("exact");
+    const entry = state.leftPanel.files.find((file) => file.name === "AppData");
+    expect(entry?.size).toBe(9_000);
+  });
+
   it("keeps a directory stale when a change was reported during the exact scan", () => {
     const { hydrateEntrySizesFromCache, markEntrySizesStale, updateEntrySize } =
       usePanelStore.getState();

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  dropPendingPersistentSizeCacheUpserts,
   flushPersistentSizeCacheWrites,
   __resetPersistentSizeCacheNotificationsForTests,
   loadPersistentSizeCache,
@@ -155,5 +156,40 @@ describe("directorySizeCachePersistence", () => {
         tone: "warning",
       }),
     ]);
+  });
+
+  it("holds cache writes until the initial load settles", async () => {
+    setTauriRuntime(true);
+    let resolveLoad: (entries: unknown[]) => void = () => {};
+    mockLoadDirSizeCache.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLoad = resolve;
+      })
+    );
+    mockUpsertDirSizeCacheEntries.mockResolvedValue(undefined);
+
+    const loading = loadPersistentSizeCache();
+    queuePersistentSizeCacheUpsert({ path: "/dir", size: 1, status: "estimated" });
+    const flushing = flushPersistentSizeCacheWrites();
+
+    await Promise.resolve();
+    expect(mockUpsertDirSizeCacheEntries).not.toHaveBeenCalled();
+
+    resolveLoad([]);
+    await loading;
+    await flushing;
+
+    expect(mockUpsertDirSizeCacheEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops pending upserts for restored paths", async () => {
+    setTauriRuntime(true);
+    mockUpsertDirSizeCacheEntries.mockResolvedValue(undefined);
+
+    queuePersistentSizeCacheUpsert({ path: "/dir", size: 1, status: "estimated" });
+    dropPendingPersistentSizeCacheUpserts(["/dir"]);
+    await flushPersistentSizeCacheWrites();
+
+    expect(mockUpsertDirSizeCacheEntries).not.toHaveBeenCalled();
   });
 });

@@ -10,7 +10,10 @@ import {
   updateEntrySizeStatusAcrossPanels,
 } from "./panelStoreReducers";
 import { persistPanelUpdate } from "./panelStorePersistence";
-import { queuePersistentSizeCacheDelete } from "./directorySizeCachePersistence";
+import {
+  dropPendingPersistentSizeCacheUpserts,
+  queuePersistentSizeCacheDelete,
+} from "./directorySizeCachePersistence";
 import {
   panelUpdate,
   type PanelStoreActions,
@@ -166,10 +169,34 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
   },
 
   updateEntrySizeEstimate: (_panel, path, size, status) => {
-    queueStableSizeCacheWrite(path, size, status);
     takeSizeBaseline(path);
 
     return set((state) => {
+      const key = normalizePathKey(path);
+      const existingSize = state.sizeCache[key];
+      // 이미 확인된 정확한 값을 빠른 추정값이 덮어쓰지 않는다(시작 직후 복원값과 추정이 경합할 수 있다).
+      if (
+        status === "estimated" &&
+        existingSize !== undefined &&
+        state.sizeStatusCache[key] === "exact" &&
+        !state.sizeCacheStale[key]
+      ) {
+        const restored = updateEntrySizeAcrossPanels(
+          state.leftPanel,
+          state.rightPanel,
+          path,
+          existingSize,
+          "exact"
+        );
+
+        return restored.leftPanel === state.leftPanel &&
+          restored.rightPanel === state.rightPanel
+          ? state
+          : { leftPanel: restored.leftPanel, rightPanel: restored.rightPanel };
+      }
+
+      queueStableSizeCacheWrite(path, size, status);
+
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,
@@ -327,12 +354,19 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       for (const entry of entries) {
         const normalizedPath = normalizePathKey(entry.path);
         const existingStatus = state.sizeStatusCache[normalizedPath];
+        // 복원한 신선한 정확한 값은 같은 세션에서 먼저 계산된 추정값보다 우선한다.
+        const restoredExactBeatsEstimate =
+          entry.status === "exact" && !entry.isStale && existingStatus === "estimated";
         const existingFreshStable =
           shouldCacheSizeStatus(existingStatus) &&
           !state.sizeCacheStale[normalizedPath];
 
-        if (existingFreshStable) {
+        if (existingFreshStable && !restoredExactBeatsEstimate) {
           continue;
+        }
+
+        if (restoredExactBeatsEstimate) {
+          dropPendingPersistentSizeCacheUpserts([normalizedPath]);
         }
 
         if (entry.scannedAt !== undefined) {
