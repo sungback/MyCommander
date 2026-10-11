@@ -12,6 +12,51 @@ pub fn find_app_bundle(current_exe: &std::path::Path) -> Option<std::path::PathB
     None
 }
 
+/// 자체 업데이트로 내려받을 수 있는 유일한 위치. 웹뷰에서 임의 URL로 호출되어도 이 저장소의 릴리스 자산만 받는다.
+const ALLOWED_UPDATE_URL_PREFIX: &str =
+    "https://github.com/sungback/MyCommander/releases/download/";
+
+/// 업데이트 URL이 이 저장소의 릴리스 자산이고 기대한 파일 종류인지 확인한다.
+fn validate_update_url(url: &str, allowed_suffixes: &[&str]) -> Result<(), String> {
+    let invalid = || "허용되지 않은 업데이트 URL입니다.".to_string();
+
+    if !url.starts_with(ALLOWED_UPDATE_URL_PREFIX) {
+        return Err(invalid());
+    }
+
+    // 경로 우회(`..`, 인코딩된 점), 쿼리·프래그먼트, 역슬래시, 공백·제어 문자는 허용하지 않는다.
+    let lowered = url.to_lowercase();
+    if lowered.contains("..")
+        || lowered.contains("%2e")
+        || lowered.contains("%2f")
+        || lowered.contains("%5c")
+        || url.contains(['?', '#', '\\'])
+        || url.chars().any(|c| c.is_whitespace() || c.is_control())
+    {
+        return Err(invalid());
+    }
+
+    if !allowed_suffixes.iter().any(|suffix| url.ends_with(suffix)) {
+        return Err(invalid());
+    }
+
+    Ok(())
+}
+
+/// 현재 플랫폼의 설치/업데이트 파일 확장자.
+fn platform_update_suffixes() -> &'static [&'static str] {
+    if cfg!(target_os = "macos") {
+        &[".tar.gz"]
+    } else if cfg!(target_os = "windows") {
+        &[".exe"]
+    } else {
+        &[".AppImage"]
+    }
+}
+
+/// curl이 HTTPS 외 프로토콜로 내려가거나 리다이렉트되지 않게 하는 옵션.
+const CURL_HTTPS_ONLY_ARGS: [&str; 4] = ["--proto", "=https", "--proto-redir", "=https"];
+
 /// 포터블 exe로 인정하는 최소 파일 크기. 오류 페이지 같은 작은 응답을 실행 파일로 오인하지 않기 위한 값이다.
 #[cfg(any(target_os = "windows", test))]
 const WINDOWS_PORTABLE_MIN_BYTES: u64 = 1_000_000;
@@ -76,14 +121,10 @@ pub async fn apply_self_update(
     asset_url: String,
     portable_asset_url: Option<String>,
 ) -> Result<(), String> {
-    if !asset_url.starts_with("https://") {
-        return Err("유효하지 않은 다운로드 URL입니다.".to_string());
-    }
+    validate_update_url(&asset_url, platform_update_suffixes())?;
 
     if let Some(portable_url) = portable_asset_url.as_deref() {
-        if !portable_url.starts_with("https://") {
-            return Err("유효하지 않은 다운로드 URL입니다.".to_string());
-        }
+        validate_update_url(portable_url, &["-portable.exe"])?;
     }
 
     #[cfg(target_os = "macos")]
@@ -134,6 +175,7 @@ async fn apply_macos_update(asset_url: &str) -> Result<(), String> {
 
     // Download archive via curl
     let curl_status = tokio::process::Command::new("curl")
+        .args(CURL_HTTPS_ONLY_ARGS)
         .args(["-fSL", asset_url, "-o", archive_path.to_str().unwrap()])
         .status()
         .await
@@ -286,6 +328,7 @@ async fn apply_windows_portable_update(
 
     let downloaded = temp_base.join("portable.exe");
     let curl_status = tokio::process::Command::new("curl")
+        .args(CURL_HTTPS_ONLY_ARGS)
         .args(["-fSL", portable_url, "-o", downloaded.to_str().unwrap()])
         .status()
         .await
@@ -361,6 +404,7 @@ async fn apply_windows_update(asset_url: &str) -> Result<(), String> {
     let installer_path = temp_base.join("setup.exe");
 
     let curl_status = tokio::process::Command::new("curl")
+        .args(CURL_HTTPS_ONLY_ARGS)
         .args(["-fSL", asset_url, "-o", installer_path.to_str().unwrap()])
         .status()
         .await
@@ -400,6 +444,7 @@ async fn apply_linux_update(asset_url: &str) -> Result<(), String> {
         let new_appimage = temp_base.join("updated.AppImage");
 
         let curl_status = tokio::process::Command::new("curl")
+            .args(CURL_HTTPS_ONLY_ARGS)
             .args(["-fSL", asset_url, "-o", new_appimage.to_str().unwrap()])
             .status()
             .await
@@ -491,5 +536,62 @@ mod tests {
         assert!(!looks_like_windows_executable(500, b"MZ"));
         assert!(!looks_like_windows_executable(2_000_000, b"<h"));
         assert!(!looks_like_windows_executable(2_000_000, b""));
+    }
+
+    #[test]
+    fn update_url_allows_only_release_assets_of_this_repository() {
+        let base = "https://github.com/sungback/MyCommander/releases/download/v1.2.54";
+
+        assert!(validate_update_url(
+            &format!("{base}/MyCommander_1.2.54_x64-setup.exe"),
+            &[".exe"]
+        )
+        .is_ok());
+        assert!(validate_update_url(
+            &format!("{base}/MyCommander_1.2.54_x64-portable.exe"),
+            &["-portable.exe"]
+        )
+        .is_ok());
+        assert!(validate_update_url(
+            &format!("{base}/MyCommander_aarch64.app.tar.gz"),
+            &[".tar.gz"]
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn update_url_rejects_other_hosts_repositories_and_tricks() {
+        let rejected = [
+            "http://github.com/sungback/MyCommander/releases/download/v1/a.exe",
+            "https://evil.example.com/sungback/MyCommander/releases/download/v1/a.exe",
+            "https://github.com.evil.example.com/sungback/MyCommander/releases/download/v1/a.exe",
+            "https://github.com/other/MyCommander/releases/download/v1/a.exe",
+            "https://github.com/sungback/MyCommander/archive/refs/heads/main.exe",
+            "https://github.com/sungback/MyCommander/releases/download/../../../evil/a.exe",
+            "https://github.com/sungback/MyCommander/releases/download/v1/%2e%2e/a.exe",
+            "https://github.com/sungback/MyCommander/releases/download/v1/a.exe?x=1",
+            "https://github.com/sungback/MyCommander/releases/download/v1/a.exe#frag",
+            "https://github.com/sungback/MyCommander/releases/download/v1/a b.exe",
+            "file:///C:/Windows/System32/cmd.exe",
+        ];
+
+        for url in rejected {
+            assert!(
+                validate_update_url(url, &[".exe"]).is_err(),
+                "should reject: {url}"
+            );
+        }
+    }
+
+    #[test]
+    fn update_url_rejects_unexpected_file_types() {
+        let url = "https://github.com/sungback/MyCommander/releases/download/v1/a.msi";
+
+        assert!(validate_update_url(url, &[".exe"]).is_err());
+        assert!(validate_update_url(
+            "https://github.com/sungback/MyCommander/releases/download/v1/a-setup.exe",
+            &["-portable.exe"]
+        )
+        .is_err());
     }
 }
