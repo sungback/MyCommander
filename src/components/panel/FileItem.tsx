@@ -7,6 +7,8 @@ import { formatDate, formatSize } from "../../utils/format";
 import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
 import { resolveEntryVisual } from "./visuals/fileVisuals";
 import { isLikelyCloudStoragePath } from "./size/backgroundDirSizeHelpers";
+import { getSizeScannedAt } from "../../store/panelStoreFileHelpers";
+import { formatElapsedSince } from "../../utils/format";
 
 const THUMBNAIL_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "avif",
@@ -49,6 +51,22 @@ const getEntrySizeText = (entry: FileEntry) => {
 };
 
 const getEntrySizeTitle = (entry: FileEntry) => {
+  const title = getEntrySizeBaseTitle(entry);
+  if (!title) {
+    return title;
+  }
+
+  // 값이 있는 상태에서만 계산 시각을 덧붙인다(계산 중이거나 실패한 경우는 제외).
+  const hasValue =
+    entry.sizeStatus === "exact" ||
+    entry.sizeStatus === "estimated" ||
+    entry.sizeStatus === "partial";
+  const elapsed = hasValue ? formatElapsedSince(getSizeScannedAt(entry.path)) : "";
+
+  return elapsed ? `${title} ${elapsed}에 계산한 값입니다.` : title;
+};
+
+const getEntrySizeBaseTitle = (entry: FileEntry) => {
   if (entry.kind !== "directory" || entry.name === "..") {
     return undefined;
   }

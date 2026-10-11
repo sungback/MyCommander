@@ -69,6 +69,7 @@ export interface AppState {
       size: number;
       status: Extract<DirectorySizeStatus, "exact" | "estimated" | "partial">;
       isStale: boolean;
+      scannedAt?: number;
     }>
   ) => void;
   invalidateEntrySizes: (paths: string[]) => void;

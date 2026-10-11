@@ -33,12 +33,23 @@ export const toHydratedStatus = (
   return resolved;
 };
 
+// 경로별로 크기를 마지막으로 계산한 시각. 툴팁에서 "N일 전 계산"을 보여 주는 데 쓴다.
+const sizeScannedAtByPath = new Map<string, number>();
+
+export const recordSizeScannedAt = (path: string, scannedAt: number) => {
+  sizeScannedAtByPath.set(normalizePathKey(path), scannedAt);
+};
+
+export const getSizeScannedAt = (path: string) =>
+  sizeScannedAtByPath.get(normalizePathKey(path));
+
 export const queueStableSizeCacheWrite = (
   path: string,
   size: number,
   status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
 ) => {
   const timestamp = Date.now();
+  recordSizeScannedAt(path, timestamp);
   queuePersistentSizeCacheUpsert({
     path: normalizePathKey(path),
     size,
@@ -63,6 +74,7 @@ export const __resetSessionVerifiedSizesForTests = () => {
   sessionVerifiedSizePaths.clear();
   progressBaselines.clear();
   sizeChangeTimes.clear();
+  sizeScannedAtByPath.clear();
 };
 
 // 파일 감시가 마지막으로 알려 준 변경 시각. 정확 스캔 중에 생긴 변경을 스캔 완료 시 놓치지 않기 위해 쓴다.

@@ -22,6 +22,7 @@ import {
   shouldCacheSizeStatus,
   toHydratedStatus,
   queueStableSizeCacheWrite,
+  recordSizeScannedAt,
   hasSizeChangedSince,
   markSizeVerifiedThisSession,
   recordSizeChange,
@@ -332,6 +333,10 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
 
         if (existingFreshStable) {
           continue;
+        }
+
+        if (entry.scannedAt !== undefined) {
+          recordSizeScannedAt(entry.path, entry.scannedAt);
         }
 
         const status = toHydratedStatus(entry.status, entry.isStale, entry.path);
