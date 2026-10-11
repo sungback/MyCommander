@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import type { DirectorySizeProgressEvent } from "../../../hooks/tauriCommands/fileCommands";
@@ -40,6 +40,9 @@ interface UseBackgroundDirSizesProps {
   ) => void;
 }
 
+// 파일 변경으로 stale이 된 폴더를 다시 정확 계산하기까지 두는 최소 간격
+const EXACT_RESCAN_COOLDOWN_MS = 30_000;
+
 export const useBackgroundDirSizes = ({
   activeTabId,
   currentPath,
@@ -55,6 +58,8 @@ export const useBackgroundDirSizes = ({
   const fs = useFileSystem();
   const scanCounterRef = useRef(0);
   const attemptedExactKeysRef = useRef(new Set<string>());
+  const lastExactFinishedAtRef = useRef(new Map<string, number>());
+  const [rescanTick, setRescanTick] = useState(0);
   const backgroundSchedulerRef = useRef<BackgroundSizeScheduler>(
     createScheduler()
   );
@@ -70,6 +75,14 @@ export const useBackgroundDirSizes = ({
     }
 
     backgroundSchedulerRef.current = createScheduler();
+    // lastUpdated(파일 변경 감시)로는 진행 중인 스캔을 취소하지 않는다. 경로·탭이 바뀔 때만 초기화한다.
+  }, [activeTabId, currentPath, panelId]);
+
+  useEffect(() => {
+    // 패널이 새로고침되면 완료/실패로 기록된 항목을 다시 시도할 수 있게 한다. 진행 중인 스캔은 유지한다.
+    const scheduler = backgroundSchedulerRef.current;
+    scheduler.settledPaths.clear();
+    scheduler.settledExactPaths.clear();
   }, [activeTabId, currentPath, lastUpdated, panelId]);
 
   useEffect(() => {
@@ -192,21 +205,47 @@ export const useBackgroundDirSizes = ({
 
     const scheduler = backgroundSchedulerRef.current;
     const isStale = (path: string) => Boolean(sizeCacheStale[path.normalize("NFC")]);
+    const now = Date.now();
+    let nextRetryDelay: number | null = null;
     const pendingDirectories = files.filter(
       (entry) => {
         const stale = isStale(entry.path);
         const attemptKey = getExactAttemptKey(entry, stale);
-        return (
+        const shouldQueue =
           shouldQueueExactBackgroundScan(entry, stale) &&
           !scheduler.queuedExactPaths.has(entry.path) &&
           !attemptedExactKeysRef.current.has(attemptKey) &&
-          !scheduler.settledExactPaths.has(entry.path)
-        );
+          !scheduler.settledExactPaths.has(entry.path);
+        if (!shouldQueue) {
+          return false;
+        }
+
+        const finishedAt = lastExactFinishedAtRef.current.get(entry.path);
+        if (stale && finishedAt !== undefined) {
+          const remaining = finishedAt + EXACT_RESCAN_COOLDOWN_MS - now;
+          if (remaining > 0) {
+            nextRetryDelay =
+              nextRetryDelay === null ? remaining : Math.min(nextRetryDelay, remaining);
+            return false;
+          }
+        }
+
+        return true;
       }
     );
 
+    const retryTimer =
+      nextRetryDelay === null
+        ? undefined
+        : window.setTimeout(() => setRescanTick((tick) => tick + 1), nextRetryDelay);
+    const cancelRetryTimer = () => {
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+      }
+    };
+
     if (pendingDirectories.length === 0) {
-      return;
+      return cancelRetryTimer;
     }
 
     const drainExactQueue = () => {
@@ -231,11 +270,14 @@ export const useBackgroundDirSizes = ({
               return;
             }
 
-            scheduler.settledExactPaths.add(queuedEntry.path);
+            lastExactFinishedAtRef.current.set(queuedEntry.path, Date.now());
             if (result.isPartial) {
+              scheduler.settledExactPaths.add(queuedEntry.path);
               updateEntrySizeEstimate(panelId, queuedEntry.path, result.size, "partial");
             } else {
               updateEntrySize(panelId, queuedEntry.path, result.size);
+              // 이후 파일 변경으로 다시 stale이 되면 재스캔할 수 있도록 시도 기록을 비운다.
+              attemptedExactKeysRef.current.delete(queuedEntry.attemptKey);
             }
           })
           .catch((error) => {
@@ -271,12 +313,15 @@ export const useBackgroundDirSizes = ({
     }
 
     drainExactQueue();
+
+    return cancelRetryTimer;
   }, [
     currentPath,
     files,
     fs,
     lastUpdated,
     panelId,
+    rescanTick,
     sizeCacheStale,
     setEntrySizeStatus,
     updateEntrySize,

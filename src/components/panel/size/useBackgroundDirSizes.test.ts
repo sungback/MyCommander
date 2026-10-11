@@ -136,6 +136,32 @@ describe("useBackgroundDirSizes", () => {
     await waitFor(() => expect(mockEstimateDirSize).toHaveBeenCalledTimes(2));
   });
 
+  it("keeps an active exact scan running when only lastUpdated changes", async () => {
+    mockScanDirSize.mockReturnValue(new Promise(() => {}));
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        { ...makeDirectory("/Users/sam/code"), size: 1024, sizeStatus: "estimated" },
+      ],
+    });
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalledTimes(1));
+
+    rerender({ ...props, lastUpdated: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockCancelDirSizeScan).not.toHaveBeenCalled();
+    expect(mockScanDirSize).toHaveBeenCalledTimes(1);
+
+    rerender({ ...props, currentPath: "/Users/sam/other", lastUpdated: 2 });
+    await waitFor(() => expect(mockCancelDirSizeScan).toHaveBeenCalledTimes(1));
+  });
+
   it("uses shallower estimates for filesystem roots and deeper estimates for complex directories", () => {
     expect(getAutomaticEstimateOptions("C:\\")).toEqual({
       maxDepth: 0,

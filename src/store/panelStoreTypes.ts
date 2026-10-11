@@ -66,5 +66,6 @@ export interface AppState {
     }>
   ) => void;
   invalidateEntrySizes: (paths: string[]) => void;
+  markEntrySizesStale: (paths: string[]) => void;
   swapPanels: () => void;
 }

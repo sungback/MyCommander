@@ -29,6 +29,7 @@ import {
 type FileActions = Pick<
   PanelStoreActions,
   | "invalidateEntrySizes"
+  | "markEntrySizesStale"
   | "setEntrySizeStatus"
   | "setFiles"
   | "setSort"
@@ -366,6 +367,23 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         leftPanel,
         rightPanel,
       };
+    }),
+
+  // 외부 파일 변경 감시용: 표시 중인 크기는 유지하고 stale로만 표시해 백그라운드에서 다시 계산한다.
+  markEntrySizesStale: (paths) =>
+    set((state) => {
+      let nextStaleCache: Record<string, boolean> | null = null;
+
+      for (const path of collectEntrySizeInvalidationPaths(paths)) {
+        if (state.sizeCache[path] === undefined || state.sizeCacheStale[path]) {
+          continue;
+        }
+
+        nextStaleCache ??= { ...state.sizeCacheStale };
+        nextStaleCache[path] = true;
+      }
+
+      return nextStaleCache ? { sizeCacheStale: nextStaleCache } : state;
     }),
 
   invalidateEntrySizes: (paths) =>

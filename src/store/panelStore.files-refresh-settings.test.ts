@@ -293,6 +293,30 @@ describe("panelStore — updateEntrySize", () => {
     expect(usePanelStore.getState().sizeCacheStale["/work/app"]).toBe(true);
   });
 
+  it("marks changed directories and ancestors stale while keeping their sizes", () => {
+    const { hydrateEntrySizesFromCache, setFiles, markEntrySizesStale } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work", size: 5_000, status: "exact", isStale: false },
+      { path: "/work/app", size: 4_000, status: "exact", isStale: false },
+      { path: "/other", size: 100, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [{ name: "app", path: "/work/app", kind: "directory" }]);
+
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work"]).toBe(5_000);
+    expect(state.sizeStatusCache["/work"]).toBe("exact");
+    expect(state.sizeCacheStale["/work"]).toBe(true);
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.sizeCacheStale["/other"]).toBe(false);
+    const entry = state.leftPanel.files.find((file) => file.name === "app");
+    expect(entry?.size).toBe(4_000);
+    expect(entry?.sizeStatus).toBe("exact");
+  });
+
   it("invalidates stale persistent cache markers with size cache entries", () => {
     const { hydrateEntrySizesFromCache, invalidateEntrySizes } = usePanelStore.getState();
 
