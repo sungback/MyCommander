@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,7 +21,35 @@ pub(super) struct ScanProgress {
     pub completed: bool,
 }
 
+/// 같은 inode를 가리키는 하드링크를 한 번만 집계하기 위한 추적기.
+/// conda/pnpm처럼 하드링크를 많이 쓰는 폴더가 실제보다 크게 보이는 것을 막는다.
+#[derive(Default)]
+pub(super) struct HardLinkTracker {
+    #[cfg(unix)]
+    seen: HashSet<(u64, u64)>,
+}
+
+impl HardLinkTracker {
+    /// 파일 크기를 집계해야 하면 true. 이미 집계한 하드링크면 false.
+    #[cfg(unix)]
+    pub(super) fn should_count(&mut self, metadata: &fs::Metadata) -> bool {
+        use std::os::unix::fs::MetadataExt;
+
+        if metadata.nlink() <= 1 {
+            return true;
+        }
+
+        self.seen.insert((metadata.dev(), metadata.ino()))
+    }
+
+    #[cfg(not(unix))]
+    pub(super) fn should_count(&mut self, _metadata: &fs::Metadata) -> bool {
+        true
+    }
+}
+
 struct ScanAccumulator {
+    hard_links: HardLinkTracker,
     size: u64,
     is_partial: bool,
     scanned_entries: usize,
@@ -31,6 +61,7 @@ struct ScanAccumulator {
 impl ScanAccumulator {
     fn new() -> Self {
         Self {
+            hard_links: HardLinkTracker::default(),
             size: 0,
             is_partial: false,
             scanned_entries: 0,
@@ -189,7 +220,9 @@ where
         };
 
         if metadata.is_file() {
-            accumulator.size = accumulator.size.saturating_add(metadata.len());
+            if accumulator.hard_links.should_count(&metadata) {
+                accumulator.size = accumulator.size.saturating_add(metadata.len());
+            }
         } else if should_skip_directory_traversal(&metadata) {
             continue;
         } else if metadata.is_dir() {

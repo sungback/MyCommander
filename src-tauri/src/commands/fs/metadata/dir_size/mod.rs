@@ -247,6 +247,41 @@ mod tests {
         fs::remove_dir_all(outside).unwrap();
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn scan_path_size_counts_hard_linked_files_once() {
+        let root = make_temp_dir("scan-hardlink");
+        let original = root.join("original.bin");
+        fs::write(&original, [1_u8; 100]).unwrap();
+        fs::hard_link(&original, root.join("link-a.bin")).unwrap();
+        fs::create_dir_all(root.join("nested")).unwrap();
+        fs::hard_link(&original, root.join("nested").join("link-b.bin")).unwrap();
+        fs::write(root.join("other.bin"), [1_u8; 10]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let result =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
+
+        assert_eq!(result.size, 110);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn estimate_path_size_counts_hard_linked_files_once() {
+        let root = make_temp_dir("estimate-hardlink");
+        let original = root.join("original.bin");
+        fs::write(&original, [1_u8; 100]).unwrap();
+        fs::hard_link(&original, root.join("link-a.bin")).unwrap();
+
+        let estimate = estimate_path_size(root.to_str().unwrap(), 1, 100).unwrap();
+
+        assert_eq!(estimate.size, 100);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
     fn make_temp_dir(label: &str) -> std::path::PathBuf {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)

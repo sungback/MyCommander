@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
-use super::scan::scan_path_size_with_progress;
+use super::scan::{scan_path_size_with_progress, HardLinkTracker};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
@@ -61,7 +61,15 @@ pub(crate) fn estimate_path_size(
         return Ok(estimate);
     }
 
-    scan_estimate_dir(target, 0, max_depth, max_entries, &mut estimate);
+    let mut hard_links = HardLinkTracker::default();
+    scan_estimate_dir(
+        target,
+        0,
+        max_depth,
+        max_entries,
+        &mut estimate,
+        &mut hard_links,
+    );
     Ok(estimate)
 }
 
@@ -126,6 +134,7 @@ fn scan_estimate_dir(
     max_depth: usize,
     max_entries: usize,
     estimate: &mut DirectorySizeEstimate,
+    hard_links: &mut HardLinkTracker,
 ) {
     if estimate.scanned_entries >= max_entries {
         estimate.is_partial = true;
@@ -164,7 +173,9 @@ fn scan_estimate_dir(
         };
 
         if metadata.is_file() {
-            estimate.size = estimate.size.saturating_add(metadata.len());
+            if hard_links.should_count(&metadata) {
+                estimate.size = estimate.size.saturating_add(metadata.len());
+            }
             continue;
         }
 
@@ -179,7 +190,14 @@ fn scan_estimate_dir(
                 continue;
             }
 
-            scan_estimate_dir(&entry.path(), depth + 1, max_depth, max_entries, estimate);
+            scan_estimate_dir(
+                &entry.path(),
+                depth + 1,
+                max_depth,
+                max_entries,
+                estimate,
+                hard_links,
+            );
         }
     }
 }
