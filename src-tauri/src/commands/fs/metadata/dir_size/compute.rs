@@ -22,11 +22,7 @@ pub(crate) fn compute_path_size(path: &str) -> Result<u64, String> {
             .map_err(|e| e.to_string());
     }
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    if let Ok(size) = get_dir_size_with_du(path) {
-        return Ok(size);
-    }
-
+    // 목록 표시와 같은 기준(겉보기 크기, 하드링크 한 번만 집계)을 쓰도록 스캔 결과를 사용한다.
     get_dir_size_with_walkdir(path)
 }
 
@@ -90,7 +86,7 @@ fn is_windows_reparse_point(_metadata: &fs::Metadata) -> bool {
     false
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
 pub(super) fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
     use std::process::Command;
 
@@ -113,7 +109,7 @@ pub(super) fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
     Err("Failed to parse `du` output".to_string())
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
 pub(super) fn parse_du_size_bytes(stdout: &str) -> Option<u64> {
     stdout
         .split_whitespace()

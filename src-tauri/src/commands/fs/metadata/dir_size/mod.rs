@@ -73,10 +73,9 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 
 #[cfg(test)]
 mod tests {
-    #[cfg(target_os = "macos")]
     use super::compute::compute_path_size;
     use super::compute::estimate_path_size;
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     use super::compute::parse_du_size_bytes;
     use super::scan::scan_path_size_with_progress;
     use std::fs;
@@ -85,13 +84,13 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     #[test]
     fn parse_du_size_bytes_reads_summary_even_with_other_output() {
         assert_eq!(parse_du_size_bytes("42\t/Users/example\n"), Some(43_008));
     }
 
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     #[test]
     fn parse_du_size_bytes_returns_none_for_unparseable_output() {
         assert_eq!(parse_du_size_bytes(""), None);
@@ -263,6 +262,27 @@ mod tests {
             scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
 
         assert_eq!(result.size, 110);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn compute_path_size_matches_scan_and_counts_hard_links_once() {
+        let root = make_temp_dir("compute-hardlink");
+        let original = root.join("original.bin");
+        fs::write(&original, vec![1_u8; 8192]).unwrap();
+        fs::hard_link(&original, root.join("link.bin")).unwrap();
+        fs::write(root.join("small.bin"), [1_u8; 10]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let computed = compute_path_size(root.to_str().unwrap()).unwrap();
+        let scanned = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {})
+            .unwrap()
+            .size;
+
+        assert_eq!(computed, 8202);
+        assert_eq!(computed, scanned);
 
         fs::remove_dir_all(root).unwrap();
     }
