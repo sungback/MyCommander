@@ -111,6 +111,48 @@ export const collectAncestorPaths = (path: string) => {
   return ancestors;
 };
 
+// 빌드·캐시·에이전트 로그처럼 변경이 잦아 폴더 크기 재계산을 계속 유발하는 디렉터리 이름
+const NOISY_SIZE_PATH_COMPONENTS = new Set([
+  ".cache",
+  ".claude",
+  "node_modules",
+  "target",
+]);
+
+const splitPathComponents = (path: string) =>
+  path.replace(/\\/g, "/").split("/").filter(Boolean);
+
+/**
+ * 파일 감시 이벤트로 stale 처리할 경로를 모은다.
+ * 노이즈 디렉터리(또는 그 하위)에서 발생한 변경은, 그 디렉터리와 상위 조상의 크기에는 반영하지 않는다.
+ * 노이즈 디렉터리 안쪽의 하위 경로는 그대로 유지한다.
+ */
+export const collectNoiseFilteredSizeStalePaths = (paths: string[]) => {
+  const result = new Set<string>();
+
+  for (const path of paths) {
+    if (!path) continue;
+
+    const components = splitPathComponents(path);
+    const noisyIndex = components.findIndex((component) =>
+      NOISY_SIZE_PATH_COMPONENTS.has(component.toLowerCase())
+    );
+
+    for (const candidate of collectEntrySizeInvalidationPaths([path])) {
+      if (
+        noisyIndex !== -1 &&
+        splitPathComponents(candidate).length <= noisyIndex + 1
+      ) {
+        continue;
+      }
+
+      result.add(candidate);
+    }
+  }
+
+  return Array.from(result);
+};
+
 export const collectEntrySizeInvalidationPaths = (paths: string[]) => {
   const pathsToInvalidate = new Set<string>();
 

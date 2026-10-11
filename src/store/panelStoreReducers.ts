@@ -24,6 +24,7 @@ export {
 export {
   collectAncestorPaths,
   collectEntrySizeInvalidationPaths,
+  collectNoiseFilteredSizeStalePaths,
   invalidateEntrySizesAcrossPanels,
   setPanelFiles,
   sortPanelByField,

@@ -1,6 +1,7 @@
 import {
   collectAncestorPaths,
   collectEntrySizeInvalidationPaths,
+  collectNoiseFilteredSizeStalePaths,
   getPanelKey,
   invalidateEntrySizesAcrossPanels,
   setPanelFiles,
@@ -370,11 +371,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
     }),
 
   // 외부 파일 변경 감시용: 표시 중인 크기는 유지하고 stale로만 표시해 백그라운드에서 다시 계산한다.
+  // 노이즈 디렉터리(node_modules, target 등) 안의 변경은 상위 폴더 크기에 반영하지 않는다.
   markEntrySizesStale: (paths) =>
     set((state) => {
       let nextStaleCache: Record<string, boolean> | null = null;
 
-      for (const path of collectEntrySizeInvalidationPaths(paths)) {
+      for (const path of collectNoiseFilteredSizeStalePaths(paths)) {
         if (state.sizeCache[path] === undefined || state.sizeCacheStale[path]) {
           continue;
         }

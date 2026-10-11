@@ -317,6 +317,39 @@ describe("panelStore — updateEntrySize", () => {
     expect(entry?.sizeStatus).toBe("exact");
   });
 
+  it("ignores noisy directories when marking sizes stale on filesystem changes", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work", size: 9_000, status: "exact", isStale: false },
+      { path: "/work/app", size: 8_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 7_000, status: "exact", isStale: false },
+      { path: "/work/app/target/debug", size: 6_000, status: "exact", isStale: false },
+      { path: "/work/app/src", size: 100, status: "exact", isStale: false },
+    ]);
+
+    // 빌드 산출물 변경: target과 상위 폴더는 stale로 만들지 않는다.
+    markEntrySizesStale([
+      "/work/app/target/debug/deps/lib.rlib",
+      "/work/app/target/debug/deps",
+    ]);
+
+    let state = usePanelStore.getState();
+    expect(state.sizeCacheStale["/work"]).toBe(false);
+    expect(state.sizeCacheStale["/work/app"]).toBe(false);
+    expect(state.sizeCacheStale["/work/app/target"]).toBe(false);
+    // 노이즈 디렉터리 안쪽 폴더는 직접 보고 있을 수 있으므로 stale 처리한다.
+    expect(state.sizeCacheStale["/work/app/target/debug"]).toBe(true);
+
+    // target 자체가 지워진 경우: 이벤트의 부모 경로(/work/app)는 stale로 처리된다.
+    markEntrySizesStale(["/work/app/target", "/work/app"]);
+
+    state = usePanelStore.getState();
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.sizeCacheStale["/work"]).toBe(true);
+    expect(state.sizeCacheStale["/work/app/src"]).toBe(false);
+  });
+
   it("invalidates stale persistent cache markers with size cache entries", () => {
     const { hydrateEntrySizesFromCache, invalidateEntrySizes } = usePanelStore.getState();
 
