@@ -216,6 +216,65 @@ describe("panelStore — updateEntrySize", () => {
     expect(state.sizeCacheStale["/cached/stale"]).toBe(false);
   });
 
+  it("marks cached exact ancestors stale when a descendant exact size changes", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+      { path: "/work/other", size: 500, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [
+      { name: "app", path: "/work/app", kind: "directory" },
+      { name: "other", path: "/work/other", kind: "directory" },
+    ]);
+
+    updateEntrySize("left", "/work/app/target", 10);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/app"]).toBe("estimated");
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.leftPanel.files.find((entry) => entry.name === "app")?.sizeStatus).toBe(
+      "estimated"
+    );
+    expect(state.sizeStatusCache["/work/other"]).toBe("exact");
+    expect(state.sizeCacheStale["/work/other"]).toBe(false);
+  });
+
+  it("keeps cached exact ancestors when a descendant exact size is unchanged", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySize("left", "/work/app/target", 10_000);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/app"]).toBe("exact");
+    expect(state.sizeCacheStale["/work/app"]).toBe(false);
+  });
+
+  it("compares against the pre-progress size when progress events overwrote the cache", () => {
+    const {
+      hydrateEntrySizesFromCache,
+      updateEntrySize,
+      updateEntrySizeProgress,
+    } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySizeProgress("left", "/work/app/target", 10);
+    updateEntrySize("left", "/work/app/target", 10);
+
+    expect(usePanelStore.getState().sizeCacheStale["/work/app"]).toBe(true);
+  });
+
   it("invalidates stale persistent cache markers with size cache entries", () => {
     const { hydrateEntrySizesFromCache, invalidateEntrySizes } = usePanelStore.getState();
 

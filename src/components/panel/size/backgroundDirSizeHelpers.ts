@@ -1,4 +1,5 @@
 import type { FileEntry } from "../../../types/file";
+import { isSizeVerifiedThisSession } from "../../../store/panelStoreFileHelpers";
 
 export const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
 export const MAX_BACKGROUND_EXACT_WORKERS = 1;
@@ -144,6 +145,11 @@ export const shouldQueueExactBackgroundScan = (
 
   if (isLikelyHeavySystemPath(entry.path)) {
     return false;
+  }
+
+  if (entry.sizeStatus === "exact" && !isSizeVerifiedThisSession(entry.path)) {
+    // 영속 캐시에서 복원된 exact 값은 세션당 한 번 백그라운드로 재검증한다.
+    return true;
   }
 
   return entry.sizeStatus === "estimated" || entry.sizeStatus === "partial" || isStale;

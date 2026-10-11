@@ -98,6 +98,19 @@ export const updateEntrySizeStatusAcrossPanels = (
   };
 };
 
+export const collectAncestorPaths = (path: string) => {
+  const ancestors: string[] = [];
+  let current = path;
+  let parent = getPathDirectoryName(current);
+  while (parent && parent !== current) {
+    ancestors.push(normalizePathKey(parent));
+    current = parent;
+    parent = getPathDirectoryName(current);
+  }
+
+  return ancestors;
+};
+
 export const collectEntrySizeInvalidationPaths = (paths: string[]) => {
   const pathsToInvalidate = new Set<string>();
 

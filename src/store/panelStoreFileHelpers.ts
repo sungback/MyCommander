@@ -47,3 +47,41 @@ export const queueStableSizeCacheWrite = (
     lastUsedAt: timestamp,
   });
 };
+
+// 이번 앱 세션에서 실제 디스크 스캔으로 다시 확인한 디렉터리 경로.
+// 영속 캐시에서 복원된 exact 값은 외부 변경(cargo clean 등)을 반영하지 못할 수 있어 세션당 한 번 재검증한다.
+const sessionVerifiedSizePaths = new Set<string>();
+
+export const markSizeVerifiedThisSession = (path: string) => {
+  sessionVerifiedSizePaths.add(normalizePathKey(path));
+};
+
+export const isSizeVerifiedThisSession = (path: string) =>
+  sessionVerifiedSizePaths.has(normalizePathKey(path));
+
+export const __resetSessionVerifiedSizesForTests = () => {
+  sessionVerifiedSizePaths.clear();
+  progressBaselines.clear();
+};
+
+// 스캔 진행 이벤트가 sizeCache를 덮어쓰기 전의 값. 최종 exact 값과 비교해 크기 변화를 감지한다.
+interface SizeBaseline {
+  size: number;
+  wasExact: boolean;
+}
+
+const progressBaselines = new Map<string, SizeBaseline>();
+
+export const rememberSizeBaseline = (path: string, baseline: SizeBaseline) => {
+  const key = normalizePathKey(path);
+  if (!progressBaselines.has(key)) {
+    progressBaselines.set(key, baseline);
+  }
+};
+
+export const takeSizeBaseline = (path: string) => {
+  const key = normalizePathKey(path);
+  const baseline = progressBaselines.get(key);
+  progressBaselines.delete(key);
+  return baseline;
+};

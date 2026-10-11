@@ -1,4 +1,5 @@
 import {
+  collectAncestorPaths,
   collectEntrySizeInvalidationPaths,
   getPanelKey,
   invalidateEntrySizesAcrossPanels,
@@ -15,10 +16,14 @@ import {
   type PanelStoreSet,
 } from "./panelStoreActionTypes";
 import { normalizePathKey } from "../utils/panelHelpers";
+import type { DirectorySizeStatus } from "../types/file";
 import {
   shouldCacheSizeStatus,
   toHydratedStatus,
   queueStableSizeCacheWrite,
+  markSizeVerifiedThisSession,
+  rememberSizeBaseline,
+  takeSizeBaseline,
 } from "./panelStoreFileHelpers";
 
 type FileActions = Pick<
@@ -61,6 +66,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
 
   updateEntrySize: (_panel, path, size) => {
     queueStableSizeCacheWrite(path, size, "exact");
+    markSizeVerifiedThisSession(path);
 
     return set((state) => {
       const nextPanels = updateEntrySizeAcrossPanels(
@@ -74,7 +80,23 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
       const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
 
+      // 이전에 exact였던 값이 달라졌다면 조상 폴더의 exact 캐시도 더 이상 믿을 수 없다.
+      const baseline =
+        takeSizeBaseline(path) ??
+        (cachedSize === undefined
+          ? undefined
+          : { size: cachedSize, wasExact: cachedStatus === "exact" || Boolean(cachedStale) });
+      const staleAncestors =
+        baseline?.wasExact && baseline.size !== size
+          ? collectAncestorPaths(path).filter(
+              (ancestor) =>
+                state.sizeStatusCache[ancestor] === "exact" &&
+                state.sizeCache[ancestor] !== undefined
+            )
+          : [];
+
       if (
+        staleAncestors.length === 0 &&
         cachedSize === size &&
         cachedStatus === "exact" &&
         !cachedStale &&
@@ -84,7 +106,38 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         return state;
       }
 
+      let leftPanel = nextPanels.leftPanel;
+      let rightPanel = nextPanels.rightPanel;
+      const nextSizeStatusCache: Record<string, DirectorySizeStatus> = {
+        ...state.sizeStatusCache,
+        [nextPanels.normalizedPath]: "exact",
+      };
+      const nextSizeCacheStale = {
+        ...state.sizeCacheStale,
+        ...(cachedStale ? { [nextPanels.normalizedPath]: false } : {}),
+      };
+
+      for (const ancestor of staleAncestors) {
+        const ancestorPanels = updateEntrySizeAcrossPanels(
+          leftPanel,
+          rightPanel,
+          ancestor,
+          state.sizeCache[ancestor],
+          "estimated"
+        );
+        leftPanel = ancestorPanels.leftPanel;
+        rightPanel = ancestorPanels.rightPanel;
+        nextSizeStatusCache[ancestor] = "estimated";
+        nextSizeCacheStale[ancestor] = true;
+      }
+
+      if (staleAncestors.length > 0) {
+        queuePersistentSizeCacheDelete(staleAncestors);
+      }
+
       return {
+        sizeStatusCache: nextSizeStatusCache,
+        sizeCacheStale: nextSizeCacheStale,
         ...(cachedSize === size
           ? {}
           : {
@@ -93,30 +146,15 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
                 [nextPanels.normalizedPath]: size,
               },
             }),
-        ...(cachedStatus === "exact"
-          ? {}
-          : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: "exact",
-              },
-            }),
-        ...(cachedStale
-          ? {
-              sizeCacheStale: {
-                ...state.sizeCacheStale,
-                [nextPanels.normalizedPath]: false,
-              },
-            }
-          : {}),
-        leftPanel: nextPanels.leftPanel,
-        rightPanel: nextPanels.rightPanel,
+        leftPanel,
+        rightPanel,
       };
     });
   },
 
   updateEntrySizeEstimate: (_panel, path, size, status) => {
     queueStableSizeCacheWrite(path, size, status);
+    takeSizeBaseline(path);
 
     return set((state) => {
       const nextPanels = updateEntrySizeAcrossPanels(
@@ -173,6 +211,17 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
 
   updateEntrySizeProgress: (_panel, path, size) =>
     set((state) => {
+      const key = normalizePathKey(path);
+      const previousSize = state.sizeCache[key];
+      if (previousSize !== undefined) {
+        rememberSizeBaseline(path, {
+          size: previousSize,
+          wasExact:
+            state.sizeStatusCache[key] === "exact" ||
+            Boolean(state.sizeCacheStale[key]),
+        });
+      }
+
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,

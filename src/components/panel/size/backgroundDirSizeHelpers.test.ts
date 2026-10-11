@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  __resetSessionVerifiedSizesForTests,
+  markSizeVerifiedThisSession,
+} from "../../../store/panelStoreFileHelpers";
 import type { FileEntry } from "../../../types/file";
 import {
   getAutomaticEstimateOptions,
@@ -18,6 +22,37 @@ const makeDirectory = (path: string): FileEntry => ({
 });
 
 describe("backgroundDirSizeHelpers", () => {
+  beforeEach(() => {
+    __resetSessionVerifiedSizesForTests();
+  });
+
+  it("revalidates restored exact sizes once per session", () => {
+    const entry: FileEntry = {
+      ...makeDirectory("/Users/sam/code/app"),
+      size: 2048,
+      sizeStatus: "exact",
+    };
+
+    expect(shouldQueueExactBackgroundScan(entry, false)).toBe(true);
+
+    markSizeVerifiedThisSession(entry.path);
+
+    expect(shouldQueueExactBackgroundScan(entry, false)).toBe(false);
+  });
+
+  it("does not revalidate exact sizes on cloud storage paths", () => {
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("/Users/sam/Library/CloudStorage/Dropbox/app"),
+          size: 2048,
+          sizeStatus: "exact",
+        },
+        false
+      )
+    ).toBe(false);
+  });
+
   it("createScheduler initializes scheduler state correctly", () => {
     const scheduler = createScheduler();
     expect(scheduler.activeCount).toBe(0);
