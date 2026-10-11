@@ -61,7 +61,11 @@ pub async fn load_dir_size_cache(app: AppHandle) -> Result<DirectorySizeCacheLoa
     tokio::task::spawn_blocking(move || {
         let file_path = cache_file_path(&app)?;
         let now_ms = now_ms();
-        let snapshot = read_snapshot_from_path(&file_path)?;
+        let mut snapshot = read_snapshot_from_path(&file_path)?;
+        // 삭제되었거나 이동한 폴더의 오래된 크기가 다시 나타나지 않도록 로드할 때 정리한다.
+        if remove_missing_entries(&mut snapshot) > 0 {
+            write_snapshot_to_path(&file_path, &snapshot)?;
+        }
         Ok(build_load_result(snapshot, now_ms, DEFAULT_MAX_ENTRIES))
     })
     .await
@@ -227,6 +231,80 @@ fn prune_snapshot(snapshot: &mut DirectorySizeCacheSnapshot, max_entries: usize)
     }
 }
 
+const CLOUD_PATH_MARKERS: [&str; 10] = [
+    "cloudstorage",
+    "mobile documents",
+    "icloud",
+    "onedrive",
+    "dropbox",
+    "drivefs",
+    "google drive",
+    "my drive",
+    "shared drives",
+    "드라이브",
+];
+
+/// 스냅샷에서 실제로 사라진 경로의 항목을 제거하고 제거한 개수를 반환한다.
+fn remove_missing_entries(snapshot: &mut DirectorySizeCacheSnapshot) -> usize {
+    let before = snapshot.entries.len();
+    snapshot
+        .entries
+        .retain(|path, _| !is_confirmed_missing_path(Path::new(path)));
+    before - snapshot.entries.len()
+}
+
+/// 경로가 사라졌다고 확신할 수 있을 때만 true.
+/// 분리된 외장 볼륨, 클라우드 경로, 권한 오류처럼 판단할 수 없는 경우에는 항목을 유지한다.
+fn is_confirmed_missing_path(path: &Path) -> bool {
+    if !path.is_absolute() {
+        return false;
+    }
+
+    let lowered = path.to_string_lossy().to_lowercase();
+    if CLOUD_PATH_MARKERS
+        .iter()
+        .any(|marker| lowered.contains(marker))
+    {
+        return false;
+    }
+
+    if let Some(volume_root) = volume_root_of(path) {
+        if !volume_root.exists() {
+            return false;
+        }
+    }
+
+    matches!(
+        fs::symlink_metadata(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    )
+}
+
+/// 외장 볼륨/드라이브 루트(`/Volumes/<name>`, `D:\`)를 반환한다. 해당하지 않으면 None.
+fn volume_root_of(path: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+
+    let mut components = path.components();
+    let first = components.next()?;
+
+    if let Component::Prefix(prefix) = first {
+        let mut root = PathBuf::from(prefix.as_os_str());
+        root.push(std::path::MAIN_SEPARATOR_STR);
+        return Some(root);
+    }
+
+    if !matches!(first, Component::RootDir) {
+        return None;
+    }
+
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(top)), Some(Component::Normal(name))) if top == "Volumes" => {
+            Some(PathBuf::from("/Volumes").join(name))
+        }
+        _ => None,
+    }
+}
+
 fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
     let ttl = match entry.status.as_str() {
         "exact" => EXACT_TTL_MS,
@@ -278,8 +356,8 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, write_snapshot_to_path,
-        DirectorySizeCacheEntry, DirectorySizeCacheSnapshot,
+        build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, remove_missing_entries,
+        write_snapshot_to_path, DirectorySizeCacheEntry, DirectorySizeCacheSnapshot,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -391,6 +469,42 @@ mod tests {
         let parsed = parse_snapshot(&content).unwrap();
 
         assert_eq!(parsed.entries.get("/dir").unwrap().size, 123);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn remove_missing_entries_drops_only_confirmed_missing_paths() {
+        let root = make_temp_dir("size-cache-missing");
+        let existing = root.join("existing");
+        fs::create_dir_all(&existing).unwrap();
+        let missing = root.join("missing");
+        let cloud_missing = root.join("CloudStorage").join("missing");
+        let mut snapshot = empty_snapshot();
+        for path in [
+            existing.to_str().unwrap(),
+            missing.to_str().unwrap(),
+            cloud_missing.to_str().unwrap(),
+            "/Volumes/__mycommander_unplugged_volume__/project",
+            "relative/path",
+        ] {
+            snapshot
+                .entries
+                .insert(path.to_string(), entry(1, "exact", 100));
+        }
+
+        let removed = remove_missing_entries(&mut snapshot);
+
+        assert_eq!(removed, 1);
+        assert!(snapshot.entries.contains_key(existing.to_str().unwrap()));
+        assert!(!snapshot.entries.contains_key(missing.to_str().unwrap()));
+        assert!(snapshot
+            .entries
+            .contains_key(cloud_missing.to_str().unwrap()));
+        assert!(snapshot
+            .entries
+            .contains_key("/Volumes/__mycommander_unplugged_volume__/project"));
+        assert!(snapshot.entries.contains_key("relative/path"));
 
         fs::remove_dir_all(root).unwrap();
     }
