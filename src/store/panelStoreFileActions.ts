@@ -220,6 +220,11 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
             state.sizeStatusCache[key] === "exact" ||
             Boolean(state.sizeCacheStale[key]),
         });
+
+        // 재검증 중에는 이미 표시 중인 값보다 작은 진행값으로 되돌리지 않는다(0에서 다시 오르며 깜빡이고 정렬이 흔들림).
+        if (size <= previousSize) {
+          return state;
+        }
       }
 
       const nextPanels = updateEntrySizeAcrossPanels(

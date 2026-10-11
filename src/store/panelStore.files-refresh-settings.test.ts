@@ -257,6 +257,24 @@ describe("panelStore — updateEntrySize", () => {
     expect(state.sizeCacheStale["/work/app"]).toBe(false);
   });
 
+  it("does not shrink a displayed directory size while a rescan is in progress", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize, updateEntrySizeProgress } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/big", size: 8_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySizeProgress("left", "/work/big", 100);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(8_000);
+
+    updateEntrySizeProgress("left", "/work/big", 9_000);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(9_000);
+
+    updateEntrySize("left", "/work/big", 8_500);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(8_500);
+  });
+
   it("compares against the pre-progress size when progress events overwrote the cache", () => {
     const {
       hydrateEntrySizesFromCache,
