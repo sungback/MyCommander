@@ -265,7 +265,8 @@ describe("useBackgroundDirSizes", () => {
       expect(props.updateEntrySize).toHaveBeenCalledWith(
         "left",
         "/Users/sam/Projects",
-      2048
+        2048,
+        expect.any(Number)
       )
     );
   });
@@ -318,7 +319,8 @@ describe("useBackgroundDirSizes", () => {
       expect(props.updateEntrySize).toHaveBeenCalledWith(
         "left",
         "/Applications/Example.app",
-        2048
+        2048,
+        expect.any(Number)
       )
     );
   });
@@ -371,7 +373,8 @@ describe("useBackgroundDirSizes", () => {
       expect(props.updateEntrySize).toHaveBeenCalledWith(
         "left",
         "/Users/back/Downloads",
-        2048
+        2048,
+        expect.any(Number)
       )
     );
   });

@@ -62,6 +62,30 @@ export const isSizeVerifiedThisSession = (path: string) =>
 export const __resetSessionVerifiedSizesForTests = () => {
   sessionVerifiedSizePaths.clear();
   progressBaselines.clear();
+  sizeChangeTimes.clear();
+};
+
+// 파일 감시가 마지막으로 알려 준 변경 시각. 정확 스캔 중에 생긴 변경을 스캔 완료 시 놓치지 않기 위해 쓴다.
+const MAX_TRACKED_SIZE_CHANGES = 2_000;
+const sizeChangeTimes = new Map<string, number>();
+
+export const recordSizeChange = (path: string, at: number = Date.now()) => {
+  const key = normalizePathKey(path);
+  // 삽입 순서를 갱신해 오래된 항목부터 버린다.
+  sizeChangeTimes.delete(key);
+  sizeChangeTimes.set(key, at);
+
+  if (sizeChangeTimes.size > MAX_TRACKED_SIZE_CHANGES) {
+    const oldest = sizeChangeTimes.keys().next().value;
+    if (oldest !== undefined) {
+      sizeChangeTimes.delete(oldest);
+    }
+  }
+};
+
+export const hasSizeChangedSince = (path: string, since: number) => {
+  const changedAt = sizeChangeTimes.get(normalizePathKey(path));
+  return changedAt !== undefined && changedAt >= since;
 };
 
 // 스캔 진행 이벤트가 sizeCache를 덮어쓰기 전의 값. 최종 exact 값과 비교해 크기 변화를 감지한다.

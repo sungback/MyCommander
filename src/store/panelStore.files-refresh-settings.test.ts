@@ -317,6 +317,39 @@ describe("panelStore — updateEntrySize", () => {
     expect(entry?.sizeStatus).toBe("exact");
   });
 
+  it("keeps a directory stale when a change was reported during the exact scan", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 4_000, status: "exact", isStale: true },
+    ]);
+    const scanStartedAt = Date.now() - 1_000;
+
+    // 스캔 도중 이미 stale인 폴더에 다시 변경이 알려진 상황
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+    updateEntrySize("left", "/work/app", 4_200, scanStartedAt);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/app"]).toBe(4_200);
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+  });
+
+  it("clears stale when no change was reported after the exact scan started", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 4_000, status: "exact", isStale: false },
+    ]);
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+    const scanStartedAt = Date.now() + 1_000;
+
+    updateEntrySize("left", "/work/app", 4_200, scanStartedAt);
+
+    expect(usePanelStore.getState().sizeCacheStale["/work/app"]).toBe(false);
+  });
+
   it("ignores noisy directories when marking sizes stale on filesystem changes", () => {
     const { hydrateEntrySizesFromCache, markEntrySizesStale } = usePanelStore.getState();
 

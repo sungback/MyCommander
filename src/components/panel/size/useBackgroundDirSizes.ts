@@ -32,7 +32,12 @@ interface UseBackgroundDirSizesProps {
     size: number,
     status: Extract<DirectorySizeStatus, "estimated" | "partial">
   ) => void;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySize: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    scanStartedAt?: number
+  ) => void;
   updateEntrySizeProgress: (
     panel: PanelId,
     path: string,
@@ -262,6 +267,7 @@ export const useBackgroundDirSizes = ({
         const scanId = `${panelId}-${Date.now()}-${scanCounterRef.current++}`;
         scheduler.activeExactScans.set(scanId, queuedEntry.path);
         setEntrySizeStatus(panelId, queuedEntry.path, "calculating");
+        const scanStartedAt = Date.now();
 
         void fs
           .scanDirSize(queuedEntry.path, scanId)
@@ -275,7 +281,7 @@ export const useBackgroundDirSizes = ({
               scheduler.settledExactPaths.add(queuedEntry.path);
               updateEntrySizeEstimate(panelId, queuedEntry.path, result.size, "partial");
             } else {
-              updateEntrySize(panelId, queuedEntry.path, result.size);
+              updateEntrySize(panelId, queuedEntry.path, result.size, scanStartedAt);
               // 이후 파일 변경으로 다시 stale이 되면 재스캔할 수 있도록 시도 기록을 비운다.
               attemptedExactKeysRef.current.delete(queuedEntry.attemptKey);
             }

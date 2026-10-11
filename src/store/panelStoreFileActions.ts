@@ -22,7 +22,9 @@ import {
   shouldCacheSizeStatus,
   toHydratedStatus,
   queueStableSizeCacheWrite,
+  hasSizeChangedSince,
   markSizeVerifiedThisSession,
+  recordSizeChange,
   rememberSizeBaseline,
   takeSizeBaseline,
 } from "./panelStoreFileHelpers";
@@ -66,7 +68,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
-  updateEntrySize: (_panel, path, size) => {
+  updateEntrySize: (_panel, path, size, scanStartedAt) => {
     queueStableSizeCacheWrite(path, size, "exact");
     markSizeVerifiedThisSession(path);
 
@@ -81,6 +83,9 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       const cachedSize = state.sizeCache[nextPanels.normalizedPath];
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
       const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
+      // 스캔 도중 외부 변경이 감지됐다면 이 결과는 이미 낡았을 수 있으므로 stale을 유지해 다시 계산한다.
+      const changedDuringScan =
+        scanStartedAt !== undefined && hasSizeChangedSince(path, scanStartedAt);
 
       // 이전에 exact였던 값이 달라졌다면 조상 폴더의 exact 캐시도 더 이상 믿을 수 없다.
       const baseline =
@@ -102,6 +107,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         cachedSize === size &&
         cachedStatus === "exact" &&
         !cachedStale &&
+        !changedDuringScan &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
@@ -116,7 +122,11 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
       const nextSizeCacheStale = {
         ...state.sizeCacheStale,
-        ...(cachedStale ? { [nextPanels.normalizedPath]: false } : {}),
+        ...(changedDuringScan
+          ? { [nextPanels.normalizedPath]: true }
+          : cachedStale
+            ? { [nextPanels.normalizedPath]: false }
+            : {}),
       };
 
       for (const ancestor of staleAncestors) {
@@ -377,6 +387,8 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       let nextStaleCache: Record<string, boolean> | null = null;
 
       for (const path of collectNoiseFilteredSizeStalePaths(paths)) {
+        // 이미 stale이어도 변경 시각은 남겨 진행 중인 스캔 결과가 stale을 지우지 못하게 한다.
+        recordSizeChange(path);
         if (state.sizeCache[path] === undefined || state.sizeCacheStale[path]) {
           continue;
         }

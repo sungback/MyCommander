@@ -40,7 +40,13 @@ export interface AppState {
   refreshPanel: (panel: PanelId) => void;
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: SortField) => void;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  // scanStartedAt: 정확 스캔 시작 시각. 스캔 중 변경이 감지됐으면 완료 후에도 stale을 유지한다.
+  updateEntrySize: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    scanStartedAt?: number
+  ) => void;
   updateEntrySizeProgress: (
     panel: PanelId,
     path: string,
