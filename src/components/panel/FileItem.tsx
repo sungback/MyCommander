@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { formatDate, formatSize } from "../../utils/format";
 import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
 import { resolveEntryVisual } from "./visuals/fileVisuals";
+import { isLikelyCloudStoragePath } from "./size/backgroundDirSizeHelpers";
 
 const THUMBNAIL_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "avif",
@@ -58,9 +59,13 @@ const getEntrySizeTitle = (entry: FileEntry) => {
     case "calculating":
       return "정확한 크기를 계산하는 중입니다.";
     case "estimated":
-      return "빠른 추정 크기입니다.";
+      return isLikelyCloudStoragePath(entry.path)
+        ? "클라우드 동기화 폴더라 자동으로 정확히 계산하지 않습니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다."
+        : "빠른 추정 크기입니다.";
     case "partial":
-      return "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
+      return isLikelyCloudStoragePath(entry.path)
+        ? "클라우드 동기화 폴더의 부분 계산 결과입니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다."
+        : "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
     case "exact":
       return "정확히 계산된 크기입니다.";
     case "error":

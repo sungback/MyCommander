@@ -112,6 +112,29 @@ describe("FileItem", () => {
     expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
   });
 
+  it("explains why cloud storage folder sizes stay estimated", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "내 드라이브",
+          path: "/Users/sam/내 드라이브",
+          kind: "directory",
+          size: 2048,
+          sizeStatus: "estimated",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("~2.0 KB")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/클라우드 동기화 폴더라 자동으로 정확히 계산하지 않습니다/)
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/빠른 추정 크기입니다/)).not.toBeInTheDocument();
+  });
+
   it("labels directory size calculation errors", () => {
     render(
       <FileItem
