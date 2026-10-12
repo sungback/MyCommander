@@ -21,6 +21,35 @@ pub(super) struct ScanProgress {
     pub completed: bool,
 }
 
+/// 이 크기 이상이면서 실제 할당이 절반 미만인 파일만 sparse 파일로 본다.
+/// 작은 파일이나 일반 파일의 블록 반올림 차이로 기준이 흔들리지 않게 한다.
+#[cfg(unix)]
+const SPARSE_FILE_MIN_LEN: u64 = 1024 * 1024 * 1024;
+
+/// 디렉터리 합계에 더할 파일 크기.
+/// OrbStack/Docker 가상 디스크 같은 sparse 파일은 겉보기 크기(수 TB)가 아니라 실제 할당 크기를 쓴다.
+#[cfg(unix)]
+pub(super) fn counted_file_size(metadata: &fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+
+    let len = metadata.len();
+    if len < SPARSE_FILE_MIN_LEN {
+        return len;
+    }
+
+    let allocated = metadata.blocks().saturating_mul(512);
+    if allocated < len / 2 {
+        allocated
+    } else {
+        len
+    }
+}
+
+#[cfg(not(unix))]
+pub(super) fn counted_file_size(metadata: &fs::Metadata) -> u64 {
+    metadata.len()
+}
+
 /// 같은 inode를 가리키는 하드링크를 한 번만 집계하기 위한 추적기.
 /// conda/pnpm처럼 하드링크를 많이 쓰는 폴더가 실제보다 크게 보이는 것을 막는다.
 #[derive(Default)]
@@ -124,7 +153,7 @@ where
     let mut accumulator = ScanAccumulator::new();
 
     if metadata.is_file() {
-        accumulator.size = metadata.len();
+        accumulator.size = counted_file_size(&metadata);
         accumulator.scanned_entries = 1;
         accumulator.maybe_emit(true, &mut emit_progress);
         return Ok(accumulator.into_result());
@@ -221,7 +250,9 @@ where
 
         if metadata.is_file() {
             if accumulator.hard_links.should_count(&metadata) {
-                accumulator.size = accumulator.size.saturating_add(metadata.len());
+                accumulator.size = accumulator
+                    .size
+                    .saturating_add(counted_file_size(&metadata));
             }
         } else if should_skip_directory_traversal(&metadata) {
             continue;

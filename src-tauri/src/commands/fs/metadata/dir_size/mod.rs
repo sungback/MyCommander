@@ -97,6 +97,36 @@ mod tests {
         assert_eq!(parse_du_size_bytes("du: cannot read directory"), None);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn sparse_file_counts_allocated_size_not_apparent_size() {
+        let root = make_temp_dir("sparse-file");
+        let sparse = root.join("disk.img.raw");
+        let file = fs::File::create(&sparse).unwrap();
+        // 실제 데이터 없이 논리 크기만 4GiB로 늘린다.
+        file.set_len(4 * 1024 * 1024 * 1024).unwrap();
+        drop(file);
+        fs::write(root.join("small.txt"), [1_u8; 10]).unwrap();
+
+        let cancel = AtomicBool::new(false);
+        let scanned =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel, |_| {}).unwrap();
+        let estimate = estimate_path_size(root.to_str().unwrap(), 1, 100).unwrap();
+
+        assert!(
+            scanned.size < 1024 * 1024 * 1024,
+            "scan size {}",
+            scanned.size
+        );
+        assert!(
+            estimate.size < 1024 * 1024 * 1024,
+            "estimate size {}",
+            estimate.size
+        );
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn estimate_path_size_reads_files_within_depth_limit() {
         let root = make_temp_dir("estimate-depth");

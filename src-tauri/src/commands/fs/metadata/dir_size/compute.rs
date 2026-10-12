@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
-use super::scan::{scan_path_size_with_progress, HardLinkTracker};
+use super::scan::{counted_file_size, scan_path_size_with_progress, HardLinkTracker};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
@@ -18,7 +18,7 @@ pub(crate) fn compute_path_size(path: &str) -> Result<u64, String> {
 
     if target.is_file() {
         return fs::metadata(target)
-            .map(|metadata| metadata.len())
+            .map(|metadata| counted_file_size(&metadata))
             .map_err(|e| e.to_string());
     }
 
@@ -42,7 +42,7 @@ pub(crate) fn estimate_path_size(
     };
 
     if metadata.is_file() {
-        estimate.size = metadata.len();
+        estimate.size = counted_file_size(&metadata);
         estimate.scanned_entries = 1;
         return Ok(estimate);
     }
@@ -170,7 +170,7 @@ fn scan_estimate_dir(
 
         if metadata.is_file() {
             if hard_links.should_count(&metadata) {
-                estimate.size = estimate.size.saturating_add(metadata.len());
+                estimate.size = estimate.size.saturating_add(counted_file_size(&metadata));
             }
             continue;
         }
