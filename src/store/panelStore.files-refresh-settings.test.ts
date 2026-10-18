@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { registerPanelStoreReset, usePanelStore } from './panelStore.test-harness';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  getPendingPersistentSizeCacheUpserts,
+  registerPanelStoreReset,
+  usePanelStore,
+} from './panelStore.test-harness';
 
 registerPanelStoreReset();
 
@@ -315,6 +319,37 @@ describe("panelStore — updateEntrySize", () => {
     const entry = state.leftPanel.files.find((file) => file.name === "app");
     expect(entry?.size).toBe(4_000);
     expect(entry?.sizeStatus).toBe("exact");
+  });
+
+  it('lowers confirmed sizes to estimates in the disk cache when marking them stale', () => {
+    // 디스크 캐시 쓰기는 Tauri 런타임에서만 대기열에 들어간다. 가짜 타이머로 실제 저장은 막는다.
+    vi.useFakeTimers();
+    Object.assign(window, { __TAURI_INTERNALS__: {} });
+    try {
+      const { hydrateEntrySizesFromCache, markEntrySizesStale } = usePanelStore.getState();
+      hydrateEntrySizesFromCache([
+        { path: '/work', size: 5_000, status: 'exact', isStale: false, scannedAt: 1_000 },
+        { path: '/work/app', size: 4_000, status: 'limited', isStale: false, scannedAt: 2_000 },
+        { path: '/work/app/src', size: 300, status: 'estimated', isStale: false },
+      ]);
+
+      markEntrySizesStale(['/work/app/src/file.ts']);
+
+      const pending = getPendingPersistentSizeCacheUpserts();
+      expect(pending).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '/work', size: 5_000, status: 'estimated', scannedAt: 1_000 }),
+          expect.objectContaining({ path: '/work/app', size: 4_000, status: 'estimated', scannedAt: 2_000 }),
+        ])
+      );
+      // 이미 추정값인 폴더는 다시 쓰지 않고, 사용자가 연 것이 아니므로 최근 사용 시각도 바꾸지 않는다.
+      expect(pending.some((entry) => entry.path === '/work/app/src')).toBe(false);
+      expect(pending.every((entry) => entry.lastUsedAt === undefined)).toBe(true);
+    } finally {
+      Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("stores limited sizes and keeps them over quick estimates", () => {

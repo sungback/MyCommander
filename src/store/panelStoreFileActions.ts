@@ -13,6 +13,7 @@ import { persistPanelUpdate } from "./panelStorePersistence";
 import {
   dropPendingPersistentSizeCacheUpserts,
   queuePersistentSizeCacheDelete,
+  queuePersistentSizeCacheUpsert,
 } from "./directorySizeCachePersistence";
 import {
   panelUpdate,
@@ -515,12 +516,24 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       for (const path of collectNoiseFilteredSizeStalePaths(paths)) {
         // 이미 stale이어도 변경 시각은 남겨 진행 중인 스캔 결과가 stale을 지우지 못하게 한다.
         recordSizeChange(path);
-        if (state.sizeCache[path] === undefined || state.sizeCacheStale[path]) {
+        const cachedSize = state.sizeCache[path];
+        if (cachedSize === undefined || state.sizeCacheStale[path]) {
           continue;
         }
 
         nextStaleCache ??= { ...state.sizeCacheStale };
         nextStaleCache[path] = true;
+
+        // 다시 계산하기 전에 앱을 끄면 디스크 캐시의 정확한 값이 다음 실행에 그대로 살아나므로 추정값으로 낮춰 둔다.
+        // 계산 시각은 원래 값을 유지한다(진행 중인 스캔의 하위 폴더 결과가 이 기록에 막히지 않게).
+        if (isConfirmedSizeStatus(state.sizeStatusCache[path])) {
+          queuePersistentSizeCacheUpsert({
+            path,
+            size: cachedSize,
+            status: "estimated",
+            scannedAt: getSizeScannedAt(path) ?? Date.now(),
+          });
+        }
       }
 
       return nextStaleCache ? { sizeCacheStale: nextStaleCache } : state;

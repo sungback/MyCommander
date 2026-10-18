@@ -5,7 +5,8 @@ import {
   refreshPanelsForDirectories,
   refreshPanelsForEntryPaths,
 } from "../store/panelRefresh";
-import { collectWatchDirectories } from "../store/panelWatch";
+import { collectWatchDirectories, updateWatchRoots } from "../store/panelWatch";
+import { expireSizeVerificationOutside } from "../store/panelStoreFileHelpers";
 import { useGitStatusStore } from "../store/gitStatusStore";
 import { showTransientToast } from "../store/toastStore";
 import { useFileSystem } from "./useFileSystem";
@@ -28,22 +29,28 @@ export const useDirectoryWatch = () => {
   const fs = useFileSystem();
   const leftPanel = usePanelStore((state) => state.leftPanel);
   const rightPanel = usePanelStore((state) => state.rightPanel);
-  const watchedDirectories = useMemo(
+  const panelDirectories = useMemo(
     () => collectWatchDirectories([leftPanel, rightPanel]),
     [leftPanel, rightPanel]
   );
-  const watchSignature = useMemo(() => buildWatchSignature(watchedDirectories), [watchedDirectories]);
-  const lastSyncedSignatureRef = useRef("");
+  const panelSignature = useMemo(() => buildWatchSignature(panelDirectories), [panelDirectories]);
+  const lastPanelSignatureRef = useRef<string | null>(null);
+  // 패널이 떠난 최근 경로도 이어서 감시한다(그 안의 폴더 크기를 계속 믿을 수 있게).
+  const watchRootsRef = useRef<string[]>([]);
 
   useEffect(() => {
-    if (watchSignature === lastSyncedSignatureRef.current) {
+    if (panelSignature === lastPanelSignatureRef.current) {
       return;
     }
 
-    lastSyncedSignatureRef.current = watchSignature;
+    lastPanelSignatureRef.current = panelSignature;
+    const watchRoots = updateWatchRoots(watchRootsRef.current, panelDirectories);
+    watchRootsRef.current = watchRoots;
+    // 감시 범위에서 빠진 경로의 크기는 그동안의 변경을 알 수 없으므로 다시 보일 때 재검증한다.
+    expireSizeVerificationOutside(watchRoots);
 
     let cancelled = false;
-    void fs.syncWatchedDirectories(watchedDirectories).catch((error) => {
+    void fs.syncWatchedDirectories(watchRoots).catch((error) => {
       if (!cancelled) {
         console.error("Failed to sync watched directories:", error);
         showTransientToast("폴더 변경 감시를 갱신하지 못했습니다.", {
@@ -56,7 +63,7 @@ export const useDirectoryWatch = () => {
     return () => {
       cancelled = true;
     };
-  }, [fs, watchSignature, watchedDirectories]);
+  }, [fs, panelSignature, panelDirectories]);
 
   useEffect(() => {
     let isMounted = true;

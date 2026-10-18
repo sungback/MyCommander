@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PanelState } from "../types/file";
-import { collectWatchDirectories } from "./panelWatch";
+import { collectWatchDirectories, updateWatchRoots } from "./panelWatch";
 
 const createPanelState = (id: "left" | "right", paths: string[]): PanelState => {
   const tabs = paths.map((currentPath, index) => ({
@@ -81,5 +81,36 @@ describe("collectWatchDirectories", () => {
     const watched = collectWatchDirectories([leftPanel, rightPanel]);
 
     expect(watched).toEqual(["/Users/back/Library/CloudStorage/Dropbox"]);
+  });
+});
+
+describe("updateWatchRoots", () => {
+  it("keeps recently left paths watched after the current panel paths", () => {
+    const roots = updateWatchRoots(["/work/a", "/data"], ["/work/b"]);
+
+    expect(roots).toEqual(["/work/b", "/work/a", "/data"]);
+  });
+
+  it("drops paths already covered by a current or lingering parent", () => {
+    // ~ → ~/a → ~/a/b 순서로 들어간 경우: ~가 하위 경로를 모두 덮는다.
+    const roots = updateWatchRoots(["/home/me/a", "/home/me"], ["/home/me/a/b"]);
+
+    expect(roots).toEqual(["/home/me/a/b", "/home/me"]);
+  });
+
+  it("does not keep a previous path that is the current path or inside it", () => {
+    expect(updateWatchRoots(["/work", "/work/app"], ["/work"])).toEqual(["/work"]);
+  });
+
+  it("keeps at most the given number of lingering paths, most recent first", () => {
+    const previous = ["/p1", "/p2", "/p3", "/p4"];
+
+    expect(updateWatchRoots(previous, ["/now"], 2)).toEqual(["/now", "/p1", "/p2"]);
+  });
+
+  it("frees slots when an older parent covers newer lingering children", () => {
+    const roots = updateWatchRoots(["/root/a", "/root/b", "/root"], ["/now"], 2);
+
+    expect(roots).toEqual(["/now", "/root"]);
   });
 });

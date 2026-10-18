@@ -1,5 +1,6 @@
 import { queuePersistentSizeCacheUpsert } from "./directorySizeCachePersistence";
 import { normalizePathKey } from "../utils/panelHelpers";
+import { isSameOrNestedPath } from "../utils/path";
 import type { ConfirmedDirectorySizeStatus, DirectorySizeStatus } from "../types/file";
 
 type StableDirectorySizeStatus = Extract<
@@ -83,6 +84,18 @@ export const markSizeVerifiedThisSession = (path: string) => {
 
 export const isSizeVerifiedThisSession = (path: string) =>
   sessionVerifiedSizePaths.has(normalizePathKey(path));
+
+/**
+ * 감시 범위(`watchRoots`, 재귀 감시) 밖으로 벗어난 경로의 "이번 세션에 확인함" 표시를 지운다.
+ * 감시가 끊긴 동안의 외부 변경은 알 수 없으므로, 다시 보일 때 한 번 재검증하게 한다.
+ */
+export const expireSizeVerificationOutside = (watchRoots: string[]) => {
+  for (const path of sessionVerifiedSizePaths) {
+    if (!watchRoots.some((root) => isSameOrNestedPath(root, path))) {
+      sessionVerifiedSizePaths.delete(path);
+    }
+  }
+};
 
 export const __resetSessionVerifiedSizesForTests = () => {
   sessionVerifiedSizePaths.clear();

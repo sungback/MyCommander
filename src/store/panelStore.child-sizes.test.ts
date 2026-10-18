@@ -5,8 +5,10 @@ import {
   usePanelStore,
 } from './panelStore.test-harness';
 import {
+  expireSizeVerificationOutside,
   getSizeScannedAt,
   isSizeVerifiedThisSession,
+  markSizeVerifiedThisSession,
   recordSizeChange,
   recordSizeScannedAt,
 } from './panelStoreFileHelpers';
@@ -128,5 +130,30 @@ describe('panelStore — applyScannedChildSizes', () => {
       vi.clearAllTimers();
       vi.useRealTimers();
     }
+  });
+});
+
+describe('expireSizeVerificationOutside', () => {
+  it('keeps verification only for paths inside the watched roots', () => {
+    markSizeVerifiedThisSession('/work/a');
+    markSizeVerifiedThisSession('/work/a/b');
+    markSizeVerifiedThisSession('/workspace');
+    markSizeVerifiedThisSession('/data/x');
+
+    expireSizeVerificationOutside(['/work', '/data/x']);
+
+    expect(isSizeVerifiedThisSession('/work/a')).toBe(true);
+    expect(isSizeVerifiedThisSession('/work/a/b')).toBe(true);
+    // 이름 앞부분만 같은 형제 경로는 감시 범위가 아니다.
+    expect(isSizeVerifiedThisSession('/workspace')).toBe(false);
+    expect(isSizeVerifiedThisSession('/data/x')).toBe(true);
+  });
+
+  it('expires every verification when nothing is watched', () => {
+    markSizeVerifiedThisSession('/work/a');
+
+    expireSizeVerificationOutside([]);
+
+    expect(isSizeVerifiedThisSession('/work/a')).toBe(false);
   });
 });
