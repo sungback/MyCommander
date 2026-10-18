@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod bench;
 mod compute;
 mod scan;
 mod shared_scan;
