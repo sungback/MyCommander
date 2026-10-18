@@ -116,6 +116,27 @@ describe("FileItem", () => {
     expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
   });
 
+  it("hides zero-size quick estimates instead of showing ~0 B", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "Users",
+          path: "/Users",
+          kind: "directory",
+          size: 0,
+          sizeStatus: "estimated",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("~0 B")).not.toBeInTheDocument();
+    expect(screen.getByText("-")).toBeInTheDocument();
+    expect(screen.getByLabelText(/빠른 추정으로는 크기를 알 수 없습니다/)).toBeInTheDocument();
+  });
+
   it("marks limited directory sizes as lower bounds", () => {
     render(
       <FileItem

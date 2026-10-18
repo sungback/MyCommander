@@ -29,9 +29,11 @@ const getEntrySizeText = (entry: FileEntry) => {
         ? "calc..."
         : `${formatSize(entry.size)}+`;
     case "estimated":
-      return entry.size === undefined || entry.size === null
-        ? "..."
-        : `~${formatSize(entry.size)}`;
+      if (entry.size === undefined || entry.size === null) {
+        return "...";
+      }
+      // 추정에서 하위 폴더를 세지 못해 0이 나온 값은 빈 폴더로 오해하지 않게 숨긴다.
+      return entry.size === 0 ? "-" : `~${formatSize(entry.size)}`;
     case "partial":
       return entry.size === undefined || entry.size === null
         ? "-"
@@ -82,6 +84,9 @@ const getEntrySizeBaseTitle = (entry: FileEntry) => {
     case "calculating":
       return "정확한 크기를 계산하는 중입니다.";
     case "estimated":
+      if (entry.size === 0) {
+        return "빠른 추정으로는 크기를 알 수 없습니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다.";
+      }
       return isLikelyCloudStoragePath(entry.path)
         ? "클라우드 동기화 폴더라 자동으로 정확히 계산하지 않습니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다."
         : "빠른 추정 크기입니다.";

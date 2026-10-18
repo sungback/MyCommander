@@ -114,6 +114,23 @@ impl VolumeBoundary {
     }
 }
 
+/// macOS 데이터 볼륨이 firmlink로 다시 보이는 경로.
+/// `/`와 장치 번호가 같아 `VolumeBoundary`로 걸러지지 않으므로, 하위로 내려가면
+/// `/Users`·`/Applications` 등 데이터 볼륨 전체가 `/System` 합계에 더해지고 `/`에서는 두 번 집계된다.
+#[cfg(target_os = "macos")]
+const MACOS_DATA_VOLUME_MIRROR: &str = "/System/Volumes/Data";
+
+/// 스캔 도중 만난 디렉터리가 데이터 볼륨의 firmlink 경로면 true. 스캔 루트 자체에는 적용하지 않는다.
+#[cfg(target_os = "macos")]
+pub(super) fn is_data_volume_mirror(path: &Path) -> bool {
+    path == Path::new(MACOS_DATA_VOLUME_MIRROR)
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(super) fn is_data_volume_mirror(_path: &Path) -> bool {
+    false
+}
+
 struct ScanAccumulator {
     hard_links: HardLinkTracker,
     volume: VolumeBoundary,
@@ -295,6 +312,7 @@ where
             }
         } else if should_skip_directory_traversal(&metadata)
             || !accumulator.volume.contains(&metadata)
+            || is_data_volume_mirror(&entry.path())
         {
             continue;
         } else if metadata.is_dir() {

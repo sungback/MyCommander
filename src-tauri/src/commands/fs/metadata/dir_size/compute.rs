@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use super::scan::{counted_file_size, HardLinkTracker, VolumeBoundary};
+use super::scan::{counted_file_size, is_data_volume_mirror, HardLinkTracker, VolumeBoundary};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
@@ -128,7 +128,7 @@ fn scan_estimate_dir(
             continue;
         }
 
-        if !volume.contains(&metadata) {
+        if !volume.contains(&metadata) || is_data_volume_mirror(&entry.path()) {
             continue;
         }
 

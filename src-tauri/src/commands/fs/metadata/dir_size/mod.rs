@@ -65,9 +65,9 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 #[cfg(test)]
 mod tests {
     use super::compute::estimate_path_size;
-    use super::scan::scan_path_size_with_progress;
     #[cfg(unix)]
     use super::scan::VolumeBoundary;
+    use super::scan::{is_data_volume_mirror, scan_path_size_with_progress};
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
@@ -367,6 +367,32 @@ mod tests {
         assert!(result.started_at_ms >= before_ms && result.started_at_ms <= unix_ms());
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn data_volume_mirror_is_detected_only_on_macos() {
+        assert_eq!(
+            is_data_volume_mirror(std::path::Path::new("/System/Volumes/Data")),
+            cfg!(target_os = "macos")
+        );
+        assert!(!is_data_volume_mirror(std::path::Path::new(
+            "/System/Volumes/Data/Users"
+        )));
+        assert!(!is_data_volume_mirror(std::path::Path::new("/System")));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn estimate_path_size_does_not_descend_into_data_volume_mirror() {
+        // /System/Volumes 아래에는 다른 볼륨(Preboot, VM 등)과 데이터 볼륨 firmlink만 있다.
+        // firmlink로 내려가면 데이터 볼륨의 파일 수천 개를 읽어 항목 한도에 걸린다.
+        let estimate = estimate_path_size("/System/Volumes", 2, 5_000).unwrap();
+
+        assert!(
+            estimate.scanned_entries < 100,
+            "{}",
+            estimate.scanned_entries
+        );
     }
 
     #[cfg(unix)]
