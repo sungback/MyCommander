@@ -68,7 +68,10 @@
 - **Git 상태 표시 (`useGitStatus`):** 경로별 Git 상태를 `gitStatusStore`에 캐싱하고 패널 파일 리스트에 M/A/D/? 마킹으로 표시합니다. 이전에 실패한 경로는 `hasFreshFailure` 체크로 재시도 없이 null을 반환합니다(Windows noisy probe 억제).
 - **잡 큐 이벤트 연동 (`useJobQueue`):** 앱 시작 시 진행 중/실패 잡을 복원하여 ProgressDialog를 자동 표시합니다. `job-updated` Tauri 이벤트를 구독하고, 잡 완료 시 영향 받은 디렉터리의 패널을 자동 갱신합니다. delete 잡은 삭제된 경로를 패널에서 제거한 뒤 갱신합니다.
 - **디렉터리 크기 계산:** `useBackgroundDirSizes`가 디렉터리 크기를 빠르게 추정하고, 일반 로컬 경로는 백그라운드 정확 계산으로 보강합니다. CloudStorage/Windows `AppData` 같은 경로는 자동 정확 계산을 피합니다. 수동 계산은 `manualDirectorySizeScan.ts`가 진행 이벤트와 취소를 관리합니다.
-- **디렉터리 크기 캐시:** `directorySizeCachePersistence.ts`와 `usePersistentSizeCache`가 안정적인 크기 결과를 localStorage에 보관/복원합니다. 오래된 exact 값은 estimated/stale 상태로 되돌려 재검증 대상으로 취급합니다.
+- **디렉터리 크기 기준:** 모든 폴더(`.app` 포함)는 같은 스캐너로 겉보기 크기를 셉니다. 1GiB 이상이면서 실제 할당이 절반 미만인 sparse 파일만 할당 크기로 세고, 하드링크는 `(dev, ino)`로 한 번만 셉니다. 심볼릭 링크·reparse point, 루트와 장치 번호가 다른 볼륨, macOS 데이터 볼륨 firmlink(`/System/Volumes/Data`)로는 내려가지 않습니다.
+- **크기 상태:** `exact`(정확), `limited`(권한이 없어 못 읽은 항목을 뺀 하한값, "≥"), `partial`(읽기 오류 등으로 미완료, "+"), `estimated`(빠른 추정, "~"; 0이면 "-")가 있습니다. 권한 오류는 `partial`이 아니라 `limited`로 취급합니다. `partial`은 재스캔 대상이라 Windows `C:\Users`에서 "+"가 풀리지 않던 문제가 있었기 때문입니다. `limited`의 TTL·재검증 규칙은 `exact`와 같습니다.
+- **크기 계산 공유:** `scan_dir_size`는 진행 중인 계산을 `scan_id`가 아니라 경로 기준으로 공유합니다(`dir_size/shared_scan.rs`). 마지막 요청자가 취소해야 계산이 멈추고, 결과의 `startedAtMs`로 늦게 합류한 요청도 스캔 도중의 변경을 stale로 판단합니다. 정보 다이얼로그도 같은 경로를 씁니다.
+- **디렉터리 크기 캐시:** Rust가 앱 데이터 폴더의 `size-cache-v1.json`에 안정적인 크기 결과를 보관하고(`size_cache.rs`, 최대 10,000개, TTL: exact·limited 7일, estimated·partial 1일), `directorySizeCachePersistence.ts`와 `usePersistentSizeCache`가 불러오고 저장합니다. 오래된 exact·limited 값은 estimated/stale 상태로 되돌려 재검증 대상으로 취급합니다.
 - **Command Palette:** `Cmd/Ctrl+Shift+P`로 열고 `src/components/dialogs/palette/commandPaletteActions.ts`에서 현재 패널 상태 기반 명령 목록과 비활성 사유를 계산합니다. 실행은 `CommandPalette.tsx`에서 기존 dialog/store/Tauri facade를 호출합니다. 마지막 이름 변경/이동 Undo는 `fileOperationUndoStore.ts`에 세션 단위로 보관하고 Palette 명령에서 실행합니다.
 - **현재 폴더 빠른 필터:** 각 `FilePanel`은 패널 로컬 상태로 필터 문자열을 보관하고 `quickFilter.ts` 헬퍼로 현재 폴더 파일 목록만 좁힙니다. `/` 키는 활성 패널의 필터 입력으로 포커스를 이동하며, 필터 적용 중 숨겨진 선택 항목은 안전하게 해제합니다.
 - **최근 위치 / 자주 쓰는 위치:** `locationHistoryStore.ts`가 패널 경로 이동을 localStorage에 기록합니다. 즐겨찾기 패널은 최근/자주 쓰는 위치 섹션을 표시하고, Command Palette는 위치 항목을 검색 가능한 명령으로 추가합니다.
