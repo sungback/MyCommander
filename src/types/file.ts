@@ -7,8 +7,12 @@ export type DirectorySizeStatus =
   | "estimated"
   | "calculating"
   | "exact"
+  | "limited"
   | "partial"
   | "error";
+
+// 끝까지 계산이 끝난 크기 상태. limited는 권한이 없어 읽지 못한 항목을 뺀 하한값이다.
+export type ConfirmedDirectorySizeStatus = Extract<DirectorySizeStatus, "exact" | "limited">;
 
 export interface FileEntry {
   name: string;

@@ -86,6 +86,7 @@ describe("useBackgroundDirSizes", () => {
       isPartial: false,
       scannedEntries: 2,
       errorCount: 0,
+      inaccessibleCount: 0,
     });
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -352,7 +353,8 @@ describe("useBackgroundDirSizes", () => {
         "left",
         "/Users/sam/Projects",
         2048,
-        expect.any(Number)
+        expect.any(Number),
+        "exact"
       )
     );
   });
@@ -406,7 +408,8 @@ describe("useBackgroundDirSizes", () => {
         "left",
         "/Applications/Example.app",
         2048,
-        expect.any(Number)
+        expect.any(Number),
+        "exact"
       )
     );
   });
@@ -460,8 +463,86 @@ describe("useBackgroundDirSizes", () => {
         "left",
         "/Users/back/Downloads",
         2048,
-        expect.any(Number)
+        expect.any(Number),
+        "exact"
       )
+    );
+  });
+
+  it("uses the shared scan start time when it began before this request", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 2,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1_000,
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/sam/Projects",
+        2048,
+        1_000,
+        "exact"
+      )
+    );
+  });
+
+  it("stores exact scans with unreadable entries as limited sizes", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: false,
+      scannedEntries: 8,
+      errorCount: 0,
+      inaccessibleCount: 2,
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/sam/Projects",
+        4096,
+        expect.any(Number),
+        "limited"
+      )
+    );
+    expect(props.updateEntrySizeEstimate).not.toHaveBeenCalledWith(
+      "left",
+      "/Users/sam/Projects",
+      4096,
+      "partial"
     );
   });
 

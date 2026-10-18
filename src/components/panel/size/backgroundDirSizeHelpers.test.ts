@@ -40,6 +40,21 @@ describe("backgroundDirSizeHelpers", () => {
     expect(shouldQueueExactBackgroundScan(entry, false)).toBe(false);
   });
 
+  it("revalidates limited sizes once per session without requeueing them", () => {
+    const entry: FileEntry = {
+      ...makeDirectory("/Users/sam/Library"),
+      size: 2048,
+      sizeStatus: "limited",
+    };
+
+    expect(shouldQueueExactBackgroundScan(entry, false)).toBe(true);
+
+    markSizeVerifiedThisSession(entry.path);
+
+    // partial과 달리 다시 계산해도 같은 결과이므로 같은 세션에서 반복 스캔하지 않는다.
+    expect(shouldQueueExactBackgroundScan(entry, false)).toBe(false);
+  });
+
   it("does not revalidate exact sizes on cloud storage paths", () => {
     expect(
       shouldQueueExactBackgroundScan(

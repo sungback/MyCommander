@@ -131,9 +131,10 @@ export const ContextMenu: React.FC = () => {
                       tone: "warning",
                     });
                   } else if (typeof result.size === "number") {
+                    const prefix = result.isLimited ? "≥" : "";
                     const suffix = result.isPartial ? "+" : "";
                     showTransientToast(
-                      `${targetEntry.name}: ${formatSize(result.size)}${suffix}`
+                      `${targetEntry.name}: ${prefix}${formatSize(result.size)}${suffix}`
                     );
                   }
                 } catch (error) {

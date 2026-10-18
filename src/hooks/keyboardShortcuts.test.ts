@@ -156,7 +156,7 @@ describe('calculatePanelDirectories', () => {
       updateEntrySize,
     });
 
-    expect(updateEntrySize).toHaveBeenCalledWith('left', '/home/docs', 512);
+    expect(updateEntrySize).toHaveBeenCalledWith('left', '/home/docs', 512, undefined, 'exact');
   });
 
   it('marks directory entries as calculating before exact size work', async () => {

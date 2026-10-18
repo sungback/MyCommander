@@ -1,5 +1,8 @@
 import type { FileEntry } from "../../../types/file";
-import { isSizeVerifiedThisSession } from "../../../store/panelStoreFileHelpers";
+import {
+  isConfirmedSizeStatus,
+  isSizeVerifiedThisSession,
+} from "../../../store/panelStoreFileHelpers";
 import { getPathBelowVerifiedLocalRoot } from "./storageClassification";
 
 export const MAX_BACKGROUND_DIR_SIZE_WORKERS = 2;
@@ -157,7 +160,7 @@ export const shouldQueueExactBackgroundScan = (
     return false;
   }
 
-  if (entry.sizeStatus === "exact" && !isSizeVerifiedThisSession(entry.path)) {
+  if (isConfirmedSizeStatus(entry.sizeStatus) && !isSizeVerifiedThisSession(entry.path)) {
     // 영속 캐시에서 복원된 exact 값은 세션당 한 번 백그라운드로 재검증한다.
     return true;
   }

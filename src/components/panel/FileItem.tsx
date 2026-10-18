@@ -40,6 +40,10 @@ const getEntrySizeText = (entry: FileEntry) => {
       return entry.size === undefined || entry.size === null
         ? "-"
         : formatSize(entry.size);
+    case "limited":
+      return entry.size === undefined || entry.size === null
+        ? "-"
+        : `≥${formatSize(entry.size)}`;
     case "error":
     case "unknown":
       return "-";
@@ -59,6 +63,7 @@ const getEntrySizeTitle = (entry: FileEntry) => {
   // 값이 있는 상태에서만 계산 시각을 덧붙인다(계산 중이거나 실패한 경우는 제외).
   const hasValue =
     entry.sizeStatus === "exact" ||
+    entry.sizeStatus === "limited" ||
     entry.sizeStatus === "estimated" ||
     entry.sizeStatus === "partial";
   const elapsed = hasValue ? formatElapsedSince(getSizeScannedAt(entry.path)) : "";
@@ -86,6 +91,8 @@ const getEntrySizeBaseTitle = (entry: FileEntry) => {
         : "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
     case "exact":
       return "정확히 계산된 크기입니다.";
+    case "limited":
+      return "접근 권한이 없는 항목을 뺀 크기입니다. 실제 크기는 이보다 클 수 있습니다.";
     case "error":
       return "크기를 계산하지 못했습니다.";
     case "unknown":

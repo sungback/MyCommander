@@ -3,9 +3,22 @@ import type {
   DirectorySizeProgressEvent,
   DirectorySizeScanResult,
 } from "./tauriCommands/fileCommands";
-import type { DirectorySizeStatus, PanelId } from "../types/file";
+import type {
+  ConfirmedDirectorySizeStatus,
+  DirectorySizeStatus,
+  PanelId,
+} from "../types/file";
 
 type PersistentEstimateStatus = Extract<DirectorySizeStatus, "estimated" | "partial">;
+
+// 정확 계산 결과를 패널에 반영한다. status를 생략하면 exact로 저장한다.
+export type UpdateEntrySizeHandler = (
+  panelId: PanelId,
+  path: string,
+  size: number,
+  scanStartedAt?: number,
+  status?: ConfirmedDirectorySizeStatus
+) => void;
 
 interface ManualDirectorySizeScanCallbacks {
   setEntrySizeStatus: (
@@ -13,7 +26,7 @@ interface ManualDirectorySizeScanCallbacks {
     path: string,
     status: DirectorySizeStatus
   ) => void;
-  updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
+  updateEntrySize: UpdateEntrySizeHandler;
   updateEntrySizeEstimate: (
     panelId: PanelId,
     path: string,
@@ -35,6 +48,8 @@ export interface ManualDirectorySizeScanOutcome {
   status: "completed" | "cancelled";
   size?: number;
   isPartial?: boolean;
+  // 권한이 없어 읽지 못한 항목이 있어 size가 하한값이면 true
+  isLimited?: boolean;
 }
 
 interface ActiveManualDirectorySizeScan extends ManualDirectorySizeScanCallbacks {
@@ -178,16 +193,24 @@ export const scanDirectorySizeWithProgress = async ({
   try {
     const result = await scanDirSize(path, scanId);
 
+    const isLimited = !result.isPartial && result.inaccessibleCount > 0;
     if (result.isPartial) {
       updateEntrySizeEstimate(panelId, path, result.size, "partial");
     } else {
-      updateEntrySize(panelId, path, result.size);
+      updateEntrySize(
+        panelId,
+        path,
+        result.size,
+        undefined,
+        isLimited ? "limited" : "exact"
+      );
     }
 
     return {
       status: "completed",
       size: result.size,
       isPartial: result.isPartial,
+      isLimited,
     };
   } catch (error) {
     if (active.cancelRequested || isCancellationError(error)) {

@@ -280,6 +280,8 @@ describe("fileCommands", () => {
         isPartial: false,
         scannedEntries: 30,
         errorCount: 0,
+        inaccessibleCount: 3,
+        startedAtMs: 1_700_000_000_000,
       });
 
       const result = await fileCommands.scanDirSize("/some/dir", "scan-1");
@@ -293,6 +295,8 @@ describe("fileCommands", () => {
         isPartial: false,
         scannedEntries: 30,
         errorCount: 0,
+        inaccessibleCount: 3,
+        startedAtMs: 1_700_000_000_000,
       });
     });
   });

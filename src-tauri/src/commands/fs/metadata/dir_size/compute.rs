@@ -2,7 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
-use super::scan::{counted_file_size, scan_path_size_with_progress, HardLinkTracker};
+use super::scan::{
+    counted_file_size, scan_path_size_with_progress, HardLinkTracker, VolumeBoundary,
+};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
@@ -11,15 +13,17 @@ const MAX_ESTIMATE_DEPTH: usize = 4;
 const MAX_ESTIMATE_ENTRIES: usize = 5_000;
 
 pub(crate) fn compute_path_size(path: &str) -> Result<u64, String> {
-    let target = Path::new(path);
-    if !target.exists() {
-        return Err(format!("{path} does not exist"));
-    }
+    // 링크를 따라가지 않는다. 심볼릭 링크 자체는 스캐너와 같은 기준으로 크기 0으로 본다.
+    let metadata = fs::symlink_metadata(path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            format!("{path} does not exist")
+        } else {
+            e.to_string()
+        }
+    })?;
 
-    if target.is_file() {
-        return fs::metadata(target)
-            .map(|metadata| counted_file_size(&metadata))
-            .map_err(|e| e.to_string());
+    if metadata.is_file() {
+        return Ok(counted_file_size(&metadata));
     }
 
     // 목록 표시와 같은 기준(겉보기 크기, 하드링크 한 번만 집계)을 쓰도록 스캔 결과를 사용한다.
@@ -58,6 +62,7 @@ pub(crate) fn estimate_path_size(
     }
 
     let mut hard_links = HardLinkTracker::default();
+    let volume = VolumeBoundary::new(&metadata);
     scan_estimate_dir(
         target,
         0,
@@ -65,6 +70,7 @@ pub(crate) fn estimate_path_size(
         max_entries,
         &mut estimate,
         &mut hard_links,
+        &volume,
     );
     Ok(estimate)
 }
@@ -86,39 +92,6 @@ fn is_windows_reparse_point(_metadata: &fs::Metadata) -> bool {
     false
 }
 
-#[cfg(target_os = "macos")]
-pub(super) fn get_dir_size_with_du(path: &str) -> Result<u64, String> {
-    use std::process::Command;
-
-    let output = Command::new("du")
-        .arg("-sk")
-        .arg(path)
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed_size = parse_du_size_bytes(&stdout);
-    if let Some(size) = parsed_size {
-        return Ok(size);
-    }
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-
-    Err("Failed to parse `du` output".to_string())
-}
-
-#[cfg(target_os = "macos")]
-pub(super) fn parse_du_size_bytes(stdout: &str) -> Option<u64> {
-    stdout
-        .split_whitespace()
-        .next()?
-        .parse::<u64>()
-        .ok()
-        .map(|size_kb| size_kb.saturating_mul(1024))
-}
-
 fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
     let cancel_flag = AtomicBool::new(false);
     scan_path_size_with_progress(path, &cancel_flag, |_| {}).map(|result| result.size)
@@ -131,6 +104,7 @@ fn scan_estimate_dir(
     max_entries: usize,
     estimate: &mut DirectorySizeEstimate,
     hard_links: &mut HardLinkTracker,
+    volume: &VolumeBoundary,
 ) {
     if estimate.scanned_entries >= max_entries {
         estimate.is_partial = true;
@@ -180,6 +154,10 @@ fn scan_estimate_dir(
             continue;
         }
 
+        if !volume.contains(&metadata) {
+            continue;
+        }
+
         if metadata.is_dir() {
             if depth >= max_depth {
                 estimate.is_partial = true;
@@ -193,6 +171,7 @@ fn scan_estimate_dir(
                 max_entries,
                 estimate,
                 hard_links,
+                volume,
             );
         }
     }

@@ -1,4 +1,5 @@
 import type {
+  ConfirmedDirectorySizeStatus,
   FileEntry,
   DirectorySizeStatus,
   PanelId,
@@ -41,11 +42,13 @@ export interface AppState {
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: SortField) => void;
   // scanStartedAt: 정확 스캔 시작 시각. 스캔 중 변경이 감지됐으면 완료 후에도 stale을 유지한다.
+  // status: 권한이 없어 읽지 못한 항목이 있으면 "limited"(하한값), 없으면 "exact"(기본값).
   updateEntrySize: (
     panel: PanelId,
     path: string,
     size: number,
-    scanStartedAt?: number
+    scanStartedAt?: number,
+    status?: ConfirmedDirectorySizeStatus
   ) => void;
   updateEntrySizeProgress: (
     panel: PanelId,
@@ -67,7 +70,7 @@ export interface AppState {
     entries: Array<{
       path: string;
       size: number;
-      status: Extract<DirectorySizeStatus, "exact" | "estimated" | "partial">;
+      status: Extract<DirectorySizeStatus, "exact" | "limited" | "estimated" | "partial">;
       isStale: boolean;
       scannedAt?: number;
     }>

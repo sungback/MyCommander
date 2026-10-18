@@ -6,6 +6,7 @@ import type { DirectorySizeStatus, PanelId, ViewMode } from "../types/file";
 import type { DirectorySizeScanResult } from "./tauriCommands/fileCommands";
 import { showTransientStatusMessage, type useAppCommands } from "./useAppCommands";
 import { calculatePanelDirectories } from "./calculatePanelDirectories";
+import type { UpdateEntrySizeHandler } from "./manualDirectorySizeScan";
 
 export type { DirectorySizeCalculationResult } from "./calculatePanelDirectories";
 
@@ -45,7 +46,7 @@ export interface KeyboardHandlerDependencies
     path: string,
     status: DirectorySizeStatus
   ) => void;
-  updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
+  updateEntrySize: UpdateEntrySizeHandler;
   updateEntrySizeEstimate: (
     panelId: PanelId,
     path: string,

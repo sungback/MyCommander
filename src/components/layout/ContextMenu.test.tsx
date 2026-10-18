@@ -358,7 +358,9 @@ describe("ContextMenu", () => {
     expect(mockUpdateEntrySize).toHaveBeenCalledWith(
       "left",
       "/home/user/Documents",
-      42
+      42,
+      undefined,
+      "exact"
     );
     expect(mockShowTransientToast).toHaveBeenCalledWith("Documents: 42 B");
     expect(mockCloseContextMenu).toHaveBeenCalled();

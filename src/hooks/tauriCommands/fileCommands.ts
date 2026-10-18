@@ -5,7 +5,7 @@ import type { SqliteDatabasePreview } from "../../types/sqlitePreview";
 
 export type PersistentDirectorySizeStatus = Extract<
   DirectorySizeStatus,
-  "exact" | "estimated" | "partial"
+  "exact" | "limited" | "estimated" | "partial"
 >;
 
 // provider: 파일 제공자 폴더, local: 일반 로컬 폴더, unknown: 판단 불가
@@ -22,6 +22,10 @@ export interface DirectorySizeScanResult {
   isPartial: boolean;
   scannedEntries: number;
   errorCount: number;
+  // 권한이 없어 읽지 못한 항목 수. 0보다 크면 size는 하한값이다.
+  inaccessibleCount: number;
+  // 스캔을 실제로 시작한 시각(Unix ms). 같은 경로의 진행 중인 스캔에 합류한 요청도 이 값을 받는다.
+  startedAtMs: number;
 }
 
 export interface DirectorySizeProgressEvent {
@@ -61,6 +65,8 @@ interface DirectorySizeScanResponse {
   isPartial: boolean;
   scannedEntries: number;
   errorCount: number;
+  inaccessibleCount: number;
+  startedAtMs: number;
 }
 
 interface PersistentDirectorySizeCacheLoadResponse {
@@ -207,6 +213,8 @@ export const fileCommands = {
       isPartial: result.isPartial,
       scannedEntries: result.scannedEntries,
       errorCount: result.errorCount,
+      inaccessibleCount: result.inaccessibleCount,
+      startedAtMs: result.startedAtMs,
     };
   },
 

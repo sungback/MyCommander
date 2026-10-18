@@ -82,12 +82,43 @@ describe("manualDirectorySizeScan", () => {
     expect(args.updateEntrySize).toHaveBeenCalledWith(
       "left",
       "/cloud/My Drive",
-      2048
+      2048,
+      undefined,
+      "exact"
     );
     expect(result).toEqual({
       status: "completed",
       size: 2048,
       isPartial: false,
+      isLimited: false,
+    });
+  });
+
+  it("stores a lower-bound size when some entries were not readable", async () => {
+    const args = makeArgs({
+      scanDirSize: vi.fn().mockResolvedValue({
+        size: 4096,
+        isPartial: false,
+        scannedEntries: 5,
+        errorCount: 0,
+        inaccessibleCount: 2,
+      }),
+    });
+
+    const result = await scanDirectorySizeWithProgress(args);
+
+    expect(args.updateEntrySize).toHaveBeenCalledWith(
+      "left",
+      "/cloud/My Drive",
+      4096,
+      undefined,
+      "limited"
+    );
+    expect(result).toEqual({
+      status: "completed",
+      size: 4096,
+      isPartial: false,
+      isLimited: true,
     });
   });
 

@@ -22,6 +22,7 @@ import {
 import { normalizePathKey } from "../utils/panelHelpers";
 import type { DirectorySizeStatus } from "../types/file";
 import {
+  isConfirmedSizeStatus,
   shouldCacheSizeStatus,
   toHydratedStatus,
   queueStableSizeCacheWrite,
@@ -72,8 +73,8 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
-  updateEntrySize: (_panel, path, size, scanStartedAt) => {
-    queueStableSizeCacheWrite(path, size, "exact");
+  updateEntrySize: (_panel, path, size, scanStartedAt, status = "exact") => {
+    queueStableSizeCacheWrite(path, size, status);
     markSizeVerifiedThisSession(path);
 
     return set((state) => {
@@ -82,7 +83,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         state.rightPanel,
         path,
         size,
-        "exact"
+        status
       );
       const cachedSize = state.sizeCache[nextPanels.normalizedPath];
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
@@ -96,12 +97,15 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         takeSizeBaseline(path) ??
         (cachedSize === undefined
           ? undefined
-          : { size: cachedSize, wasExact: cachedStatus === "exact" || Boolean(cachedStale) });
+          : {
+              size: cachedSize,
+              wasExact: isConfirmedSizeStatus(cachedStatus) || Boolean(cachedStale),
+            });
       const staleAncestors =
         baseline?.wasExact && baseline.size !== size
           ? collectAncestorPaths(path).filter(
               (ancestor) =>
-                state.sizeStatusCache[ancestor] === "exact" &&
+                isConfirmedSizeStatus(state.sizeStatusCache[ancestor]) &&
                 state.sizeCache[ancestor] !== undefined
             )
           : [];
@@ -109,7 +113,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       if (
         staleAncestors.length === 0 &&
         cachedSize === size &&
-        cachedStatus === "exact" &&
+        cachedStatus === status &&
         !cachedStale &&
         !changedDuringScan &&
         nextPanels.leftPanel === state.leftPanel &&
@@ -122,7 +126,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       let rightPanel = nextPanels.rightPanel;
       const nextSizeStatusCache: Record<string, DirectorySizeStatus> = {
         ...state.sizeStatusCache,
-        [nextPanels.normalizedPath]: "exact",
+        [nextPanels.normalizedPath]: status,
       };
       const nextSizeCacheStale = {
         ...state.sizeCacheStale,
@@ -174,11 +178,12 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
     return set((state) => {
       const key = normalizePathKey(path);
       const existingSize = state.sizeCache[key];
+      const existingStatus = state.sizeStatusCache[key];
       // 이미 확인된 정확한 값을 빠른 추정값이 덮어쓰지 않는다(시작 직후 복원값과 추정이 경합할 수 있다).
       if (
         status === "estimated" &&
         existingSize !== undefined &&
-        state.sizeStatusCache[key] === "exact" &&
+        isConfirmedSizeStatus(existingStatus) &&
         !state.sizeCacheStale[key]
       ) {
         const restored = updateEntrySizeAcrossPanels(
@@ -186,7 +191,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
           state.rightPanel,
           path,
           existingSize,
-          "exact"
+          existingStatus
         );
 
         return restored.leftPanel === state.leftPanel &&
@@ -257,7 +262,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         rememberSizeBaseline(path, {
           size: previousSize,
           wasExact:
-            state.sizeStatusCache[key] === "exact" ||
+            isConfirmedSizeStatus(state.sizeStatusCache[key]) ||
             Boolean(state.sizeCacheStale[key]),
         });
 
@@ -356,7 +361,9 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         const existingStatus = state.sizeStatusCache[normalizedPath];
         // 복원한 신선한 정확한 값은 같은 세션에서 먼저 계산된 추정값보다 우선한다.
         const restoredExactBeatsEstimate =
-          entry.status === "exact" && !entry.isStale && existingStatus === "estimated";
+          isConfirmedSizeStatus(entry.status) &&
+          !entry.isStale &&
+          existingStatus === "estimated";
         const existingFreshStable =
           shouldCacheSizeStatus(existingStatus) &&
           !state.sizeCacheStale[normalizedPath];

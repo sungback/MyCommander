@@ -3,6 +3,7 @@ import type { DirectorySizeStatus, PanelId } from "../../types/file";
 import {
   cancelManualDirectorySizeScan,
   scanDirectorySizeWithProgress,
+  type UpdateEntrySizeHandler,
 } from "../../hooks/manualDirectorySizeScan";
 import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
 import { showTransientToast } from "../../store/toastStore";
@@ -30,7 +31,7 @@ interface UseFileListKeyboardProps {
   ) => void;
   setSelection: (panel: PanelId, paths: string[]) => void;
   showHiddenFiles: boolean;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySize: UpdateEntrySizeHandler;
   updateEntrySizeEstimate: (
     panel: PanelId,
     path: string,

@@ -1,9 +1,19 @@
 import { queuePersistentSizeCacheUpsert } from "./directorySizeCachePersistence";
 import { normalizePathKey } from "../utils/panelHelpers";
-import type { DirectorySizeStatus } from "../types/file";
+import type { ConfirmedDirectorySizeStatus, DirectorySizeStatus } from "../types/file";
+
+type StableDirectorySizeStatus = Extract<
+  DirectorySizeStatus,
+  "estimated" | "partial" | "exact" | "limited"
+>;
 
 export const shouldCacheSizeStatus = (status: unknown) =>
-  status === "estimated" || status === "partial" || status === "exact";
+  status === "estimated" || status === "partial" || isConfirmedSizeStatus(status);
+
+// 끝까지 계산이 끝난 값(exact, limited)인지 확인한다. 재검증·조상 무효화 규칙은 두 상태가 같다.
+export const isConfirmedSizeStatus = (
+  status: unknown
+): status is ConfirmedDirectorySizeStatus => status === "exact" || status === "limited";
 
 export const isLikelyHeavySystemPath = (path: string) => {
   const normalized = path
@@ -22,11 +32,11 @@ export const isLikelyHeavySystemPath = (path: string) => {
 };
 
 export const toHydratedStatus = (
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">,
+  status: StableDirectorySizeStatus,
   isStale: boolean,
   path: string
 ) => {
-  const resolved = isStale && status === "exact" ? "estimated" : status;
+  const resolved = isStale && isConfirmedSizeStatus(status) ? "estimated" : status;
   if (resolved === "partial" && isLikelyHeavySystemPath(path)) {
     return "estimated";
   }
@@ -46,7 +56,7 @@ export const getSizeScannedAt = (path: string) =>
 export const queueStableSizeCacheWrite = (
   path: string,
   size: number,
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
+  status: StableDirectorySizeStatus
 ) => {
   const timestamp = Date.now();
   recordSizeScannedAt(path, timestamp);

@@ -216,7 +216,13 @@ describe("useFileListKeyboard", () => {
     await waitFor(() =>
       expect(props.scanDirSize).toHaveBeenCalledWith("/home/docs", expect.any(String))
     );
-    expect(props.updateEntrySize).toHaveBeenCalledWith("left", "/home/docs", 1024);
+    expect(props.updateEntrySize).toHaveBeenCalledWith(
+      "left",
+      "/home/docs",
+      1024,
+      undefined,
+      "exact"
+    );
   });
 
   it("Space는 '..' 항목에서 scanDirSize를 호출하지 않는다", async () => {

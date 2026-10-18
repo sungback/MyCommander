@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import type { DirectorySizeProgressEvent } from "../../../hooks/tauriCommands/fileCommands";
-import type { DirectorySizeStatus, FileEntry, PanelId } from "../../../types/file";
+import type {
+  ConfirmedDirectorySizeStatus,
+  DirectorySizeStatus,
+  FileEntry,
+  PanelId,
+} from "../../../types/file";
 import {
   hasRequestedStorageKind,
   markStorageKindRequested,
@@ -42,7 +47,8 @@ interface UseBackgroundDirSizesProps {
     panel: PanelId,
     path: string,
     size: number,
-    scanStartedAt?: number
+    scanStartedAt?: number,
+    status?: ConfirmedDirectorySizeStatus
   ) => void;
   updateEntrySizeProgress: (
     panel: PanelId,
@@ -53,6 +59,13 @@ interface UseBackgroundDirSizesProps {
 
 // 파일 변경으로 stale이 된 폴더를 다시 정확 계산하기까지 두는 최소 간격
 const EXACT_RESCAN_COOLDOWN_MS = 30_000;
+
+// 같은 경로의 진행 중인 스캔에 합류했다면 결과는 요청보다 먼저 시작된 스캔에서 나온다.
+// 더 이른 시작 시각을 써야 그 사이의 파일 변경을 놓치지 않는다.
+const getEffectiveScanStartedAt = (requestedAt: number, startedAtMs: unknown) =>
+  typeof startedAtMs === "number" && Number.isFinite(startedAtMs)
+    ? Math.min(requestedAt, startedAtMs)
+    : requestedAt;
 
 export const useBackgroundDirSizes = ({
   activeTabId,
@@ -334,7 +347,13 @@ export const useBackgroundDirSizes = ({
               scheduler.settledExactPaths.add(queuedEntry.path);
               updateEntrySizeEstimate(panelId, queuedEntry.path, result.size, "partial");
             } else {
-              updateEntrySize(panelId, queuedEntry.path, result.size, scanStartedAt);
+              updateEntrySize(
+                panelId,
+                queuedEntry.path,
+                result.size,
+                getEffectiveScanStartedAt(scanStartedAt, result.startedAtMs),
+                result.inaccessibleCount > 0 ? "limited" : "exact"
+              );
               // 이후 파일 변경으로 다시 stale이 되면 재스캔할 수 있도록 시도 기록을 비운다.
               attemptedExactKeysRef.current.delete(queuedEntry.attemptKey);
             }

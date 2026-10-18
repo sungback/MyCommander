@@ -1,12 +1,12 @@
 mod compute;
 mod scan;
+mod shared_scan;
 mod types;
 
 #[cfg(test)]
 pub(crate) use compute::compute_path_size;
-pub use types::{
-    DirSizeScanState, DirectorySizeEstimate, DirectorySizeProgress, DirectorySizeScanResult,
-};
+pub use shared_scan::DirSizeScanState;
+pub use types::{DirectorySizeEstimate, DirectorySizeProgress, DirectorySizeScanResult};
 
 use compute::{DEFAULT_ESTIMATE_MAX_DEPTH, DEFAULT_ESTIMATE_MAX_ENTRIES};
 use tauri::{AppHandle, Emitter};
@@ -39,31 +39,28 @@ pub async fn scan_dir_size(
     path: String,
     scan_id: String,
 ) -> Result<DirectorySizeScanResult, String> {
-    let cancel_flag = state.begin(&scan_id)?;
-    let scan_result = tokio::task::spawn_blocking({
-        let cancel_flag = cancel_flag.clone();
-        let path = path.clone();
-        let scan_id = scan_id.clone();
-        move || {
-            scan::scan_path_size_with_progress(&path, &cancel_flag, |progress| {
-                let _ = app.emit(
-                    "dir-size-progress",
-                    DirectorySizeProgress {
-                        scan_id: scan_id.clone(),
-                        path: path.clone(),
-                        size: progress.size,
-                        is_partial: progress.is_partial,
-                        scanned_entries: progress.scanned_entries,
-                        completed: progress.completed,
-                    },
-                );
-            })
-        }
-    })
-    .await;
-
-    state.end(&scan_id);
-    scan_result.map_err(|e| e.to_string())?
+    shared_scan::run_shared_scan(
+        state,
+        path,
+        scan_id,
+        |path, cancel_flag, emit_progress| {
+            scan::scan_path_size_with_progress(path, cancel_flag, emit_progress)
+        },
+        move |scan_id, path, progress| {
+            let _ = app.emit(
+                "dir-size-progress",
+                DirectorySizeProgress {
+                    scan_id: scan_id.to_string(),
+                    path: path.to_string(),
+                    size: progress.size,
+                    is_partial: progress.is_partial,
+                    scanned_entries: progress.scanned_entries,
+                    completed: progress.completed,
+                },
+            );
+        },
+    )
+    .await
 }
 
 pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<(), String> {
@@ -75,27 +72,14 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 mod tests {
     use super::compute::compute_path_size;
     use super::compute::estimate_path_size;
-    #[cfg(target_os = "macos")]
-    use super::compute::parse_du_size_bytes;
     use super::scan::scan_path_size_with_progress;
+    #[cfg(unix)]
+    use super::scan::VolumeBoundary;
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
     use std::sync::atomic::AtomicBool;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn parse_du_size_bytes_reads_summary_even_with_other_output() {
-        assert_eq!(parse_du_size_bytes("42\t/Users/example\n"), Some(43_008));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn parse_du_size_bytes_returns_none_for_unparseable_output() {
-        assert_eq!(parse_du_size_bytes(""), None);
-        assert_eq!(parse_du_size_bytes("du: cannot read directory"), None);
-    }
 
     #[cfg(unix)]
     #[test]
@@ -198,28 +182,35 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn scan_path_size_with_progress_reports_app_bundle_disk_usage() {
+    fn scan_path_size_uses_same_basis_for_app_bundles_and_plain_folders() {
         let root = make_temp_dir("scan-app-bundle");
+        let make_tree = |dir: &std::path::Path| {
+            let resources = dir.join("Contents").join("Resources");
+            fs::create_dir_all(&resources).unwrap();
+            fs::write(resources.join("icon.icns"), [1_u8; 1234]).unwrap();
+            fs::File::create(resources.join("sparse.bin"))
+                .unwrap()
+                .set_len(8 * 1024 * 1024)
+                .unwrap();
+        };
         let app_bundle = root.join("Example.app");
-        let contents = app_bundle.join("Contents").join("Resources");
-        fs::create_dir_all(&contents).unwrap();
-        let sparse_file = contents.join("sparse.bin");
-        fs::File::create(&sparse_file)
-            .unwrap()
-            .set_len(8 * 1024 * 1024)
-            .unwrap();
-        let expected = compute_path_size(app_bundle.to_str().unwrap()).unwrap();
+        let plain = root.join("Example");
+        make_tree(&app_bundle);
+        make_tree(&plain);
         let cancel_flag = AtomicBool::new(false);
 
-        let result =
+        let app_result =
             scan_path_size_with_progress(app_bundle.to_str().unwrap(), &cancel_flag, |_| {})
                 .unwrap();
+        let plain_result =
+            scan_path_size_with_progress(plain.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
 
-        assert_eq!(result.size, expected);
-        assert!(!result.is_partial);
-        assert_eq!(result.error_count, 0);
+        // .app도 du(할당 크기) 대신 다른 폴더와 같은 겉보기 크기 기준을 쓴다.
+        assert_eq!(app_result.size, 1234 + 8 * 1024 * 1024);
+        assert_eq!(app_result.size, plain_result.size);
+        assert_eq!(app_result.scanned_entries, plain_result.scanned_entries);
+        assert!(!app_result.is_partial);
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -330,6 +321,137 @@ mod tests {
         assert_eq!(estimate.size, 100);
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_path_size_counts_unreadable_directories_without_marking_partial() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_temp_dir("scan-permission");
+        let locked = root.join("locked");
+        fs::create_dir_all(&locked).unwrap();
+        fs::write(locked.join("hidden.bin"), [1_u8; 50]).unwrap();
+        fs::write(root.join("visible.bin"), [1_u8; 10]).unwrap();
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        if fs::read_dir(&locked).is_ok() {
+            // root 권한에서는 권한 비트가 무시되어 재현할 수 없다.
+            fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+            fs::remove_dir_all(&root).unwrap();
+            return;
+        }
+
+        let result = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {});
+
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        let result = result.unwrap();
+        assert_eq!(result.size, 10);
+        assert!(!result.is_partial);
+        assert_eq!(result.error_count, 0);
+        assert_eq!(result.inaccessible_count, 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_path_size_counts_unreadable_root_as_inaccessible() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_temp_dir("scan-permission-root");
+        fs::write(root.join("hidden.bin"), [1_u8; 50]).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o000)).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        if fs::read_dir(&root).is_ok() {
+            // root 권한에서는 권한 비트가 무시되어 재현할 수 없다.
+            fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+            fs::remove_dir_all(&root).unwrap();
+            return;
+        }
+
+        let result = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {});
+
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        let result = result.unwrap();
+        assert_eq!(result.size, 0);
+        assert!(!result.is_partial);
+        assert_eq!(result.inaccessible_count, 1);
+    }
+
+    #[test]
+    fn scan_path_size_reports_zero_inaccessible_for_readable_tree() {
+        let root = make_temp_dir("scan-readable");
+        fs::write(root.join("file.bin"), [1_u8; 10]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+        let before_ms = unix_ms();
+
+        let result =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
+
+        assert_eq!(result.inaccessible_count, 0);
+        assert!(result.started_at_ms >= before_ms && result.started_at_ms <= unix_ms());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn volume_boundary_rejects_other_devices() {
+        let root = make_temp_dir("volume-boundary");
+        fs::write(root.join("file.bin"), [1_u8; 10]).unwrap();
+        let root_metadata = fs::symlink_metadata(&root).unwrap();
+        let boundary = VolumeBoundary::new(&root_metadata);
+        // /dev는 macOS(devfs)와 Linux(devtmpfs) 모두 별도 파일시스템이다.
+        let other_device = fs::symlink_metadata("/dev").unwrap();
+
+        assert!(boundary.contains(&fs::symlink_metadata(root.join("file.bin")).unwrap()));
+        assert!(!boundary.contains(&other_device));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn compute_path_size_does_not_follow_symlinks() {
+        let root = make_temp_dir("compute-symlink");
+        let target_file = root.join("target.bin");
+        let target_dir = root.join("target-dir");
+        fs::write(&target_file, [1_u8; 100]).unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+        fs::write(target_dir.join("inner.bin"), [1_u8; 200]).unwrap();
+        symlink(&target_file, root.join("file-link")).unwrap();
+        symlink(&target_dir, root.join("dir-link")).unwrap();
+        symlink(root.join("missing"), root.join("dangling-link")).unwrap();
+
+        let file_link = compute_path_size(root.join("file-link").to_str().unwrap());
+        let dir_link = compute_path_size(root.join("dir-link").to_str().unwrap());
+        let dangling_link = compute_path_size(root.join("dangling-link").to_str().unwrap());
+
+        assert_eq!(file_link, Ok(0));
+        assert_eq!(dir_link, Ok(0));
+        assert_eq!(dangling_link, Ok(0));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn compute_path_size_reports_missing_path() {
+        let result = compute_path_size("/nonexistent/mycommander/size/path");
+
+        assert_eq!(
+            result.unwrap_err(),
+            "/nonexistent/mycommander/size/path does not exist"
+        );
+    }
+
+    fn unix_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
     }
 
     fn make_temp_dir(label: &str) -> std::path::PathBuf {

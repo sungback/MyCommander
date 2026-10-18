@@ -317,6 +317,50 @@ describe("panelStore — updateEntrySize", () => {
     expect(entry?.sizeStatus).toBe("exact");
   });
 
+  it("stores limited sizes and keeps them over quick estimates", () => {
+    const { setFiles, updateEntrySize, updateEntrySizeEstimate } = usePanelStore.getState();
+    setFiles("left", [{ name: "Library", path: "/work/Library", kind: "directory" }]);
+
+    updateEntrySize("left", "/work/Library", 5_000, undefined, "limited");
+    updateEntrySizeEstimate("left", "/work/Library", 100, "estimated");
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/Library"]).toBe(5_000);
+    expect(state.sizeStatusCache["/work/Library"]).toBe("limited");
+    const entry = state.leftPanel.files.find((file) => file.name === "Library");
+    expect(entry?.size).toBe(5_000);
+    expect(entry?.sizeStatus).toBe("limited");
+  });
+
+  it("hydrates limited sizes and marks stale limited values as estimated", () => {
+    const { hydrateEntrySizesFromCache } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/cached/limited", size: 10, status: "limited", isStale: false },
+      { path: "/cached/old-limited", size: 20, status: "limited", isStale: true },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/cached/limited"]).toBe("limited");
+    expect(state.sizeStatusCache["/cached/old-limited"]).toBe("estimated");
+    expect(state.sizeCacheStale["/cached/old-limited"]).toBe(true);
+  });
+
+  it("marks cached limited ancestors stale when a descendant size changes", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/home", size: 11_000, status: "limited", isStale: false },
+      { path: "/work/home/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySize("left", "/work/home/target", 10);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/home"]).toBe("estimated");
+    expect(state.sizeCacheStale["/work/home"]).toBe(true);
+  });
+
   it("does not let a quick estimate overwrite a restored exact size", () => {
     const { hydrateEntrySizesFromCache, setFiles, updateEntrySizeEstimate } =
       usePanelStore.getState();

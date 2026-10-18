@@ -307,7 +307,8 @@ fn volume_root_of(path: &Path) -> Option<PathBuf> {
 
 fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
     let ttl = match entry.status.as_str() {
-        "exact" => EXACT_TTL_MS,
+        // limited: 끝까지 계산했지만 권한이 없는 항목을 뺀 하한값. 다시 계산해도 같으므로 exact와 같은 TTL을 쓴다.
+        "exact" | "limited" => EXACT_TTL_MS,
         "estimated" | "partial" => ESTIMATE_TTL_MS,
         _ => return true,
     };
@@ -319,7 +320,7 @@ fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
 }
 
 fn is_stable_status(status: &str) -> bool {
-    matches!(status, "exact" | "estimated" | "partial")
+    matches!(status, "exact" | "limited" | "estimated" | "partial")
 }
 
 fn write_snapshot_to_path(
@@ -413,6 +414,10 @@ mod tests {
             "/stale-estimate".to_string(),
             entry(1, "estimated", now_ms - 2 * 24 * 60 * 60 * 1000),
         );
+        snapshot.entries.insert(
+            "/fresh-limited".to_string(),
+            entry(1, "limited", now_ms - 2 * 24 * 60 * 60 * 1000),
+        );
 
         let result = build_load_result(snapshot, now_ms, 10);
 
@@ -431,10 +436,16 @@ mod tests {
             .iter()
             .find(|entry| entry.path == "/stale-estimate")
             .unwrap();
+        let fresh_limited = result
+            .entries
+            .iter()
+            .find(|entry| entry.path == "/fresh-limited")
+            .unwrap();
 
         assert!(!fresh.is_stale);
         assert!(stale_exact.is_stale);
         assert!(stale_estimate.is_stale);
+        assert!(!fresh_limited.is_stale);
     }
 
     #[test]

@@ -116,6 +116,26 @@ describe("FileItem", () => {
     expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
   });
 
+  it("marks limited directory sizes as lower bounds", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "limited",
+          path: "/tmp/limited",
+          kind: "directory",
+          size: 4096,
+          sizeStatus: "limited",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("≥4.0 KB")).toBeInTheDocument();
+    expect(screen.getByLabelText(/접근 권한이 없는 항목을 뺀 크기입니다/)).toBeInTheDocument();
+  });
+
   it("shows when a directory size was calculated", () => {
     __resetSessionVerifiedSizesForTests();
     recordSizeScannedAt("/Users/sam/AppData", Date.now() - 3 * 24 * 60 * 60_000);
