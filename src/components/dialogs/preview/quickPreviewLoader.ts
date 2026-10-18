@@ -3,7 +3,6 @@ import { useFileSystem } from "../../../hooks/useFileSystem";
 import {
   type MarkdownRendererModule,
   type NotebookRendererModule,
-  type PptxRendererModule,
   type HwpxRendererModule,
   type SqliteRendererModule,
   type TextHighlighterModule,
@@ -54,16 +53,6 @@ const defaultLoadNotebookRenderer = async (): Promise<NotebookRendererModule> =>
   );
 
   return loadRenderer();
-};
-
-const defaultLoadPptxRenderer = async (
-  readFileBinary?: (path: string, maxBytes?: number) => Promise<ArrayBuffer | Uint8Array>
-): Promise<PptxRendererModule> => {
-  const { defaultLoadPptxRenderer: loadRenderer } = await import(
-    "./quickPreviewRenderers/pptxRenderer"
-  );
-
-  return loadRenderer({ readFileBinary });
 };
 
 const defaultLoadHwpxRenderer = async (
@@ -143,8 +132,6 @@ export const loadPreviewForPath = async (
   const loadTextHighlighter = options.loadTextHighlighter ?? defaultLoadTextHighlighter;
   const loadMarkdownRenderer = options.loadMarkdownRenderer ?? defaultLoadMarkdownRenderer;
   const loadNotebookRenderer = options.loadNotebookRenderer ?? defaultLoadNotebookRenderer;
-  const loadPptxRenderer =
-    options.loadPptxRenderer ?? (() => defaultLoadPptxRenderer(readFileBinary));
   const loadHwpxRenderer =
     options.loadHwpxRenderer ?? (() => defaultLoadHwpxRenderer(readFileBinary));
   const loadXlsxRenderer =
@@ -163,7 +150,6 @@ export const loadPreviewForPath = async (
     loadTextHighlighter,
     loadMarkdownRenderer,
     loadNotebookRenderer,
-    loadPptxRenderer,
     loadHwpxRenderer,
     loadXlsxRenderer,
     loadSqliteRenderer,

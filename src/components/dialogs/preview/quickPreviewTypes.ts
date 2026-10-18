@@ -2,7 +2,6 @@ import type {
   HwpxRendererModule,
   MarkdownRendererModule,
   NotebookRendererModule,
-  PptxRendererModule,
   SqliteRendererModule,
   TextHighlighterModule,
   XlsxRendererModule,
@@ -14,6 +13,7 @@ export type PreviewType =
   | "image"
   | "video"
   | "pdf"
+  | "pptx"
   | "text"
   | "rendered"
   | "unsupported"
@@ -50,7 +50,6 @@ export interface QuickPreviewLoaderOptions {
   loadTextHighlighter?: () => Promise<TextHighlighterModule>;
   loadMarkdownRenderer?: () => Promise<MarkdownRendererModule>;
   loadNotebookRenderer?: () => Promise<NotebookRendererModule>;
-  loadPptxRenderer?: () => Promise<PptxRendererModule>;
   loadHwpxRenderer?: () => Promise<HwpxRendererModule>;
   loadXlsxRenderer?: () => Promise<XlsxRendererModule>;
   loadSqliteRenderer?: () => Promise<SqliteRendererModule>;

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useFileSystem } from "../../../../hooks/useFileSystem";
+import { PagedPreviewLayout, THUMBNAIL_WIDTH } from "../paged/PagedPreviewLayout";
+import { getFitScale } from "../paged/pageNavigation";
 import {
   createRenderLimiter,
-  getFitScale,
-  getPdfPageForKey,
   isPdfPasswordError,
   isPdfRenderCancelled,
   type RenderLimiter,
@@ -16,7 +16,6 @@ import type {
   PdfRendererModule,
 } from "./pdfTypes";
 
-const THUMBNAIL_WIDTH = 112;
 const THUMBNAIL_RENDER_CONCURRENCY = 2;
 const PAGE_PADDING = 24;
 
@@ -58,7 +57,6 @@ export const QuickPreviewPdfView: React.FC<QuickPreviewPdfViewProps> = ({
   const { readFileBinary: fsReadFileBinary } = useFileSystem();
   const readBinary = readFileBinary ?? fsReadFileBinary;
   const [loadState, setLoadState] = useState<PdfLoadState>({ kind: "loading" });
-  const [currentPage, setCurrentPage] = useState(1);
   const [showNativeViewer, setShowNativeViewer] = useState(false);
 
   useEffect(() => {
@@ -69,7 +67,6 @@ export const QuickPreviewPdfView: React.FC<QuickPreviewPdfViewProps> = ({
       document: null,
     };
     setLoadState({ kind: "loading" });
-    setCurrentPage(1);
     setShowNativeViewer(false);
 
     const openDocument = (renderer: PdfRendererModule, source: Parameters<PdfRendererModule["openPdf"]>[0]) => {
@@ -131,31 +128,24 @@ export const QuickPreviewPdfView: React.FC<QuickPreviewPdfViewProps> = ({
     };
   }, [src, filePath, loadRenderer, readBinary]);
 
-  const pageCount = loadState.kind === "ready" ? loadState.document.numPages : 0;
-
-  useEffect(() => {
-    if (pageCount === 0 || showNativeViewer) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      if (getPdfPageForKey(event.key, 1, pageCount) === null) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      setCurrentPage((page) => getPdfPageForKey(event.key, page, pageCount) ?? page);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [pageCount, showNativeViewer]);
+  const readyDocument = loadState.kind === "ready" ? loadState.document : null;
+  // 문서마다 동시에 그리는 썸네일 수를 제한한다.
+  const limiter = useMemo(
+    () => createRenderLimiter(THUMBNAIL_RENDER_CONCURRENCY),
+    [readyDocument]
+  );
+  const renderPage = useCallback(
+    (pageNumber: number) =>
+      readyDocument ? <PdfPageView document={readyDocument} pageNumber={pageNumber} /> : null,
+    [readyDocument]
+  );
+  const renderThumbnail = useCallback(
+    (pageNumber: number) =>
+      readyDocument ? (
+        <PdfThumbnailImage document={readyDocument} pageNumber={pageNumber} limiter={limiter} />
+      ) : null,
+    [limiter, readyDocument]
+  );
 
   if (showNativeViewer) {
     return <iframe src={src} className="w-full flex-1 border-none" title="PDF preview" />;
@@ -198,33 +188,25 @@ export const QuickPreviewPdfView: React.FC<QuickPreviewPdfViewProps> = ({
     );
   }
 
+  const { firstPageSize } = loadState;
   return (
-    <div className="flex flex-1 min-h-0">
-      <PdfThumbnailList
-        document={loadState.document}
-        firstPageSize={loadState.firstPageSize}
-        currentPage={currentPage}
-        onSelectPage={setCurrentPage}
-      />
-      <div className="flex flex-1 min-w-0 flex-col">
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-color text-xs text-text-secondary shrink-0">
-          <span aria-live="polite">
-            {currentPage} / {pageCount}
-          </span>
-          <span className="flex items-center gap-3">
-            <span>↑↓ 페이지 이동</span>
-            <button
-              type="button"
-              onClick={() => setShowNativeViewer(true)}
-              className="hover:text-text-primary underline-offset-2 hover:underline"
-            >
-              기본 뷰어로 보기
-            </button>
-          </span>
-        </div>
-        <PdfPageView document={loadState.document} pageNumber={currentPage} />
-      </div>
-    </div>
+    <PagedPreviewLayout
+      key={src}
+      pageCount={loadState.document.numPages}
+      thumbnailAspectRatio={firstPageSize.height / Math.max(firstPageSize.width, 1)}
+      thumbnailLabel={(pageNumber) => `${pageNumber}페이지로 이동`}
+      renderPage={renderPage}
+      renderThumbnail={renderThumbnail}
+      toolbarActions={
+        <button
+          type="button"
+          onClick={() => setShowNativeViewer(true)}
+          className="hover:text-text-primary underline-offset-2 hover:underline"
+        >
+          기본 뷰어로 보기
+        </button>
+      }
+    />
   );
 };
 
@@ -330,124 +312,17 @@ const PdfPageView: React.FC<PdfPageViewProps> = ({ document, pageNumber }) => {
   );
 };
 
-interface PdfThumbnailListProps {
-  document: PdfDocumentHandle;
-  firstPageSize: PdfPageSize;
-  currentPage: number;
-  onSelectPage: (pageNumber: number) => void;
-}
-
-/** 페이지 썸네일 세로 목록. 현재 페이지가 보이도록 따라 스크롤한다. */
-const PdfThumbnailList: React.FC<PdfThumbnailListProps> = ({
-  document,
-  firstPageSize,
-  currentPage,
-  onSelectPage,
-}) => {
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef(new Map<number, HTMLButtonElement>());
-  // 문서마다 동시에 그리는 썸네일 수를 제한한다.
-  const limiter = useMemo(() => createRenderLimiter(THUMBNAIL_RENDER_CONCURRENCY), [document]);
-  const placeholderHeight = Math.round(
-    THUMBNAIL_WIDTH * (firstPageSize.height / Math.max(firstPageSize.width, 1))
-  );
-  const pages = useMemo(
-    () => Array.from({ length: document.numPages }, (_, index) => index + 1),
-    [document]
-  );
-
-  useEffect(() => {
-    itemRefs.current.get(currentPage)?.scrollIntoView?.({ block: "nearest" });
-  }, [currentPage]);
-
-  const registerItem = useCallback((pageNumber: number, element: HTMLButtonElement | null) => {
-    if (element) {
-      itemRefs.current.set(pageNumber, element);
-    } else {
-      itemRefs.current.delete(pageNumber);
-    }
-  }, []);
-
-  return (
-    <div
-      ref={listRef}
-      aria-label="페이지 목록"
-      className="w-40 shrink-0 overflow-y-auto border-r border-border-color bg-bg-panel py-3"
-    >
-      {pages.map((pageNumber) => (
-        <PdfThumbnail
-          key={pageNumber}
-          document={document}
-          pageNumber={pageNumber}
-          isCurrent={pageNumber === currentPage}
-          placeholderHeight={placeholderHeight}
-          limiter={limiter}
-          scrollRoot={listRef}
-          registerItem={registerItem}
-          onSelect={onSelectPage}
-        />
-      ))}
-    </div>
-  );
-};
-
-interface PdfThumbnailProps {
+interface PdfThumbnailImageProps {
   document: PdfDocumentHandle;
   pageNumber: number;
-  isCurrent: boolean;
-  placeholderHeight: number;
   limiter: RenderLimiter;
-  scrollRoot: React.RefObject<HTMLDivElement | null>;
-  registerItem: (pageNumber: number, element: HTMLButtonElement | null) => void;
-  onSelect: (pageNumber: number) => void;
 }
 
-/**
- * 목록에서 보일 때만 그린다. 그린 결과는 압축 이미지로 바꿔 캔버스 메모리를 돌려준다.
- * 페이지를 넘길 때 바뀌는 썸네일(이전·현재)만 다시 렌더링되도록 memo로 감싼다.
- */
-const PdfThumbnail = React.memo<PdfThumbnailProps>(function PdfThumbnail({
-  document,
-  pageNumber,
-  isCurrent,
-  placeholderHeight,
-  limiter,
-  scrollRoot,
-  registerItem,
-  onSelect,
-}) {
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
+/** 썸네일 한 장을 그린다. 그린 결과는 PNG 객체 URL로 바꿔 캔버스 메모리를 돌려준다. */
+const PdfThumbnailImage: React.FC<PdfThumbnailImageProps> = ({ document, pageNumber, limiter }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const element = buttonRef.current;
-    if (!element) {
-      return;
-    }
-    if (typeof IntersectionObserver === "undefined") {
-      setIsVisible(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { root: scrollRoot.current, rootMargin: "200px 0px" }
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [scrollRoot]);
-
-  useEffect(() => {
-    if (!isVisible || imageUrl) {
-      return;
-    }
-
     let cancelled = false;
     let cancelRender: (() => void) | null = null;
     let createdUrl: string | null = null;
@@ -488,7 +363,7 @@ const PdfThumbnail = React.memo<PdfThumbnailProps>(function PdfThumbnail({
       cancelled = true;
       cancelRender?.();
     };
-  }, [document, imageUrl, isVisible, limiter, pageNumber]);
+  }, [document, limiter, pageNumber]);
 
   useEffect(
     () => () => {
@@ -499,34 +374,15 @@ const PdfThumbnail = React.memo<PdfThumbnailProps>(function PdfThumbnail({
     [imageUrl]
   );
 
-  return (
-    <button
-      ref={(element) => {
-        buttonRef.current = element;
-        registerItem(pageNumber, element);
-      }}
-      type="button"
-      onClick={() => onSelect(pageNumber)}
-      aria-label={`${pageNumber}페이지로 이동`}
-      aria-current={isCurrent ? "page" : undefined}
-      className="mx-auto mb-3 flex flex-col items-center gap-1 focus:outline-none"
-    >
-      <span
-        className={`block overflow-hidden rounded-sm bg-white ${
-          isCurrent ? "ring-2 ring-accent-color" : "ring-1 ring-border-color"
-        }`}
-        style={{ width: THUMBNAIL_WIDTH, minHeight: imageUrl ? undefined : placeholderHeight }}
-      >
-        {imageUrl && (
-          <img src={imageUrl} alt="" className="block w-full" draggable={false} />
-        )}
-      </span>
-      <span className={`text-xs ${isCurrent ? "text-text-primary" : "text-text-secondary"}`}>
-        {pageNumber}
-      </span>
-    </button>
-  );
-});
+  return imageUrl ? (
+    <img
+      src={imageUrl}
+      alt=""
+      className="block h-full w-full object-contain"
+      draggable={false}
+    />
+  ) : null;
+};
 
 /** 캔버스를 PNG 객체 URL로 바꾼다. 지원하지 않는 환경이면 null. */
 const canvasToObjectUrl = (canvas: HTMLCanvasElement) =>

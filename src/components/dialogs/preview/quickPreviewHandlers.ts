@@ -56,19 +56,18 @@ const assetPreviewHandler: QuickPreviewHandler = async (path, context) => {
     };
   }
 
+  // 슬라이드 해석과 텍스트 보기는 화면(QuickPreviewPptxView)이 asset URL로 읽어 처리한다.
+  if (PPTX_EXTENSIONS.has(context.extension)) {
+    return {
+      type: "pptx",
+      src: context.convertFileSrcImpl(path),
+    };
+  }
+
   return null;
 };
 
 const officePreviewHandler: QuickPreviewHandler = async (path, context) => {
-  if (PPTX_EXTENSIONS.has(context.extension)) {
-    const renderer = await context.loadPptxRenderer();
-    return {
-      type: "rendered",
-      renderedHtml: await renderer.renderPptx(path),
-      renderExt: "pptx",
-    };
-  }
-
   if (HWPX_EXTENSIONS.has(context.extension)) {
     const renderer = await context.loadHwpxRenderer();
     return {

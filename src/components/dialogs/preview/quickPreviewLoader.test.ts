@@ -7,7 +7,6 @@ describe("loadPreviewForPath", () => {
     const loadTextHighlighter = vi.fn();
     const loadMarkdownRenderer = vi.fn();
     const loadNotebookRenderer = vi.fn();
-    const loadPptxRenderer = vi.fn();
     const loadHwpxRenderer = vi.fn();
     const loadXlsxRenderer = vi.fn();
     const loadSqliteRenderer = vi.fn();
@@ -17,7 +16,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter,
       loadMarkdownRenderer,
       loadNotebookRenderer,
-      loadPptxRenderer,
       loadHwpxRenderer,
       loadXlsxRenderer,
       loadSqliteRenderer,
@@ -30,7 +28,6 @@ describe("loadPreviewForPath", () => {
     expect(loadTextHighlighter).not.toHaveBeenCalled();
     expect(loadMarkdownRenderer).not.toHaveBeenCalled();
     expect(loadNotebookRenderer).not.toHaveBeenCalled();
-    expect(loadPptxRenderer).not.toHaveBeenCalled();
     expect(loadHwpxRenderer).not.toHaveBeenCalled();
     expect(loadXlsxRenderer).not.toHaveBeenCalled();
     expect(loadSqliteRenderer).not.toHaveBeenCalled();
@@ -49,7 +46,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter,
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });
@@ -78,7 +74,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter,
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
       loadDocxRenderer: vi.fn(),
@@ -105,7 +100,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer,
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });
@@ -137,7 +131,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer,
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });
@@ -165,7 +158,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer,
     });
@@ -186,7 +178,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer,
     });
@@ -205,7 +196,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
       loadDocxRenderer,
@@ -220,27 +210,26 @@ describe("loadPreviewForPath", () => {
     });
   });
 
-  it("loads the pptx renderer only for pptx previews", async () => {
-    const renderPptx = vi.fn().mockResolvedValue("<html><body>slides</body></html>");
-    const loadPptxRenderer = vi.fn().mockResolvedValue({ renderPptx });
+  it("returns an asset-backed pptx preview without parsing the file", async () => {
+    const convertFileSrcImpl = vi.fn((path: string) => `asset://localhost${path}`);
+    const readFileBinary = vi.fn();
 
     const result = await loadPreviewForPath("/tmp/presentation.pptx", {
+      convertFileSrcImpl,
+      readFileBinary,
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer,
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
       loadDocxRenderer: vi.fn(),
     });
 
-    expect(loadPptxRenderer).toHaveBeenCalledTimes(1);
-    expect(renderPptx).toHaveBeenCalledWith("/tmp/presentation.pptx");
     expect(result).toEqual({
-      type: "rendered",
-      renderedHtml: "<html><body>slides</body></html>",
-      renderExt: "pptx",
+      type: "pptx",
+      src: "asset://localhost/tmp/presentation.pptx",
     });
+    expect(readFileBinary).not.toHaveBeenCalled();
   });
 
   it("loads the sqlite renderer only for sqlite database previews", async () => {
@@ -253,7 +242,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
       loadSqliteRenderer,
@@ -286,7 +274,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter,
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });
@@ -315,7 +302,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter,
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });
@@ -351,7 +337,6 @@ describe("loadPreviewForPath", () => {
       loadTextHighlighter: vi.fn(),
       loadMarkdownRenderer: vi.fn(),
       loadNotebookRenderer: vi.fn(),
-      loadPptxRenderer: vi.fn(),
       loadHwpxRenderer: vi.fn(),
       loadXlsxRenderer: vi.fn(),
     });

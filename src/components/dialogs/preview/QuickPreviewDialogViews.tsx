@@ -15,6 +15,7 @@ import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
 import { QuickPreviewJsonView } from "./QuickPreviewJsonView";
 import { QuickPreviewZipView } from "./QuickPreviewZipView";
 import { QuickPreviewPdfView } from "./pdf/QuickPreviewPdfView";
+import { QuickPreviewPptxView } from "./pptx/QuickPreviewPptxView";
 import type { PreviewState } from "./quickPreviewLoader";
 import type { PreviewStatusContent } from "./quickPreviewStatus";
 
@@ -71,6 +72,11 @@ export const QuickPreviewHeader: React.FC<QuickPreviewHeaderProps> = ({
       {preview.type === "pdf" && (
         <span className="shrink-0 text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono">
           PDF
+        </span>
+      )}
+      {preview.type === "pptx" && (
+        <span className="shrink-0 text-xs text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded font-mono">
+          PPTX
         </span>
       )}
       <Dialog.Title className="text-sm font-medium text-text-primary truncate">
@@ -292,6 +298,14 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
 
     {preview.type === "pdf" && preview.src && (
       <QuickPreviewPdfView
+        src={preview.src}
+        filePath={filePath ?? ""}
+        readFileBinary={readFileBinary}
+      />
+    )}
+
+    {preview.type === "pptx" && preview.src && (
+      <QuickPreviewPptxView
         src={preview.src}
         filePath={filePath ?? ""}
         readFileBinary={readFileBinary}
