@@ -19,10 +19,52 @@
 - 추정 모드(`estimate_path_size`)와 JSON 영속 캐시(최대 10,000개, TTL: exact·limited 7일, estimated·partial 1일)
 
 ## 0단계: 측정 기준 만들기
-- [ ] 고정된 테스트 폴더 세트 준비: 작은 파일이 많은 폴더, `~/Library`, 하드링크가 많은 폴더, sparse 파일, `.app`, 네트워크 볼륨
-- [ ] `#[ignore]` 벤치 테스트나 예제 바이너리로 시간과 결과값 기록. 디스크 캐시가 데워진 상태와 식은 상태(`sudo purge`)를 구분
-- [ ] 정확도 기준값으로 `du -sk`(할당 크기)와 `du -sAk`(겉보기 크기)를 함께 기록
-- [ ] 1단계에서 `.app`의 `du` 분기를 없앤 뒤 큰 `.app`(예: Xcode)의 계산 시간이 얼마나 늘었는지 확인
+- [x] 고정된 테스트 폴더 세트 준비: 작은 파일이 많은 폴더, `~/Library`, 하드링크가 많은 폴더, sparse 파일, `.app`, 네트워크 볼륨
+  - 생성기 `dir_size/bench.rs`의 `generate`가 항상 같은 내용을 만든다(작은 파일 2만 개, 8 MiB 파일의 하드링크 500개, 4 GiB·512 MiB sparse 파일). 저장소 밖에 만든다.
+  - 네트워크 볼륨은 마운트된 것이 없어 측정하지 못했다.
+- [ ] `#[ignore]` 벤치 테스트로 시간과 결과값 기록. 디스크 캐시가 데워진 상태와 식은 상태(`sudo purge`)를 구분
+  - warm 측정 완료(아래 기록). cold는 비밀번호가 필요한 `sudo purge` 때문에 사용자가 직접 실행해야 해서 보류.
+- [x] 정확도 기준값으로 `du -skx`(할당 크기)와 `du -sAkx`(겉보기 크기)를 함께 기록(`-x`는 스캐너의 볼륨 경계와 맞추기 위함)
+- [x] 1단계에서 `.app`의 `du` 분기를 없앤 뒤 큰 `.app`의 계산 시간 확인: warm 기준 Xcode.app 스캐너 0.89초, `du -skx` 0.86초로 차이 없음. cold는 보류.
+
+### 0단계 측정 기록 (2026-10-18, warm)
+- 환경: Mac16,10, macOS 27.0.1, release 빌드, 터미널에 전체 디스크 접근 권한 있음(`~/Library`에서 권한 오류 0건). 앱 번들의 권한과는 다를 수 있다.
+- 방법: 방법마다 예열 1회 후 3회를 번갈아 실행한 시간 중앙값.
+- 실행 방법은 `dir_size/bench.rs` 모듈 주석 참고.
+
+| 대상 | 스캐너 | `du -skx` (할당) | `du -sAkx` (겉보기) | 항목 수 | 시간 (스캐너 / du) |
+|---|---:|---:|---:|---:|---|
+| 작은 파일 2만 개 | 40.9 MB | 81.9 MB | 46.7 MB | 20,100 | 0.04s / 0.04s |
+| 하드링크 500개 | 8.4 MB | 8.4 MB | 8.4 MB | 511 | 0.00s / 0.00s |
+| sparse 4 GiB | 0 | 0 | 4.29 GB | 1 | - |
+| sparse 512 MiB | 536.9 MB | 0 | 536.9 MB | 1 | - |
+| Xcode.app | 10.24 GB | 4.17 GB | 10.29 GB | 166,835 | 0.89s / 0.86s |
+| Cursor.app | 972.7 MB | 1.02 GB | 980.1 MB | 22,627 | 0.11s / 0.11s |
+| `~/Library` | 61.74 GB | 47.16 GB | 8.86 TB | 307,801 | 7.95s / 7.92s |
+
+관찰:
+- 속도: warm에서는 단일 스레드 스캐너와 `du`가 같은 속도다. 둘 다 항목당 메타데이터 조회가 병목으로 보인다(초당 약 3만 8천 항목). 2단계의 병렬 순회·`getattrlistbulk` 효과는 이 기준과 cold 수치로 판단한다.
+- 하드링크와 볼륨 경계: `du`와 결과가 같다.
+- sparse 파일: 1 GiB 이상은 보정이 동작한다(`~/Library`의 sparse 파일 2개, 약 8 TiB). 1 GiB 미만은 실제 데이터에서 99개, 0.02 GiB뿐이라 "1단계 후속 과제"의 우선순위는 낮다.
+- 겉보기 크기와 할당 크기 차이의 원인(Python으로 `st_flags`·`st_blocks` 분해, 읽기 전용):
+  - 작은 파일: 할당 크기가 최소 4 KB 블록 단위라 겉보기의 약 2배.
+  - APFS 압축 파일: Xcode.app은 압축 파일 26,564개에서 5.88 GiB 차이. 1단계 이전 `.app`은 `du`로 4.2 GB를 표시했고, 지금은 10.2 GB를 표시한다.
+  - 클라우드 온라인 전용(dataless) 파일: `~/Library/CloudStorage`의 51,411개, 13.48 GiB는 디스크에 없지만 겉보기 크기로 집계된다.
+- 결정(2026-10-18): 크기 기준은 겉보기 크기로 유지한다(sparse 파일만 할당 크기). 위 세 경우는 겉보기 크기가 디스크 사용량보다 크거나 작게 보이는 알려진 차이로 둔다.
+
+### cold 측정 방법 (사용자 실행 필요)
+- `sudo purge`에 비밀번호가 필요해 에이전트가 실행할 수 없다. 저장소 루트에서 아래를 실행하고 출력된 표 행을 이 기록에 추가한다.
+- 방법마다 바로 앞에서 `sudo purge`로 캐시를 비운다. cold에서 `du`는 `du -skx`만 잰다.
+
+```sh
+for P in /Applications/Xcode.app "$HOME/Library"; do
+  for M in scanner du; do
+    sudo purge
+    MYCOMMANDER_SIZE_BENCH_MODE=cold MYCOMMANDER_SIZE_BENCH_METHOD=$M MYCOMMANDER_SIZE_BENCH_PATHS="$P" \
+      cargo test --release --lib --manifest-path src-tauri/Cargo.toml dir_size::bench::measure -- --ignored --nocapture 2>&1 | grep '^| `'
+  done
+done
+```
 
 ## 1단계: 안정성 (새 의존성 없음) — 2026-10-18 완료
 - [x] 크기 기준 통일: `.app`만 `du -sk`(KB 단위로 반올림된 할당 크기)를 쓰던 분기를 없애고 모든 폴더가 같은 스캐너를 쓴다. 이제 `.app` 계산도 취소할 수 있다.
