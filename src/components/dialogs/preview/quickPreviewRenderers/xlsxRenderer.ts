@@ -37,6 +37,20 @@ const readBuffer = async (
   }
 };
 
+/**
+ * 압축하지 않은 zip으로 다시 묶는다.
+ * read-excel-file이 쓰는 fflate는 압축을 푼 크기가 512 KB 이상인 항목을 `blob:` Web Worker에서 푸는데,
+ * CSP가 `blob:` Worker를 막고 fflate는 그 실패를 알리지 않아 미리보기가 멈춘다.
+ * 압축하지 않은 항목은 Worker 없이 바로 읽는다.
+ */
+export const repackWithoutCompression = async (
+  buffer: ArrayBuffer | Uint8Array
+): Promise<ArrayBuffer> => {
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(buffer);
+  return zip.generateAsync({ type: "arraybuffer", compression: "STORE" });
+};
+
 const formatCellValue = (value: unknown): string => {
   if (value instanceof Date) {
     return value.toLocaleString();
@@ -53,7 +67,7 @@ export const buildXlsxHtml = async (
   const theme = getPreviewTheme();
 
   const buffer = await readBuffer(filePath, options);
-  const sheets = await readExcelFile(buffer);
+  const sheets = await readExcelFile(await repackWithoutCompression(buffer));
 
   const sheetsHtml = sheets.map(({ sheet: sheetName, data: rows }: Sheet) => {
     const truncated = rows.length > MAX_ROWS;
