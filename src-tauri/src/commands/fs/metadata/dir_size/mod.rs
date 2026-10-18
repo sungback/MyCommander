@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod bench;
+#[cfg(target_os = "macos")]
+mod bulk_listing;
 mod compute;
 mod scan;
 mod shared_scan;
@@ -74,7 +76,10 @@ mod tests {
         scan_path_size_with_progress, select_recorded_children,
     };
     #[cfg(target_os = "macos")]
-    use super::scan::{filesystem_type_name, is_network_filesystem, is_network_filesystem_type};
+    use super::scan::{
+        default_scan_threads, filesystem_type_name, is_network_filesystem,
+        is_network_filesystem_type, scan_path_size_with_listing, DirectoryListing,
+    };
     use super::types::DirectorySizeChild;
     use std::fs;
     #[cfg(unix)]
@@ -677,6 +682,71 @@ mod tests {
         assert!(is_windows_unc_path(r"\\?\UNC\server\share"));
         assert!(!is_windows_unc_path(r"\\?\C:\Users"));
         assert!(!is_windows_unc_path(r"C:\Users"));
+    }
+
+    /// macOS 기본(getattrlistbulk)과 `read_dir` 방식이 같은 결과를 내는지 여러 경우가 섞인 트리로 비교한다.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn bulk_listing_matches_std_listing() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_temp_dir("listing-compare");
+        let deep = root.join("a").join("b").join("c");
+        fs::create_dir_all(&deep).unwrap();
+        fs::create_dir_all(root.join("empty")).unwrap();
+        fs::write(root.join("root.bin"), [1_u8; 10]).unwrap();
+        fs::write(root.join("a").join("a.bin"), [1_u8; 200]).unwrap();
+        fs::write(deep.join("deep.bin"), [1_u8; 3000]).unwrap();
+        fs::write(root.join("공백 있는 이름.txt"), [1_u8; 7]).unwrap();
+        // 폴더를 넘나드는 하드링크
+        fs::hard_link(root.join("a").join("a.bin"), deep.join("a-link.bin")).unwrap();
+        // 따라가지 않는 심볼릭 링크
+        symlink(&deep, root.join("dir-link")).unwrap();
+        symlink(root.join("root.bin"), root.join("file-link")).unwrap();
+        // sparse 파일: 할당 크기로 센다
+        let sparse = fs::File::create(root.join("disk.img")).unwrap();
+        sparse.set_len(4 * 1024 * 1024 * 1024).unwrap();
+        drop(sparse);
+        // 읽을 수 없는 폴더
+        let locked = root.join("a").join("locked");
+        fs::create_dir_all(&locked).unwrap();
+        fs::write(locked.join("hidden.bin"), [1_u8; 50]).unwrap();
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
+        let path = root.to_str().unwrap();
+        let cancel_flag = AtomicBool::new(false);
+        let pool = build_scan_pool(2).unwrap();
+        let scan =
+            |listing| scan_path_size_with_listing(path, &cancel_flag, |_| {}, Some(&pool), listing);
+        let bulk = scan(DirectoryListing::Bulk);
+        let std_listing = scan(DirectoryListing::Std);
+
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        let (mut bulk, mut std_listing) = (bulk.unwrap(), std_listing.unwrap());
+        for result in [&mut bulk, &mut std_listing] {
+            result.started_at_ms = 0;
+            result
+                .children
+                .sort_by(|left, right| left.path.cmp(&right.path));
+        }
+        assert_eq!(bulk, std_listing);
+        assert!(
+            bulk.size < 1024 * 1024,
+            "sparse file counted as {}",
+            bulk.size
+        );
+        assert!(bulk
+            .children
+            .iter()
+            .any(|child| child.path.ends_with("/a/b")));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_scans_use_bulk_listing_with_at_most_six_threads() {
+        assert_eq!(DirectoryListing::platform_default(), DirectoryListing::Bulk);
+        assert!((4..=6).contains(&default_scan_threads()));
     }
 
     fn unix_ms() -> u64 {

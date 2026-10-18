@@ -6,8 +6,9 @@
 //!
 //! 측정:
 //! `MYCOMMANDER_SIZE_BENCH_PATHS=<path1>:<path2> cargo test --release --lib dir_size::bench::measure -- --ignored --nocapture`
-//! - `MYCOMMANDER_SIZE_BENCH_METHOD`: `scanner` | `du` | `threads` | `all`(기본값). cold에서 `du`는 `du -skx`만 잰다.
+//! - `MYCOMMANDER_SIZE_BENCH_METHOD`: `scanner` | `du` | `threads` | `listing` | `all`(기본값). cold에서 `du`는 `du -skx`만 잰다.
 //!   `threads`는 스레드 수별 병렬 스캐너(`scanner-tN`)를 비교한다.
+//!   `listing`은 앱 기본 항목 읽기(macOS는 `getattrlistbulk`)와 `read_dir` 방식(`scanner-std`)을 같은 풀에서 비교한다.
 //! - `MYCOMMANDER_SIZE_BENCH_THREADS`: `threads`에서 잴 스레드 수 목록(기본값 `1,2,4,8`)
 //! - `MYCOMMANDER_SIZE_BENCH_MODE`: `warm`(기본값, 예열 1회 후 3회 교차 실행의 중앙값) | `cold`(1회, 실행 전 `sudo purge`)
 
@@ -17,7 +18,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
-use super::scan::{build_scan_pool, scan_path_size_with_pool, scan_path_size_with_progress};
+use super::scan::{
+    build_scan_pool, scan_path_size_with_listing, scan_path_size_with_pool,
+    scan_path_size_with_progress, DirectoryListing,
+};
 
 const PATHS_ENV: &str = "MYCOMMANDER_SIZE_BENCH_PATHS";
 const METHOD_ENV: &str = "MYCOMMANDER_SIZE_BENCH_METHOD";
@@ -33,6 +37,8 @@ enum Method {
     Scanner,
     /// 스레드 수를 지정한 병렬 스캐너. 측정마다 새 풀을 만든다.
     ScannerThreads(usize),
+    /// 앱과 같은 풀에서 항목을 `read_dir` + 항목별 메타데이터 조회로 읽는 스캐너.
+    ScannerStd,
     /// 할당 크기. 1단계 이전 `.app` 계산 방식과 같다.
     DuAllocated,
     /// 겉보기 크기. 스캐너와 기준이 같지만 디렉터리 자체 크기도 더하고 sparse 보정이 없다.
@@ -44,6 +50,7 @@ impl Method {
         match self {
             Method::Scanner => "scanner".to_string(),
             Method::ScannerThreads(threads) => format!("scanner-t{threads}"),
+            Method::ScannerStd => "scanner-std".to_string(),
             Method::DuAllocated => "du -skx".to_string(),
             Method::DuApparent => "du -sAkx".to_string(),
         }
@@ -66,6 +73,7 @@ fn selected_methods() -> Vec<Method> {
         // cold에서 du를 두 번 돌리면 두 번째는 캐시가 데워진 상태라 할당 크기 1회만 잰다.
         Ok("du") if is_cold_mode() => vec![Method::DuAllocated],
         Ok("du") => vec![Method::DuAllocated, Method::DuApparent],
+        Ok("listing") => vec![Method::Scanner, Method::ScannerStd],
         Ok("threads") => selected_thread_counts()
             .into_iter()
             .map(Method::ScannerThreads)
@@ -96,6 +104,7 @@ fn run_method(method: Method, path: &Path) -> Result<Sample, String> {
     match method {
         Method::Scanner => run_scanner(path, ScannerKind::Default),
         Method::ScannerThreads(threads) => run_scanner(path, ScannerKind::Threads(threads)),
+        Method::ScannerStd => run_scanner(path, ScannerKind::StdListing),
         Method::DuAllocated => run_du(path, "-skx"),
         Method::DuApparent => run_du(path, "-sAkx"),
     }
@@ -104,6 +113,7 @@ fn run_method(method: Method, path: &Path) -> Result<Sample, String> {
 enum ScannerKind {
     Default,
     Threads(usize),
+    StdListing,
 }
 
 fn run_scanner(path: &Path, kind: ScannerKind) -> Result<Sample, String> {
@@ -112,7 +122,8 @@ fn run_scanner(path: &Path, kind: ScannerKind) -> Result<Sample, String> {
     // 풀 생성 시간은 측정에 넣지 않는다.
     let pool = match kind {
         ScannerKind::Threads(threads) => Some(build_scan_pool(threads)?),
-        _ => None,
+        ScannerKind::StdListing => Some(build_scan_pool(super::scan::default_scan_threads())?),
+        ScannerKind::Default => None,
     };
     let started = Instant::now();
     let result = match kind {
@@ -120,6 +131,13 @@ fn run_scanner(path: &Path, kind: ScannerKind) -> Result<Sample, String> {
         ScannerKind::Threads(_) => {
             scan_path_size_with_pool(path, &cancel_flag, |_| {}, pool.as_ref())?
         }
+        ScannerKind::StdListing => scan_path_size_with_listing(
+            path,
+            &cancel_flag,
+            |_| {},
+            pool.as_ref(),
+            DirectoryListing::Std,
+        )?,
     };
 
     Ok(Sample {

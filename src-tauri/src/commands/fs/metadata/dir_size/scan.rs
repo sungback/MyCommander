@@ -15,6 +15,11 @@ const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 /// 깊은 트리에서 rayon 작업자가 훔친 작업을 자기 스택 위에서 이어 실행하므로 기본값보다 넉넉히 잡는다.
 const SCAN_THREAD_STACK_SIZE: usize = 8 * 1024 * 1024;
 const MIN_SCAN_THREADS: usize = 4;
+/// macOS는 `getattrlistbulk`가 8스레드에서 `/System` 같은 큰 트리를 오히려 느리게 읽어(커널 경합으로 추정) 6으로 둔다.
+/// (2026-10-18 warm 측정: `/System` bulk 6스레드 2.06초, 8스레드 2.89초)
+#[cfg(target_os = "macos")]
+const MAX_SCAN_THREADS: usize = 6;
+#[cfg(not(target_os = "macos"))]
 const MAX_SCAN_THREADS: usize = 8;
 /// 취소된 스캔의 오류 메시지. 프런트엔드는 "cancel" 포함 여부로 취소를 판별한다.
 pub(super) const SCAN_CANCELLED_MESSAGE: &str = "Directory size scan cancelled";
@@ -39,12 +44,16 @@ const SPARSE_FILE_MIN_LEN: u64 = 1024 * 1024 * 1024;
 pub(super) fn counted_file_size(metadata: &fs::Metadata) -> u64 {
     use std::os::unix::fs::MetadataExt;
 
-    let len = metadata.len();
+    counted_size(metadata.len(), metadata.blocks().saturating_mul(512))
+}
+
+/// `counted_file_size`의 기준을 겉보기 크기(`len`)와 할당 크기(`allocated`)로 계산한다.
+#[cfg(unix)]
+fn counted_size(len: u64, allocated: u64) -> u64 {
     if len < SPARSE_FILE_MIN_LEN {
         return len;
     }
 
-    let allocated = metadata.blocks().saturating_mul(512);
     if allocated < len / 2 {
         allocated
     } else {
@@ -117,6 +126,11 @@ impl VolumeBoundary {
     #[cfg(not(unix))]
     pub(super) fn contains(&self, _metadata: &fs::Metadata) -> bool {
         true
+    }
+
+    #[cfg(target_os = "macos")]
+    fn contains_dev(&self, dev: u64) -> bool {
+        dev == self.root_dev
     }
 }
 
@@ -234,6 +248,31 @@ fn entry_metadata(entry: &fs::DirEntry) -> std::io::Result<fs::Metadata> {
 
 struct Cancelled;
 
+/// 디렉터리 항목을 읽는 방식.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DirectoryListing {
+    /// `read_dir` + 항목마다 메타데이터 조회. macOS 외 플랫폼의 기본이다.
+    /// macOS에서는 일괄 조회를 지원하지 않는 디렉터리를 이 방식으로 다시 읽고, 이 값 자체는 비교 테스트·측정에서만 쓴다.
+    #[cfg_attr(all(target_os = "macos", not(test)), allow(dead_code))]
+    Std,
+    /// macOS `getattrlistbulk`로 디렉터리마다 일괄 조회(`bulk_listing.rs`).
+    #[cfg(target_os = "macos")]
+    Bulk,
+}
+
+impl DirectoryListing {
+    pub(super) fn platform_default() -> Self {
+        #[cfg(target_os = "macos")]
+        {
+            Self::Bulk
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Self::Std
+        }
+    }
+}
+
 /// 하드링크 파일 하나: (dev, ino, 집계할 크기). 스캔이 끝난 뒤 (dev, ino)로 한 번만 더한다.
 type HardLinkRecord = (u64, u64, u64);
 
@@ -304,6 +343,7 @@ impl SubtreeStats {
 /// `size`에는 하드링크 파일을 넣지 않는다(중복 제거 전이라 진행값이 최종값을 넘지 않게 한다).
 struct ParallelScan<'a> {
     cancel_flag: &'a AtomicBool,
+    listing: DirectoryListing,
     volume: VolumeBoundary,
     size: AtomicU64,
     scanned_entries: AtomicUsize,
@@ -311,9 +351,14 @@ struct ParallelScan<'a> {
 }
 
 impl<'a> ParallelScan<'a> {
-    fn new(cancel_flag: &'a AtomicBool, root_metadata: &fs::Metadata) -> Self {
+    fn new(
+        cancel_flag: &'a AtomicBool,
+        listing: DirectoryListing,
+        root_metadata: &fs::Metadata,
+    ) -> Self {
         Self {
             cancel_flag,
+            listing,
             volume: VolumeBoundary::new(root_metadata),
             size: AtomicU64::new(0),
             scanned_entries: AtomicUsize::new(0),
@@ -372,10 +417,107 @@ impl<'a> ParallelScan<'a> {
         Ok(stats)
     }
 
+    /// 파일 하나를 집계한다. 하드링크(`hard_link`가 Some)는 끝에서 (dev, ino)로 한 번만 더한다.
+    fn record_file(&self, stats: &mut SubtreeStats, size: u64, hard_link: Option<HardLinkRecord>) {
+        match hard_link {
+            Some(record) => stats.hard_links.push(record),
+            None => {
+                stats.size = stats.size.saturating_add(size);
+                self.size.fetch_add(size, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn record_entry(&self, stats: &mut SubtreeStats) {
+        stats.scanned_entries = stats.scanned_entries.saturating_add(1);
+        self.scanned_entries.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// 디렉터리 항목을 모두 처리하고 내려갈 하위 디렉터리 목록을 돌려준다.
     /// 디렉터리 핸들은 이 함수가 끝나면 닫힌다. 하위로 내려가는 동안 열어 두면
     /// 병렬 작업에서 열린 파일 수가 깊이 × 분기 수만큼 늘어 한도(EMFILE)에 걸릴 수 있다.
     fn read_entries(
+        &self,
+        path: &Path,
+        stats: &mut SubtreeStats,
+    ) -> Result<Vec<PathBuf>, Cancelled> {
+        match self.listing {
+            #[cfg(target_os = "macos")]
+            DirectoryListing::Bulk => match self.read_entries_bulk(path, stats)? {
+                Some(subdirs) => Ok(subdirs),
+                None => self.read_entries_std(path, stats),
+            },
+            DirectoryListing::Std => self.read_entries_std(path, stats),
+        }
+    }
+
+    /// `getattrlistbulk`로 읽는다. 파일시스템이 일괄 조회를 지원하지 않아 항목을 하나도 못 읽었으면
+    /// None을 돌려 `read_dir`로 다시 읽게 한다.
+    #[cfg(target_os = "macos")]
+    fn read_entries_bulk(
+        &self,
+        path: &Path,
+        stats: &mut SubtreeStats,
+    ) -> Result<Option<Vec<PathBuf>>, Cancelled> {
+        use super::bulk_listing::{is_unsupported_error, list_directory, BulkEntryKind};
+        use std::ffi::OsStr;
+        use std::ops::ControlFlow;
+        use std::os::unix::ffi::OsStrExt;
+
+        let entries_before = stats.scanned_entries;
+        let mut subdirs = Vec::new();
+        let outcome = list_directory(path, |entry| {
+            if self.is_cancelled() {
+                return ControlFlow::Break(());
+            }
+            self.record_entry(stats);
+
+            if let Some(errno) = entry.error {
+                self.record_error(stats, &std::io::Error::from_raw_os_error(errno));
+                return ControlFlow::Continue(());
+            }
+
+            match entry.kind {
+                BulkEntryKind::File {
+                    len,
+                    allocated,
+                    link_count,
+                    dev,
+                    file_id,
+                } => {
+                    let size = counted_size(len, allocated);
+                    let hard_link = (link_count > 1).then_some((dev, file_id, size));
+                    self.record_file(stats, size, hard_link);
+                }
+                // 마운트 지점은 일괄 조회에서 덮인 디렉터리의 장치 번호로 보일 수 있어 따로 확인한다.
+                BulkEntryKind::Dir {
+                    dev,
+                    is_mount_point,
+                } if !is_mount_point && self.volume.contains_dev(dev) => {
+                    let child = path.join(OsStr::from_bytes(entry.name));
+                    if !is_data_volume_mirror(&child) {
+                        subdirs.push(child);
+                    }
+                }
+                BulkEntryKind::Dir { .. } | BulkEntryKind::Other => {}
+            }
+            ControlFlow::Continue(())
+        });
+
+        match outcome {
+            Ok(ControlFlow::Continue(())) => Ok(Some(subdirs)),
+            Ok(ControlFlow::Break(())) => Err(Cancelled),
+            Err(e) if stats.scanned_entries == entries_before && is_unsupported_error(&e) => {
+                Ok(None)
+            }
+            Err(e) => {
+                self.record_error(stats, &e);
+                Ok(Some(subdirs))
+            }
+        }
+    }
+
+    fn read_entries_std(
         &self,
         path: &Path,
         stats: &mut SubtreeStats,
@@ -401,8 +543,7 @@ impl<'a> ParallelScan<'a> {
                     continue;
                 }
             };
-            stats.scanned_entries = stats.scanned_entries.saturating_add(1);
-            self.scanned_entries.fetch_add(1, Ordering::Relaxed);
+            self.record_entry(stats);
 
             let metadata = match entry_metadata(&entry) {
                 Ok(metadata) => metadata,
@@ -413,14 +554,11 @@ impl<'a> ParallelScan<'a> {
             };
 
             if metadata.is_file() {
-                match hard_link_record(&metadata) {
-                    Some(record) => stats.hard_links.push(record),
-                    None => {
-                        let size = counted_file_size(&metadata);
-                        stats.size = stats.size.saturating_add(size);
-                        self.size.fetch_add(size, Ordering::Relaxed);
-                    }
-                }
+                self.record_file(
+                    stats,
+                    counted_file_size(&metadata),
+                    hard_link_record(&metadata),
+                );
                 continue;
             }
 
@@ -472,8 +610,28 @@ where
 pub(super) fn scan_path_size_with_pool<F>(
     path: &str,
     cancel_flag: &AtomicBool,
+    emit_progress: F,
+    pool: Option<&ThreadPool>,
+) -> Result<DirectorySizeScanResult, String>
+where
+    F: FnMut(ScanProgress),
+{
+    scan_path_size_with_listing(
+        path,
+        cancel_flag,
+        emit_progress,
+        pool,
+        DirectoryListing::platform_default(),
+    )
+}
+
+/// 항목 읽기 방식을 지정해 스캔한다. 두 방식의 결과 비교 테스트와 측정에서 쓴다.
+pub(super) fn scan_path_size_with_listing<F>(
+    path: &str,
+    cancel_flag: &AtomicBool,
     mut emit_progress: F,
     pool: Option<&ThreadPool>,
+    listing: DirectoryListing,
 ) -> Result<DirectorySizeScanResult, String>
 where
     F: FnMut(ScanProgress),
@@ -498,7 +656,7 @@ where
         result.is_partial = true;
         result.error_count = 1;
     } else if metadata.is_dir() {
-        let scan = ParallelScan::new(cancel_flag, &metadata);
+        let scan = ParallelScan::new(cancel_flag, listing, &metadata);
         let stats = run_with_progress(&scan, target, pool, &mut emit_progress)?;
         result.size = stats.total_size();
         result.is_partial = stats.error_count > 0;
