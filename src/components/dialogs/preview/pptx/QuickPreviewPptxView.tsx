@@ -4,14 +4,14 @@ import { useFileSystem } from "../../../../hooks/useFileSystem";
 import type { PptxRendererModule } from "../quickPreviewRenderers/shared";
 import { PagedPreviewLayout, THUMBNAIL_WIDTH } from "../paged/PagedPreviewLayout";
 import { getFitScale } from "../paged/pageNavigation";
-import type { PptxDeck } from "./pptxDeck";
+import type { ParsePptxDeckOptions, PptxDeck } from "./pptxDeck";
 import { buildSlideDocument, type SlideSize } from "./pptxSlideHtml";
 
 const PAGE_PADDING = 24;
 const PT_TO_PX = 4 / 3;
 
 export interface PptxDeckModule {
-  parsePptxDeck: (bytes: ArrayBuffer) => Promise<PptxDeck>;
+  parsePptxDeck: (bytes: ArrayBuffer, options?: ParsePptxDeckOptions) => Promise<PptxDeck>;
 }
 
 const defaultLoadDeckModule = async (): Promise<PptxDeckModule> => import("./pptxDeck");
@@ -69,6 +69,8 @@ export const QuickPreviewPptxView: React.FC<QuickPreviewPptxViewProps> = ({
   useEffect(() => {
     let disposed = false;
     let openedDeck: PptxDeck | null = null;
+    // 닫거나 파일이 바뀌면 진행 중인 해석 Worker를 멈춘다.
+    const abortController = new AbortController();
     bytesRef.current = null;
     setLoadState({ kind: "loading" });
     setShowText(false);
@@ -96,7 +98,7 @@ export const QuickPreviewPptxView: React.FC<QuickPreviewPptxViewProps> = ({
         bytesRef.current = bytes;
 
         const deckModule = await loadDeckModule();
-        const deck = await deckModule.parsePptxDeck(bytes);
+        const deck = await deckModule.parsePptxDeck(bytes, { signal: abortController.signal });
         if (disposed) {
           deck.dispose();
           return;
@@ -118,6 +120,7 @@ export const QuickPreviewPptxView: React.FC<QuickPreviewPptxViewProps> = ({
 
     return () => {
       disposed = true;
+      abortController.abort();
       openedDeck?.dispose();
       bytesRef.current = null;
     };
