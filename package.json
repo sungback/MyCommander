@@ -39,6 +39,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^1.7.0",
     "marked": "^18.0.3",
+    "pdfjs-dist": "^6.4.299",
     "re-resizable": "^6.11.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

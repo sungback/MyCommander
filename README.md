@@ -24,6 +24,7 @@ MyCommander는 **Tauri v2 + React 19 + TypeScript**로 만든 크로스플랫폼
 - 파일시스템 변경 감시 기반 **자동 패널 갱신**
 - macOS에서 **Dropbox / iCloud Drive / CloudStorage symlink 경로 탐색 지원**
 - **빠른 미리보기**와 텍스트/문서 계열 렌더링
+- PDF 미리보기: 왼쪽 페이지 썸네일, ↑↓(또는 ←→, PageUp/PageDown)로 한 장씩, Home/End로 처음/끝 이동
 - 정규식 / 대소문자 / 숨김 파일 / 파일 유형 / 확장자 / 크기 / 수정일 범위를 지원하는 **고급 파일 검색**
 - 검색 결과 **복사 / 이동 / 삭제**
 - **일괄 이름 변경**

@@ -14,6 +14,7 @@ import { useFileSystem } from "../../../hooks/useFileSystem";
 import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
 import { QuickPreviewJsonView } from "./QuickPreviewJsonView";
 import { QuickPreviewZipView } from "./QuickPreviewZipView";
+import { QuickPreviewPdfView } from "./pdf/QuickPreviewPdfView";
 import type { PreviewState } from "./quickPreviewLoader";
 import type { PreviewStatusContent } from "./quickPreviewStatus";
 
@@ -290,7 +291,11 @@ export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
     )}
 
     {preview.type === "pdf" && preview.src && (
-      <iframe src={preview.src} className="w-full flex-1 border-none" title="PDF preview" />
+      <QuickPreviewPdfView
+        src={preview.src}
+        filePath={filePath ?? ""}
+        readFileBinary={readFileBinary}
+      />
     )}
 
     {preview.type === "rendered" && !showSource && (
