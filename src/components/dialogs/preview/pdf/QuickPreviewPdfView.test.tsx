@@ -28,6 +28,17 @@ const renderView = (renderer: PdfRendererModule, readFileBinary = vi.fn()) =>
     />
   );
 
+/**
+ * 페이지 표시가 나타날 때까지 기다리고, 키 리스너를 등록하는 effect까지 마저 실행한다.
+ * 문서를 비동기로 연 뒤의 렌더링은 act 밖에서 일어나 effect가 늦게 돌 수 있어,
+ * 부하가 큰 전체 테스트 실행에서 첫 키 입력이 사라지곤 했다.
+ */
+const findPageIndicator = async (text: string) => {
+  const indicator = await screen.findByText(text);
+  await act(async () => {});
+  return indicator;
+};
+
 const pressKey = (key: string) => {
   act(() => {
     fireEvent.keyDown(window, { key });
@@ -44,7 +55,7 @@ describe("QuickPreviewPdfView", () => {
     const document = makeDocument(3);
     renderView(makeRenderer(async () => document));
 
-    expect(await screen.findByText("1 / 3")).toBeInTheDocument();
+    expect(await findPageIndicator("1 / 3")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /페이지로 이동/ })).toHaveLength(3);
     expect(screen.getByRole("button", { name: "1페이지로 이동" })).toHaveAttribute(
       "aria-current",
@@ -126,7 +137,7 @@ describe("QuickPreviewPdfView", () => {
       />
     );
     const { rerender } = render(view);
-    await screen.findByText("1 / 2");
+    await findPageIndicator("1 / 2");
 
     rerender(view);
     pressKey("ArrowDown");
