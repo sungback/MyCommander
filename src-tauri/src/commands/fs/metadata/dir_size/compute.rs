@@ -1,34 +1,13 @@
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
 
-use super::scan::{
-    counted_file_size, scan_path_size_with_progress, HardLinkTracker, VolumeBoundary,
-};
+use super::scan::{counted_file_size, HardLinkTracker, VolumeBoundary};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
 pub(super) const DEFAULT_ESTIMATE_MAX_ENTRIES: usize = 200;
 const MAX_ESTIMATE_DEPTH: usize = 4;
 const MAX_ESTIMATE_ENTRIES: usize = 5_000;
-
-pub(crate) fn compute_path_size(path: &str) -> Result<u64, String> {
-    // 링크를 따라가지 않는다. 심볼릭 링크 자체는 스캐너와 같은 기준으로 크기 0으로 본다.
-    let metadata = fs::symlink_metadata(path).map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            format!("{path} does not exist")
-        } else {
-            e.to_string()
-        }
-    })?;
-
-    if metadata.is_file() {
-        return Ok(counted_file_size(&metadata));
-    }
-
-    // 목록 표시와 같은 기준(겉보기 크기, 하드링크 한 번만 집계)을 쓰도록 스캔 결과를 사용한다.
-    get_dir_size_with_walkdir(path)
-}
 
 pub(crate) fn estimate_path_size(
     path: &str,
@@ -90,11 +69,6 @@ fn is_windows_reparse_point(metadata: &fs::Metadata) -> bool {
 #[cfg(not(target_os = "windows"))]
 fn is_windows_reparse_point(_metadata: &fs::Metadata) -> bool {
     false
-}
-
-fn get_dir_size_with_walkdir(path: &str) -> Result<u64, String> {
-    let cancel_flag = AtomicBool::new(false);
-    scan_path_size_with_progress(path, &cancel_flag, |_| {}).map(|result| result.size)
 }
 
 fn scan_estimate_dir(

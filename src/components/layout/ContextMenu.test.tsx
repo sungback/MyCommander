@@ -17,7 +17,6 @@ const {
   mockSetActivePanel,
   mockSubmitJob,
   mockCancelDirSizeScan,
-  mockGetDirSize,
   mockScanDirSize,
   mockRenameFile,
   mockOpenInTerminal,
@@ -40,7 +39,6 @@ const {
   mockSetActivePanel: vi.fn(),
   mockSubmitJob: vi.fn(),
   mockCancelDirSizeScan: vi.fn(),
-  mockGetDirSize: vi.fn(),
   mockScanDirSize: vi.fn(),
   mockRenameFile: vi.fn(),
   mockOpenInTerminal: vi.fn(),
@@ -126,7 +124,6 @@ vi.mock("../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     cancelDirSizeScan: mockCancelDirSizeScan,
     extractZip: mockExtractZip,
-    getDirSize: mockGetDirSize,
     openInTerminal: mockOpenInTerminal,
     renameFile: mockRenameFile,
     scanDirSize: mockScanDirSize,
@@ -193,7 +190,6 @@ describe("ContextMenu", () => {
     });
     mockExtractZip.mockResolvedValue(undefined);
     mockCancelDirSizeScan.mockResolvedValue(undefined);
-    mockGetDirSize.mockResolvedValue(42);
     mockScanDirSize.mockResolvedValue({
       size: 42,
       isPartial: false,

@@ -238,15 +238,6 @@ describe("fileCommands", () => {
     });
   });
 
-  describe("getDirSize", () => {
-    it("calls get_dir_size and returns number", async () => {
-      mockInvoke.mockResolvedValue(1024);
-      const result = await fileCommands.getDirSize("/some/dir");
-      expect(mockInvoke).toHaveBeenCalledWith("get_dir_size", { path: "/some/dir" });
-      expect(result).toBe(1024);
-    });
-  });
-
   describe("estimateDirSize", () => {
     it("calls estimate_dir_size with limits and returns estimate metadata", async () => {
       mockInvoke.mockResolvedValue({

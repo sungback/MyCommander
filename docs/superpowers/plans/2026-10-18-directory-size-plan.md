@@ -3,7 +3,7 @@
 - 작성일: 2026-10-18
 - 기준 커밋: `a5839fa` (1.2.55)
 - 대상 코드
-  - Rust: `src-tauri/src/commands/fs/metadata/dir_size/` (`compute.rs`, `scan.rs`, `shared_scan.rs`, `mod.rs`, `types.rs`), `metadata/size_cache.rs`
+  - Rust: `src-tauri/src/commands/fs/metadata/dir_size/` (`compute.rs`, `scan.rs`, `shared_scan.rs`, `bench.rs`, `mod.rs`, `types.rs`), `metadata/size_cache.rs`
   - Frontend: `src/components/panel/size/`, `src/hooks/manualDirectorySizeScan.ts`, `src/store/panelStoreFile*.ts`
 - 원칙: 일반적인 설계 원칙만 적용한다.
   - 계산 전에 캐시를 확인하고, 취소된 결과는 저장하지 않는다.
@@ -82,8 +82,10 @@ done
 - [x] 각 항목에 회귀 테스트를 추가했다(Rust 12개, 프런트엔드 8개).
 
 ### 1단계 후속 과제
-- [ ] 정보 다이얼로그(`useDialogInfo` → `get_dir_size`)는 크기 숫자만 받으므로, 접근 불가 항목이 있어도 exact로 저장한다. `get_dir_size`가 `inaccessible_count`도 돌려주게 바꾼다(IPC 반환 형식 변경).
-- [ ] 1GiB 미만 sparse 파일은 겉보기 크기로 센다. 0단계 측정에서 차이가 크게 나오면 기준을 다시 정한다.
+- [x] 정보 다이얼로그(`useDialogInfo` → `get_dir_size`)는 크기 숫자만 받으므로, 접근 불가 항목이 있어도 exact로 저장한다.
+  - 2026-10-18 완료: 다이얼로그도 `scan_dir_size`를 써서 `limited`·partial을 반영하고("≥", "+" 표시), 같은 경로 계산을 공유하며, 닫으면 대기를 취소한다. 쓰이지 않게 된 `get_dir_size` 명령(권한·capability 포함)과 `compute_path_size`는 제거했다.
+- [x] 1GiB 미만 sparse 파일은 겉보기 크기로 센다. 0단계 측정에서 차이가 크게 나오면 기준을 다시 정한다.
+  - 2026-10-18 결정: 변경하지 않는다. `~/Library`에서 99개, 0.02 GiB뿐이었다.
 
 ## 2단계: 속도 (측정으로 효과를 확인한 것만 채택)
 - [ ] 병렬 순회: 전용 `rayon::ThreadPool`(스레드 4~8개). `sysinfo`가 쓰는 전역 풀과 분리한다.

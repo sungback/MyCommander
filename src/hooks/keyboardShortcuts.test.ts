@@ -240,7 +240,7 @@ describe('calculatePanelDirectories', () => {
     expect(updateEntrySize).not.toHaveBeenCalled();
   });
 
-  it('catches error from getDirSize without rethrowing — updateEntrySize not called for that entry', async () => {
+  it('catches error from scanDirSize without rethrowing — updateEntrySize not called for that entry', async () => {
     const cancelDirSizeScan = vi.fn().mockResolvedValue(undefined);
     const scanDirSize = vi.fn().mockRejectedValue(new Error('permission denied'));
     const updateEntrySize = vi.fn();

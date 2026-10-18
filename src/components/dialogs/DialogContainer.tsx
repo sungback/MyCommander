@@ -34,6 +34,7 @@ export const DialogContainer: React.FC = () => {
     isPasteMode,
   } = useDialogStore();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
+  const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
   const activePanelId = usePanelStore((s) => s.activePanel);
   const leftPanel = usePanelStore((s) => s.leftPanel);
   const rightPanel = usePanelStore((s) => s.rightPanel);
@@ -64,11 +65,12 @@ export const DialogContainer: React.FC = () => {
     activePanel,
   });
 
-  const { infoSize, infoLoading, infoError } = useDialogInfo({
+  const { infoSize, infoSizeStatus, infoLoading, infoError } = useDialogInfo({
     openDialog,
     dialogTarget,
     infoEntry,
     updateEntrySize,
+    updateEntrySizeEstimate,
     fs,
   });
 
@@ -252,6 +254,7 @@ export const DialogContainer: React.FC = () => {
         onClose={closeDialog}
         infoEntry={infoEntry}
         infoSize={infoSize}
+        infoSizeStatus={infoSizeStatus}
         infoLoading={infoLoading}
         infoError={infoError}
       />

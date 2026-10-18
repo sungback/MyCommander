@@ -178,10 +178,6 @@ export const fileCommands = {
     return await invoke<StorageKind[]>("classify_storage_paths", { paths });
   },
 
-  getDirSize: async (path: string): Promise<number> => {
-    return await invoke<number>("get_dir_size", { path });
-  },
-
   estimateDirSize: async (
     path: string,
     options: { maxDepth?: number; maxEntries?: number } = {}

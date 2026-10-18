@@ -14,7 +14,6 @@ const {
   listenHandlers,
   mockCheckCopyConflicts,
   mockEstimateDirSize,
-  mockGetDirSize,
   mockListDirectory,
   mockListJobs,
   mockSubmitJob,
@@ -23,7 +22,6 @@ const {
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
   mockCheckCopyConflicts: vi.fn(),
   mockEstimateDirSize: vi.fn(),
-  mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockListJobs: vi.fn(),
   mockSubmitJob: vi.fn(),
@@ -70,7 +68,6 @@ vi.mock("./useFileSystem", () => ({
     checkCopyConflicts: mockCheckCopyConflicts,
     submitJob: mockSubmitJob,
     estimateDirSize: mockEstimateDirSize,
-    getDirSize: mockGetDirSize,
   }),
 }));
 
@@ -138,7 +135,6 @@ describe("useJobQueue + expanded preview refresh", () => {
     mockCheckCopyConflicts.mockReset();
     mockEstimateDirSize.mockReset();
     mockSubmitJob.mockReset();
-    mockGetDirSize.mockReset();
     mockStartDrag.mockReset();
 
     mockListJobs.mockResolvedValue([]);
@@ -149,7 +145,6 @@ describe("useJobQueue + expanded preview refresh", () => {
       scannedEntries: 0,
     });
     mockSubmitJob.mockResolvedValue(undefined);
-    mockGetDirSize.mockResolvedValue(0);
 
     usePanelStore.getState().setPath("left", "/Users/back/_Dn");
     usePanelStore.getState().setPath("right", "/Users/back/_Dn/_abc");

@@ -4,7 +4,6 @@ import {
   alertSpy,
   lastFileListProps,
   mockEstimateDirSize,
-  mockGetDirSize,
   mockListDirectory,
   mockOpenContextMenu,
   mockResolvePath,
@@ -36,7 +35,6 @@ describe('FilePanel', () => {
 
     setMockExtraFileListRows([expandedChild]);
     mockListDirectory.mockResolvedValue([rootEntry]);
-    mockGetDirSize.mockResolvedValue(0);
 
     setLeftPanelPath("/home/user");
     render(<FilePanel id="left" />);
@@ -224,7 +222,6 @@ describe('FilePanel', () => {
         ? "/Users/back/Library/CloudStorage/Dropbox"
         : path
     );
-    mockGetDirSize.mockResolvedValue(0);
 
     render(<FilePanel id="left" />);
 
@@ -276,7 +273,6 @@ describe('FilePanel', () => {
         ? "/Users/back/Library/CloudStorage/Dropbox"
         : path
     );
-    mockGetDirSize.mockResolvedValue(0);
 
     render(<FilePanel id="left" />);
 
@@ -312,7 +308,6 @@ describe('FilePanel', () => {
       throw new Error("permission denied");
     });
     mockResolvePath.mockImplementation(async (path: string) => path);
-    mockGetDirSize.mockResolvedValue(0);
 
     render(<FilePanel id="left" />);
 
@@ -358,7 +353,6 @@ describe('FilePanel', () => {
         ? "/Users/back/Library/CloudStorage/Dropbox"
         : path
     );
-    mockGetDirSize.mockResolvedValue(0);
 
     setLeftPanelPath("/Users/back");
     render(<FilePanel id="left" />);

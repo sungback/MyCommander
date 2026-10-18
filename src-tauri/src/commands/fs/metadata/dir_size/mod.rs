@@ -5,19 +5,11 @@ mod scan;
 mod shared_scan;
 mod types;
 
-#[cfg(test)]
-pub(crate) use compute::compute_path_size;
 pub use shared_scan::DirSizeScanState;
 pub use types::{DirectorySizeEstimate, DirectorySizeProgress, DirectorySizeScanResult};
 
 use compute::{DEFAULT_ESTIMATE_MAX_DEPTH, DEFAULT_ESTIMATE_MAX_ENTRIES};
 use tauri::{AppHandle, Emitter};
-
-pub async fn get_dir_size(path: String) -> Result<u64, String> {
-    tokio::task::spawn_blocking(move || compute::compute_path_size(&path))
-        .await
-        .map_err(|e| e.to_string())?
-}
 
 pub async fn estimate_dir_size(
     path: String,
@@ -72,7 +64,6 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 
 #[cfg(test)]
 mod tests {
-    use super::compute::compute_path_size;
     use super::compute::estimate_path_size;
     use super::scan::scan_path_size_with_progress;
     #[cfg(unix)]
@@ -291,27 +282,6 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn compute_path_size_matches_scan_and_counts_hard_links_once() {
-        let root = make_temp_dir("compute-hardlink");
-        let original = root.join("original.bin");
-        fs::write(&original, vec![1_u8; 8192]).unwrap();
-        fs::hard_link(&original, root.join("link.bin")).unwrap();
-        fs::write(root.join("small.bin"), [1_u8; 10]).unwrap();
-        let cancel_flag = AtomicBool::new(false);
-
-        let computed = compute_path_size(root.to_str().unwrap()).unwrap();
-        let scanned = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {})
-            .unwrap()
-            .size;
-
-        assert_eq!(computed, 8202);
-        assert_eq!(computed, scanned);
-
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[cfg(unix)]
-    #[test]
     fn estimate_path_size_counts_hard_linked_files_once() {
         let root = make_temp_dir("estimate-hardlink");
         let original = root.join("original.bin");
@@ -417,8 +387,8 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn compute_path_size_does_not_follow_symlinks() {
-        let root = make_temp_dir("compute-symlink");
+    fn scan_path_size_does_not_follow_symlinked_roots() {
+        let root = make_temp_dir("scan-symlink-root");
         let target_file = root.join("target.bin");
         let target_dir = root.join("target-dir");
         fs::write(&target_file, [1_u8; 100]).unwrap();
@@ -427,26 +397,34 @@ mod tests {
         symlink(&target_file, root.join("file-link")).unwrap();
         symlink(&target_dir, root.join("dir-link")).unwrap();
         symlink(root.join("missing"), root.join("dangling-link")).unwrap();
+        let cancel_flag = AtomicBool::new(false);
 
-        let file_link = compute_path_size(root.join("file-link").to_str().unwrap());
-        let dir_link = compute_path_size(root.join("dir-link").to_str().unwrap());
-        let dangling_link = compute_path_size(root.join("dangling-link").to_str().unwrap());
+        for link in ["file-link", "dir-link", "dangling-link"] {
+            let result = scan_path_size_with_progress(
+                root.join(link).to_str().unwrap(),
+                &cancel_flag,
+                |_| {},
+            )
+            .unwrap();
 
-        assert_eq!(file_link, Ok(0));
-        assert_eq!(dir_link, Ok(0));
-        assert_eq!(dangling_link, Ok(0));
+            assert_eq!(result.size, 0, "{link}");
+            assert!(result.is_partial, "{link}");
+        }
 
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn compute_path_size_reports_missing_path() {
-        let result = compute_path_size("/nonexistent/mycommander/size/path");
+    fn scan_path_size_reports_missing_path() {
+        let cancel_flag = AtomicBool::new(false);
 
-        assert_eq!(
-            result.unwrap_err(),
-            "/nonexistent/mycommander/size/path does not exist"
+        let result = scan_path_size_with_progress(
+            "/nonexistent/mycommander/size/path",
+            &cancel_flag,
+            |_| {},
         );
+
+        assert!(result.is_err());
     }
 
     fn unix_ms() -> u64 {

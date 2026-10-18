@@ -67,7 +67,6 @@ pub fn run() {
             commands::fs::metadata::preview_sqlite_database,
             commands::search_commands::search_files,
             commands::fs::metadata::classify_storage_paths,
-            commands::fs::metadata::get_dir_size,
             commands::fs::metadata::estimate_dir_size,
             commands::fs::metadata::scan_dir_size,
             commands::fs::metadata::cancel_dir_size_scan,

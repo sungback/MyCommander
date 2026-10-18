@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
-  mockGetDirSize,
   mockListDirectory,
   registerFilePanelTestLifecycle,
   setLeftPanelPath,
@@ -22,7 +21,6 @@ describe("FilePanel quick filter", () => {
 
   it("filters the current folder by filename", async () => {
     mockListDirectory.mockResolvedValue(entries);
-    mockGetDirSize.mockResolvedValue(0);
     setLeftPanelPath("/home/user");
 
     render(<FilePanel id="left" />);
@@ -42,7 +40,6 @@ describe("FilePanel quick filter", () => {
 
   it("clears hidden selections while a quick filter is active", async () => {
     mockListDirectory.mockResolvedValue(entries);
-    mockGetDirSize.mockResolvedValue(0);
     setLeftPanelPath("/home/user");
 
     render(<FilePanel id="left" />);
@@ -69,7 +66,6 @@ describe("FilePanel quick filter", () => {
 
   it("clears the quick filter with the clear button", async () => {
     mockListDirectory.mockResolvedValue(entries);
-    mockGetDirSize.mockResolvedValue(0);
     setLeftPanelPath("/home/user");
 
     render(<FilePanel id="left" />);

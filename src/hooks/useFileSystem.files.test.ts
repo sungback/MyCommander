@@ -269,16 +269,4 @@ describe('useFileSystem', () => {
     });
   });
 
-  // ─── getDirSize ────────────────────────────────────────────────────────────
-  describe('getDirSize', () => {
-    it('returns directory size in bytes', async () => {
-      mockInvoke.mockResolvedValueOnce(4096);
-      const result = await useFileSystem().getDirSize('/home/user/Documents');
-      expect(mockInvoke).toHaveBeenCalledWith('get_dir_size', {
-        path: '/home/user/Documents',
-      });
-      expect(result).toBe(4096);
-    });
-  });
-
 });

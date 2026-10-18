@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   mockCreateDirectory,
   mockCreateFile,
-  mockGetDirSize,
+  mockCancelDirSizeScan,
+  mockScanDirSize,
   mockRefreshPanelsForDirectories,
   mockRenameFile,
   mockSubmitJob,
@@ -19,7 +20,14 @@ describe('DialogContainer', () => {
   registerDialogContainerTestLifecycle();
 
   it("loads folder size in the info dialog for directories without a cached size", async () => {
-    mockGetDirSize.mockResolvedValue(2048);
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 3,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1,
+    });
     useDialogStore.setState((state) => ({
       ...state,
       openDialog: "info",
@@ -35,11 +43,64 @@ describe('DialogContainer', () => {
     expect(screen.getByText("Calculating...")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockGetDirSize).toHaveBeenCalledWith("/home/user/LargeFolder");
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/home/user/LargeFolder",
+        expect.stringMatching(/^info-dir-size-left-/)
+      );
     });
     await waitFor(() => {
       expect(screen.getByText("2.0 KB")).toBeInTheDocument();
     });
+    expect(usePanelStore.getState().sizeStatusCache["/home/user/LargeFolder"]).toBe("exact");
+  });
+
+  it("marks info dialog folder sizes with unreadable entries as lower bounds", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: false,
+      scannedEntries: 5,
+      errorCount: 0,
+      inaccessibleCount: 2,
+      startedAtMs: 1,
+    });
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "info",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/LargeFolder",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    await waitFor(() => {
+      expect(screen.getByText("≥4.0 KB")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Excludes items without read permission.")).toBeInTheDocument();
+    expect(usePanelStore.getState().sizeStatusCache["/home/user/LargeFolder"]).toBe("limited");
+  });
+
+  it("cancels the info dialog folder scan when the dialog closes", async () => {
+    mockScanDirSize.mockReturnValue(new Promise(() => undefined));
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "info",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/LargeFolder",
+      },
+    }));
+
+    render(<DialogContainer />);
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalled());
+    const scanId = mockScanDirSize.mock.calls[0][1];
+
+    act(() => {
+      useDialogStore.setState((state) => ({ ...state, openDialog: null }));
+    });
+
+    await waitFor(() => expect(mockCancelDirSizeScan).toHaveBeenCalledWith(scanId));
   });
 
   it("creates a directory in the active panel path", async () => {
