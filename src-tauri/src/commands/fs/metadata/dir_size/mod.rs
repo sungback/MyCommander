@@ -65,9 +65,16 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
 #[cfg(test)]
 mod tests {
     use super::compute::estimate_path_size;
+    #[cfg(target_os = "windows")]
+    use super::scan::is_windows_unc_path;
     #[cfg(unix)]
     use super::scan::VolumeBoundary;
-    use super::scan::{is_data_volume_mirror, scan_path_size_with_progress};
+    use super::scan::{
+        build_scan_pool, is_data_volume_mirror, scan_path_size_with_pool,
+        scan_path_size_with_progress,
+    };
+    #[cfg(target_os = "macos")]
+    use super::scan::{filesystem_type_name, is_network_filesystem, is_network_filesystem_type};
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
@@ -451,6 +458,114 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    /// 병렬 스캐너 결과에서 시작 시각만 뺀 비교용 값.
+    fn comparable(result: &super::DirectorySizeScanResult) -> (u64, bool, usize, usize, usize) {
+        (
+            result.size,
+            result.is_partial,
+            result.scanned_entries,
+            result.error_count,
+            result.inaccessible_count,
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parallel_scan_counts_hard_links_spread_across_workers_once() {
+        let root = make_temp_dir("parallel-hardlinks");
+        let original = root.join("original.bin");
+        fs::write(&original, vec![1_u8; 10_000]).unwrap();
+        for dir in 0..32 {
+            let dir_path = root.join(format!("dir-{dir:02}"));
+            fs::create_dir_all(&dir_path).unwrap();
+            for link in 0..4 {
+                fs::hard_link(&original, dir_path.join(format!("link-{link}.bin"))).unwrap();
+            }
+        }
+        let cancel_flag = AtomicBool::new(false);
+        let mut max_progress = 0;
+
+        let result =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |progress| {
+                max_progress = max_progress.max(progress.size);
+            })
+            .unwrap();
+
+        assert_eq!(result.size, 10_000);
+        // 진행값은 중복 제거 전 하드링크를 넣지 않으므로 최종값을 넘지 않는다.
+        assert!(max_progress <= result.size);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn parallel_scan_handles_deeply_nested_directories() {
+        let root = make_temp_dir("parallel-deep");
+        let mut deepest = root.clone();
+        for _ in 0..400 {
+            deepest.push("d");
+        }
+        fs::create_dir_all(&deepest).unwrap();
+        fs::write(deepest.join("leaf.bin"), [1_u8; 7]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let result =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
+
+        assert_eq!(result.size, 7);
+        assert_eq!(result.scanned_entries, 401);
+        assert!(!result.is_partial);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn single_thread_pool_matches_default_pool() {
+        let root = make_temp_dir("parallel-single-pool");
+        for dir in 0..5 {
+            let dir_path = root.join(format!("dir-{dir}"));
+            fs::create_dir_all(&dir_path).unwrap();
+            fs::write(dir_path.join("file.bin"), vec![1_u8; dir * 10 + 1]).unwrap();
+        }
+        let cancel_flag = AtomicBool::new(false);
+        let single = build_scan_pool(1).unwrap();
+
+        let default =
+            scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
+        let single =
+            scan_path_size_with_pool(root.to_str().unwrap(), &cancel_flag, |_| {}, Some(&single))
+                .unwrap();
+
+        assert_eq!(comparable(&default), comparable(&single));
+        assert_eq!(default.size, 1 + 11 + 21 + 31 + 41);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn network_filesystem_detection_reads_local_root_as_local() {
+        assert_eq!(
+            filesystem_type_name(std::path::Path::new("/")).as_deref(),
+            Some("apfs")
+        );
+        assert!(!is_network_filesystem(std::path::Path::new("/")));
+        assert!(is_network_filesystem_type("smbfs"));
+        assert!(is_network_filesystem_type("nfs"));
+        assert!(is_network_filesystem_type("webdav"));
+        assert!(!is_network_filesystem_type("apfs"));
+        assert!(!is_network_filesystem_type("hfs"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_unc_paths_are_treated_as_network() {
+        assert!(is_windows_unc_path(r"\\server\share\dir"));
+        assert!(is_windows_unc_path(r"\\?\UNC\server\share"));
+        assert!(!is_windows_unc_path(r"\\?\C:\Users"));
+        assert!(!is_windows_unc_path(r"C:\Users"));
     }
 
     fn unix_ms() -> u64 {

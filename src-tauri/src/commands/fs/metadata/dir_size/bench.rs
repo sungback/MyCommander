@@ -6,7 +6,9 @@
 //!
 //! 측정:
 //! `MYCOMMANDER_SIZE_BENCH_PATHS=<path1>:<path2> cargo test --release --lib dir_size::bench::measure -- --ignored --nocapture`
-//! - `MYCOMMANDER_SIZE_BENCH_METHOD`: `scanner` | `du` | `all`(기본값). cold에서 `du`는 `du -skx`만 잰다.
+//! - `MYCOMMANDER_SIZE_BENCH_METHOD`: `scanner` | `du` | `threads` | `all`(기본값). cold에서 `du`는 `du -skx`만 잰다.
+//!   `threads`는 스레드 수별 병렬 스캐너(`scanner-tN`)를 비교한다.
+//! - `MYCOMMANDER_SIZE_BENCH_THREADS`: `threads`에서 잴 스레드 수 목록(기본값 `1,2,4,8`)
 //! - `MYCOMMANDER_SIZE_BENCH_MODE`: `warm`(기본값, 예열 1회 후 3회 교차 실행의 중앙값) | `cold`(1회, 실행 전 `sudo purge`)
 
 use std::env;
@@ -15,18 +17,22 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
-use super::scan::scan_path_size_with_progress;
+use super::scan::{build_scan_pool, scan_path_size_with_pool, scan_path_size_with_progress};
 
 const PATHS_ENV: &str = "MYCOMMANDER_SIZE_BENCH_PATHS";
 const METHOD_ENV: &str = "MYCOMMANDER_SIZE_BENCH_METHOD";
 const MODE_ENV: &str = "MYCOMMANDER_SIZE_BENCH_MODE";
 const FIXTURES_ENV: &str = "MYCOMMANDER_SIZE_BENCH_FIXTURES";
+const THREADS_ENV: &str = "MYCOMMANDER_SIZE_BENCH_THREADS";
 const WARM_REPEAT: usize = 3;
 const FIXTURE_MARKER: &str = ".mycommander-size-bench-v1";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Method {
+    /// 앱과 같은 경로(기본 전용 풀).
     Scanner,
+    /// 스레드 수를 지정한 병렬 스캐너. 측정마다 새 풀을 만든다.
+    ScannerThreads(usize),
     /// 할당 크기. 1단계 이전 `.app` 계산 방식과 같다.
     DuAllocated,
     /// 겉보기 크기. 스캐너와 기준이 같지만 디렉터리 자체 크기도 더하고 sparse 보정이 없다.
@@ -34,11 +40,12 @@ enum Method {
 }
 
 impl Method {
-    fn label(self) -> &'static str {
+    fn label(self) -> String {
         match self {
-            Method::Scanner => "scanner",
-            Method::DuAllocated => "du -skx",
-            Method::DuApparent => "du -sAkx",
+            Method::Scanner => "scanner".to_string(),
+            Method::ScannerThreads(threads) => format!("scanner-t{threads}"),
+            Method::DuAllocated => "du -skx".to_string(),
+            Method::DuApparent => "du -sAkx".to_string(),
         }
     }
 }
@@ -59,8 +66,26 @@ fn selected_methods() -> Vec<Method> {
         // cold에서 du를 두 번 돌리면 두 번째는 캐시가 데워진 상태라 할당 크기 1회만 잰다.
         Ok("du") if is_cold_mode() => vec![Method::DuAllocated],
         Ok("du") => vec![Method::DuAllocated, Method::DuApparent],
+        Ok("threads") => selected_thread_counts()
+            .into_iter()
+            .map(Method::ScannerThreads)
+            .collect(),
         _ => vec![Method::Scanner, Method::DuAllocated, Method::DuApparent],
     }
+}
+
+fn selected_thread_counts() -> Vec<usize> {
+    env::var(THREADS_ENV)
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .filter_map(|count| count.trim().parse::<usize>().ok())
+                .filter(|count| *count > 0)
+                .collect::<Vec<_>>()
+        })
+        .filter(|counts| !counts.is_empty())
+        .unwrap_or_else(|| vec![1, 2, 4, 8])
 }
 
 fn is_cold_mode() -> bool {
@@ -69,17 +94,33 @@ fn is_cold_mode() -> bool {
 
 fn run_method(method: Method, path: &Path) -> Result<Sample, String> {
     match method {
-        Method::Scanner => run_scanner(path),
+        Method::Scanner => run_scanner(path, ScannerKind::Default),
+        Method::ScannerThreads(threads) => run_scanner(path, ScannerKind::Threads(threads)),
         Method::DuAllocated => run_du(path, "-skx"),
         Method::DuApparent => run_du(path, "-sAkx"),
     }
 }
 
-fn run_scanner(path: &Path) -> Result<Sample, String> {
+enum ScannerKind {
+    Default,
+    Threads(usize),
+}
+
+fn run_scanner(path: &Path, kind: ScannerKind) -> Result<Sample, String> {
     let path = path.to_str().ok_or("path is not valid UTF-8")?;
     let cancel_flag = AtomicBool::new(false);
+    // 풀 생성 시간은 측정에 넣지 않는다.
+    let pool = match kind {
+        ScannerKind::Threads(threads) => Some(build_scan_pool(threads)?),
+        _ => None,
+    };
     let started = Instant::now();
-    let result = scan_path_size_with_progress(path, &cancel_flag, |_| {})?;
+    let result = match kind {
+        ScannerKind::Default => scan_path_size_with_progress(path, &cancel_flag, |_| {})?,
+        ScannerKind::Threads(_) => {
+            scan_path_size_with_pool(path, &cancel_flag, |_| {}, pool.as_ref())?
+        }
+    };
 
     Ok(Sample {
         elapsed: started.elapsed(),
