@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { BatchRenameOperation } from "../../features/multiRename";
-import type { DirectorySizeStatus, FileEntry } from "../../types/file";
+import type {
+  DirectorySizeStatus,
+  FileEntry,
+  ScannedChildDirectorySize,
+} from "../../types/file";
 import type { SqliteDatabasePreview } from "../../types/sqlitePreview";
 
 export type PersistentDirectorySizeStatus = Extract<
@@ -26,6 +30,8 @@ export interface DirectorySizeScanResult {
   inaccessibleCount: number;
   // 스캔을 실제로 시작한 시각(Unix ms). 같은 경로의 진행 중인 스캔에 합류한 요청도 이 값을 받는다.
   startedAtMs: number;
+  // 스캔하며 함께 구한 하위 폴더 결과(깊이 1~2, 큰 폴더부터 최대 2,000개)
+  children: ScannedChildDirectorySize[];
 }
 
 export interface DirectorySizeProgressEvent {
@@ -67,6 +73,7 @@ interface DirectorySizeScanResponse {
   errorCount: number;
   inaccessibleCount: number;
   startedAtMs: number;
+  children: ScannedChildDirectorySize[];
 }
 
 interface PersistentDirectorySizeCacheLoadResponse {
@@ -211,6 +218,7 @@ export const fileCommands = {
       errorCount: result.errorCount,
       inaccessibleCount: result.inaccessibleCount,
       startedAtMs: result.startedAtMs,
+      children: result.children ?? [],
     };
   },
 

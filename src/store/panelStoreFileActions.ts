@@ -22,6 +22,7 @@ import {
 import { normalizePathKey } from "../utils/panelHelpers";
 import type { DirectorySizeStatus } from "../types/file";
 import {
+  getSizeScannedAt,
   isConfirmedSizeStatus,
   shouldCacheSizeStatus,
   toHydratedStatus,
@@ -44,6 +45,7 @@ type FileActions = Pick<
   | "updateEntrySize"
   | "updateEntrySizeEstimate"
   | "updateEntrySizeProgress"
+  | "applyScannedChildSizes"
   | "hydrateEntrySizesFromCache"
 >;
 
@@ -253,6 +255,84 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     });
   },
+
+  applyScannedChildSizes: (children, scanStartedAt) =>
+    set((state) => {
+      let leftPanel = state.leftPanel;
+      let rightPanel = state.rightPanel;
+      const nextSizeCache = { ...state.sizeCache };
+      const nextStatusCache = { ...state.sizeStatusCache };
+      const nextStaleCache = { ...state.sizeCacheStale };
+      // 패널 목록 갱신은 화면에 있는 항목만 한다(하위 폴더 수 × 패널 항목 수만큼 순회하지 않게).
+      // 펼친 트리의 하위 행은 sizeCache를 직접 읽으므로 캐시만 갱신하면 된다.
+      const visibleEntryKeys = new Set(
+        [leftPanel, rightPanel].flatMap((panel) =>
+          panel.tabs.flatMap((tab) => tab.files.map((entry) => normalizePathKey(entry.path)))
+        )
+      );
+      let changed = false;
+
+      for (const child of children) {
+        const key = normalizePathKey(child.path);
+        // 이 스캔이 시작된 뒤에 끝난 다른 계산의 결과가 있으면 그 값이 더 최신이다.
+        // 빠른 추정값이나 계산 중 표시는 정확 결과를 막지 않는다.
+        const existingStatus = state.sizeStatusCache[key];
+        const existingScannedAt = getSizeScannedAt(child.path);
+        if (
+          (isConfirmedSizeStatus(existingStatus) || existingStatus === "partial") &&
+          existingScannedAt !== undefined &&
+          existingScannedAt > scanStartedAt
+        ) {
+          continue;
+        }
+
+        const status = child.isPartial
+          ? "partial"
+          : child.inaccessibleCount > 0
+            ? "limited"
+            : "exact";
+        // 스캔 도중 이 폴더 안에서 변경이 감지됐으면 값을 쓰되 stale로 남겨 다시 계산한다.
+        const changedDuringScan = hasSizeChangedSince(child.path, scanStartedAt);
+        if (visibleEntryKeys.has(key)) {
+          const nextPanels = updateEntrySizeAcrossPanels(
+            leftPanel,
+            rightPanel,
+            child.path,
+            child.size,
+            status
+          );
+          leftPanel = nextPanels.leftPanel;
+          rightPanel = nextPanels.rightPanel;
+        }
+        nextSizeCache[key] = child.size;
+        nextStatusCache[key] = status;
+        nextStaleCache[key] = changedDuringScan;
+        changed = true;
+
+        // 바로 아래 폴더만 디스크 캐시에 남기고, 더 깊은 결과는 이번 실행의 메모리에만 둔다.
+        if (child.depth === 1) {
+          queueStableSizeCacheWrite(child.path, child.size, status, scanStartedAt);
+        } else {
+          recordSizeScannedAt(child.path, scanStartedAt);
+        }
+        if (!changedDuringScan) {
+          // 폴더에 들어가자마자 같은 값을 다시 계산하지 않게 한다.
+          markSizeVerifiedThisSession(child.path);
+        }
+      }
+
+      if (!changed) {
+        return state;
+      }
+
+      return {
+        sizeCache: nextSizeCache,
+        sizeStatusCache: nextStatusCache,
+        sizeCacheStale: nextStaleCache,
+        leftPanel,
+        rightPanel,
+      };
+    }),
 
   updateEntrySizeProgress: (_panel, path, size) =>
     set((state) => {

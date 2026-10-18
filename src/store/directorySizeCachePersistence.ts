@@ -21,6 +21,18 @@ export const __resetPersistentSizeCacheNotificationsForTests = () => {
   initialLoadSettled = null;
 };
 
+export const __getPendingPersistentSizeCacheUpsertsForTests = () =>
+  Array.from(pendingUpserts.values());
+
+export const __clearPendingPersistentSizeCacheWritesForTests = () => {
+  pendingUpserts.clear();
+  pendingDeletes.clear();
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+};
+
 const isTauriRuntime = () => {
   if (typeof window === "undefined") {
     return false;

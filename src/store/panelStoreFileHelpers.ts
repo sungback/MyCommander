@@ -53,19 +53,20 @@ export const recordSizeScannedAt = (path: string, scannedAt: number) => {
 export const getSizeScannedAt = (path: string) =>
   sizeScannedAtByPath.get(normalizePathKey(path));
 
+// scannedAt: 값이 계산된 시각. 하위 폴더 결과처럼 상위 스캔에서 구한 값은 그 스캔의 시작 시각을 넘긴다.
 export const queueStableSizeCacheWrite = (
   path: string,
   size: number,
-  status: StableDirectorySizeStatus
+  status: StableDirectorySizeStatus,
+  scannedAt: number = Date.now()
 ) => {
-  const timestamp = Date.now();
-  recordSizeScannedAt(path, timestamp);
+  recordSizeScannedAt(path, scannedAt);
   queuePersistentSizeCacheUpsert({
     path: normalizePathKey(path),
     size,
     status,
-    scannedAt: timestamp,
-    lastUsedAt: timestamp,
+    scannedAt,
+    lastUsedAt: Date.now(),
   });
 };
 

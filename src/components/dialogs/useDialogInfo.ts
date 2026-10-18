@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import type { UpdateEntrySizeHandler } from "../../hooks/manualDirectorySizeScan";
 import { DialogTarget, DialogType } from "../../store/dialogStore";
+import { recordScannedChildSizes } from "../../store/scannedChildSizes";
 import { DirectorySizeStatus, FileEntry, PanelId } from "../../types/file";
 
 interface UseDialogInfoArgs {
@@ -72,6 +73,8 @@ export const useDialogInfo = ({
     fs.scanDirSize(infoEntry.path, scanId)
       .then((result) => {
         finished = true;
+        // 다이얼로그를 닫았어도 끝난 계산의 하위 폴더 결과는 유효하다.
+        recordScannedChildSizes(result);
         if (cancelled) return;
         setInfoSize(result.size);
         if (result.isPartial) {

@@ -81,6 +81,40 @@ describe('DialogContainer', () => {
     expect(usePanelStore.getState().sizeStatusCache["/home/user/LargeFolder"]).toBe("limited");
   });
 
+  it("records child folder sizes from the info dialog scan", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: false,
+      scannedEntries: 5,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1,
+      children: [
+        {
+          path: "/home/user/LargeFolder/info-child",
+          size: 300,
+          isPartial: false,
+          inaccessibleCount: 0,
+          depth: 1,
+        },
+      ],
+    });
+    useDialogStore.setState((state) => ({
+      ...state,
+      openDialog: "info",
+      dialogTarget: {
+        panelId: "left",
+        path: "/home/user/LargeFolder",
+      },
+    }));
+
+    render(<DialogContainer />);
+
+    await waitFor(() => {
+      expect(usePanelStore.getState().sizeCache["/home/user/LargeFolder/info-child"]).toBe(300);
+    });
+  });
+
   it("cancels the info dialog folder scan when the dialog closes", async () => {
     mockScanDirSize.mockReturnValue(new Promise(() => undefined));
     useDialogStore.setState((state) => ({

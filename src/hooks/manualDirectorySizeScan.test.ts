@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
+import { usePanelStore } from "../store/panelStore";
 import {
   __resetManualDirectorySizeScansForTests,
   cancelManualDirectorySizeScan,
@@ -120,6 +121,34 @@ describe("manualDirectorySizeScan", () => {
       isPartial: false,
       isLimited: true,
     });
+  });
+
+  it("records child folder sizes that came with the scan result", async () => {
+    const args = makeArgs({
+      scanDirSize: vi.fn().mockResolvedValue({
+        size: 2048,
+        isPartial: false,
+        scannedEntries: 4,
+        errorCount: 0,
+        inaccessibleCount: 0,
+        startedAtMs: 1_000,
+        children: [
+          {
+            path: "/cloud/My Drive/manual-child",
+            size: 512,
+            isPartial: false,
+            inaccessibleCount: 0,
+            depth: 1,
+          },
+        ],
+      }),
+    });
+
+    await scanDirectorySizeWithProgress(args);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/cloud/My Drive/manual-child"]).toBe(512);
+    expect(state.sizeStatusCache["/cloud/My Drive/manual-child"]).toBe("exact");
   });
 
   it("cancels an active scan and keeps the latest progress as partial", async () => {

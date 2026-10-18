@@ -3,6 +3,7 @@ import type {
   DirectorySizeProgressEvent,
   DirectorySizeScanResult,
 } from "./tauriCommands/fileCommands";
+import { recordScannedChildSizes } from "../store/scannedChildSizes";
 import type {
   ConfirmedDirectorySizeStatus,
   DirectorySizeStatus,
@@ -192,6 +193,7 @@ export const scanDirectorySizeWithProgress = async ({
 
   try {
     const result = await scanDirSize(path, scanId);
+    recordScannedChildSizes(result);
 
     const isLimited = !result.isPartial && result.inaccessibleCount > 0;
     if (result.isPartial) {

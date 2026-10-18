@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileEntry } from "../../../types/file";
 import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import { usePanelStore } from "../../../store/panelStore";
 import {
   __resetStorageClassificationForTests,
   recordStorageKind,
@@ -467,6 +468,48 @@ describe("useBackgroundDirSizes", () => {
         "exact"
       )
     );
+  });
+
+  it("records child folder sizes from background exact scans", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 2,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1_000,
+      children: [
+        {
+          path: "/Users/sam/Projects/background-child",
+          size: 640,
+          isPartial: false,
+          inaccessibleCount: 1,
+          depth: 1,
+        },
+      ],
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(usePanelStore.getState().sizeCache["/Users/sam/Projects/background-child"]).toBe(640)
+    );
+    expect(
+      usePanelStore.getState().sizeStatusCache["/Users/sam/Projects/background-child"]
+    ).toBe("limited");
   });
 
   it("uses the shared scan start time when it began before this request", async () => {

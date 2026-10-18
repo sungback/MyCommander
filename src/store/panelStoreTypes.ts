@@ -4,6 +4,7 @@ import type {
   DirectorySizeStatus,
   PanelId,
   PanelState,
+  ScannedChildDirectorySize,
   SortField,
   ViewMode,
 } from "../types/file";
@@ -61,6 +62,8 @@ export interface AppState {
     size: number,
     status: Extract<DirectorySizeStatus, "estimated" | "partial">
   ) => void;
+  // 상위 폴더 정확 계산에서 함께 구한 하위 폴더 결과를 한 번에 반영한다. scanStartedAt은 그 스캔의 시작 시각이다.
+  applyScannedChildSizes: (children: ScannedChildDirectorySize[], scanStartedAt: number) => void;
   setEntrySizeStatus: (
     panel: PanelId,
     path: string,

@@ -273,6 +273,9 @@ describe("fileCommands", () => {
         errorCount: 0,
         inaccessibleCount: 3,
         startedAtMs: 1_700_000_000_000,
+        children: [
+          { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },
+        ],
       });
 
       const result = await fileCommands.scanDirSize("/some/dir", "scan-1");
@@ -288,6 +291,9 @@ describe("fileCommands", () => {
         errorCount: 0,
         inaccessibleCount: 3,
         startedAtMs: 1_700_000_000_000,
+        children: [
+          { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },
+        ],
       });
     });
   });

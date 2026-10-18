@@ -14,6 +14,16 @@ export type DirectorySizeStatus =
 // 끝까지 계산이 끝난 크기 상태. limited는 권한이 없어 읽지 못한 항목을 뺀 하한값이다.
 export type ConfirmedDirectorySizeStatus = Extract<DirectorySizeStatus, "exact" | "limited">;
 
+// 상위 폴더를 정확 계산하며 함께 구한 하위 폴더 결과. 그 폴더만 따로 계산한 값과 같다.
+export interface ScannedChildDirectorySize {
+  path: string;
+  size: number;
+  isPartial: boolean;
+  inaccessibleCount: number;
+  // 스캔한 폴더로부터의 깊이(바로 아래가 1)
+  depth: number;
+}
+
 export interface FileEntry {
   name: string;
   path: string;

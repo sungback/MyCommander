@@ -71,10 +71,11 @@ mod tests {
     use super::scan::VolumeBoundary;
     use super::scan::{
         build_scan_pool, is_data_volume_mirror, scan_path_size_with_pool,
-        scan_path_size_with_progress,
+        scan_path_size_with_progress, select_recorded_children,
     };
     #[cfg(target_os = "macos")]
     use super::scan::{filesystem_type_name, is_network_filesystem, is_network_filesystem_type};
+    use super::types::DirectorySizeChild;
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
@@ -469,6 +470,116 @@ mod tests {
             result.error_count,
             result.inaccessible_count,
         )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recorded_children_match_standalone_scans() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = make_temp_dir("children-standalone");
+        let outside = make_temp_dir("children-standalone-outside");
+        fs::write(outside.join("outside.bin"), [1_u8; 999]).unwrap();
+        let alpha = root.join("alpha");
+        let beta = root.join("beta");
+        let deep = alpha.join("deep");
+        let deeper = deep.join("deeper");
+        fs::create_dir_all(&deeper).unwrap();
+        fs::create_dir_all(&beta).unwrap();
+        fs::write(alpha.join("a.bin"), [1_u8; 100]).unwrap();
+        fs::write(deep.join("d.bin"), [1_u8; 30]).unwrap();
+        fs::write(deeper.join("x.bin"), [1_u8; 7]).unwrap();
+        fs::write(beta.join("b.bin"), [1_u8; 20]).unwrap();
+        // 형제 폴더가 공유하는 하드링크는 각 폴더 합계에 한 번씩 들어간다.
+        let shared = alpha.join("shared.bin");
+        fs::write(&shared, [1_u8; 500]).unwrap();
+        fs::hard_link(&shared, beta.join("shared-link.bin")).unwrap();
+        symlink(&outside, root.join("linked-outside")).unwrap();
+        let locked = root.join("locked");
+        fs::create_dir_all(&locked).unwrap();
+        fs::write(locked.join("hidden.bin"), [1_u8; 50]).unwrap();
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let result = scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {});
+        let standalone = |path: &std::path::Path| {
+            scan_path_size_with_progress(path.to_str().unwrap(), &cancel_flag, |_| {}).unwrap()
+        };
+        let expected: Vec<_> = [&alpha, &beta, &deep, &locked]
+            .iter()
+            .map(|path| (path.to_str().unwrap().to_string(), standalone(path)))
+            .collect();
+
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir_all(&outside).unwrap();
+        let result = result.unwrap();
+
+        // 심볼릭 링크와 깊이 3 이상(deeper)은 기록하지 않는다.
+        let mut recorded: Vec<_> = result
+            .children
+            .iter()
+            .map(|child| child.path.clone())
+            .collect();
+        recorded.sort();
+        let mut expected_paths: Vec<_> = expected.iter().map(|(path, _)| path.clone()).collect();
+        expected_paths.sort();
+        assert_eq!(recorded, expected_paths);
+
+        for (path, alone) in &expected {
+            let child = result
+                .children
+                .iter()
+                .find(|child| &child.path == path)
+                .unwrap();
+            assert_eq!(child.size, alone.size, "{path}");
+            assert_eq!(child.is_partial, alone.is_partial, "{path}");
+            assert_eq!(child.inaccessible_count, alone.inaccessible_count, "{path}");
+        }
+        let depth_of = |path: &std::path::Path| {
+            result
+                .children
+                .iter()
+                .find(|child| child.path == path.to_str().unwrap())
+                .unwrap()
+                .depth
+        };
+        assert_eq!(depth_of(&alpha), 1);
+        assert_eq!(depth_of(&deep), 2);
+        assert_eq!(result.size, 100 + 30 + 7 + 20 + 500);
+        assert_eq!(result.inaccessible_count, 1);
+    }
+
+    #[test]
+    fn recorded_children_keep_largest_within_cap() {
+        let child = |path: &str, size: u64| DirectorySizeChild {
+            path: path.to_string(),
+            size,
+            is_partial: false,
+            inaccessible_count: 0,
+            depth: 1,
+        };
+
+        let selected =
+            select_recorded_children(vec![child("/a", 10), child("/b", 30), child("/c", 20)], 2);
+
+        let paths: Vec<_> = selected.iter().map(|child| child.path.as_str()).collect();
+        assert_eq!(paths, vec!["/b", "/c"]);
+    }
+
+    #[test]
+    fn file_scan_reports_no_children() {
+        let root = make_temp_dir("children-file");
+        let file = root.join("file.bin");
+        fs::write(&file, [1_u8; 10]).unwrap();
+        let cancel_flag = AtomicBool::new(false);
+
+        let result =
+            scan_path_size_with_progress(file.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
+
+        assert!(result.children.is_empty());
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(unix)]

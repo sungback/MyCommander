@@ -279,6 +279,7 @@ mod tests {
             error_count: 0,
             inaccessible_count: 0,
             started_at_ms: 1_000,
+            children: Vec::new(),
         }
     }
 

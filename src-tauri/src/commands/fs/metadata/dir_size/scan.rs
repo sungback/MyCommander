@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use super::compute::should_skip_directory_traversal;
-use super::types::DirectorySizeScanResult;
+use super::types::{DirectorySizeChild, DirectorySizeScanResult};
 
 const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 /// 깊은 트리에서 rayon 작업자가 훔친 작업을 자기 스택 위에서 이어 실행하므로 기본값보다 넉넉히 잡는다.
@@ -249,15 +249,64 @@ fn hard_link_record(_metadata: &fs::Metadata) -> Option<HardLinkRecord> {
     None
 }
 
-/// 여러 작업자가 함께 쓰는 스캔 상태. 진행 표시용 값은 원자 변수로 모은다.
+/// 하위 폴더 결과를 기록할 최대 깊이(스캔 루트의 바로 아래가 1).
+pub(super) const MAX_RECORDED_CHILD_DEPTH: usize = 2;
+/// 스캔 하나가 돌려주는 하위 폴더 결과의 최대 개수. 넘치면 큰 폴더부터 남긴다.
+pub(super) const MAX_RECORDED_CHILDREN: usize = 2_000;
+
+/// 디렉터리 하나의 하위 트리 통계. 하위 폴더 결과가 그 폴더만 따로 계산한 값과 같도록
+/// 루트 전체 값이 아니라 하위 트리마다 따로 모은다.
+#[derive(Default)]
+struct SubtreeStats {
+    /// 하드링크를 뺀 파일 크기 합계
+    size: u64,
+    hard_links: Vec<HardLinkRecord>,
+    scanned_entries: usize,
+    error_count: usize,
+    inaccessible_count: usize,
+    children: Vec<DirectorySizeChild>,
+}
+
+impl SubtreeStats {
+    fn merge(mut self, mut other: Self) -> Self {
+        self.size = self.size.saturating_add(other.size);
+        if self.hard_links.len() < other.hard_links.len() {
+            std::mem::swap(&mut self.hard_links, &mut other.hard_links);
+        }
+        self.hard_links.append(&mut other.hard_links);
+        self.scanned_entries = self.scanned_entries.saturating_add(other.scanned_entries);
+        self.error_count = self.error_count.saturating_add(other.error_count);
+        self.inaccessible_count = self
+            .inaccessible_count
+            .saturating_add(other.inaccessible_count);
+        self.children.append(&mut other.children);
+        self
+    }
+
+    /// 하드링크를 (dev, ino) 기준으로 한 번만 더한 하위 트리 전체 크기.
+    fn total_size(&self) -> u64 {
+        self.size
+            .saturating_add(unique_hard_link_size(&self.hard_links))
+    }
+
+    /// 권한 부족은 다시 계산해도 같으므로 partial이 아니라 접근 불가 개수로 센다.
+    /// (partial은 재스캔 대상이라 Windows `C:\Users` 등에서 "+" 표시가 풀리지 않는 문제가 있었다.)
+    fn record_error(&mut self, error: &std::io::Error) {
+        if error.kind() == std::io::ErrorKind::PermissionDenied {
+            self.inaccessible_count = self.inaccessible_count.saturating_add(1);
+        } else {
+            self.error_count = self.error_count.saturating_add(1);
+        }
+    }
+}
+
+/// 여러 작업자가 함께 쓰는 스캔 상태. 원자 변수는 진행 표시용이다.
 /// `size`에는 하드링크 파일을 넣지 않는다(중복 제거 전이라 진행값이 최종값을 넘지 않게 한다).
 struct ParallelScan<'a> {
     cancel_flag: &'a AtomicBool,
     volume: VolumeBoundary,
     size: AtomicU64,
     scanned_entries: AtomicUsize,
-    error_count: AtomicUsize,
-    inaccessible_count: AtomicUsize,
     is_partial: AtomicBool,
 }
 
@@ -268,8 +317,6 @@ impl<'a> ParallelScan<'a> {
             volume: VolumeBoundary::new(root_metadata),
             size: AtomicU64::new(0),
             scanned_entries: AtomicUsize::new(0),
-            error_count: AtomicUsize::new(0),
-            inaccessible_count: AtomicUsize::new(0),
             is_partial: AtomicBool::new(false),
         }
     }
@@ -278,14 +325,10 @@ impl<'a> ParallelScan<'a> {
         self.cancel_flag.load(Ordering::Relaxed)
     }
 
-    /// 권한 부족은 다시 계산해도 같으므로 partial이 아니라 접근 불가 개수로 센다.
-    /// (partial은 재스캔 대상이라 Windows `C:\Users` 등에서 "+" 표시가 풀리지 않는 문제가 있었다.)
-    fn record_error(&self, error: &std::io::Error) {
-        if error.kind() == std::io::ErrorKind::PermissionDenied {
-            self.inaccessible_count.fetch_add(1, Ordering::Relaxed);
-        } else {
+    fn record_error(&self, stats: &mut SubtreeStats, error: &std::io::Error) {
+        stats.record_error(error);
+        if error.kind() != std::io::ErrorKind::PermissionDenied {
             self.is_partial.store(true, Ordering::Relaxed);
-            self.error_count.fetch_add(1, Ordering::Relaxed);
         }
     }
 
@@ -298,27 +341,35 @@ impl<'a> ParallelScan<'a> {
         }
     }
 
-    /// 디렉터리 하나를 읽고 하위 디렉터리는 병렬로 처리한다. 하드링크 파일 목록을 돌려준다.
-    fn scan_dir(&self, path: &Path) -> Result<Vec<HardLinkRecord>, Cancelled> {
+    /// 디렉터리 하나를 읽고 하위 디렉터리는 병렬로 처리해 하위 트리 통계를 돌려준다.
+    /// `depth`는 스캔 루트로부터의 깊이(루트는 0)이며, 1~`MAX_RECORDED_CHILD_DEPTH`인 폴더는 결과를 기록한다.
+    fn scan_dir(&self, path: &Path, depth: usize) -> Result<SubtreeStats, Cancelled> {
         if self.is_cancelled() {
             return Err(Cancelled);
         }
 
-        let mut hard_links = Vec::new();
-        let subdirs = self.read_entries(path, &mut hard_links)?;
+        let mut stats = SubtreeStats::default();
+        let subdirs = self.read_entries(path, &mut stats)?;
         let nested = subdirs
             .into_par_iter()
-            .map(|subdir| self.scan_dir(&subdir))
-            .try_reduce(Vec::new, |mut left, mut right| {
-                if left.len() < right.len() {
-                    std::mem::swap(&mut left, &mut right);
-                }
-                left.append(&mut right);
-                Ok(left)
-            })?;
+            .map(|subdir| self.scan_dir(&subdir, depth + 1))
+            .try_reduce(SubtreeStats::default, |left, right| Ok(left.merge(right)))?;
+        let mut stats = stats.merge(nested);
 
-        hard_links.extend(nested);
-        Ok(hard_links)
+        if (1..=MAX_RECORDED_CHILD_DEPTH).contains(&depth) {
+            // 이름이 UTF-8이 아니면 프런트엔드 경로 키와 맞출 수 없으므로 기록하지 않는다.
+            if let Some(path) = path.to_str() {
+                stats.children.push(DirectorySizeChild {
+                    path: path.to_string(),
+                    size: stats.total_size(),
+                    is_partial: stats.error_count > 0,
+                    inaccessible_count: stats.inaccessible_count,
+                    depth,
+                });
+            }
+        }
+
+        Ok(stats)
     }
 
     /// 디렉터리 항목을 모두 처리하고 내려갈 하위 디렉터리 목록을 돌려준다.
@@ -327,12 +378,12 @@ impl<'a> ParallelScan<'a> {
     fn read_entries(
         &self,
         path: &Path,
-        hard_links: &mut Vec<HardLinkRecord>,
+        stats: &mut SubtreeStats,
     ) -> Result<Vec<PathBuf>, Cancelled> {
         let entries = match fs::read_dir(path) {
             Ok(entries) => entries,
             Err(e) => {
-                self.record_error(&e);
+                self.record_error(stats, &e);
                 return Ok(Vec::new());
             }
         };
@@ -346,26 +397,28 @@ impl<'a> ParallelScan<'a> {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    self.record_error(&e);
+                    self.record_error(stats, &e);
                     continue;
                 }
             };
+            stats.scanned_entries = stats.scanned_entries.saturating_add(1);
             self.scanned_entries.fetch_add(1, Ordering::Relaxed);
 
             let metadata = match entry_metadata(&entry) {
                 Ok(metadata) => metadata,
                 Err(e) => {
-                    self.record_error(&e);
+                    self.record_error(stats, &e);
                     continue;
                 }
             };
 
             if metadata.is_file() {
                 match hard_link_record(&metadata) {
-                    Some(record) => hard_links.push(record),
+                    Some(record) => stats.hard_links.push(record),
                     None => {
-                        self.size
-                            .fetch_add(counted_file_size(&metadata), Ordering::Relaxed);
+                        let size = counted_file_size(&metadata);
+                        stats.size = stats.size.saturating_add(size);
+                        self.size.fetch_add(size, Ordering::Relaxed);
                     }
                 }
                 continue;
@@ -385,6 +438,16 @@ impl<'a> ParallelScan<'a> {
 
         Ok(subdirs)
     }
+}
+
+/// 기록할 하위 폴더 결과를 큰 폴더부터 `cap`개까지 남긴다.
+pub(super) fn select_recorded_children(
+    mut children: Vec<DirectorySizeChild>,
+    cap: usize,
+) -> Vec<DirectorySizeChild> {
+    children.sort_by_key(|child| std::cmp::Reverse(child.size));
+    children.truncate(cap);
+    children
 }
 
 pub(crate) fn scan_path_size_with_progress<F>(
@@ -425,6 +488,7 @@ where
         error_count: 0,
         inaccessible_count: 0,
         started_at_ms,
+        children: Vec::new(),
     };
 
     if metadata.is_file() {
@@ -435,15 +499,13 @@ where
         result.error_count = 1;
     } else if metadata.is_dir() {
         let scan = ParallelScan::new(cancel_flag, &metadata);
-        let hard_links = run_with_progress(&scan, target, pool, &mut emit_progress)?;
-        result.size = scan
-            .size
-            .load(Ordering::Relaxed)
-            .saturating_add(unique_hard_link_size(hard_links));
-        result.is_partial = scan.is_partial.load(Ordering::Relaxed);
-        result.scanned_entries = scan.scanned_entries.load(Ordering::Relaxed);
-        result.error_count = scan.error_count.load(Ordering::Relaxed);
-        result.inaccessible_count = scan.inaccessible_count.load(Ordering::Relaxed);
+        let stats = run_with_progress(&scan, target, pool, &mut emit_progress)?;
+        result.size = stats.total_size();
+        result.is_partial = stats.error_count > 0;
+        result.scanned_entries = stats.scanned_entries;
+        result.error_count = stats.error_count;
+        result.inaccessible_count = stats.inaccessible_count;
+        result.children = select_recorded_children(stats.children, MAX_RECORDED_CHILDREN);
     }
 
     emit_progress(ScanProgress {
@@ -462,7 +524,7 @@ fn run_with_progress<F>(
     root: &Path,
     pool: Option<&ThreadPool>,
     emit_progress: &mut F,
-) -> Result<Vec<HardLinkRecord>, String>
+) -> Result<SubtreeStats, String>
 where
     F: FnMut(ScanProgress),
 {
@@ -470,15 +532,15 @@ where
         let (result_tx, result_rx) = mpsc::channel();
         scope.spawn(move || {
             let outcome = match pool {
-                Some(pool) => pool.install(|| scan.scan_dir(root)),
-                None => scan.scan_dir(root),
+                Some(pool) => pool.install(|| scan.scan_dir(root, 0)),
+                None => scan.scan_dir(root, 0),
             };
             let _ = result_tx.send(outcome);
         });
 
         loop {
             match result_rx.recv_timeout(SCAN_PROGRESS_INTERVAL) {
-                Ok(Ok(hard_links)) => return Ok(hard_links),
+                Ok(Ok(stats)) => return Ok(stats),
                 Ok(Err(Cancelled)) => return Err(SCAN_CANCELLED_MESSAGE.to_string()),
                 Err(mpsc::RecvTimeoutError::Timeout) => emit_progress(scan.progress(false)),
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -489,10 +551,10 @@ where
     })
 }
 
-fn unique_hard_link_size(records: Vec<HardLinkRecord>) -> u64 {
+fn unique_hard_link_size(records: &[HardLinkRecord]) -> u64 {
     let mut seen = HashSet::with_capacity(records.len());
     records
-        .into_iter()
+        .iter()
         .filter(|(dev, ino, _)| seen.insert((*dev, *ino)))
-        .fold(0_u64, |total, (_, _, size)| total.saturating_add(size))
+        .fold(0_u64, |total, (_, _, size)| total.saturating_add(*size))
 }
