@@ -311,7 +311,7 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
 
         // 바로 아래 폴더만 디스크 캐시에 남기고, 더 깊은 결과는 이번 실행의 메모리에만 둔다.
         if (child.depth === 1) {
-          queueStableSizeCacheWrite(child.path, child.size, status, scanStartedAt);
+          queueStableSizeCacheWrite(child.path, child.size, status, scanStartedAt, false);
         } else {
           recordSizeScannedAt(child.path, scanStartedAt);
         }

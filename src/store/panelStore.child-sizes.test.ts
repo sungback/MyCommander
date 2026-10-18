@@ -120,6 +120,8 @@ describe('panelStore — applyScannedChildSizes', () => {
       const pending = getPendingPersistentSizeCacheUpserts();
       expect(pending.map((entry) => entry.path)).toEqual(['/root/direct']);
       expect(pending[0].scannedAt).toBe(1_000);
+      // 사용자가 열지 않은 하위 폴더는 최근 사용 시각을 바꾸지 않는다.
+      expect(pending[0].lastUsedAt).toBeUndefined();
       expect(usePanelStore.getState().sizeCache['/root/direct/nested']).toBe(1000);
     } finally {
       Reflect.deleteProperty(window, '__TAURI_INTERNALS__');

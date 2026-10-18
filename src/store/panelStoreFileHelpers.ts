@@ -54,11 +54,14 @@ export const getSizeScannedAt = (path: string) =>
   sizeScannedAtByPath.get(normalizePathKey(path));
 
 // scannedAt: 값이 계산된 시각. 하위 폴더 결과처럼 상위 스캔에서 구한 값은 그 스캔의 시작 시각을 넘긴다.
+// touchLastUsed: false면 최근 사용 시각을 바꾸지 않는다. 사용자가 열지 않은 하위 폴더 결과가
+// 디스크 캐시 정리(최근 사용 순) 때 실제로 쓰던 항목을 밀어내지 않게 한다.
 export const queueStableSizeCacheWrite = (
   path: string,
   size: number,
   status: StableDirectorySizeStatus,
-  scannedAt: number = Date.now()
+  scannedAt: number = Date.now(),
+  touchLastUsed = true
 ) => {
   recordSizeScannedAt(path, scannedAt);
   queuePersistentSizeCacheUpsert({
@@ -66,7 +69,7 @@ export const queueStableSizeCacheWrite = (
     size,
     status,
     scannedAt,
-    lastUsedAt: Date.now(),
+    ...(touchLastUsed ? { lastUsedAt: Date.now() } : {}),
   });
 };
 

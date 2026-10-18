@@ -54,6 +54,8 @@ pub struct DirectorySizeCacheEntryUpdate {
     pub size: u64,
     pub status: String,
     pub scanned_at: Option<u64>,
+    /// 사용자가 이 경로를 쓴 시각. 없으면 기존 값을 유지하고, 새 항목이면 0으로 둬 가장 먼저 정리되게 한다
+    /// (상위 폴더를 계산하며 함께 저장한 하위 폴더가 실제로 쓰던 항목을 밀어내지 않게 한다).
     pub last_used_at: Option<u64>,
 }
 
@@ -83,26 +85,7 @@ pub async fn upsert_dir_size_cache_entries(
 
         let file_path = cache_file_path(&app)?;
         let mut snapshot = read_snapshot_from_path(&file_path)?;
-        let now_ms = now_ms();
-
-        for entry in entries {
-            let path = entry.path.trim();
-            if path.is_empty() || !is_stable_status(&entry.status) {
-                continue;
-            }
-
-            let scanned_at = entry.scanned_at.unwrap_or(now_ms);
-            snapshot.entries.insert(
-                path.to_string(),
-                DirectorySizeCacheEntry {
-                    size: entry.size,
-                    status: entry.status,
-                    scanned_at,
-                    last_used_at: entry.last_used_at.unwrap_or(scanned_at),
-                },
-            );
-        }
-
+        apply_entry_updates(&mut snapshot, entries, now_ms());
         prune_snapshot(&mut snapshot, DEFAULT_MAX_ENTRIES);
         write_snapshot_to_path(&file_path, &snapshot)
     })
@@ -347,6 +330,36 @@ fn write_snapshot_to_path(
         .map_err(|error| format!("Failed to finalize directory size cache: {error}"))
 }
 
+fn apply_entry_updates(
+    snapshot: &mut DirectorySizeCacheSnapshot,
+    entries: Vec<DirectorySizeCacheEntryUpdate>,
+    now_ms: u64,
+) {
+    for entry in entries {
+        let path = entry.path.trim();
+        if path.is_empty() || !is_stable_status(&entry.status) {
+            continue;
+        }
+
+        let scanned_at = entry.scanned_at.unwrap_or(now_ms);
+        let last_used_at = entry.last_used_at.unwrap_or_else(|| {
+            snapshot
+                .entries
+                .get(path)
+                .map_or(0, |existing| existing.last_used_at)
+        });
+        snapshot.entries.insert(
+            path.to_string(),
+            DirectorySizeCacheEntry {
+                size: entry.size,
+                status: entry.status,
+                scanned_at,
+                last_used_at,
+            },
+        );
+    }
+}
+
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -357,8 +370,9 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, remove_missing_entries,
-        write_snapshot_to_path, DirectorySizeCacheEntry, DirectorySizeCacheSnapshot,
+        apply_entry_updates, build_load_result, empty_snapshot, parse_snapshot, prune_snapshot,
+        remove_missing_entries, write_snapshot_to_path, DirectorySizeCacheEntry,
+        DirectorySizeCacheEntryUpdate, DirectorySizeCacheSnapshot,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -446,6 +460,40 @@ mod tests {
         assert!(stale_exact.is_stale);
         assert!(stale_estimate.is_stale);
         assert!(!fresh_limited.is_stale);
+    }
+
+    #[test]
+    fn apply_entry_updates_keeps_last_used_when_update_omits_it() {
+        let mut snapshot = empty_snapshot();
+        snapshot
+            .entries
+            .insert("/visited".to_string(), entry(1, "exact", 500));
+        let update = |path: &str, last_used_at: Option<u64>| DirectorySizeCacheEntryUpdate {
+            path: path.to_string(),
+            size: 9,
+            status: "exact".to_string(),
+            scanned_at: Some(900),
+            last_used_at,
+        };
+
+        apply_entry_updates(
+            &mut snapshot,
+            vec![
+                update("/visited", None),
+                update("/new-child", None),
+                update("/touched", Some(950)),
+            ],
+            1_000,
+        );
+
+        let visited = &snapshot.entries["/visited"];
+        assert_eq!(
+            (visited.size, visited.scanned_at, visited.last_used_at),
+            (9, 900, 500)
+        );
+        // 사용자가 쓴 적 없는 새 항목은 가장 먼저 정리된다.
+        assert_eq!(snapshot.entries["/new-child"].last_used_at, 0);
+        assert_eq!(snapshot.entries["/touched"].last_used_at, 950);
     }
 
     #[test]
