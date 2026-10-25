@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::Path;
 
-use super::scan::{counted_file_size, is_data_volume_mirror, HardLinkTracker, VolumeBoundary};
+use super::scan::{
+    counted_file_size, entry_metadata, is_data_volume_mirror, HardLinkTracker, VolumeBoundary,
+};
 use super::types::DirectorySizeEstimate;
 
 pub(super) const DEFAULT_ESTIMATE_MAX_DEPTH: usize = 1;
@@ -108,7 +110,7 @@ fn scan_estimate_dir(
         };
 
         estimate.scanned_entries += 1;
-        let metadata = match fs::symlink_metadata(entry.path()) {
+        let metadata = match entry_metadata(&entry) {
             Ok(metadata) => metadata,
             Err(_) => {
                 estimate.is_partial = true;
