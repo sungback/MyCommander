@@ -11,6 +11,7 @@ mod sqlite_preview;
 #[path = "metadata/storage_kind.rs"]
 mod storage_kind;
 
+pub(crate) use dir_size::scan_path_size_for_space_check;
 pub use dir_size::{DirSizeScanState, DirectorySizeEstimate, DirectorySizeScanResult};
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;

@@ -1,4 +1,5 @@
 pub(crate) mod copy;
+pub(crate) mod copy_space;
 pub(crate) mod delete;
 pub(crate) mod move_ops;
 mod path_utils;

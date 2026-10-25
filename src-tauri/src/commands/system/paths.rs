@@ -35,7 +35,7 @@ pub async fn get_available_space(path: String) -> Result<u64, String> {
         .map_err(|error| error.to_string())?
 }
 
-fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
+pub(crate) fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
     let resolved_path = resolve_existing_path(path)?;
 
     #[cfg(target_os = "windows")]

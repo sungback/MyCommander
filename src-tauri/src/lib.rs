@@ -52,6 +52,7 @@ pub fn run() {
             commands::fs::operations::copy::copy_files,
             commands::fs::operations::move_ops::move_files,
             commands::fs::operations::copy::check_copy_conflicts,
+            commands::fs::operations::copy_space::check_transfer_space,
             commands::fs::archive::extract_zip,
             commands::fs::archive::create_zip,
             commands::fs::archive::create_zip_from_paths,

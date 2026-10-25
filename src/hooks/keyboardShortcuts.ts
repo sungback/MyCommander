@@ -2,6 +2,7 @@ import { useClipboardStore } from "../store/clipboardStore";
 import { useDialogStore, type DialogType } from "../store/dialogStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { usePanelStore } from "../store/panelStore";
+import { useTransferSpaceWarningStore } from "../store/transferSpaceWarningStore";
 import type { DirectorySizeStatus, PanelId, ViewMode } from "../types/file";
 import type { DirectorySizeScanResult } from "./tauriCommands/fileCommands";
 import { showTransientStatusMessage, type useAppCommands } from "./useAppCommands";
@@ -312,6 +313,12 @@ export const createKeyboardHandler =
     if (isCloseShortcut) {
       event.preventDefault();
       void deps.closeApp();
+      return;
+    }
+
+    // 공간 부족 경고는 dialogStore 밖에 있어 드래그로 열리면 openDialog가 null이다.
+    // 열려 있는 동안 패널 단축키를 막는다(Escape는 경고 창이 직접 닫는다).
+    if (useTransferSpaceWarningStore.getState().pending) {
       return;
     }
 

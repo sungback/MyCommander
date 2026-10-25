@@ -4,6 +4,7 @@ import { useClipboardStore } from "../../store/clipboardStore";
 import { useDialogStore } from "../../store/dialogStore";
 import { usePanelStore } from "../../store/panelStore";
 import { CopyConflictDialog } from "./CopyConflictDialog";
+import { TransferSpaceWarningDialog } from "./TransferSpaceWarningDialog";
 import { CommandPalette } from "./palette/CommandPalette";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
@@ -267,6 +268,8 @@ export const DialogContainer: React.FC = () => {
         onSkipExisting={handleSkipExisting}
         onOverwriteAll={handleOverwriteAll}
       />
+
+      <TransferSpaceWarningDialog />
 
       <QuickPreviewDialog />
       <SettingsDialog />

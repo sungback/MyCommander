@@ -337,3 +337,94 @@ describe("useCopyMoveFlow", () => {
     });
   });
 });
+
+describe("useCopyMoveFlow — 공간 부족 경고", () => {
+  const mockCheckTransferSpace = vi.fn();
+  let props: ReturnType<typeof defaultProps>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { useTransferSpaceWarningStore } = await import(
+      "../../store/transferSpaceWarningStore"
+    );
+    useTransferSpaceWarningStore.setState({ pending: null });
+    mockResolveTargetPath.mockReturnValue("/target");
+    mockCheckCopyConflicts.mockResolvedValue([]);
+    mockSubmitJob.mockResolvedValue(undefined);
+    mockCheckTransferSpace.mockResolvedValue({
+      requiredBytes: 5_000,
+      availableBytes: 1_000,
+      complete: true,
+      insufficient: true,
+    });
+    props = defaultProps();
+    props.fs = {
+      ...props.fs,
+      checkTransferSpace: mockCheckTransferSpace,
+    } as typeof props.fs;
+  });
+
+  const answerWarning = async (proceed: boolean) => {
+    const { useTransferSpaceWarningStore } = await import(
+      "../../store/transferSpaceWarningStore"
+    );
+    await vi.waitFor(() => {
+      expect(useTransferSpaceWarningStore.getState().pending).not.toBeNull();
+    });
+    expect(useTransferSpaceWarningStore.getState().pending?.shortage).toEqual({
+      isMove: false,
+      requiredBytes: 5_000,
+      availableBytes: 1_000,
+      complete: true,
+    });
+    act(() => {
+      useTransferSpaceWarningStore.getState().respond(proceed);
+    });
+  };
+
+  it("부족하다는 경고에서 취소하면 job을 제출하지 않고 다이얼로그에 남는다", async () => {
+    const { result } = renderHook(() => useCopyMoveFlow(props));
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = result.current.handleCopyMove(false);
+    });
+    await answerWarning(false);
+    await act(async () => {
+      await pending;
+    });
+
+    expect(mockCheckTransferSpace).toHaveBeenCalledWith(props.selectedPaths, "/target", false);
+    expect(mockSubmitJob).not.toHaveBeenCalled();
+    expect(mockSetOpenDialog).not.toHaveBeenCalledWith("progress");
+    expect(result.current.isSubmitting).toBe(false);
+  });
+
+  it("부족하다는 경고에서 계속하면 job을 제출한다", async () => {
+    const { result } = renderHook(() => useCopyMoveFlow(props));
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = result.current.handleCopyMove(false);
+    });
+    await answerWarning(true);
+    await act(async () => {
+      await pending;
+    });
+
+    expect(mockSetOpenDialog).toHaveBeenCalledWith("progress");
+    expect(mockSubmitJob).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "copy", sourcePaths: props.selectedPaths })
+    );
+  });
+
+  it("공간 확인이 실패하면 경고 없이 진행한다", async () => {
+    mockCheckTransferSpace.mockRejectedValue(new Error("statfs failed"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { result } = renderHook(() => useCopyMoveFlow(props));
+    await act(async () => {
+      await result.current.handleCopyMove(false);
+    });
+
+    expect(mockSubmitJob).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

@@ -3,6 +3,7 @@ import {
   submitCopyJob,
   submitMoveJobWithUndo,
 } from "../../../features/fileOperationJobs";
+import { confirmTransferSpace } from "../../../features/transferSpaceCheck";
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import { useDialogStore } from "../../../store/dialogStore";
 import { usePanelStore } from "../../../store/panelStore";
@@ -31,6 +32,10 @@ export const useFileListDragActions = (panelId: PanelId) => {
         return false;
       }
 
+      if (!(await confirmTransferSpace(fs, paths, targetPath, false))) {
+        return false;
+      }
+
       await submitCopyJob(fs, {
         sourcePaths: paths,
         targetPath,
@@ -50,6 +55,10 @@ export const useFileListDragActions = (panelId: PanelId) => {
           durationMs: 1800,
           tone: "warning",
         });
+        return false;
+      }
+
+      if (!(await confirmTransferSpace(fs, collapsedPaths, targetPath, true))) {
         return false;
       }
 

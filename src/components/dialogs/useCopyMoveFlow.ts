@@ -5,6 +5,7 @@ import {
   submitCopyJob,
   submitMoveJobWithUndo,
 } from "../../features/fileOperationJobs";
+import { confirmTransferSpace } from "../../features/transferSpaceCheck";
 import { useFileSystem, getErrorMessage } from "../../hooks/useFileSystem";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import { PanelState } from "../../types/file";
@@ -99,13 +100,18 @@ export const useCopyMoveFlow = ({
     targetPath: string,
     keepBoth: boolean = false,
     overwrite: boolean = false
-  ) => {
+  ): Promise<boolean> => {
     if (paths.length === 0 || targetPath.trim().length === 0) {
       throw new Error(
         isMove
           ? "No source files or target folder available for move."
           : "No source files or target folder available for copy."
       );
+    }
+
+    // 공간이 부족하면 경고만 하고, 사용자가 취소하면 지금 다이얼로그로 돌아간다.
+    if (!(await confirmTransferSpace(fs, paths, targetPath, isMove))) {
+      return false;
     }
 
     setOpenDialog("progress");
@@ -133,6 +139,7 @@ export const useCopyMoveFlow = ({
       if (isMove) {
         showTransientStatusMessage("이동 작업이 대기열에 추가되었습니다.");
       }
+      return true;
     } catch (error) {
       console.error(error);
       if (!isMove && dragCopyRequest) {
@@ -166,7 +173,9 @@ export const useCopyMoveFlow = ({
       const conflicts = await fs.checkCopyConflicts(selectedPaths, targetPath);
       if (conflicts.length > 0) {
         if (isPasteMode && !isMove) {
-          await executeCopyMove(false, selectedPaths, targetPath, true);
+          if (!(await executeCopyMove(false, selectedPaths, targetPath, true))) {
+            setIsSubmitting(false);
+          }
           return;
         }
 
@@ -176,7 +185,9 @@ export const useCopyMoveFlow = ({
         return;
       }
 
-      await executeCopyMove(isMove, selectedPaths, targetPath);
+      if (!(await executeCopyMove(isMove, selectedPaths, targetPath))) {
+        setIsSubmitting(false);
+      }
     } catch (error) {
       console.error(error);
       setCopyMoveError(error, isMove);

@@ -64,6 +64,17 @@ pub fn cancel_dir_size_scan(state: DirSizeScanState, scan_id: String) -> Result<
     Ok(())
 }
 
+/// 복사·이동 전 공간 확인용 크기 계산. 공유 레지스트리·패널 진행 이벤트·크기 캐시를 거치지 않는다.
+/// `on_progress`는 약 200ms마다 지금까지 센 크기를 받는다. 하드링크를 빼고 센 값이라 최종값을 넘지 않는다.
+pub(crate) fn scan_path_size_for_space_check(
+    path: &str,
+    cancel_flag: &std::sync::atomic::AtomicBool,
+    mut on_progress: impl FnMut(u64),
+) -> Result<u64, String> {
+    scan::scan_path_size_with_progress(path, cancel_flag, |progress| on_progress(progress.size))
+        .map(|result| result.size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::compute::estimate_path_size;

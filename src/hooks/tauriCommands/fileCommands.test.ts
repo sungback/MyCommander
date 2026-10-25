@@ -146,6 +146,25 @@ describe("fileCommands", () => {
     });
   });
 
+  describe("checkTransferSpace", () => {
+    it("calls check_transfer_space with source_paths, target_path and is_move", async () => {
+      const check = {
+        requiredBytes: 10,
+        availableBytes: 5,
+        complete: true,
+        insufficient: true,
+      };
+      mockInvoke.mockResolvedValue(check);
+      const result = await fileCommands.checkTransferSpace(["/src/a.txt"], "/dst", true);
+      expect(mockInvoke).toHaveBeenCalledWith("check_transfer_space", {
+        source_paths: ["/src/a.txt"],
+        target_path: "/dst",
+        is_move: true,
+      });
+      expect(result).toEqual(check);
+    });
+  });
+
   describe("renameFile", () => {
     it("calls rename_file with old_path and new_path", async () => {
       mockInvoke.mockResolvedValue(undefined);

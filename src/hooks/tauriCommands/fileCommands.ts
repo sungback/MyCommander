@@ -34,6 +34,15 @@ export interface DirectorySizeScanResult {
   children: ScannedChildDirectorySize[];
 }
 
+export interface TransferSpaceCheck {
+  /** 옮기는 데 필요한 크기. complete가 false면 하한값이다. */
+  requiredBytes: number;
+  /** 대상 볼륨의 남은 공간. 알 수 없으면 null */
+  availableBytes: number | null;
+  complete: boolean;
+  insufficient: boolean;
+}
+
 export interface DirectorySizeProgressEvent {
   scanId: string;
   path: string;
@@ -144,6 +153,18 @@ export const fileCommands = {
     return await invoke<string[]>("check_copy_conflicts", {
       source_paths: sourcePaths,
       target_path: targetPath,
+    });
+  },
+
+  checkTransferSpace: async (
+    sourcePaths: string[],
+    targetPath: string,
+    isMove: boolean
+  ): Promise<TransferSpaceCheck> => {
+    return await invoke<TransferSpaceCheck>("check_transfer_space", {
+      source_paths: sourcePaths,
+      target_path: targetPath,
+      is_move: isMove,
     });
   },
 

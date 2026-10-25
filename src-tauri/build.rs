@@ -23,6 +23,7 @@ fn main() {
         "copy_files",
         "move_files",
         "check_copy_conflicts",
+        "check_transfer_space",
         "extract_zip",
         "create_zip",
         "create_zip_from_paths",

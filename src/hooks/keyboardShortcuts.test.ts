@@ -3,6 +3,7 @@ import { calculatePanelDirectories } from './calculatePanelDirectories';
 import { createKeyboardHandler } from './keyboardShortcuts';
 import type { KeyboardHandlerDependencies } from './keyboardShortcuts';
 import type { PanelState } from '../types/file';
+import { useTransferSpaceWarningStore } from '../store/transferSpaceWarningStore';
 
 // ── hoisted mocks ────────────────────────────────────────────────────────────
 const mockPanelStoreGetState = vi.hoisted(() => vi.fn());
@@ -264,6 +265,25 @@ describe('calculatePanelDirectories', () => {
 
 // ── createKeyboardHandler ─────────────────────────────────────────────────────
 describe('createKeyboardHandler', () => {
+  it('공간 부족 경고가 열려 있으면 패널 단축키를 실행하지 않는다', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    useTransferSpaceWarningStore.setState({
+      pending: {
+        shortage: { isMove: false, requiredBytes: 2, availableBytes: 1, complete: true },
+        resolve: vi.fn(),
+      },
+    });
+    try {
+      handler(makeEvent('F5'));
+      handler(makeEvent('F8'));
+      expect(deps.openCopy).not.toHaveBeenCalled();
+      expect(deps.openDelete).not.toHaveBeenCalled();
+    } finally {
+      useTransferSpaceWarningStore.setState({ pending: null });
+    }
+  });
+
   it('Mac Cmd+Q → calls deps.closeApp()', () => {
     const deps = makeDeps({ isMac: true });
     const handler = createKeyboardHandler(deps);

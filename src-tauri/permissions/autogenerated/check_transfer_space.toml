@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-transfer-space"
+description = "Enables the check_transfer_space command without any pre-configured scope."
+commands.allow = ["check_transfer_space"]
+
+[[permission]]
+identifier = "deny-check-transfer-space"
+description = "Denies the check_transfer_space command without any pre-configured scope."
+commands.deny = ["check_transfer_space"]
