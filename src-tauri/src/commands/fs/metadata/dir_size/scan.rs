@@ -233,17 +233,12 @@ pub(super) fn is_windows_unc_path(path: &str) -> bool {
 }
 
 /// 항목 메타데이터를 링크를 따라가지 않고 읽는다.
-/// Unix의 `DirEntry::metadata`는 디렉터리 기준 상대 조회(fstatat)라 전체 경로 조회보다 빠르다.
-#[cfg(unix)]
+/// Unix는 디렉터리 기준 상대 조회(fstatat)라 전체 경로 조회보다 빠르다.
+/// Windows는 목록 조회(`FindNextFileW`) 때 받은 값을 그대로 써서 파일마다 열고 닫는 호출이 없다.
+/// 대신 쓰는 중인 파일의 크기는 NTFS 디렉터리 항목이 갱신될 때(보통 파일을 닫을 때)까지 늦게 반영된다.
+/// (2026-10-25 결정: 속도를 위해 이 지연을 받아들인다. 이전에는 파일마다 `symlink_metadata`로 다시 조회했다.)
 pub(super) fn entry_metadata(entry: &fs::DirEntry) -> std::io::Result<fs::Metadata> {
     entry.metadata()
-}
-
-/// Windows의 `DirEntry::metadata`는 목록 조회 때 받은 값이라 쓰는 중인 파일의 크기가 늦게 반영될 수 있어,
-/// 1단계와 같이 파일마다 다시 조회한다.
-#[cfg(not(unix))]
-pub(super) fn entry_metadata(entry: &fs::DirEntry) -> std::io::Result<fs::Metadata> {
-    fs::symlink_metadata(entry.path())
 }
 
 struct Cancelled;
