@@ -90,6 +90,17 @@ fn looks_like_windows_executable(size: u64, header: &[u8]) -> bool {
     size >= WINDOWS_PORTABLE_MIN_BYTES && header.starts_with(b"MZ")
 }
 
+/// `codesign -dv --verbose=2` 출력에서 TeamIdentifier 값을 꺼낸다. 서명이 없거나 `not set`이면 None.
+#[cfg(any(target_os = "macos", test))]
+fn parse_team_identifier(codesign_output: &str) -> Option<String> {
+    codesign_output
+        .lines()
+        .find_map(|line| line.strip_prefix("TeamIdentifier="))
+        .map(str::trim)
+        .filter(|team| !team.is_empty() && *team != "not set")
+        .map(str::to_string)
+}
+
 /// 이전 업데이트에서 이름을 바꿔 둔 실행 파일(`.old`)을 지운다. 이전 프로세스가 끝나기 전에는 지워지지 않으므로 잠시 재시도한다.
 pub fn cleanup_replaced_executable() {
     #[cfg(target_os = "windows")]
@@ -230,6 +241,11 @@ async fn apply_macos_update(asset_url: &str) -> Result<(), String> {
         }
     }
 
+    if let Err(error) = verify_update_bundle_signature(&current_bundle, &new_app).await {
+        let _ = tokio::fs::remove_dir_all(&temp_base).await;
+        return Err(error);
+    }
+
     // Strip quarantine attribute just in case
     let _ = tokio::process::Command::new("xattr")
         .args(["-dr", "com.apple.quarantine", new_app.to_str().unwrap()])
@@ -291,6 +307,46 @@ async fn apply_macos_update(asset_url: &str) -> Result<(), String> {
     });
 
     Ok(())
+}
+
+/// 내려받은 앱의 코드 서명이 온전하고, 지금 실행 중인 앱과 같은 개발자 팀(TeamIdentifier)이 서명했는지 확인한다.
+/// 둘 중 하나라도 서명 정보를 확인할 수 없으면(서명 없는 빌드 포함) 교체하지 않는다.
+#[cfg(target_os = "macos")]
+async fn verify_update_bundle_signature(
+    current_bundle: &std::path::Path,
+    new_app: &std::path::Path,
+) -> Result<(), String> {
+    let verify_status = tokio::process::Command::new("codesign")
+        .args(["--verify", "--deep", "--strict"])
+        .arg(new_app)
+        .status()
+        .await
+        .map_err(|e| format!("서명 검증 명령(codesign) 실행 실패: {e}"))?;
+    if !verify_status.success() {
+        return Err("내려받은 앱의 코드 서명이 올바르지 않아 업데이트를 중단했습니다.".to_string());
+    }
+
+    let current_team = bundle_team_identifier(current_bundle).await?;
+    let new_team = bundle_team_identifier(new_app).await?;
+    if current_team != new_team {
+        return Err("내려받은 앱의 서명 팀이 현재 앱과 달라 업데이트를 중단했습니다.".to_string());
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn bundle_team_identifier(bundle: &std::path::Path) -> Result<String, String> {
+    let output = tokio::process::Command::new("codesign")
+        .args(["-dv", "--verbose=2"])
+        .arg(bundle)
+        .output()
+        .await
+        .map_err(|e| format!("서명 정보 확인 명령(codesign) 실행 실패: {e}"))?;
+
+    // codesign은 서명 정보를 stderr로 출력한다.
+    parse_team_identifier(&String::from_utf8_lossy(&output.stderr))
+        .ok_or_else(|| format!("서명 팀 정보를 확인할 수 없습니다: {}", bundle.display()))
 }
 
 /// 포터블로 실행 중이면 현재 exe 경로를 반환한다.
@@ -491,6 +547,16 @@ async fn apply_linux_update(asset_url: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn parse_team_identifier_reads_team_and_rejects_unsigned() {
+        assert_eq!(
+            parse_team_identifier("Identifier=com.x\nTeamIdentifier=6T338B4T7M\nSealed Resources"),
+            Some("6T338B4T7M".to_string())
+        );
+        assert_eq!(parse_team_identifier("TeamIdentifier=not set"), None);
+        assert_eq!(parse_team_identifier("Identifier=com.x"), None);
+    }
 
     #[test]
     fn test_find_app_bundle() {
