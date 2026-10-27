@@ -3,6 +3,7 @@ import { getErrorMessage, useFileSystem } from "../../../hooks/useFileSystem";
 import type { PanelId, PanelState } from "../../../types/file";
 import type { SyncDirection, SyncItem } from "../../../types/sync";
 import { buildSyncExecutionOperations } from "../../../features/syncExecution";
+import { confirmTransferSpace } from "../../../features/transferSpaceCheck";
 import {
   excludeSameSyncItems,
   formatSyncExecutionFailures,
@@ -116,6 +117,20 @@ export const useSyncDialogState = ({
     if (operations.length === 0) {
       setError("No actionable items to synchronize.");
       return;
+    }
+
+    // 방향별로 대상 볼륨이 다르므로 방향마다 한 번씩 공간을 확인한다.
+    const directionTargets = [
+      ["toRight", rightPath],
+      ["toLeft", leftPath],
+    ] as const;
+    for (const [direction, targetRoot] of directionTargets) {
+      const sourcePaths = operations
+        .filter((operation) => operation.direction === direction)
+        .map((operation) => operation.sourcePath);
+      if (!(await confirmTransferSpace(fs, sourcePaths, targetRoot, false))) {
+        return;
+      }
     }
 
     setStage("executing");

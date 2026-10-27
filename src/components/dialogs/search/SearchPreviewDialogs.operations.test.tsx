@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   emitSearchEvents,
   mockCheckCopyConflicts,
+  mockCheckTransferSpace,
   mockCopyFiles,
   mockDeleteFiles,
   mockMoveFiles,
@@ -14,6 +15,7 @@ import {
 } from './SearchPreviewDialogs.test-harness';
 import { SearchPreviewDialogs } from './SearchPreviewDialogs';
 import { usePanelStore } from '../../../store/panelStore';
+import { useTransferSpaceWarningStore } from '../../../store/transferSpaceWarningStore';
 
 const notesResult = {
   name: "notes.txt",
@@ -115,6 +117,38 @@ describe('SearchPreviewDialogs operations', () => {
       "/target",
       "/home/user",
     ]);
+  });
+
+  it("does not move when the user cancels the low-space warning", async () => {
+    mockCheckTransferSpace.mockResolvedValue({
+      requiredBytes: 5_000,
+      availableBytes: 1_000,
+      complete: true,
+      insufficient: true,
+    });
+    await renderSearchResults([notesResult], "/home/user/notes.txt");
+    chooseFirstResult();
+    fireEvent.click(screen.getByRole("button", { name: "Move Selected" }));
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("/target")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Move" }));
+
+    await waitFor(() => {
+      expect(useTransferSpaceWarningStore.getState().pending).not.toBeNull();
+    });
+    expect(mockCheckTransferSpace).toHaveBeenCalledWith(
+      ["/home/user/notes.txt"],
+      "/target",
+      true
+    );
+    useTransferSpaceWarningStore.getState().respond(false);
+
+    await waitFor(() => {
+      expect(useTransferSpaceWarningStore.getState().pending).toBeNull();
+    });
+    expect(mockMoveFiles).not.toHaveBeenCalled();
+    expect(screen.getByText("/home/user/notes.txt")).toBeInTheDocument();
   });
 
   it("deletes selected search results after collapsing descendants under selected directories", async () => {

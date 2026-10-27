@@ -1,16 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncDialog } from "./SyncDialog";
+import { useTransferSpaceWarningStore } from "../../../store/transferSpaceWarningStore";
 
 const {
   mockCloseDialog,
   mockCompareDirectories,
+  mockCheckTransferSpace,
   mockCopyFiles,
   mockRefreshPanel,
   mockShowHiddenFiles,
 } = vi.hoisted(() => ({
   mockCloseDialog: vi.fn(),
   mockCompareDirectories: vi.fn(),
+  mockCheckTransferSpace: vi.fn(),
   mockCopyFiles: vi.fn(),
   mockRefreshPanel: vi.fn(),
   mockShowHiddenFiles: { value: false },
@@ -43,6 +46,7 @@ vi.mock("../../../hooks/useFileSystem", () => ({
   useFileSystem: () => ({
     compareDirectories: mockCompareDirectories,
     copyFiles: mockCopyFiles,
+    checkTransferSpace: mockCheckTransferSpace,
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === "string" ? error : fallback,
@@ -53,9 +57,17 @@ describe("SyncDialog", () => {
     mockCloseDialog.mockReset();
     mockCompareDirectories.mockReset();
     mockCopyFiles.mockReset();
+    mockCheckTransferSpace.mockReset();
+    useTransferSpaceWarningStore.setState({ pending: null });
     mockRefreshPanel.mockReset();
     mockShowHiddenFiles.value = false;
     mockCopyFiles.mockResolvedValue([]);
+    mockCheckTransferSpace.mockResolvedValue({
+      requiredBytes: 0,
+      availableBytes: 1_000,
+      complete: true,
+      insufficient: false,
+    });
   });
 
   it("passes the global hidden-files toggle to directory analysis", async () => {
@@ -113,6 +125,43 @@ describe("SyncDialog", () => {
         true
       );
     });
+  });
+
+  it("does not copy when the user cancels the low-space warning", async () => {
+    mockCheckTransferSpace.mockResolvedValue({
+      requiredBytes: 5_000,
+      availableBytes: 1_000,
+      complete: true,
+      insufficient: true,
+    });
+    mockCompareDirectories.mockResolvedValue([
+      {
+        relPath: "big.bin",
+        leftPath: "/left/big.bin",
+        rightPath: null,
+        leftKind: "file",
+        rightKind: null,
+        status: "LeftOnly",
+        direction: "toRight",
+      },
+    ]);
+
+    render(<SyncDialog />);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+    await screen.findByText("Found 1 item(s) to compare");
+    fireEvent.click(screen.getByRole("button", { name: "Synchronize" }));
+
+    await waitFor(() => {
+      expect(useTransferSpaceWarningStore.getState().pending).not.toBeNull();
+    });
+    expect(mockCheckTransferSpace).toHaveBeenCalledWith(["/left/big.bin"], "/right", false);
+    useTransferSpaceWarningStore.getState().respond(false);
+
+    await waitFor(() => {
+      expect(useTransferSpaceWarningStore.getState().pending).toBeNull();
+    });
+    expect(mockCopyFiles).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Synchronize" })).toBeInTheDocument();
   });
 
   it("exposes synchronization progress while a copy is running", async () => {

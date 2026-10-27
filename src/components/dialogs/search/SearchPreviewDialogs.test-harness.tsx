@@ -6,6 +6,7 @@ import type { SearchEvent, SearchResult } from '../../../hooks/useFileSystem';
 const searchPreviewMocks = vi.hoisted(() => ({
   mockSearchFiles: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
+  mockCheckTransferSpace: vi.fn(),
   mockCopyFiles: vi.fn(),
   mockMoveFiles: vi.fn(),
   mockDeleteFiles: vi.fn(),
@@ -15,6 +16,7 @@ const searchPreviewMocks = vi.hoisted(() => ({
 
 export const mockSearchFiles = searchPreviewMocks.mockSearchFiles;
 export const mockCheckCopyConflicts = searchPreviewMocks.mockCheckCopyConflicts;
+export const mockCheckTransferSpace = searchPreviewMocks.mockCheckTransferSpace;
 export const mockCopyFiles = searchPreviewMocks.mockCopyFiles;
 export const mockMoveFiles = searchPreviewMocks.mockMoveFiles;
 export const mockDeleteFiles = searchPreviewMocks.mockDeleteFiles;
@@ -29,6 +31,7 @@ vi.mock('../../../hooks/useFileSystem', () => ({
   useFileSystem: () => ({
     searchFiles: searchPreviewMocks.mockSearchFiles,
     checkCopyConflicts: searchPreviewMocks.mockCheckCopyConflicts,
+    checkTransferSpace: searchPreviewMocks.mockCheckTransferSpace,
     copyFiles: searchPreviewMocks.mockCopyFiles,
     moveFiles: searchPreviewMocks.mockMoveFiles,
     deleteFiles: searchPreviewMocks.mockDeleteFiles,
@@ -73,6 +76,7 @@ export const registerSearchPreviewDialogsTestLifecycle = () => {
     }));
     searchPreviewMocks.mockSearchFiles.mockReset();
     searchPreviewMocks.mockCheckCopyConflicts.mockReset();
+    searchPreviewMocks.mockCheckTransferSpace.mockReset();
     searchPreviewMocks.mockCopyFiles.mockReset();
     searchPreviewMocks.mockMoveFiles.mockReset();
     searchPreviewMocks.mockDeleteFiles.mockReset();
@@ -88,6 +92,12 @@ export const registerSearchPreviewDialogsTestLifecycle = () => {
       }
     );
     searchPreviewMocks.mockCheckCopyConflicts.mockResolvedValue([]);
+    searchPreviewMocks.mockCheckTransferSpace.mockResolvedValue({
+      requiredBytes: 0,
+      availableBytes: 1_000,
+      complete: true,
+      insufficient: false,
+    });
   });
 };
 

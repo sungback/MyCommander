@@ -4,6 +4,7 @@ import {
   type SearchResult,
   useFileSystem,
 } from "../../../hooks/useFileSystem";
+import { confirmTransferSpace } from "../../../features/transferSpaceCheck";
 import {
   refreshPanelsForDirectories,
   refreshPanelsForEntryPaths,
@@ -133,8 +134,16 @@ export const useSearchResultOperations = ({
           return;
         }
 
+        if (!(await confirmTransferSpace(fs, selectedPaths, resolvedTarget, false))) {
+          return;
+        }
+
         await fs.copyFiles(selectedPaths, resolvedTarget);
       } else {
+        if (!(await confirmTransferSpace(fs, selectedPaths, resolvedTarget, true))) {
+          return;
+        }
+
         await fs.moveFiles(selectedPaths, resolvedTarget);
         removeResultsFromList(selectedResults);
         clearSearchSelection();
