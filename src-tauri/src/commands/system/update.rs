@@ -90,14 +90,20 @@ fn looks_like_windows_executable(size: u64, header: &[u8]) -> bool {
     size >= WINDOWS_PORTABLE_MIN_BYTES && header.starts_with(b"MZ")
 }
 
-/// `codesign -dv --verbose=2` 출력에서 TeamIdentifier 값을 꺼낸다. 서명이 없거나 `not set`이면 None.
+/// `codesign -dv --verbose=2` 출력에서 TeamIdentifier 값을 꺼낸다. 서명이 없거나 `not set`이거나
+/// 대문자·숫자 10자가 아니면 None. 값은 코드 요구사항 문자열에 들어가므로 형식을 엄격히 본다.
 #[cfg(any(target_os = "macos", test))]
 fn parse_team_identifier(codesign_output: &str) -> Option<String> {
     codesign_output
         .lines()
         .find_map(|line| line.strip_prefix("TeamIdentifier="))
         .map(str::trim)
-        .filter(|team| !team.is_empty() && *team != "not set")
+        .filter(|team| {
+            team.len() == 10
+                && team
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        })
         .map(str::to_string)
 }
 
@@ -273,12 +279,7 @@ async fn apply_macos_update(asset_url: &str) -> Result<(), String> {
         }
     } else {
         // Fallback: request administrator privileges via osascript
-        let script = format!(
-            "do shell script \"mv '{current}' '{backup}' && ditto '{new_app}' '{current}' && rm -rf '{backup}'\" with administrator privileges",
-            current = current_bundle.display(),
-            backup = backup_path.display(),
-            new_app = new_app.display()
-        );
+        let script = build_admin_swap_script(&current_bundle, &backup_path, &new_app);
 
         let osascript_status = tokio::process::Command::new("osascript")
             .args(["-e", &script])
@@ -309,27 +310,51 @@ async fn apply_macos_update(asset_url: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 내려받은 앱의 코드 서명이 온전하고, 지금 실행 중인 앱과 같은 개발자 팀(TeamIdentifier)이 서명했는지 확인한다.
-/// 둘 중 하나라도 서명 정보를 확인할 수 없으면(서명 없는 빌드 포함) 교체하지 않는다.
+/// 관리자 권한으로 앱 번들을 교체하는 AppleScript. 경로는 셸 따옴표와 AppleScript 문자열 순서로 이스케이프한다.
+#[cfg(target_os = "macos")]
+fn build_admin_swap_script(
+    current: &std::path::Path,
+    backup: &std::path::Path,
+    new_app: &std::path::Path,
+) -> String {
+    use super::launch::shell::{escape_applescript_string, shell_escape_single_quotes};
+
+    let quote = |path: &std::path::Path| {
+        format!("'{}'", shell_escape_single_quotes(&path.to_string_lossy()))
+    };
+    let (current, backup, new_app) = (quote(current), quote(backup), quote(new_app));
+    let command = format!("mv {current} {backup} && ditto {new_app} {current} && rm -rf {backup}");
+
+    format!(
+        "do shell script \"{}\" with administrator privileges",
+        escape_applescript_string(&command)
+    )
+}
+
+/// 내려받은 앱이 Apple 인증서 체인으로 서명됐고, 지금 실행 중인 앱과 같은 개발자 팀 소유인지 확인한다.
+/// 신뢰할 팀은 실행 중인 앱의 서명에서만 읽고, 내려받은 앱의 codesign 출력은 해석하지 않는다.
+/// `anchor apple generic`이 없으면 같은 팀 ID를 적은 자체 서명 인증서도 통과하므로 반드시 붙인다.
+/// 서명 정보를 읽을 수 없으면(서명 없는 빌드 포함) 교체하지 않는다.
 #[cfg(target_os = "macos")]
 async fn verify_update_bundle_signature(
     current_bundle: &std::path::Path,
     new_app: &std::path::Path,
 ) -> Result<(), String> {
+    let team = bundle_team_identifier(current_bundle).await?;
+    let requirement = format!("anchor apple generic and certificate leaf[subject.OU] = \"{team}\"");
+
     let verify_status = tokio::process::Command::new("codesign")
         .args(["--verify", "--deep", "--strict"])
+        .arg(format!("-R={requirement}"))
         .arg(new_app)
         .status()
         .await
         .map_err(|e| format!("서명 검증 명령(codesign) 실행 실패: {e}"))?;
     if !verify_status.success() {
-        return Err("내려받은 앱의 코드 서명이 올바르지 않아 업데이트를 중단했습니다.".to_string());
-    }
-
-    let current_team = bundle_team_identifier(current_bundle).await?;
-    let new_team = bundle_team_identifier(new_app).await?;
-    if current_team != new_team {
-        return Err("내려받은 앱의 서명 팀이 현재 앱과 달라 업데이트를 중단했습니다.".to_string());
+        return Err(
+            "내려받은 앱의 코드 서명이 올바르지 않거나 현재 앱과 같은 개발자 팀이 아니어서 업데이트를 중단했습니다."
+                .to_string(),
+        );
     }
 
     Ok(())
@@ -555,7 +580,24 @@ mod tests {
             Some("6T338B4T7M".to_string())
         );
         assert_eq!(parse_team_identifier("TeamIdentifier=not set"), None);
+        assert_eq!(parse_team_identifier("TeamIdentifier=ABC\" or true"), None);
+        assert_eq!(parse_team_identifier("TeamIdentifier=6t338b4t7m"), None);
         assert_eq!(parse_team_identifier("Identifier=com.x"), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn admin_swap_script_escapes_quotes_in_paths() {
+        let script = build_admin_swap_script(
+            Path::new("/Applications/Bob's \"Tools\"/MyCommander.app"),
+            Path::new("/Applications/Bob's \"Tools\"/MyCommander.app.old.1"),
+            Path::new("/tmp/x/MyCommander.app"),
+        );
+
+        // 셸: ' -> '\'' , AppleScript: \ -> \\ , " -> \"
+        assert!(script.contains(r#"Bob'\\''s \"Tools\""#));
+        assert!(script.starts_with("do shell script \"mv '/Applications/"));
+        assert!(script.ends_with("\" with administrator privileges"));
     }
 
     #[test]

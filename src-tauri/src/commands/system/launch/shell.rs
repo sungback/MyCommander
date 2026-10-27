@@ -85,12 +85,12 @@ pub(super) fn run_shell_command_for_path(path: &Path, command: &str) -> Result<(
 }
 
 #[cfg(not(target_os = "windows"))]
-fn shell_escape_single_quotes(value: &str) -> String {
+pub(crate) fn shell_escape_single_quotes(value: &str) -> String {
     value.replace('\'', "'\\''")
 }
 
 #[cfg(target_os = "macos")]
-fn escape_applescript_string(value: &str) -> String {
+pub(crate) fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 

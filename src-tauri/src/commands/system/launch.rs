@@ -5,7 +5,7 @@ mod editor;
 #[path = "launch/open.rs"]
 mod open;
 #[path = "launch/shell.rs"]
-mod shell;
+pub(crate) mod shell;
 #[path = "launch/terminal.rs"]
 mod terminal;
 
