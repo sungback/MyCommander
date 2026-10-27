@@ -1,5 +1,8 @@
 use super::execution::build_retry_submission;
-use super::persistence::{restore_job_engine_state, snapshot_persisted_state};
+use super::persistence::{
+    read_job_state_from_path, restore_job_engine_state, snapshot_persisted_state,
+    write_job_state_to_path,
+};
 use super::state::{InternalJobRecord, JobEngineInner, PersistedJobEngineState};
 use super::*;
 use std::collections::VecDeque;
@@ -321,4 +324,44 @@ fn job_submission_deserializes_move_overwrite() {
         }
         other => panic!("unexpected submission: {other:?}"),
     }
+}
+
+fn create_job_state_test_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("mycommander_{name}_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+#[test]
+fn job_state_file_roundtrips_without_leaving_temp_file() {
+    let dir = create_job_state_test_dir("job_state_roundtrip");
+    let file_path = dir.join("job-queue.json");
+    let inner = JobEngineInner {
+        next_id: 7,
+        ..Default::default()
+    };
+
+    write_job_state_to_path(&file_path, &inner).unwrap();
+
+    assert_eq!(read_job_state_from_path(&file_path).unwrap().next_id, 7);
+    assert!(!file_path.with_extension("json.tmp").exists());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn corrupt_job_state_file_is_set_aside_and_starts_empty() {
+    let dir = create_job_state_test_dir("job_state_corrupt");
+    let file_path = dir.join("job-queue.json");
+    std::fs::write(&file_path, "{\"nextId\": 3, \"jobs\": [").unwrap();
+
+    let inner = read_job_state_from_path(&file_path).unwrap();
+
+    assert!(inner.hydrated);
+    assert!(inner.jobs.is_empty());
+    assert!(!file_path.exists());
+    assert!(file_path.with_extension("json.bad").exists());
+
+    let _ = std::fs::remove_dir_all(&dir);
 }

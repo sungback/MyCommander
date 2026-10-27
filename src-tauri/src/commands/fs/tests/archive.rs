@@ -137,6 +137,22 @@ fn keeps_single_top_level_directory_when_name_differs_from_archive() {
 }
 
 #[test]
+fn keeps_nested_directory_when_it_has_same_name_as_top_level_directory() {
+    let tmp = create_test_dir("keep_same_name_nested_root");
+    let extraction_dir = tmp.join("abc");
+    let nested_child = extraction_dir.join("abc").join("abc").join("notes.txt");
+
+    fs::create_dir_all(nested_child.parent().unwrap()).unwrap();
+    fs::write(&nested_child, b"hello").unwrap();
+
+    flatten_matching_archive_root_dir(&extraction_dir, Path::new("abc.zip")).unwrap();
+
+    assert!(nested_child.exists());
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn create_zip_archive_rejects_non_directory() {
     let tmp = std::env::temp_dir().join("test_create_zip_file.txt");
     let _ = fs::remove_file(&tmp);

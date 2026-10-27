@@ -246,6 +246,11 @@ pub(crate) fn flatten_matching_archive_root_dir(
         return Ok(());
     }
 
+    // 안쪽에 같은 이름 폴더가 있으면 그 폴더를 비어 있지 않은 상위 폴더 자리로 옮기게 되어 rename이 실패한다.
+    if nested_root.path().join(&nested_name).exists() {
+        return Ok(());
+    }
+
     move_directory_contents(nested_root.path().as_path(), extraction_dir)?;
     fs::remove_dir(nested_root.path()).map_err(|e| e.to_string())
 }
