@@ -1,42 +1,13 @@
-name: Setup CI Environment
-description: Prepare the repository for Ubuntu-based CI jobs.
-
-inputs:
-  install_rust:
-    description: Whether to install the Rust toolchain and cache.
-    required: false
-    default: "true"
-  install_linux_tauri_deps:
-    description: Whether to install Linux packages required by Tauri/Rust checks.
-    required: false
-    default: "true"
+name: Setup Rust CI Environment
+description: Prepare Rust and its dependency cache for the Rust CI job.
 
 runs:
   using: composite
   steps:
-    - name: Node.js 설치
-      uses: actions/setup-node@v5
-      with:
-        node-version: 22
-        cache: "npm"
-
-    - name: 의존성 설치
-      shell: bash
-      run: npm ci
-
     - name: Rust 설치
-      if: ${{ inputs.install_rust == 'true' }}
       uses: dtolnay/rust-toolchain@stable
 
     - name: Rust 캐시 설정
-      if: ${{ inputs.install_rust == 'true' }}
       uses: swatinem/rust-cache@v2
       with:
         workspaces: "./src-tauri -> target"
-
-    - name: 리눅스 필수 의존성 패키지 설치
-      if: ${{ inputs.install_linux_tauri_deps == 'true' }}
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf

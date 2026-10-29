@@ -79,6 +79,16 @@ PDF·PPTX 미리보기는 왼쪽 썸네일과 현재 페이지를 표시합니�
 
 변경 범위별 검사 기준과 Git 훅의 실제 동작은 [AGENTS.md](AGENTS.md#검증)에 정리되어 있습니다.
 
+## CI와 릴리즈 캐시
+
+[CI](.github/workflows/ci.yml)는 Rust 검사·테스트, 프런트엔드 타입·테스트, 프런트엔드 빌드를 나눠 실행합니다. 프런트엔드는 Linux 의존성 설치를 기다리지 않으며, Rust 작업은 필수 라이브러리를 한 번만 설치합니다.
+
+[Linux 설치 스크립트](scripts/install-linux-tauri-deps.sh)는 권장 패키지를 제외하고 설치합니다. 패키지 목록 갱신은 90초, 다운로드는 180초로 제한하고, 실패하면 Azure Ubuntu 미러를 공식 archive 서버로 바꿔 한 번 더 시도합니다. 실제 설치에는 시간 제한을 걸지 않습니다. 실패·시간 초과 처리는 `bash scripts/test-install-linux-tauri-deps.sh`로 오프라인 검사합니다.
+
+[Prepare Release Cache](.github/workflows/release-cache.yml)는 Rust 코드·의존성·빌드 설정을 main에 올릴 때 세 운영체제의 릴리즈 의존성을 미리 컴파일합니다. 문서만 바꾸면 실행하지 않으며, Actions에서 main을 선택해 수동으로도 실행할 수 있습니다. 서명·패키징·업로드 없이 캐시만 준비합니다.
+
+캐시 준비와 릴리즈는 [공통 Rust 설정](.github/actions/setup-release-rust/action.yml)을 사용합니다. 운영체제·아키텍처·Rust 타깃별로 의존성을 재사용하고 앱 자체는 다시 컴파일합니다. 처음 준비하거나 Rust 버전·의존성이 바뀌면 시간이 더 걸립니다. 새 의존성의 캐시가 필요하면 해당 main 실행이 성공한 뒤 릴리즈 태그를 푸시합니다. GitHub는 다른 태그에 저장한 캐시의 직접 공유를 제한하므로 main에서 준비합니다.
+
 ## 빌드와 릴리즈
 
 로컬 앱 패키지는 `npm run tauri build`로 빌드합니다. 결과는 `src-tauri/target/release/bundle/`에 생성됩니다.

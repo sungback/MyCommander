@@ -1,0 +1,29 @@
+name: Setup Release Rust
+description: Use the same Rust toolchain and dependency cache for main warmups and releases.
+
+inputs:
+  target:
+    description: Explicit Rust target, or empty for the runner's host target.
+    required: false
+    default: ""
+  save-cache:
+    description: Save dependency caches only from a trusted main branch warmup.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Rust 설치
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.target }}
+
+    - name: 릴리즈 의존성 캐시
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: "./src-tauri -> target"
+        shared-key: release-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target || 'host' }}
+        # Never reuse a built app or persist signing material from a release job.
+        cache-workspace-crates: "false"
+        save-if: ${{ inputs.save-cache == 'true' && github.ref == 'refs/heads/main' }}

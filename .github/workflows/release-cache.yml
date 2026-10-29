@@ -1,0 +1,75 @@
+name: Prepare Release Cache
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src-tauri/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "scripts/vitePdfjsResources.mjs"
+      - "scripts/install-linux-tauri-deps.sh"
+      - ".cargo/**"
+      - "rust-toolchain*"
+      - ".github/actions/setup-js/**"
+      - ".github/actions/setup-release-rust/**"
+      - ".github/workflows/release-cache.yml"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CARGO_INCREMENTAL: 0
+
+concurrency:
+  group: release-cache-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: windows-latest
+            target: ""
+          - platform: ubuntu-22.04
+            target: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: Rust 설치와 릴리즈 캐시 준비
+        uses: ./.github/actions/setup-release-rust
+        with:
+          target: ${{ matrix.target }}
+          save-cache: "true"
+
+      - name: Linux 필수 의존성 설치
+        if: runner.os == 'Linux'
+        run: bash scripts/install-linux-tauri-deps.sh
+
+      - name: 서명·패키징 없는 릴리즈 컴파일
+        shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+        run: |
+          # Let Tauri set the same features and platform build flags as the release.
+          args=(build --no-bundle)
+          if [[ -n "$RUST_TARGET" ]]; then
+            args+=(--target "$RUST_TARGET")
+          fi
+          npm run tauri -- "${args[@]}" -- --locked

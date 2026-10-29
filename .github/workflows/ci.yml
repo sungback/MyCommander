@@ -26,8 +26,8 @@ jobs:
       - name: 공통 CI 환경 준비
         uses: ./.github/actions/setup-ci
 
-      - name: TypeScript 타입 체크
-        run: ./node_modules/.bin/tsc --noEmit
+      - name: Linux 필수 의존성 설치
+        run: bash scripts/install-linux-tauri-deps.sh
 
       - name: Rust 포맷 체크
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
@@ -38,23 +38,32 @@ jobs:
       - name: Rust 체크
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
+      - name: Rust 테스트 실행
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
   test:
     runs-on: ubuntu-latest
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
 
-      - name: 공통 CI 환경 준비
-        uses: ./.github/actions/setup-ci
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: TypeScript 타입 체크
+        run: npm run typecheck
 
       - name: 프론트엔드 테스트 실행
         run: npm run test
 
-      - name: Rust 테스트 실행
-        run: npm run test:rust
-
       - name: 릴리즈 산출물 fixture 테스트
         run: npm run test:release-assets
+
+      - name: Linux 의존성 설치 실패·재시도 테스트
+        run: bash scripts/test-install-linux-tauri-deps.sh
+
+      - name: Tauri 명령·권한 정합성 검사
+        run: npm run verify:tauri-commands
 
   build:
     runs-on: ubuntu-latest
@@ -62,11 +71,8 @@ jobs:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
 
-      - name: 공통 CI 환경 준비
-        uses: ./.github/actions/setup-ci
-        with:
-          install_rust: "false"
-          install_linux_tauri_deps: "false"
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
 
       - name: 프런트엔드 빌드
         run: npm run build

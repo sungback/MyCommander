@@ -126,21 +126,14 @@ jobs:
       - name: 릴리즈 버전/태그 검증
         run: npm run verify:release-version
 
-      - name: Rust 설치
-        uses: dtolnay/rust-toolchain@stable
+      - name: Rust 설치와 릴리즈 캐시 복원
+        uses: ./.github/actions/setup-release-rust
         with:
-          targets: ${{ startsWith(matrix.args, '--target') && 'aarch64-apple-darwin' || '' }}
-
-      - name: Rust 캐시 설정 (빌드 속도 향상)
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
+          target: ${{ startsWith(matrix.args, '--target') && 'aarch64-apple-darwin' || '' }}
 
       - name: 리눅스 필수 의존성 패키지 설치 (우분투)
         if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        run: bash scripts/install-linux-tauri-deps.sh
 
       - name: macOS 배포 서명 설정 확인
         if: matrix.platform == 'macos-latest'
