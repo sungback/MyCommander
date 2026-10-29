@@ -81,7 +81,21 @@ const updateTabsAcrossPanels = (
   }
 };
 
-const applyDirectoryRefresh = (directories: string[]) => {
+// 외부 변경(파일 감시)은 값을 유지한 채 stale 처리하고, 앱 내부 작업 결과는 즉시 무효화한다.
+const invalidateOrMarkStale = (
+  state: ReturnType<typeof usePanelStore.getState>,
+  paths: string[],
+  reason: PanelRefreshReason
+) => {
+  if (reason === "filesystem-changed") {
+    state.markEntrySizesStale(paths);
+    return;
+  }
+
+  state.invalidateEntrySizes(paths);
+};
+
+const applyDirectoryRefresh = (directories: string[], reason: PanelRefreshReason) => {
   const normalizedDirectories = new Set(
     directories
       .filter((directory) => directory.length > 0)
@@ -93,7 +107,7 @@ const applyDirectoryRefresh = (directories: string[]) => {
   }
 
   const state = usePanelStore.getState();
-  state.invalidateEntrySizes(directories);
+  invalidateOrMarkStale(state, directories, reason);
 
   const now = Date.now();
   updateTabsAcrossPanels(state, (tab) => {
@@ -136,7 +150,7 @@ const applyDirectoryRefresh = (directories: string[]) => {
   });
 };
 
-const applyEntryPathRefresh = (paths: string[]) => {
+const applyEntryPathRefresh = (paths: string[], reason: PanelRefreshReason) => {
   const normalizedPaths = paths.filter((path) => path.length > 0);
 
   if (normalizedPaths.length === 0) {
@@ -144,7 +158,7 @@ const applyEntryPathRefresh = (paths: string[]) => {
   }
 
   const state = usePanelStore.getState();
-  state.invalidateEntrySizes(paths);
+  invalidateOrMarkStale(state, paths, reason);
 
   const now = Date.now();
   updateTabsAcrossPanels(state, (tab) => {
@@ -242,18 +256,16 @@ export const refreshPanelsForChanges = ({
   entryPaths = [],
   removeDeletedEntries = false,
 }: RefreshPanelsForChangesOptions) => {
-  void reason;
-
   if (removeDeletedEntries) {
     applyDeletedPathRemoval(entryPaths);
   }
 
   if (entryPaths.length > 0) {
-    applyEntryPathRefresh(entryPaths);
+    applyEntryPathRefresh(entryPaths, reason);
   }
 
   if (directories.length > 0) {
-    applyDirectoryRefresh(directories);
+    applyDirectoryRefresh(directories, reason);
   }
 };
 

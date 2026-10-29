@@ -2,6 +2,7 @@ import type { PanelId, PanelState, DirectorySizeStatus } from "../types/file";
 import {
   scanDirectorySizeWithProgress,
   type ManualDirectorySizeScanOutcome,
+  type UpdateEntrySizeHandler,
 } from "./manualDirectorySizeScan";
 import type { DirectorySizeScanResult } from "./tauriCommands/fileCommands";
 
@@ -15,7 +16,7 @@ interface CalculatePanelDirectoriesArgs {
     path: string,
     status: DirectorySizeStatus
   ) => void;
-  updateEntrySize: (panelId: PanelId, path: string, size: number) => void;
+  updateEntrySize: UpdateEntrySizeHandler;
   updateEntrySizeEstimate?: (
     panelId: PanelId,
     path: string,

@@ -1,6 +1,7 @@
 use super::state::{JobEngineInner, PersistedJobEngineState};
 use super::JobStatus;
 use std::fs;
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -64,7 +65,14 @@ pub(crate) fn persist_job_engine_state(
     app: &AppHandle,
     inner: &JobEngineInner,
 ) -> Result<(), String> {
-    let file_path = persistence_file_path(app)?;
+    write_job_state_to_path(&persistence_file_path(app)?, inner)
+}
+
+// 쓰는 도중 종료돼도 기존 파일이 잘리지 않도록 임시 파일에 쓴 뒤 rename으로 교체한다.
+pub(crate) fn write_job_state_to_path(
+    file_path: &Path,
+    inner: &JobEngineInner,
+) -> Result<(), String> {
     if let Some(parent) = file_path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("Failed to create job state dir: {error}"))?;
@@ -73,7 +81,11 @@ pub(crate) fn persist_job_engine_state(
     let snapshot = snapshot_persisted_state(inner);
     let content = serde_json::to_string_pretty(&snapshot)
         .map_err(|error| format!("Failed to encode job state: {error}"))?;
-    fs::write(&file_path, content).map_err(|error| format!("Failed to write job state: {error}"))
+    let temp_path = file_path.with_extension("json.tmp");
+    fs::write(&temp_path, content)
+        .map_err(|error| format!("Failed to write job state temp file: {error}"))?;
+    fs::rename(&temp_path, file_path)
+        .map_err(|error| format!("Failed to finalize job state: {error}"))
 }
 
 pub(crate) fn hydrate_job_engine_state(
@@ -84,16 +96,24 @@ pub(crate) fn hydrate_job_engine_state(
         return Ok(());
     }
 
-    let file_path = persistence_file_path(app)?;
+    *inner = read_job_state_from_path(&persistence_file_path(app)?)?;
+    Ok(())
+}
+
+// 파일이 없거나 깨졌으면 빈 상태로 시작한다. 깨진 파일은 `.bad`로 옮겨 두어 매번 같은 오류로 막히지 않게 한다.
+pub(crate) fn read_job_state_from_path(file_path: &Path) -> Result<JobEngineInner, String> {
     if !file_path.exists() {
-        inner.hydrated = true;
-        return Ok(());
+        return Ok(restore_job_engine_state(PersistedJobEngineState::default()));
     }
 
-    let content = fs::read_to_string(&file_path)
+    let content = fs::read_to_string(file_path)
         .map_err(|error| format!("Failed to read job state: {error}"))?;
-    let snapshot: PersistedJobEngineState = serde_json::from_str(&content)
-        .map_err(|error| format!("Failed to parse job state: {error}"))?;
-    *inner = restore_job_engine_state(snapshot);
-    Ok(())
+    match serde_json::from_str::<PersistedJobEngineState>(&content) {
+        Ok(snapshot) => Ok(restore_job_engine_state(snapshot)),
+        Err(_) => {
+            fs::rename(file_path, file_path.with_extension("json.bad"))
+                .map_err(|error| format!("Failed to set aside corrupt job state: {error}"))?;
+            Ok(restore_job_engine_state(PersistedJobEngineState::default()))
+        }
+    }
 }

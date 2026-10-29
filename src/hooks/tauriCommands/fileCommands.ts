@@ -1,12 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { BatchRenameOperation } from "../../features/multiRename";
-import type { DirectorySizeStatus, FileEntry } from "../../types/file";
+import type {
+  DirectorySizeStatus,
+  FileEntry,
+  ScannedChildDirectorySize,
+} from "../../types/file";
 import type { SqliteDatabasePreview } from "../../types/sqlitePreview";
 
 export type PersistentDirectorySizeStatus = Extract<
   DirectorySizeStatus,
-  "exact" | "estimated" | "partial"
+  "exact" | "limited" | "estimated" | "partial"
 >;
+
+// provider: 파일 제공자 폴더, local: 일반 로컬 폴더, unknown: 판단 불가
+export type StorageKind = "provider" | "local" | "unknown";
 
 export interface DirectorySizeEstimate {
   size: number;
@@ -19,6 +26,21 @@ export interface DirectorySizeScanResult {
   isPartial: boolean;
   scannedEntries: number;
   errorCount: number;
+  // 권한이 없어 읽지 못한 항목 수. 0보다 크면 size는 하한값이다.
+  inaccessibleCount: number;
+  // 스캔을 실제로 시작한 시각(Unix ms). 같은 경로의 진행 중인 스캔에 합류한 요청도 이 값을 받는다.
+  startedAtMs: number;
+  // 스캔하며 함께 구한 하위 폴더 결과(깊이 1~2, 큰 폴더부터 최대 2,000개)
+  children: ScannedChildDirectorySize[];
+}
+
+export interface TransferSpaceCheck {
+  /** 옮기는 데 필요한 크기. complete가 false면 하한값이다. */
+  requiredBytes: number;
+  /** 대상 볼륨의 남은 공간. 알 수 없으면 null */
+  availableBytes: number | null;
+  complete: boolean;
+  insufficient: boolean;
 }
 
 export interface DirectorySizeProgressEvent {
@@ -58,6 +80,9 @@ interface DirectorySizeScanResponse {
   isPartial: boolean;
   scannedEntries: number;
   errorCount: number;
+  inaccessibleCount: number;
+  startedAtMs: number;
+  children: ScannedChildDirectorySize[];
 }
 
 interface PersistentDirectorySizeCacheLoadResponse {
@@ -131,6 +156,18 @@ export const fileCommands = {
     });
   },
 
+  checkTransferSpace: async (
+    sourcePaths: string[],
+    targetPath: string,
+    isMove: boolean
+  ): Promise<TransferSpaceCheck> => {
+    return await invoke<TransferSpaceCheck>("check_transfer_space", {
+      source_paths: sourcePaths,
+      target_path: targetPath,
+      is_move: isMove,
+    });
+  },
+
   renameFile: async (oldPath: string, newPath: string): Promise<void> => {
     await invoke("rename_file", {
       old_path: oldPath,
@@ -154,12 +191,19 @@ export const fileCommands = {
     });
   },
 
+  readFileBinary: async (path: string, maxBytes?: number): Promise<ArrayBuffer> => {
+    return await invoke<ArrayBuffer>("read_file_binary", {
+      path,
+      ...(maxBytes != null ? { max_bytes: maxBytes } : {}),
+    });
+  },
+
   previewSqliteDatabase: async (path: string): Promise<SqliteDatabasePreview> => {
     return await invoke<SqliteDatabasePreview>("preview_sqlite_database", { path });
   },
 
-  getDirSize: async (path: string): Promise<number> => {
-    return await invoke<number>("get_dir_size", { path });
+  classifyStoragePaths: async (paths: string[]): Promise<StorageKind[]> => {
+    return await invoke<StorageKind[]>("classify_storage_paths", { paths });
   },
 
   estimateDirSize: async (
@@ -193,6 +237,9 @@ export const fileCommands = {
       isPartial: result.isPartial,
       scannedEntries: result.scannedEntries,
       errorCount: result.errorCount,
+      inaccessibleCount: result.inaccessibleCount,
+      startedAtMs: result.startedAtMs,
+      children: result.children ?? [],
     };
   },
 

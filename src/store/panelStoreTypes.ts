@@ -1,8 +1,10 @@
 import type {
+  ConfirmedDirectorySizeStatus,
   FileEntry,
   DirectorySizeStatus,
   PanelId,
   PanelState,
+  ScannedChildDirectorySize,
   SortField,
   ViewMode,
 } from "../types/file";
@@ -40,7 +42,15 @@ export interface AppState {
   refreshPanel: (panel: PanelId) => void;
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
   setSort: (panel: PanelId, field: SortField) => void;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  // scanStartedAt: 정확 스캔 시작 시각. 스캔 중 변경이 감지됐으면 완료 후에도 stale을 유지한다.
+  // status: 권한이 없어 읽지 못한 항목이 있으면 "limited"(하한값), 없으면 "exact"(기본값).
+  updateEntrySize: (
+    panel: PanelId,
+    path: string,
+    size: number,
+    scanStartedAt?: number,
+    status?: ConfirmedDirectorySizeStatus
+  ) => void;
   updateEntrySizeProgress: (
     panel: PanelId,
     path: string,
@@ -52,6 +62,8 @@ export interface AppState {
     size: number,
     status: Extract<DirectorySizeStatus, "estimated" | "partial">
   ) => void;
+  // 상위 폴더 정확 계산에서 함께 구한 하위 폴더 결과를 한 번에 반영한다. scanStartedAt은 그 스캔의 시작 시각이다.
+  applyScannedChildSizes: (children: ScannedChildDirectorySize[], scanStartedAt: number) => void;
   setEntrySizeStatus: (
     panel: PanelId,
     path: string,
@@ -61,10 +73,12 @@ export interface AppState {
     entries: Array<{
       path: string;
       size: number;
-      status: Extract<DirectorySizeStatus, "exact" | "estimated" | "partial">;
+      status: Extract<DirectorySizeStatus, "exact" | "limited" | "estimated" | "partial">;
       isStale: boolean;
+      scannedAt?: number;
     }>
   ) => void;
   invalidateEntrySizes: (paths: string[]) => void;
+  markEntrySizesStale: (paths: string[]) => void;
   swapPanels: () => void;
 }

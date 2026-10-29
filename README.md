@@ -49,6 +49,10 @@ npm run tauri dev
 | `/` | 현재 폴더 필터 |
 | `Space` | 선택한 디렉터리 크기 계산 시작·취소 |
 
+PDF·PPTX 미리보기는 왼쪽 썸네일과 현재 페이지를 표시합니다. 화살표·PageUp/PageDown으로 넘기고 Home/End로 처음·끝으로 이동합니다. PPTX의 차트·동영상·일부 이미지는 자리 표시로 보이며, 도구 줄에서 텍스트 보기로 전환할 수 있습니다.
+
+폴더 크기는 기호 없음(정확), `≥`(접근 불가 항목을 뺀 하한값), `+`(계산 중·일부 읽기 실패), `~`(추정), `-`(미확인)로 구분합니다. 계산하면 하위 두 단계 폴더의 크기도 저장합니다. 1024 단위의 겉보기 크기를 표시하므로 Finder의 디스크 사용량과 다를 수 있으며, 다른 볼륨과 symlink 대상은 합계에서 제외합니다.
+
 검색은 정규식, 숨김 파일, 파일 유형, 확장자, 크기, 수정일 조건을 지원합니다. 검색 결과에서도 복사·이동·삭제할 수 있습니다.
 
 드래그 드롭은 다음과 같이 동작합니다.
@@ -84,11 +88,11 @@ npm run tauri dev
 1. 기능 변경을 검증하고 커밋합니다.
 2. `npm version <patch|minor|major> --no-git-tag-version`으로 버전을 올립니다.
 3. `npm run verify:release`로 버전 일치, 전체 검사, 앱 빌드를 확인합니다. 현재 이 명령은 `--bundles app`을 사용하므로 macOS에서 실행합니다.
-4. `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`을 검토해 버전 커밋에 포함합니다. Cargo 실행으로 `src-tauri/Cargo.lock`의 앱 버전이 바뀌었다면 함께 포함합니다.
+4. `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `index.html`을 검토해 버전 커밋에 포함합니다. Cargo 실행으로 `src-tauri/Cargo.lock`의 앱 버전이 바뀌었다면 함께 포함합니다.
 5. 버전 커밋에 annotated tag `v<version>`을 생성합니다. 기존 릴리즈 태그는 재사용하거나 이동하지 않습니다.
 6. `git push origin main` 다음에 해당 태그를 푸시합니다. `npm run release:push`를 사용할 때도 먼저 대상 브랜치와 태그를 확인합니다.
 
-`version-sync.cjs`가 npm 버전을 Tauri 설정과 Cargo manifest에 반영합니다. npm의 `version` 스크립트는 Tauri 설정과 Cargo manifest를 자동으로 스테이징하므로, 버전 업데이트 후 `git diff --cached`도 확인해야 합니다.
+`version-sync.cjs`가 npm 버전을 Tauri 설정·창 제목, Cargo manifest, HTML 제목에 반영합니다. npm의 `version` 스크립트는 Tauri 설정·Cargo manifest·`index.html`을 자동으로 스테이징하므로, 버전 업데이트 후 `git diff --cached`도 확인해야 합니다.
 
 GitHub 릴리즈는 `v*` 태그 푸시 또는 수동 워크플로 실행으로 시작됩니다. CI와 플랫폼별 빌드 후 draft release의 산출물 검사를 통과하면 공개합니다. 자세한 실제 절차는 [release.yml](.github/workflows/release.yml)과 [산출물 검사 스크립트](scripts/verify-release-assets.sh)를 기준으로 합니다.
 

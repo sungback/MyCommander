@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { registerPanelStoreReset, usePanelStore } from './panelStore.test-harness';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  getPendingPersistentSizeCacheUpserts,
+  registerPanelStoreReset,
+  usePanelStore,
+} from './panelStore.test-harness';
 
 registerPanelStoreReset();
 
@@ -216,6 +220,285 @@ describe("panelStore — updateEntrySize", () => {
     expect(state.sizeCacheStale["/cached/stale"]).toBe(false);
   });
 
+  it("marks cached exact ancestors stale when a descendant exact size changes", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+      { path: "/work/other", size: 500, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [
+      { name: "app", path: "/work/app", kind: "directory" },
+      { name: "other", path: "/work/other", kind: "directory" },
+    ]);
+
+    updateEntrySize("left", "/work/app/target", 10);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/app"]).toBe("estimated");
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.leftPanel.files.find((entry) => entry.name === "app")?.sizeStatus).toBe(
+      "estimated"
+    );
+    expect(state.sizeStatusCache["/work/other"]).toBe("exact");
+    expect(state.sizeCacheStale["/work/other"]).toBe(false);
+  });
+
+  it("keeps cached exact ancestors when a descendant exact size is unchanged", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySize("left", "/work/app/target", 10_000);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/app"]).toBe("exact");
+    expect(state.sizeCacheStale["/work/app"]).toBe(false);
+  });
+
+  it("does not shrink a displayed directory size while a rescan is in progress", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize, updateEntrySizeProgress } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/big", size: 8_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySizeProgress("left", "/work/big", 100);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(8_000);
+
+    updateEntrySizeProgress("left", "/work/big", 9_000);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(9_000);
+
+    updateEntrySize("left", "/work/big", 8_500);
+    expect(usePanelStore.getState().sizeCache["/work/big"]).toBe(8_500);
+  });
+
+  it("compares against the pre-progress size when progress events overwrote the cache", () => {
+    const {
+      hydrateEntrySizesFromCache,
+      updateEntrySize,
+      updateEntrySizeProgress,
+    } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 11_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySizeProgress("left", "/work/app/target", 10);
+    updateEntrySize("left", "/work/app/target", 10);
+
+    expect(usePanelStore.getState().sizeCacheStale["/work/app"]).toBe(true);
+  });
+
+  it("marks changed directories and ancestors stale while keeping their sizes", () => {
+    const { hydrateEntrySizesFromCache, setFiles, markEntrySizesStale } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work", size: 5_000, status: "exact", isStale: false },
+      { path: "/work/app", size: 4_000, status: "exact", isStale: false },
+      { path: "/other", size: 100, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [{ name: "app", path: "/work/app", kind: "directory" }]);
+
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work"]).toBe(5_000);
+    expect(state.sizeStatusCache["/work"]).toBe("exact");
+    expect(state.sizeCacheStale["/work"]).toBe(true);
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.sizeCacheStale["/other"]).toBe(false);
+    const entry = state.leftPanel.files.find((file) => file.name === "app");
+    expect(entry?.size).toBe(4_000);
+    expect(entry?.sizeStatus).toBe("exact");
+  });
+
+  it('lowers confirmed sizes to estimates in the disk cache when marking them stale', () => {
+    // 디스크 캐시 쓰기는 Tauri 런타임에서만 대기열에 들어간다. 가짜 타이머로 실제 저장은 막는다.
+    vi.useFakeTimers();
+    Object.assign(window, { __TAURI_INTERNALS__: {} });
+    try {
+      const { hydrateEntrySizesFromCache, markEntrySizesStale } = usePanelStore.getState();
+      hydrateEntrySizesFromCache([
+        { path: '/work', size: 5_000, status: 'exact', isStale: false, scannedAt: 1_000 },
+        { path: '/work/app', size: 4_000, status: 'limited', isStale: false, scannedAt: 2_000 },
+        { path: '/work/app/src', size: 300, status: 'estimated', isStale: false },
+      ]);
+
+      markEntrySizesStale(['/work/app/src/file.ts']);
+
+      const pending = getPendingPersistentSizeCacheUpserts();
+      expect(pending).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '/work', size: 5_000, status: 'estimated', scannedAt: 1_000 }),
+          expect.objectContaining({ path: '/work/app', size: 4_000, status: 'estimated', scannedAt: 2_000 }),
+        ])
+      );
+      // 이미 추정값인 폴더는 다시 쓰지 않고, 사용자가 연 것이 아니므로 최근 사용 시각도 바꾸지 않는다.
+      expect(pending.some((entry) => entry.path === '/work/app/src')).toBe(false);
+      expect(pending.every((entry) => entry.lastUsedAt === undefined)).toBe(true);
+    } finally {
+      Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it("stores limited sizes and keeps them over quick estimates", () => {
+    const { setFiles, updateEntrySize, updateEntrySizeEstimate } = usePanelStore.getState();
+    setFiles("left", [{ name: "Library", path: "/work/Library", kind: "directory" }]);
+
+    updateEntrySize("left", "/work/Library", 5_000, undefined, "limited");
+    updateEntrySizeEstimate("left", "/work/Library", 100, "estimated");
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/Library"]).toBe(5_000);
+    expect(state.sizeStatusCache["/work/Library"]).toBe("limited");
+    const entry = state.leftPanel.files.find((file) => file.name === "Library");
+    expect(entry?.size).toBe(5_000);
+    expect(entry?.sizeStatus).toBe("limited");
+  });
+
+  it("hydrates limited sizes and marks stale limited values as estimated", () => {
+    const { hydrateEntrySizesFromCache } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/cached/limited", size: 10, status: "limited", isStale: false },
+      { path: "/cached/old-limited", size: 20, status: "limited", isStale: true },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/cached/limited"]).toBe("limited");
+    expect(state.sizeStatusCache["/cached/old-limited"]).toBe("estimated");
+    expect(state.sizeCacheStale["/cached/old-limited"]).toBe(true);
+  });
+
+  it("marks cached limited ancestors stale when a descendant size changes", () => {
+    const { hydrateEntrySizesFromCache, updateEntrySize } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/home", size: 11_000, status: "limited", isStale: false },
+      { path: "/work/home/target", size: 10_000, status: "exact", isStale: false },
+    ]);
+
+    updateEntrySize("left", "/work/home/target", 10);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeStatusCache["/work/home"]).toBe("estimated");
+    expect(state.sizeCacheStale["/work/home"]).toBe(true);
+  });
+
+  it("does not let a quick estimate overwrite a restored exact size", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySizeEstimate } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/AppData", size: 9_000, status: "exact", isStale: false },
+    ]);
+    setFiles("left", [{ name: "AppData", path: "/work/AppData", kind: "directory" }]);
+
+    updateEntrySizeEstimate("left", "/work/AppData", 100, "estimated");
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/AppData"]).toBe(9_000);
+    expect(state.sizeStatusCache["/work/AppData"]).toBe("exact");
+    const entry = state.leftPanel.files.find((file) => file.name === "AppData");
+    expect(entry?.size).toBe(9_000);
+    expect(entry?.sizeStatus).toBe("exact");
+  });
+
+  it("prefers a restored exact size over an estimate computed before the cache loaded", () => {
+    const { hydrateEntrySizesFromCache, setFiles, updateEntrySizeEstimate } =
+      usePanelStore.getState();
+
+    setFiles("left", [{ name: "AppData", path: "/work/AppData", kind: "directory" }]);
+    updateEntrySizeEstimate("left", "/work/AppData", 100, "estimated");
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/AppData", size: 9_000, status: "exact", isStale: false },
+    ]);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/AppData"]).toBe(9_000);
+    expect(state.sizeStatusCache["/work/AppData"]).toBe("exact");
+    const entry = state.leftPanel.files.find((file) => file.name === "AppData");
+    expect(entry?.size).toBe(9_000);
+  });
+
+  it("keeps a directory stale when a change was reported during the exact scan", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 4_000, status: "exact", isStale: true },
+    ]);
+    const scanStartedAt = Date.now() - 1_000;
+
+    // 스캔 도중 이미 stale인 폴더에 다시 변경이 알려진 상황
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+    updateEntrySize("left", "/work/app", 4_200, scanStartedAt);
+
+    const state = usePanelStore.getState();
+    expect(state.sizeCache["/work/app"]).toBe(4_200);
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+  });
+
+  it("clears stale when no change was reported after the exact scan started", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale, updateEntrySize } =
+      usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work/app", size: 4_000, status: "exact", isStale: false },
+    ]);
+    markEntrySizesStale(["/work/app/src/file.ts"]);
+    const scanStartedAt = Date.now() + 1_000;
+
+    updateEntrySize("left", "/work/app", 4_200, scanStartedAt);
+
+    expect(usePanelStore.getState().sizeCacheStale["/work/app"]).toBe(false);
+  });
+
+  it("ignores noisy directories when marking sizes stale on filesystem changes", () => {
+    const { hydrateEntrySizesFromCache, markEntrySizesStale } = usePanelStore.getState();
+
+    hydrateEntrySizesFromCache([
+      { path: "/work", size: 9_000, status: "exact", isStale: false },
+      { path: "/work/app", size: 8_000, status: "exact", isStale: false },
+      { path: "/work/app/target", size: 7_000, status: "exact", isStale: false },
+      { path: "/work/app/target/debug", size: 6_000, status: "exact", isStale: false },
+      { path: "/work/app/src", size: 100, status: "exact", isStale: false },
+    ]);
+
+    // 빌드 산출물 변경: target과 상위 폴더는 stale로 만들지 않는다.
+    markEntrySizesStale([
+      "/work/app/target/debug/deps/lib.rlib",
+      "/work/app/target/debug/deps",
+    ]);
+
+    let state = usePanelStore.getState();
+    expect(state.sizeCacheStale["/work"]).toBe(false);
+    expect(state.sizeCacheStale["/work/app"]).toBe(false);
+    expect(state.sizeCacheStale["/work/app/target"]).toBe(false);
+    // 노이즈 디렉터리 안쪽 폴더는 직접 보고 있을 수 있으므로 stale 처리한다.
+    expect(state.sizeCacheStale["/work/app/target/debug"]).toBe(true);
+
+    // target 자체가 지워진 경우: 이벤트의 부모 경로(/work/app)는 stale로 처리된다.
+    markEntrySizesStale(["/work/app/target", "/work/app"]);
+
+    state = usePanelStore.getState();
+    expect(state.sizeCacheStale["/work/app"]).toBe(true);
+    expect(state.sizeCacheStale["/work"]).toBe(true);
+    expect(state.sizeCacheStale["/work/app/src"]).toBe(false);
+  });
+
   it("invalidates stale persistent cache markers with size cache entries", () => {
     const { hydrateEntrySizesFromCache, invalidateEntrySizes } = usePanelStore.getState();
 
@@ -234,6 +517,49 @@ describe("panelStore — updateEntrySize", () => {
     expect(state.sizeCache["/cached/stale"]).toBeUndefined();
     expect(state.sizeStatusCache["/cached/stale"]).toBeUndefined();
     expect(state.sizeCacheStale["/cached/stale"]).toBeUndefined();
+  });
+
+  it("immediately resorts panel files when directory size is estimated or calculated in size-sorted panel", () => {
+    const { setFiles, setSort, updateEntrySizeEstimate, updateEntrySize } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dirA", path: "/test/dirA", kind: "directory" },
+      { name: "dirB", path: "/test/dirB", kind: "directory" },
+      { name: "dirC", path: "/test/dirC", kind: "directory" },
+    ]);
+    setSort("left", "size"); // asc
+    setSort("left", "size"); // desc
+
+    // Initially all undefined sizes (treated as 0)
+    expect(usePanelStore.getState().leftPanel.sortField).toBe("size");
+    expect(usePanelStore.getState().leftPanel.sortDirection).toBe("desc");
+
+    // dirB gets estimated size 50MB
+    updateEntrySizeEstimate("left", "/test/dirB", 50 * 1024 * 1024, "estimated");
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirB", "dirA", "dirC"]);
+
+    // dirC gets exact size 100MB -> moves to top in desc order
+    updateEntrySize("left", "/test/dirC", 100 * 1024 * 1024);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirC", "dirB", "dirA"]);
+  });
+
+  it("immediately resorts panel files when directory size is invalidated in size-sorted panel", () => {
+    const { setFiles, setSort, updateEntrySize, invalidateEntrySizes } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "dirA", path: "/test/dirA", kind: "directory" },
+      { name: "dirB", path: "/test/dirB", kind: "directory" },
+    ]);
+    setSort("left", "size");
+    setSort("left", "size"); // desc
+
+    updateEntrySize("left", "/test/dirA", 200);
+    updateEntrySize("left", "/test/dirB", 100);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirA", "dirB"]);
+
+    // Invalidate dirA -> its size becomes undefined (0), so dirB (100) becomes top
+    invalidateEntrySizes(["/test/dirA/subfile.txt"]);
+    expect(usePanelStore.getState().leftPanel.files.map((f) => f.name)).toEqual(["dirB", "dirA"]);
   });
 });
 

@@ -1,0 +1,425 @@
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ProgressDialog } from "./ProgressDialog";
+import { useDialogStore } from "../../../store/dialogStore";
+import { useJobStore } from "../../../store/jobStore";
+
+const { listenHandlers, mockCancelJob, mockListJobs, mockRetryJob, mockClearFinishedJobs } = vi.hoisted(() => ({
+  listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
+  mockCancelJob: vi.fn(),
+  mockListJobs: vi.fn(),
+  mockRetryJob: vi.fn(),
+  mockClearFinishedJobs: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockImplementation(async (eventName: string, handler: (event: { payload: unknown }) => void) => {
+    listenHandlers.set(eventName, handler);
+    return () => {
+      listenHandlers.delete(eventName);
+    };
+  }),
+}));
+
+vi.mock("../../../hooks/useFileSystem", () => ({
+  useFileSystem: () => ({
+    cancelJob: mockCancelJob,
+    listJobs: mockListJobs,
+    retryJob: mockRetryJob,
+    clearFinishedJobs: mockClearFinishedJobs,
+  }),
+}));
+
+describe("ProgressDialog", () => {
+  beforeEach(() => {
+    useDialogStore.setState(useDialogStore.getInitialState());
+    useJobStore.setState(useJobStore.getInitialState());
+    listenHandlers.clear();
+    mockCancelJob.mockReset();
+    mockListJobs.mockReset();
+    mockRetryJob.mockReset();
+    mockClearFinishedJobs.mockReset();
+    mockListJobs.mockResolvedValue([]);
+  });
+
+  it("shows delete progress details", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+    });
+
+    act(() => {
+      listenHandlers.get("fs-progress")?.({
+        payload: {
+          operation: "delete",
+          current: 1,
+          total: 4,
+          currentFile: "LargeFolder",
+          unit: "items",
+        },
+      });
+    });
+
+    expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+    expect(screen.getByText("LargeFolder")).toBeInTheDocument();
+    expect(screen.getByText("1 / 4")).toBeInTheDocument();
+    expect(screen.getByText("25%")).toBeInTheDocument();
+    expect(screen.getByText("Queued: 0")).toBeInTheDocument();
+    expect(screen.getByText("Failed: 0")).toBeInTheDocument();
+  });
+
+  it("cancels the active job via cancelJob", async () => {
+    mockCancelJob.mockResolvedValue({
+      id: "job-1",
+      kind: "delete",
+      status: "cancelled",
+      createdAt: 1,
+      updatedAt: 2,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: "Operation cancelled.",
+      result: null,
+    });
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "running",
+        createdAt: 1,
+        updatedAt: 1,
+        progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Cancel" }).click();
+    });
+
+    expect(mockCancelJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("retries the most recent failed job", async () => {
+    mockRetryJob.mockResolvedValue({
+      id: "job-2",
+      kind: "copy",
+      status: "queued",
+      createdAt: 2,
+      updatedAt: 2,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "copy",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 2, currentFile: "notes.txt", unit: "items" },
+        error: "Disk full",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Retry failed" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Retry failed" }).click();
+    });
+
+    expect(mockRetryJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("uses the latest failed move job to label the dialog when nothing is running", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-7",
+        kind: "move",
+        status: "failed",
+        createdAt: 7,
+        updatedAt: 8,
+        progress: { current: 0, total: 1, currentFile: "", unit: "items" },
+        error: "No such file or directory (os error 2)",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByText("Moving Files...")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Last failed job: move")).toBeInTheDocument();
+  });
+
+  it("lets users close a failed-only progress dialog", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-7",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "", unit: "items" },
+        error: "Access is denied. (os error 5)",
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Close" }).click();
+    });
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  it("clears finished jobs from the dialog state", async () => {
+    mockClearFinishedJobs.mockResolvedValue(undefined);
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-0",
+        kind: "zip",
+        status: "running",
+        createdAt: 0,
+        updatedAt: 1,
+        progress: { current: 0, total: 3, currentFile: "Folder", unit: "items" },
+        error: null,
+        result: null,
+      },
+      {
+        id: "job-1",
+        kind: "delete",
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 1, currentFile: "Done", unit: "items" },
+        error: null,
+        result: {
+          affectedDirectories: ["/tmp"],
+          affectedEntryPaths: ["/tmp/file.txt"],
+          archivePath: null,
+          savedNames: [],
+        },
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await Promise.resolve();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Clear finished" })).toBeInTheDocument();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Clear finished" }).click();
+    });
+
+    expect(mockClearFinishedJobs).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes automatically when only finished jobs remain", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "job-1",
+        kind: "zip",
+        status: "completed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 1, total: 1, currentFile: "Done", unit: "items" },
+        error: null,
+        result: {
+          affectedDirectories: ["/tmp"],
+          affectedEntryPaths: ["/tmp/folder"],
+          archivePath: "/tmp/folder.zip",
+          savedNames: [],
+        },
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBeNull();
+    });
+  });
+
+  it("does not surface stale failed jobs after the current dialog job completes", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "old-move",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+        error: "Access denied",
+        result: null,
+      },
+      {
+        id: "delete-job",
+        kind: "delete",
+        status: "running",
+        createdAt: 3,
+        updatedAt: 3,
+        progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+      expect(screen.getByText("Failed: 0")).toBeInTheDocument();
+    });
+
+    act(() => {
+      useJobStore.getState().hydrateJobs([
+        {
+          id: "old-move",
+          kind: "move",
+          status: "failed",
+          createdAt: 1,
+          updatedAt: 2,
+          progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+          error: "Access denied",
+          result: null,
+        },
+        {
+          id: "delete-job",
+          kind: "delete",
+          status: "completed",
+          createdAt: 3,
+          updatedAt: 4,
+          progress: { current: 1, total: 1, currentFile: "Completed", unit: "items" },
+          error: null,
+          result: {
+            affectedDirectories: ["/tmp"],
+            affectedEntryPaths: ["/tmp/delete-me.txt"],
+            archivePath: null,
+            savedNames: [],
+          },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBeNull();
+    });
+  });
+
+  it("keeps the dialog open for failures from the current dialog job", async () => {
+    useDialogStore.getState().setOpenDialog("progress");
+    useJobStore.getState().hydrateJobs([
+      {
+        id: "old-move",
+        kind: "move",
+        status: "failed",
+        createdAt: 1,
+        updatedAt: 2,
+        progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+        error: "Access denied",
+        result: null,
+      },
+      {
+        id: "delete-job",
+        kind: "delete",
+        status: "running",
+        createdAt: 3,
+        updatedAt: 3,
+        progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+        error: null,
+        result: null,
+      },
+    ]);
+
+    render(<ProgressDialog />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+    });
+
+    act(() => {
+      useJobStore.getState().hydrateJobs([
+        {
+          id: "old-move",
+          kind: "move",
+          status: "failed",
+          createdAt: 1,
+          updatedAt: 2,
+          progress: { current: 0, total: 1, currentFile: "old.txt", unit: "items" },
+          error: "Access denied",
+          result: null,
+        },
+        {
+          id: "delete-job",
+          kind: "delete",
+          status: "failed",
+          createdAt: 3,
+          updatedAt: 4,
+          progress: { current: 0, total: 1, currentFile: "delete-me.txt", unit: "items" },
+          error: "Delete denied",
+          result: null,
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(useDialogStore.getState().openDialog).toBe("progress");
+      expect(screen.getByText("Deleting Files...")).toBeInTheDocument();
+      expect(screen.getByText("Failed: 1")).toBeInTheDocument();
+      expect(screen.getByText("Last failed job: delete")).toBeInTheDocument();
+      expect(screen.getByText("Delete denied")).toBeInTheDocument();
+    });
+  });
+});

@@ -1,11 +1,10 @@
-use super::paths::get_unique_extraction_dir;
+use super::paths::{decode_zip_entry_name, get_unique_extraction_dir, safe_enclosed_path};
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use crate::commands::fs::shared::{describe_invalid_zip_problem, format_command_failure};
 use std::fs;
 use std::path::Path;
 
 pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
-    use std::process::Command;
-
     let archive_path = Path::new(path);
     if !archive_path.is_file() {
         return Err(format!("{path} is not a file"));
@@ -36,20 +35,23 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
 
     #[cfg(target_os = "macos")]
     {
+        use std::process::Command;
         let ditto_output = Command::new("ditto")
             .args(["-x", "-k", "--"])
             .arg(archive_path)
             .arg(&target_dir)
-            .output()
-            .map_err(|e| {
-                format!(
-                    "Failed to run ditto while extracting archive into {}: {e}",
-                    target_dir.display()
-                )
-            })?;
+            .output();
 
-        if !ditto_output.status.success() {
-            let ditto_error = format_command_failure("ditto", &ditto_output);
+        let ditto_success = match &ditto_output {
+            Ok(output) => output.status.success(),
+            Err(_) => false,
+        };
+
+        if !ditto_success {
+            let ditto_error = ditto_output
+                .as_ref()
+                .map(|out| format_command_failure("ditto", out))
+                .unwrap_or_else(|e| format!("failed to execute ditto: {e}"));
 
             let _ = fs::remove_dir_all(&target_dir);
             fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
@@ -59,80 +61,100 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
                 .arg(archive_path)
                 .args(["-d"])
                 .arg(&target_dir)
-                .output()
-                .map_err(|e| {
-                    format!(
-                        "Failed to run unzip fallback while extracting archive into {} after {ditto_error}: {e}",
-                        target_dir.display()
-                    )
-                })?;
+                .output();
 
-            if !unzip_output.status.success() {
+            let unzip_success = match &unzip_output {
+                Ok(output) => output.status.success(),
+                Err(_) => false,
+            };
+
+            if !unzip_success {
                 let _ = fs::remove_dir_all(&target_dir);
-                let problem = describe_invalid_zip_problem([&ditto_output, &unzip_output]);
-                return Err(format!(
-                    "Failed to extract archive into {}. {} {ditto_error}; fallback {}",
-                    target_dir.display(),
-                    problem,
-                    format_command_failure("unzip", &unzip_output)
-                ));
+                fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+
+                if let Err(native_err) = extract_zip_entries_native(archive_path, &target_dir) {
+                    let _ = fs::remove_dir_all(&target_dir);
+                    let mut outputs = Vec::new();
+                    if let Ok(out) = &ditto_output {
+                        outputs.push(out);
+                    }
+                    if let Ok(out) = &unzip_output {
+                        outputs.push(out);
+                    }
+                    let problem = describe_invalid_zip_problem(outputs);
+                    let unzip_error = unzip_output
+                        .as_ref()
+                        .map(|out| format_command_failure("unzip", out))
+                        .unwrap_or_else(|e| format!("failed to execute unzip: {e}"));
+
+                    return Err(format!(
+                        "Failed to extract archive into {}. {} {ditto_error}; fallback {unzip_error}; native extraction failed: {native_err}",
+                        target_dir.display(),
+                        problem
+                    ));
+                }
             }
         }
     }
 
     #[cfg(target_os = "linux")]
     {
+        use std::process::Command;
         let output = Command::new("unzip")
             .args(["-q"])
             .arg(archive_path)
             .args(["-d"])
             .arg(&target_dir)
-            .output()
-            .map_err(|e| {
-                format!(
-                    "Failed to run unzip while extracting archive into {}: {e}",
-                    target_dir.display()
-                )
-            })?;
+            .output();
 
-        if !output.status.success() {
+        let unzip_success = match &output {
+            Ok(out) => out.status.success(),
+            Err(_) => false,
+        };
+
+        if !unzip_success {
             let _ = fs::remove_dir_all(&target_dir);
-            let problem = describe_invalid_zip_problem([&output]);
-            return Err(format!(
-                "Failed to extract archive into {}. {} {}",
-                target_dir.display(),
-                problem,
-                format_command_failure("unzip", &output)
-            ));
+            fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+
+            if let Err(native_err) = extract_zip_entries_native(archive_path, &target_dir) {
+                let _ = fs::remove_dir_all(&target_dir);
+                let mut outputs = Vec::new();
+                if let Ok(out) = &output {
+                    outputs.push(out);
+                }
+                let problem = describe_invalid_zip_problem(outputs);
+                let unzip_error = output
+                    .as_ref()
+                    .map(|out| format_command_failure("unzip", out))
+                    .unwrap_or_else(|e| format!("failed to execute unzip: {e}"));
+
+                return Err(format!(
+                    "Failed to extract archive into {}. {} {unzip_error}; native extraction failed: {native_err}",
+                    target_dir.display(),
+                    problem
+                ));
+            }
         }
     }
 
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1]",
-            ])
-            .arg(archive_path)
-            .arg(&target_dir)
-            .output()
-            .map_err(|e| {
-                format!(
-                    "Failed to run PowerShell while extracting archive into {}: {e}",
-                    target_dir.display()
-                )
-            })?;
-
-        if !output.status.success() {
+        if let Err(err) = extract_zip_entries_native(archive_path, &target_dir) {
             let _ = fs::remove_dir_all(&target_dir);
-            let problem = describe_invalid_zip_problem([&output]);
             return Err(format!(
-                "Failed to extract archive into {}. {} {}",
-                target_dir.display(),
-                problem,
-                format_command_failure("powershell", &output)
+                "Failed to extract archive into {}: {err}",
+                target_dir.display()
+            ));
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        if let Err(err) = extract_zip_entries_native(archive_path, &target_dir) {
+            let _ = fs::remove_dir_all(&target_dir);
+            return Err(format!(
+                "Failed to extract archive into {}: {err}",
+                target_dir.display()
             ));
         }
     }
@@ -140,6 +162,58 @@ pub(crate) fn extract_zip_archive(path: &str) -> Result<String, String> {
     flatten_matching_archive_root_dir(&target_dir, archive_path)?;
 
     Ok(target_dir.to_string_lossy().to_string())
+}
+
+pub(crate) fn extract_zip_entries_native(
+    archive_path: &Path,
+    target_dir: &Path,
+) -> Result<(), String> {
+    let file = fs::File::open(archive_path).map_err(|e| e.to_string())?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Failed to open archive: {e}"))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("Failed to read archive entry #{i}: {e}"))?;
+
+        let entry_name = decode_zip_entry_name(entry.name_raw(), entry.name());
+        let enclosed = safe_enclosed_path(&entry_name)
+            .ok_or_else(|| format!("Archive contains unsafe path entry: {entry_name}"))?;
+        let outpath = target_dir.join(enclosed);
+
+        let is_dir = entry.is_dir() || entry_name.ends_with('/') || entry_name.ends_with('\\');
+
+        if is_dir {
+            fs::create_dir_all(&outpath)
+                .map_err(|e| format!("Failed to create directory {}: {e}", outpath.display()))?;
+        } else {
+            if let Some(parent) = outpath.parent() {
+                if !parent.exists() {
+                    fs::create_dir_all(parent).map_err(|e| {
+                        format!(
+                            "Failed to create parent directory {}: {e}",
+                            parent.display()
+                        )
+                    })?;
+                }
+            }
+            let mut outfile = fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file {}: {e}", outpath.display()))?;
+            std::io::copy(&mut entry, &mut outfile)
+                .map_err(|e| format!("Failed to write file {}: {e}", outpath.display()))?;
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Some(mode) = entry.unix_mode() {
+                let _ = fs::set_permissions(&outpath, fs::Permissions::from_mode(mode));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) fn flatten_matching_archive_root_dir(
@@ -172,6 +246,11 @@ pub(crate) fn flatten_matching_archive_root_dir(
         return Ok(());
     }
 
+    // 안쪽에 같은 이름 폴더가 있으면 그 폴더를 비어 있지 않은 상위 폴더 자리로 옮기게 되어 rename이 실패한다.
+    if nested_root.path().join(&nested_name).exists() {
+        return Ok(());
+    }
+
     move_directory_contents(nested_root.path().as_path(), extraction_dir)?;
     fs::remove_dir(nested_root.path()).map_err(|e| e.to_string())
 }
@@ -195,11 +274,9 @@ fn validate_zip_entry_paths(archive_path: &Path) -> Result<(), String> {
 
     for i in 0..zip.len() {
         let entry = zip.by_index(i).map_err(|e| e.to_string())?;
-        if entry.enclosed_name().is_none() {
-            return Err(format!(
-                "Archive contains unsafe path entry: {}",
-                entry.name()
-            ));
+        let entry_name = decode_zip_entry_name(entry.name_raw(), entry.name());
+        if safe_enclosed_path(&entry_name).is_none() {
+            return Err(format!("Archive contains unsafe path entry: {entry_name}"));
         }
     }
     Ok(())

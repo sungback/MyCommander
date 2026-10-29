@@ -1,5 +1,7 @@
 import {
+  collectAncestorPaths,
   collectEntrySizeInvalidationPaths,
+  collectNoiseFilteredSizeStalePaths,
   getPanelKey,
   invalidateEntrySizesAcrossPanels,
   setPanelFiles,
@@ -9,6 +11,7 @@ import {
 } from "./panelStoreReducers";
 import { persistPanelUpdate } from "./panelStorePersistence";
 import {
+  dropPendingPersistentSizeCacheUpserts,
   queuePersistentSizeCacheDelete,
   queuePersistentSizeCacheUpsert,
 } from "./directorySizeCachePersistence";
@@ -19,41 +22,33 @@ import {
 } from "./panelStoreActionTypes";
 import { normalizePathKey } from "../utils/panelHelpers";
 import type { DirectorySizeStatus } from "../types/file";
+import {
+  getSizeScannedAt,
+  isConfirmedSizeStatus,
+  shouldCacheSizeStatus,
+  toHydratedStatus,
+  queueStableSizeCacheWrite,
+  recordSizeScannedAt,
+  hasSizeChangedSince,
+  markSizeVerifiedThisSession,
+  recordSizeChange,
+  rememberSizeBaseline,
+  takeSizeBaseline,
+} from "./panelStoreFileHelpers";
 
 type FileActions = Pick<
   PanelStoreActions,
   | "invalidateEntrySizes"
+  | "markEntrySizesStale"
   | "setEntrySizeStatus"
   | "setFiles"
   | "setSort"
   | "updateEntrySize"
   | "updateEntrySizeEstimate"
   | "updateEntrySizeProgress"
+  | "applyScannedChildSizes"
   | "hydrateEntrySizesFromCache"
 >;
-
-const shouldCacheSizeStatus = (status: unknown) =>
-  status === "estimated" || status === "partial" || status === "exact";
-
-const toHydratedStatus = (
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">,
-  isStale: boolean
-) => (isStale && status === "exact" ? "estimated" : status);
-
-const queueStableSizeCacheWrite = (
-  path: string,
-  size: number,
-  status: Extract<DirectorySizeStatus, "estimated" | "partial" | "exact">
-) => {
-  const timestamp = Date.now();
-  queuePersistentSizeCacheUpsert({
-    path: normalizePathKey(path),
-    size,
-    status,
-    scannedAt: timestamp,
-    lastUsedAt: timestamp,
-  });
-};
 
 export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => ({
   setFiles: (panel, files) =>
@@ -81,8 +76,9 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       };
     }),
 
-  updateEntrySize: (_panel, path, size) => {
-    queueStableSizeCacheWrite(path, size, "exact");
+  updateEntrySize: (_panel, path, size, scanStartedAt, status = "exact") => {
+    queueStableSizeCacheWrite(path, size, status);
+    markSizeVerifiedThisSession(path);
 
     return set((state) => {
       const nextPanels = updateEntrySizeAcrossPanels(
@@ -90,23 +86,81 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         state.rightPanel,
         path,
         size,
-        "exact"
+        status
       );
       const cachedSize = state.sizeCache[nextPanels.normalizedPath];
       const cachedStatus = state.sizeStatusCache[nextPanels.normalizedPath];
       const cachedStale = state.sizeCacheStale[nextPanels.normalizedPath];
+      // 스캔 도중 외부 변경이 감지됐다면 이 결과는 이미 낡았을 수 있으므로 stale을 유지해 다시 계산한다.
+      const changedDuringScan =
+        scanStartedAt !== undefined && hasSizeChangedSince(path, scanStartedAt);
+
+      // 이전에 exact였던 값이 달라졌다면 조상 폴더의 exact 캐시도 더 이상 믿을 수 없다.
+      const baseline =
+        takeSizeBaseline(path) ??
+        (cachedSize === undefined
+          ? undefined
+          : {
+              size: cachedSize,
+              wasExact: isConfirmedSizeStatus(cachedStatus) || Boolean(cachedStale),
+            });
+      const staleAncestors =
+        baseline?.wasExact && baseline.size !== size
+          ? collectAncestorPaths(path).filter(
+              (ancestor) =>
+                isConfirmedSizeStatus(state.sizeStatusCache[ancestor]) &&
+                state.sizeCache[ancestor] !== undefined
+            )
+          : [];
 
       if (
+        staleAncestors.length === 0 &&
         cachedSize === size &&
-        cachedStatus === "exact" &&
+        cachedStatus === status &&
         !cachedStale &&
+        !changedDuringScan &&
         nextPanels.leftPanel === state.leftPanel &&
         nextPanels.rightPanel === state.rightPanel
       ) {
         return state;
       }
 
+      let leftPanel = nextPanels.leftPanel;
+      let rightPanel = nextPanels.rightPanel;
+      const nextSizeStatusCache: Record<string, DirectorySizeStatus> = {
+        ...state.sizeStatusCache,
+        [nextPanels.normalizedPath]: status,
+      };
+      const nextSizeCacheStale = {
+        ...state.sizeCacheStale,
+        ...(changedDuringScan
+          ? { [nextPanels.normalizedPath]: true }
+          : cachedStale
+            ? { [nextPanels.normalizedPath]: false }
+            : {}),
+      };
+
+      for (const ancestor of staleAncestors) {
+        const ancestorPanels = updateEntrySizeAcrossPanels(
+          leftPanel,
+          rightPanel,
+          ancestor,
+          state.sizeCache[ancestor],
+          "estimated"
+        );
+        leftPanel = ancestorPanels.leftPanel;
+        rightPanel = ancestorPanels.rightPanel;
+        nextSizeStatusCache[ancestor] = "estimated";
+        nextSizeCacheStale[ancestor] = true;
+      }
+
+      if (staleAncestors.length > 0) {
+        queuePersistentSizeCacheDelete(staleAncestors);
+      }
+
       return {
+        sizeStatusCache: nextSizeStatusCache,
+        sizeCacheStale: nextSizeCacheStale,
         ...(cachedSize === size
           ? {}
           : {
@@ -115,32 +169,42 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
                 [nextPanels.normalizedPath]: size,
               },
             }),
-        ...(cachedStatus === "exact"
-          ? {}
-          : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: "exact",
-              },
-            }),
-        ...(cachedStale
-          ? {
-              sizeCacheStale: {
-                ...state.sizeCacheStale,
-                [nextPanels.normalizedPath]: false,
-              },
-            }
-          : {}),
-        leftPanel: nextPanels.leftPanel,
-        rightPanel: nextPanels.rightPanel,
+        leftPanel,
+        rightPanel,
       };
     });
   },
 
   updateEntrySizeEstimate: (_panel, path, size, status) => {
-    queueStableSizeCacheWrite(path, size, status);
+    takeSizeBaseline(path);
 
     return set((state) => {
+      const key = normalizePathKey(path);
+      const existingSize = state.sizeCache[key];
+      const existingStatus = state.sizeStatusCache[key];
+      // 이미 확인된 정확한 값을 빠른 추정값이 덮어쓰지 않는다(시작 직후 복원값과 추정이 경합할 수 있다).
+      if (
+        status === "estimated" &&
+        existingSize !== undefined &&
+        isConfirmedSizeStatus(existingStatus) &&
+        !state.sizeCacheStale[key]
+      ) {
+        const restored = updateEntrySizeAcrossPanels(
+          state.leftPanel,
+          state.rightPanel,
+          path,
+          existingSize,
+          existingStatus
+        );
+
+        return restored.leftPanel === state.leftPanel &&
+          restored.rightPanel === state.rightPanel
+          ? state
+          : { leftPanel: restored.leftPanel, rightPanel: restored.rightPanel };
+      }
+
+      queueStableSizeCacheWrite(path, size, status);
+
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,
@@ -193,8 +257,102 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
     });
   },
 
+  applyScannedChildSizes: (children, scanStartedAt) =>
+    set((state) => {
+      let leftPanel = state.leftPanel;
+      let rightPanel = state.rightPanel;
+      const nextSizeCache = { ...state.sizeCache };
+      const nextStatusCache = { ...state.sizeStatusCache };
+      const nextStaleCache = { ...state.sizeCacheStale };
+      // 패널 목록 갱신은 화면에 있는 항목만 한다(하위 폴더 수 × 패널 항목 수만큼 순회하지 않게).
+      // 펼친 트리의 하위 행은 sizeCache를 직접 읽으므로 캐시만 갱신하면 된다.
+      const visibleEntryKeys = new Set(
+        [leftPanel, rightPanel].flatMap((panel) =>
+          panel.tabs.flatMap((tab) => tab.files.map((entry) => normalizePathKey(entry.path)))
+        )
+      );
+      let changed = false;
+
+      for (const child of children) {
+        const key = normalizePathKey(child.path);
+        // 이 스캔이 시작된 뒤에 끝난 다른 계산의 결과가 있으면 그 값이 더 최신이다.
+        // 빠른 추정값이나 계산 중 표시는 정확 결과를 막지 않는다.
+        const existingStatus = state.sizeStatusCache[key];
+        const existingScannedAt = getSizeScannedAt(child.path);
+        if (
+          (isConfirmedSizeStatus(existingStatus) || existingStatus === "partial") &&
+          existingScannedAt !== undefined &&
+          existingScannedAt > scanStartedAt
+        ) {
+          continue;
+        }
+
+        const status = child.isPartial
+          ? "partial"
+          : child.inaccessibleCount > 0
+            ? "limited"
+            : "exact";
+        // 스캔 도중 이 폴더 안에서 변경이 감지됐으면 값을 쓰되 stale로 남겨 다시 계산한다.
+        const changedDuringScan = hasSizeChangedSince(child.path, scanStartedAt);
+        if (visibleEntryKeys.has(key)) {
+          const nextPanels = updateEntrySizeAcrossPanels(
+            leftPanel,
+            rightPanel,
+            child.path,
+            child.size,
+            status
+          );
+          leftPanel = nextPanels.leftPanel;
+          rightPanel = nextPanels.rightPanel;
+        }
+        nextSizeCache[key] = child.size;
+        nextStatusCache[key] = status;
+        nextStaleCache[key] = changedDuringScan;
+        changed = true;
+
+        // 바로 아래 폴더만 디스크 캐시에 남기고, 더 깊은 결과는 이번 실행의 메모리에만 둔다.
+        if (child.depth === 1) {
+          queueStableSizeCacheWrite(child.path, child.size, status, scanStartedAt, false);
+        } else {
+          recordSizeScannedAt(child.path, scanStartedAt);
+        }
+        if (!changedDuringScan) {
+          // 폴더에 들어가자마자 같은 값을 다시 계산하지 않게 한다.
+          markSizeVerifiedThisSession(child.path);
+        }
+      }
+
+      if (!changed) {
+        return state;
+      }
+
+      return {
+        sizeCache: nextSizeCache,
+        sizeStatusCache: nextStatusCache,
+        sizeCacheStale: nextStaleCache,
+        leftPanel,
+        rightPanel,
+      };
+    }),
+
   updateEntrySizeProgress: (_panel, path, size) =>
     set((state) => {
+      const key = normalizePathKey(path);
+      const previousSize = state.sizeCache[key];
+      if (previousSize !== undefined) {
+        rememberSizeBaseline(path, {
+          size: previousSize,
+          wasExact:
+            isConfirmedSizeStatus(state.sizeStatusCache[key]) ||
+            Boolean(state.sizeCacheStale[key]),
+        });
+
+        // 재검증 중에는 이미 표시 중인 값보다 작은 진행값으로 되돌리지 않는다(0에서 다시 오르며 깜빡이고 정렬이 흔들림).
+        if (size <= previousSize) {
+          return state;
+        }
+      }
+
       const nextPanels = updateEntrySizeAcrossPanels(
         state.leftPanel,
         state.rightPanel,
@@ -282,15 +440,28 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
       for (const entry of entries) {
         const normalizedPath = normalizePathKey(entry.path);
         const existingStatus = state.sizeStatusCache[normalizedPath];
+        // 복원한 신선한 정확한 값은 같은 세션에서 먼저 계산된 추정값보다 우선한다.
+        const restoredExactBeatsEstimate =
+          isConfirmedSizeStatus(entry.status) &&
+          !entry.isStale &&
+          existingStatus === "estimated";
         const existingFreshStable =
           shouldCacheSizeStatus(existingStatus) &&
           !state.sizeCacheStale[normalizedPath];
 
-        if (existingFreshStable) {
+        if (existingFreshStable && !restoredExactBeatsEstimate) {
           continue;
         }
 
-        const status = toHydratedStatus(entry.status, entry.isStale);
+        if (restoredExactBeatsEstimate) {
+          dropPendingPersistentSizeCacheUpserts([normalizedPath]);
+        }
+
+        if (entry.scannedAt !== undefined) {
+          recordSizeScannedAt(entry.path, entry.scannedAt);
+        }
+
+        const status = toHydratedStatus(entry.status, entry.isStale, entry.path);
         const nextPanels = updateEntrySizeAcrossPanels(
           leftPanel,
           rightPanel,
@@ -334,6 +505,38 @@ export const createPanelStoreFileActions = (set: PanelStoreSet): FileActions => 
         leftPanel,
         rightPanel,
       };
+    }),
+
+  // 외부 파일 변경 감시용: 표시 중인 크기는 유지하고 stale로만 표시해 백그라운드에서 다시 계산한다.
+  // 노이즈 디렉터리(node_modules, target 등) 안의 변경은 상위 폴더 크기에 반영하지 않는다.
+  markEntrySizesStale: (paths) =>
+    set((state) => {
+      let nextStaleCache: Record<string, boolean> | null = null;
+
+      for (const path of collectNoiseFilteredSizeStalePaths(paths)) {
+        // 이미 stale이어도 변경 시각은 남겨 진행 중인 스캔 결과가 stale을 지우지 못하게 한다.
+        recordSizeChange(path);
+        const cachedSize = state.sizeCache[path];
+        if (cachedSize === undefined || state.sizeCacheStale[path]) {
+          continue;
+        }
+
+        nextStaleCache ??= { ...state.sizeCacheStale };
+        nextStaleCache[path] = true;
+
+        // 다시 계산하기 전에 앱을 끄면 디스크 캐시의 정확한 값이 다음 실행에 그대로 살아나므로 추정값으로 낮춰 둔다.
+        // 계산 시각은 원래 값을 유지한다(진행 중인 스캔의 하위 폴더 결과가 이 기록에 막히지 않게).
+        if (isConfirmedSizeStatus(state.sizeStatusCache[path])) {
+          queuePersistentSizeCacheUpsert({
+            path,
+            size: cachedSize,
+            status: "estimated",
+            scannedAt: getSizeScannedAt(path) ?? Date.now(),
+          });
+        }
+      }
+
+      return nextStaleCache ? { sizeCacheStale: nextStaleCache } : state;
     }),
 
   invalidateEntrySizes: (paths) =>

@@ -135,7 +135,7 @@ export const useExpandedDirectories = ({
           panelId,
           path,
           estimate.size,
-          estimate.isPartial ? "partial" : "estimated"
+          "estimated"
         )
       )
       .catch((error) => {

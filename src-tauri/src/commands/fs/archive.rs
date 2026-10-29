@@ -1,6 +1,7 @@
 mod create;
 mod extract;
 mod paths;
+mod preview;
 mod process;
 mod progress;
 
@@ -9,13 +10,18 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use create::{create_zip_archive, create_zip_archive_from_paths};
 pub(crate) use extract::extract_zip_archive;
+pub(crate) use preview::preview_zip_archive_sync;
+pub use preview::ZipArchivePreview;
+#[allow(unused_imports)]
+pub use preview::ZipEntryPreview;
 
 #[cfg(test)]
-pub(crate) use extract::flatten_matching_archive_root_dir;
+pub(crate) use extract::{extract_zip_entries_native, flatten_matching_archive_root_dir};
 #[cfg(test)]
 pub(crate) use paths::{
-    get_hidden_temp_archive_path, get_unique_archive_path, get_unique_archive_path_named,
-    get_unique_extraction_dir, validate_zip_source_directory,
+    decode_zip_entry_name, get_hidden_temp_archive_path, get_unique_archive_path,
+    get_unique_archive_path_named, get_unique_extraction_dir, safe_enclosed_path,
+    validate_zip_source_directory,
 };
 
 static ZIP_OPERATION_STATE: OnceLock<Mutex<Option<Arc<AtomicBool>>>> = OnceLock::new();
@@ -97,4 +103,11 @@ pub fn cancel_zip_operation() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn preview_zip_archive(path: String) -> Result<ZipArchivePreview, String> {
+    tokio::task::spawn_blocking(move || preview_zip_archive_sync(&path))
+        .await
+        .map_err(|e| e.to_string())?
 }

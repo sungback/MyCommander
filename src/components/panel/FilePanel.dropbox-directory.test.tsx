@@ -2,7 +2,6 @@ import { act, render, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   lastFileListProps,
-  mockGetDirSize,
   mockListDirectory,
   mockResolvePath,
   registerFilePanelTestLifecycle,
@@ -38,7 +37,6 @@ describe('FilePanel Dropbox-like directories', () => {
         ? "/Users/back/Library/CloudStorage/Dropbox"
         : path
     );
-    mockGetDirSize.mockResolvedValue(0);
 
     setLeftPanelPath("/Users/back");
     render(<FilePanel id="left" />);

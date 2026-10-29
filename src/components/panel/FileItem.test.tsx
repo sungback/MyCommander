@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { FileItem } from "./FileItem";
 import type { FileEntry } from "../../types/file";
+import {
+  __resetSessionVerifiedSizesForTests,
+  recordSizeScannedAt,
+} from "../../store/panelStoreFileHelpers";
 
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => `asset://${path}`,
@@ -110,6 +114,95 @@ describe("FileItem", () => {
     expect(screen.getByText("2.0 KB+")).toBeInTheDocument();
     expect(screen.getByLabelText(/빠른 추정 크기입니다/)).toBeInTheDocument();
     expect(screen.getByLabelText(/부분 계산 결과입니다/)).toBeInTheDocument();
+  });
+
+  it("hides zero-size quick estimates instead of showing ~0 B", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "Users",
+          path: "/Users",
+          kind: "directory",
+          size: 0,
+          sizeStatus: "estimated",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("~0 B")).not.toBeInTheDocument();
+    expect(screen.getByText("-")).toBeInTheDocument();
+    expect(screen.getByLabelText(/빠른 추정으로는 크기를 알 수 없습니다/)).toBeInTheDocument();
+  });
+
+  it("marks limited directory sizes as lower bounds", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "limited",
+          path: "/tmp/limited",
+          kind: "directory",
+          size: 4096,
+          sizeStatus: "limited",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("≥4.0 KB")).toBeInTheDocument();
+    expect(screen.getByLabelText(/접근 권한이 없는 항목을 뺀 크기입니다/)).toBeInTheDocument();
+  });
+
+  it("shows when a directory size was calculated", () => {
+    __resetSessionVerifiedSizesForTests();
+    recordSizeScannedAt("/Users/sam/AppData", Date.now() - 3 * 24 * 60 * 60_000);
+
+    render(
+      <FileItem
+        entry={{
+          name: "AppData",
+          path: "/Users/sam/AppData",
+          kind: "directory",
+          size: 4096,
+          sizeStatus: "exact",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByLabelText(/정확히 계산된 크기입니다\. 3일 전에 계산한 값입니다\./)
+    ).toBeInTheDocument();
+    __resetSessionVerifiedSizesForTests();
+  });
+
+  it("explains why cloud storage folder sizes stay estimated", () => {
+    render(
+      <FileItem
+        entry={{
+          name: "내 드라이브",
+          path: "/Users/sam/내 드라이브",
+          kind: "directory",
+          size: 2048,
+          sizeStatus: "estimated",
+        }}
+        viewMode="detailed"
+        onClick={vi.fn()}
+        onDoubleClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("~2.0 KB")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/클라우드 동기화 폴더라 자동으로 정확히 계산하지 않습니다/)
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/빠른 추정 크기입니다/)).not.toBeInTheDocument();
   });
 
   it("labels directory size calculation errors", () => {

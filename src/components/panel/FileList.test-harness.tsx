@@ -7,7 +7,7 @@ import { useFileOperationUndoStore } from '../../store/fileOperationUndoStore';
 import {
   resetSharedDragState,
   sharedPanelPaths,
-} from './fileListDragSharedState';
+} from "./drag/fileListDragSharedState";
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
@@ -23,7 +23,6 @@ const fileListMocks = vi.hoisted(() => ({
   mockCheckCopyConflicts: vi.fn(),
   mockCancelDirSizeScan: vi.fn(),
   mockEstimateDirSize: vi.fn(),
-  mockGetDirSize: vi.fn(),
   mockListDirectory: vi.fn(),
   mockScanDirSize: vi.fn(),
   mockSetSelection: vi.fn(),
@@ -56,7 +55,6 @@ export const mockSubmitJob = fileListMocks.mockSubmitJob;
 export const mockCheckCopyConflicts = fileListMocks.mockCheckCopyConflicts;
 export const mockCancelDirSizeScan = fileListMocks.mockCancelDirSizeScan;
 export const mockEstimateDirSize = fileListMocks.mockEstimateDirSize;
-export const mockGetDirSize = fileListMocks.mockGetDirSize;
 export const mockListDirectory = fileListMocks.mockListDirectory;
 export const mockScanDirSize = fileListMocks.mockScanDirSize;
 export const mockSetSelection = fileListMocks.mockSetSelection;
@@ -76,7 +74,6 @@ vi.mock('../../hooks/useFileSystem', () => ({
     copyFiles: vi.fn().mockResolvedValue([]),
     submitJob: fileListMocks.mockSubmitJob,
     estimateDirSize: fileListMocks.mockEstimateDirSize,
-    getDirSize: fileListMocks.mockGetDirSize,
     listDirectory: fileListMocks.mockListDirectory,
     scanDirSize: fileListMocks.mockScanDirSize,
   }),
@@ -259,7 +256,6 @@ export const registerFileListTestLifecycle = () => {
       isPartial: false,
       scannedEntries: 0,
     });
-    mockGetDirSize.mockResolvedValue(0);
     mockListDirectory.mockResolvedValue([]);
     mockScanDirSize.mockResolvedValue({
       size: 0,

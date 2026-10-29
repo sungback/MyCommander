@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatSize, formatDate } from "./format";
+import { formatSize, formatDate, formatElapsedSince } from "./format";
 
 describe("formatSize", () => {
   it("returns empty string for null or undefined", () => {
@@ -58,5 +58,25 @@ describe("formatDate", () => {
     // Verify format pattern: yyyy.MM.dd HH:mm
     expect(result).toMatch(/^\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}$/);
     expect(result).toContain("2024.01.15");
+  });
+});
+
+describe("formatElapsedSince", () => {
+  const now = Date.UTC(2026, 9, 11, 12, 0, 0);
+
+  it("formats elapsed time in the largest whole unit", () => {
+    expect(formatElapsedSince(now - 20_000, now)).toBe("방금 전");
+    expect(formatElapsedSince(now - 5 * 60_000, now)).toBe("5분 전");
+    expect(formatElapsedSince(now - 3 * 60 * 60_000, now)).toBe("3시간 전");
+    expect(formatElapsedSince(now - 3 * 24 * 60 * 60_000, now)).toBe("3일 전");
+  });
+
+  it("returns an empty string without a timestamp", () => {
+    expect(formatElapsedSince(undefined, now)).toBe("");
+    expect(formatElapsedSince(0, now)).toBe("");
+  });
+
+  it("treats future timestamps as just now", () => {
+    expect(formatElapsedSince(now + 60_000, now)).toBe("방금 전");
   });
 });

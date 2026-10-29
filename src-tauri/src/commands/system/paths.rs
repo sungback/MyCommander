@@ -35,12 +35,12 @@ pub async fn get_available_space(path: String) -> Result<u64, String> {
         .map_err(|error| error.to_string())?
 }
 
-fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
+pub(crate) fn get_available_space_for_path(path: &Path) -> Result<u64, String> {
     let resolved_path = resolve_existing_path(path)?;
 
     #[cfg(target_os = "windows")]
     {
-        return get_available_space_for_windows_path(&resolved_path);
+        get_available_space_for_windows_path(&resolved_path)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -74,8 +74,8 @@ fn resolve_path_for_navigation(path: &Path) -> Result<String, String> {
 
 #[cfg(target_os = "windows")]
 fn get_available_space_for_windows_path(path: &Path) -> Result<u64, String> {
-    let wide_path: Vec<u16> = path
-        .as_os_str()
+    let path_str = path_to_display_string(path);
+    let wide_path: Vec<u16> = std::ffi::OsStr::new(&path_str)
         .encode_wide()
         .chain(std::iter::once(0))
         .collect();

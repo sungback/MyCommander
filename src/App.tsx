@@ -4,12 +4,12 @@ import { usePanelStore } from "./store/panelStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useFileSystem } from "./hooks/useFileSystem";
 import { DialogContainer } from "./components/dialogs/DialogContainer";
-import { ProgressDialog } from "./components/dialogs/ProgressDialog";
-import { SearchPreviewDialogs } from "./components/dialogs/SearchPreviewDialogs";
-import { SyncDialog } from "./components/dialogs/SyncDialog";
+import { ProgressDialog } from "./components/dialogs/jobs/ProgressDialog";
+import { SearchPreviewDialogs } from "./components/dialogs/search/SearchPreviewDialogs";
+import { SyncDialog } from "./components/dialogs/sync/SyncDialog";
 import { ContextMenu } from "./components/layout/ContextMenu";
 import { MultiRenameDialog } from "./components/dialogs/MultiRenameDialog";
-import { JobCenterDialog } from "./components/dialogs/JobCenterDialog";
+import { JobCenterDialog } from "./components/dialogs/jobs/JobCenterDialog";
 import { ToastViewport } from "./components/layout/ToastViewport";
 import { useDialogStore } from "./store/dialogStore";
 import { useAppCommands } from "./hooks/useAppCommands";
@@ -20,6 +20,7 @@ import { buildFontFamilyStack } from "./constants/fontOptions";
 import { useJobQueue } from "./hooks/useJobQueue";
 import { useRendererRecovery } from "./hooks/useRendererRecovery";
 import { usePersistentSizeCache } from "./hooks/usePersistentSizeCache";
+import { useStartupUpdateCheck } from "./hooks/useStartupUpdateCheck";
 import {
   useAppCommandListeners,
   useAutoTheme,
@@ -48,6 +49,7 @@ function App() {
   useDirectoryWatch();
   useJobQueue();
   useRendererRecovery();
+  useStartupUpdateCheck();
   usePanelFocusShortcut(activePanelId, setActivePanel);
   useNativePreferenceListeners(setShowHiddenFiles, setThemePreference, setPanelViewMode);
   useAppCommandListeners({

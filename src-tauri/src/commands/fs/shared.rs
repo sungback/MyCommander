@@ -39,7 +39,17 @@ pub(crate) fn format_command_failure(command_name: &str, output: &std::process::
 }
 
 pub(crate) fn compact_command_output(output: &[u8]) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    let text = if let Ok(s) = std::str::from_utf8(output) {
+        std::borrow::Cow::Borrowed(s)
+    } else {
+        let (decoded, _, _) = encoding_rs::EUC_KR.decode(output);
+        decoded
+    };
+
+    #[cfg(not(target_os = "windows"))]
     let text = String::from_utf8_lossy(output);
+
     let compact = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if compact.is_empty() {
         None

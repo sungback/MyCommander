@@ -1,0 +1,138 @@
+import {
+  buildPreviewHtmlDocument,
+  escapeHtml,
+  getPreviewTheme,
+  XlsxRendererModule,
+} from "./shared";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { useFileSystem } from "../../../../hooks/useFileSystem";
+import type { Row, Sheet } from "read-excel-file/browser";
+
+const MAX_ROWS = 500;
+
+export interface XlsxRendererOptions {
+  readFileBinary?: (filePath: string) => Promise<ArrayBuffer | Uint8Array>;
+  fetchImpl?: typeof fetch;
+  convertFileSrcImpl?: (path: string) => string;
+}
+
+const readBuffer = async (
+  filePath: string,
+  options: XlsxRendererOptions
+): Promise<ArrayBuffer | Uint8Array> => {
+  if (options.readFileBinary) {
+    return options.readFileBinary(filePath);
+  }
+
+  try {
+    return await useFileSystem().readFileBinary(filePath);
+  } catch (error) {
+    if (options.fetchImpl || options.convertFileSrcImpl) {
+      const convert = options.convertFileSrcImpl ?? convertFileSrc;
+      const fetchFn = options.fetchImpl ?? fetch;
+      const url = convert(filePath);
+      return await fetchFn(url).then((response) => response.arrayBuffer());
+    }
+    throw error;
+  }
+};
+
+/**
+ * 압축하지 않은 zip으로 다시 묶는다.
+ * read-excel-file이 쓰는 fflate는 압축을 푼 크기가 512 KB 이상인 항목을 `blob:` Web Worker에서 푸는데,
+ * CSP가 `blob:` Worker를 막고 fflate는 그 실패를 알리지 않아 미리보기가 멈춘다.
+ * 압축하지 않은 항목은 Worker 없이 바로 읽는다.
+ */
+export const repackWithoutCompression = async (
+  buffer: ArrayBuffer | Uint8Array
+): Promise<ArrayBuffer> => {
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(buffer);
+  return zip.generateAsync({ type: "arraybuffer", compression: "STORE" });
+};
+
+const formatCellValue = (value: unknown): string => {
+  if (value instanceof Date) {
+    return value.toLocaleString();
+  }
+
+  return String(value ?? "");
+};
+
+export const buildXlsxHtml = async (
+  filePath: string,
+  options: XlsxRendererOptions = {}
+): Promise<string> => {
+  const { default: readExcelFile } = await import("read-excel-file/browser");
+  const theme = getPreviewTheme();
+
+  const buffer = await readBuffer(filePath, options);
+  const sheets = await readExcelFile(await repackWithoutCompression(buffer));
+
+  const sheetsHtml = sheets.map(({ sheet: sheetName, data: rows }: Sheet) => {
+    const truncated = rows.length > MAX_ROWS;
+    const displayRows = rows.slice(0, MAX_ROWS);
+
+    if (displayRows.length === 0) {
+      return `<div class="sheet-block">
+  <div class="sheet-header"><span class="sheet-badge">${escapeHtml(sheetName)}</span></div>
+  <div class="sheet-empty">( 데이터 없음 )</div>
+</div>`;
+    }
+
+    const maxCols = displayRows.reduce((max, row) => Math.max(max, row.length), 0);
+    const headerRow = displayRows[0];
+    const dataRows = displayRows.slice(1);
+
+    const theadHtml = `<thead><tr>${headerRow
+      .map((cell) => `<th>${escapeHtml(formatCellValue(cell))}</th>`)
+      .join("")}</tr></thead>`;
+
+    const tbodyHtml = `<tbody>${dataRows
+      .map(
+        (row, rowIndex) =>
+          `<tr class="${rowIndex % 2 === 1 ? "even" : ""}">${Array.from(
+            { length: maxCols },
+            (_, columnIndex) =>
+              `<td>${escapeHtml(formatCellValue((row as Row)[columnIndex]))}</td>`
+          ).join("")}</tr>`
+      )
+      .join("")}</tbody>`;
+
+    const note = truncated
+      ? `<div class="truncate-note">처음 ${MAX_ROWS}행만 표시됩니다 (전체 ${rows.length}행)</div>`
+      : "";
+
+    return `<div class="sheet-block">
+  <div class="sheet-header"><span class="sheet-badge">${escapeHtml(sheetName)}</span></div>
+  ${note}
+  <div class="table-wrap">
+    <table>${theadHtml}${tbodyHtml}</table>
+  </div>
+</div>`;
+  });
+
+  return buildPreviewHtmlDocument({
+    styles: `
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 13px; color: ${theme.foreground}; background: ${theme.background}; margin: 0; padding: 16px 20px; }
+  .sheet-block { margin-bottom: 20px; border: 1px solid ${theme.border}; border-radius: 8px; overflow: hidden; }
+  .sheet-header { background: ${theme.codeBackground}; padding: 8px 14px; border-bottom: 1px solid ${theme.divider}; }
+  .sheet-badge { font-size: 11px; font-weight: 600; color: ${theme.badgeGreen}; background: ${theme.badgeGreenBackground}; padding: 2px 8px; border-radius: 10px; }
+  .sheet-empty { padding: 14px 16px; font-size: 12px; color: ${theme.muted}; font-style: italic; }
+  .truncate-note { padding: 6px 14px; font-size: 11px; color: ${theme.muted}; background: ${theme.codeBackground}; border-bottom: 1px solid ${theme.divider}; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: max-content; }
+  th { background: ${theme.codeBackground}; font-weight: 600; text-align: left; padding: 6px 10px; border: 1px solid ${theme.border}; white-space: nowrap; position: sticky; top: 0; }
+  td { padding: 5px 10px; border: 1px solid ${theme.border}; white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+  tr.even td { background: ${theme.alternateBackground}; }
+`,
+    body: sheetsHtml.join("\n"),
+  });
+};
+
+export const defaultLoadXlsxRenderer = async (
+  options: XlsxRendererOptions = {}
+): Promise<XlsxRendererModule> => ({
+  renderXlsx: (filePath) => buildXlsxHtml(filePath, options),
+});

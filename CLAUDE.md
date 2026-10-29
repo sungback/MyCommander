@@ -17,7 +17,7 @@ React 19·TypeScript·Vite 프런트엔드와 Tauri v2·Rust 백엔드로 구성
 
 | 위치 | 역할 |
 |---|---|
-| `src/components/` | dialogs, panel, favorites, layout UI |
+| `src/components/` | dialogs, panel, favorites, layout UI. dialogs는 jobs/palette/preview/search/sync, panel은 drag/selection/size/visuals로 역할 분리 |
 | `src/features/` | 파일 작업·동기화 등 기능 로직 |
 | `src/hooks/tauriCommands/` | 프런트엔드 Tauri 명령 클라이언트 |
 | `src/hooks/useFileSystem.ts` | 컴포넌트·일반 훅이 사용하는 파일시스템 facade |
@@ -50,7 +50,20 @@ React 19·TypeScript·Vite 프런트엔드와 Tauri v2·Rust 백엔드로 구성
 ### 영속화와 복구
 
 - 설정, 패널, 크기 캐시 등 상태를 바꿀 때는 해당 store의 저장 형식·복원·이전 버전 데이터 처리도 확인합니다.
-- 디렉터리 크기에는 추정·부분·정확·오래된 값의 구분이 있습니다. CloudStorage 등에서 자동 정확 계산을 제한하는 기존 처리를 유지합니다.
+- 디렉터리 크기는 `exact`·`limited`·`partial`·`estimated`와 stale 여부를 구분합니다. 권한으로 못 읽은 항목은 재시도를 반복하는 `partial` 대신 하한값인 `limited`로 취급합니다. `limited`의 재검증 기준은 `exact`와 같습니다. CloudStorage 등의 자동 정확 계산 제한을 유지합니다.
+- 크기 캐시는 localStorage가 아니라 Rust의 앱 데이터 폴더 `size-cache-v1.json`에 보관합니다([size_cache.rs](src-tauri/src/commands/fs/metadata/size_cache.rs)). 오래된 exact·limited 값은 estimated/stale로 복원합니다.
+- 크기 스캔은 경로별로 공유하며 마지막 요청자가 취소할 때 중단합니다([shared_scan.rs](src-tauri/src/commands/fs/metadata/dir_size/shared_scan.rs)). 하위 폴더 결과를 캐시에 반영할 때 더 최근의 정확 계산을 덮어쓰지 않습니다.
+- 크기 계산은 sparse 파일의 할당 크기 예외와 하드링크 중복 제거를 유지하며 symlink·reparse point·다른 볼륨·macOS 데이터 firmlink로 내려가지 않습니다. 전용 rayon 풀, 네트워크 단일 스레드, 진행 이벤트 제한과 macOS bulk 조회의 기준은 [dir_size](src-tauri/src/commands/fs/metadata/dir_size)를 확인합니다. `unsafe` bulk 처리는 `bulk_listing.rs`에 둡니다.
+- 감시는 패널이 떠난 최근 경로도 포함합니다. 감시 범위 밖의 검증 표시를 지우고 외부 변경으로 stale이 된 값은 디스크 캐시에서도 낮춰 이전 값이 정확한 값으로 되살아나지 않게 합니다.
 - 창 상태는 Tauri window-state 플러그인이 복원합니다. macOS 잠자기 후 렌더러 복구는 [useRendererRecovery.ts](src/hooks/useRendererRecovery.ts)가 담당합니다. 시간 설정은 문서에 복제하지 않고 코드 상수를 확인합니다.
+
+### 문서 미리보기와 플랫폼 경계
+
+- PDF·PPTX는 [PagedPreviewLayout](src/components/dialogs/preview/paged/PagedPreviewLayout.tsx)을 공유합니다. PDF 리소스는 [Vite 플러그인](scripts/vitePdfjsResources.mjs)이 같은 출처로 제공하며, `useWasm: false`를 유지해 CSP를 넓히지 않습니다. 파일 읽기·해석 실패 시 기존 대체 보기 경로를 보존합니다.
+- PPTX HTML은 파일에서 온 내용이므로 스크립트 없는 sandbox iframe에서만 표시합니다. Worker의 Blob은 화면 쪽에서 객체 URL로 다시 만들고 닫을 때 해제합니다. 좌표·겹침·이미지 자르기와 미지원 형식 처리는 [pptx](src/components/dialogs/preview/pptx)를 확인합니다.
+- XLSX는 [xlsxRenderer.ts](src/components/dialogs/preview/quickPreviewRenderers/xlsxRenderer.ts)의 무압축 재포장을 유지합니다. 이를 빼면 fflate의 blob Worker가 CSP에 막혀 미리보기가 멈출 수 있습니다. 해결을 위해 CSP를 넓히지 않습니다.
+- SQLite 미리보기는 read-only이며 민감 경로 차단을 유지합니다.
+- Windows 명령 실행은 확장 경로 접두어를 제거하고 `current_dir`와 `raw_arg`를 사용합니다([shell.rs](src-tauri/src/commands/system/launch/shell.rs)). 인용된 `cd` 문자열로 바꾸지 않습니다. CMD의 UNC 작업 폴더 제한도 고려합니다.
+- [transferSpaceCheck.ts](src/features/transferSpaceCheck.ts)는 복사·이동·검색 결과·동기화 전 공간 부족을 경고합니다. 사용자가 계속할 수 있는 경고이며, 드래그 경고 중에는 패널 단축키도 막습니다. 같은 볼륨 이동은 제외하고, 확인 오류·미확인 공간은 작업을 막지 않습니다.
 
 기능을 바꿀 때는 해당 설계나 연결 관계가 바뀌는 경우에만 이 문서를 갱신합니다. 매번 바뀌는 작업 목록과 검사 결과는 `TASKS.md`에 기록합니다.

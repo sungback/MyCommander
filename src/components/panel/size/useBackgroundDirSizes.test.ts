@@ -1,0 +1,717 @@
+import { renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileEntry } from "../../../types/file";
+import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import { usePanelStore } from "../../../store/panelStore";
+import {
+  __resetStorageClassificationForTests,
+  recordStorageKind,
+} from "./storageClassification";
+import {
+  getAutomaticEstimateOptions,
+  isLikelyCloudStoragePath,
+  isLikelyVolatileAutoScanPath,
+  shouldAutoScanExactSizes,
+  shouldQueueExactBackgroundScan,
+} from "./backgroundDirSizeHelpers";
+
+const {
+  listenHandlers,
+  mockCancelDirSizeScan,
+  mockClassifyStoragePaths,
+  mockEstimateDirSize,
+  mockScanDirSize,
+} = vi.hoisted(() => ({
+  listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
+  mockCancelDirSizeScan: vi.fn(),
+  mockClassifyStoragePaths: vi.fn(),
+  mockEstimateDirSize: vi.fn(),
+  mockScanDirSize: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockImplementation(
+    async (eventName: string, handler: (event: { payload: unknown }) => void) => {
+      listenHandlers.set(eventName, handler);
+      return () => {
+        listenHandlers.delete(eventName);
+      };
+    }
+  ),
+}));
+
+vi.mock("../../../hooks/useFileSystem", () => ({
+  useFileSystem: () => ({
+    cancelDirSizeScan: mockCancelDirSizeScan,
+    classifyStoragePaths: mockClassifyStoragePaths,
+    estimateDirSize: mockEstimateDirSize,
+    scanDirSize: mockScanDirSize,
+  }),
+}));
+
+const makeDirectory = (path: string): FileEntry => ({
+  name: path.split(/[\\/]/).filter(Boolean).pop() ?? path,
+  path,
+  kind: "directory",
+});
+
+const makeProps = (overrides = {}) => ({
+  activeTabId: "tab-1",
+  currentPath: "C:\\",
+  files: [makeDirectory("C:\\Windows")],
+  lastUpdated: 0,
+  panelId: "left" as const,
+  sizeCacheStale: {},
+  setEntrySizeStatus: vi.fn(),
+  updateEntrySize: vi.fn(),
+  updateEntrySizeEstimate: vi.fn(),
+  updateEntrySizeProgress: vi.fn(),
+  ...overrides,
+});
+
+describe("useBackgroundDirSizes", () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    listenHandlers.clear();
+    mockCancelDirSizeScan.mockReset();
+    __resetStorageClassificationForTests();
+    mockClassifyStoragePaths.mockReset();
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "unknown")
+    );
+    mockEstimateDirSize.mockReset();
+    mockScanDirSize.mockReset();
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 2,
+      errorCount: 0,
+      inaccessibleCount: 0,
+    });
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("does not requeue the same unresolved directory after a size calculation settles", async () => {
+    mockEstimateDirSize.mockResolvedValue({
+      size: 1024,
+      isPartial: false,
+      scannedEntries: 1,
+    });
+    const props = makeProps();
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() =>
+      expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
+        "left",
+        "C:\\Windows",
+        1024,
+        "estimated"
+      )
+    );
+
+    rerender({
+      ...props,
+      files: [...props.files],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockEstimateDirSize).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks failed calculations as settled until the panel is refreshed", async () => {
+    mockEstimateDirSize.mockRejectedValue(new Error("access denied"));
+    const props = makeProps();
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() => expect(consoleErrorSpy).toHaveBeenCalledTimes(1));
+
+    rerender({
+      ...props,
+      files: [...props.files],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockEstimateDirSize).toHaveBeenCalledTimes(1);
+
+    rerender({
+      ...props,
+      lastUpdated: 1,
+    });
+
+    await waitFor(() => expect(mockEstimateDirSize).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps an active exact scan running when only lastUpdated changes", async () => {
+    mockScanDirSize.mockReturnValue(new Promise(() => {}));
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        { ...makeDirectory("/Users/sam/code"), size: 1024, sizeStatus: "estimated" },
+      ],
+    });
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalledTimes(1));
+
+    rerender({ ...props, lastUpdated: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockCancelDirSizeScan).not.toHaveBeenCalled();
+    expect(mockScanDirSize).toHaveBeenCalledTimes(1);
+
+    rerender({ ...props, currentPath: "/Users/sam/other", lastUpdated: 2 });
+    await waitFor(() => expect(mockCancelDirSizeScan).toHaveBeenCalledTimes(1));
+  });
+
+  it("uses shallower estimates for filesystem roots and deeper estimates for complex directories", () => {
+    expect(getAutomaticEstimateOptions("C:\\")).toEqual({
+      maxDepth: 0,
+      maxEntries: 100,
+    });
+    expect(getAutomaticEstimateOptions("/")).toEqual({
+      maxDepth: 0,
+      maxEntries: 100,
+    });
+    expect(getAutomaticEstimateOptions("/Users/sam")).toEqual({
+      maxDepth: 1,
+      maxEntries: 200,
+    });
+    expect(getAutomaticEstimateOptions("C:\\Users\\sam\\AppData")).toEqual({
+      maxDepth: 3,
+      maxEntries: 1500,
+    });
+    expect(getAutomaticEstimateOptions("G:\\내 드라이브")).toEqual({
+      maxDepth: 3,
+      maxEntries: 1500,
+    });
+    expect(shouldAutoScanExactSizes("C:\\")).toBe(false);
+    expect(shouldAutoScanExactSizes("/Users/sam")).toBe(true);
+  });
+
+  it("does not automatically exact-scan likely cloud storage paths", () => {
+    expect(isLikelyCloudStoragePath("G:\\내 드라이브")).toBe(true);
+    expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Google Drive")).toBe(true);
+    expect(isLikelyCloudStoragePath("/Users/sam/Library/CloudStorage/Dropbox")).toBe(true);
+    expect(isLikelyCloudStoragePath("C:\\Users\\sam\\Projects")).toBe(false);
+
+    expect(shouldAutoScanExactSizes("G:\\내 드라이브")).toBe(false);
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("G:\\내 드라이브"),
+          size: 1024,
+          sizeStatus: "estimated",
+        },
+        false
+      )
+    ).toBe(false);
+  });
+
+  it("does not automatically exact-scan volatile Windows profile paths", () => {
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\AppData")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("C:/Users/sam/AppData/Local")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\AppData\\Local")).toBe(true);
+    expect(isLikelyVolatileAutoScanPath("/Users/sam/AppData/Local")).toBe(false);
+    expect(isLikelyVolatileAutoScanPath("C:\\Users\\sam\\ApplicationData")).toBe(false);
+    expect(shouldAutoScanExactSizes("C:\\Users\\sam\\AppData")).toBe(false);
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("C:\\Users\\sam\\AppData"),
+          size: 1024,
+          sizeStatus: "partial",
+        },
+        false
+      )
+    ).toBe(false);
+  });
+
+  it("promotes partial estimates to automatic exact scans for stable local directories", () => {
+    expect(
+      shouldQueueExactBackgroundScan(
+        {
+          ...makeDirectory("C:\\Users\\sam\\anaconda3"),
+          size: 1024,
+          sizeStatus: "partial",
+        },
+        true
+      )
+    ).toBe(true);
+  });
+
+  it("treats a cloud-named path as local once the backend confirms it is a plain folder", () => {
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/업무")).toBe(true);
+
+    recordStorageKind("/Users/sam/내 드라이브", "local");
+
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브")).toBe(false);
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/업무")).toBe(false);
+    expect(shouldAutoScanExactSizes("/Users/sam/내 드라이브")).toBe(true);
+    // 로컬 루트 아래에 다시 클라우드 이름이 나타나면 여전히 클라우드로 본다.
+    expect(isLikelyCloudStoragePath("/Users/sam/내 드라이브/Dropbox/자료")).toBe(true);
+    // 프로바이더로 확인되었거나 판단 불가인 경로는 바뀌지 않는다.
+    recordStorageKind("/Users/sam/Library/CloudStorage/GoogleDrive-a", "provider");
+    expect(isLikelyCloudStoragePath("/Users/sam/Library/CloudStorage/GoogleDrive-a")).toBe(
+      true
+    );
+  });
+
+  it("starts exact scans for a cloud-named local folder after classification", async () => {
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "local")
+    );
+    const props = makeProps({
+      currentPath: "/Users/sam/내 드라이브",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/내 드라이브/업무"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/sam/내 드라이브/업무",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    expect(mockClassifyStoragePaths).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps skipping exact scans for provider folders", async () => {
+    mockClassifyStoragePaths.mockImplementation(async (paths: string[]) =>
+      paths.map(() => "provider")
+    );
+    const props = makeProps({
+      currentPath: "/Users/sam/Library/CloudStorage/GoogleDrive-a/내 드라이브",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Library/CloudStorage/GoogleDrive-a/내 드라이브/업무"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() => expect(mockClassifyStoragePaths).toHaveBeenCalled());
+    expect(mockScanDirSize).not.toHaveBeenCalled();
+  });
+
+  it("runs an exact background scan for estimated directories outside roots", async () => {
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/sam/Projects",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/sam/Projects",
+        2048,
+        expect.any(Number),
+        "exact"
+      )
+    );
+  });
+
+  it("promotes estimated app bundles under Applications to exact background scans", async () => {
+    mockEstimateDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: true,
+      scannedEntries: 2,
+    });
+    const appEntry = makeDirectory("/Applications/Example.app");
+    const props = makeProps({
+      currentPath: "/Applications",
+      files: [appEntry],
+    });
+
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() =>
+      expect(props.updateEntrySizeEstimate).toHaveBeenCalledWith(
+        "left",
+        "/Applications/Example.app",
+        4096,
+        "estimated"
+      )
+    );
+
+    rerender({
+      ...props,
+      files: [
+        {
+          ...appEntry,
+          size: 4096,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Applications/Example.app",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Applications/Example.app",
+        2048,
+        expect.any(Number),
+        "exact"
+      )
+    );
+  });
+
+  it("does not run an exact background scan for estimated cloud directories", async () => {
+    const props = makeProps({
+      currentPath: "C:\\Users\\sam",
+      files: [
+        {
+          ...makeDirectory("C:\\Users\\sam\\Google Drive"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockScanDirSize).not.toHaveBeenCalled();
+  });
+
+  it("runs an exact background scan for partial local directories outside roots", async () => {
+    const props = makeProps({
+      currentPath: "/Users/back",
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/back/Downloads",
+        expect.stringMatching(/^left-/)
+      )
+    );
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/back/Downloads",
+        2048,
+        expect.any(Number),
+        "exact"
+      )
+    );
+  });
+
+  it("records child folder sizes from background exact scans", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 2,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1_000,
+      children: [
+        {
+          path: "/Users/sam/Projects/background-child",
+          size: 640,
+          isPartial: false,
+          inaccessibleCount: 1,
+          depth: 1,
+        },
+      ],
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(usePanelStore.getState().sizeCache["/Users/sam/Projects/background-child"]).toBe(640)
+    );
+    expect(
+      usePanelStore.getState().sizeStatusCache["/Users/sam/Projects/background-child"]
+    ).toBe("limited");
+  });
+
+  it("uses the shared scan start time when it began before this request", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 2,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 1_000,
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/sam/Projects",
+        2048,
+        1_000,
+        "exact"
+      )
+    );
+  });
+
+  it("stores exact scans with unreadable entries as limited sizes", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 4096,
+      isPartial: false,
+      scannedEntries: 8,
+      errorCount: 0,
+      inaccessibleCount: 2,
+    });
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(props.updateEntrySize).toHaveBeenCalledWith(
+        "left",
+        "/Users/sam/Projects",
+        4096,
+        expect.any(Number),
+        "limited"
+      )
+    );
+    expect(props.updateEntrySizeEstimate).not.toHaveBeenCalledWith(
+      "left",
+      "/Users/sam/Projects",
+      4096,
+      "partial"
+    );
+  });
+
+  it("does not requeue the same partial exact-scan result after a refresh tick", async () => {
+    mockScanDirSize.mockResolvedValue({
+      size: 1024,
+      isPartial: true,
+      scannedEntries: 3,
+      errorCount: 1,
+    });
+    const props = makeProps({
+      currentPath: "/Users/back",
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    const { rerender } = renderHook(
+      (hookProps: ReturnType<typeof makeProps>) =>
+        useBackgroundDirSizes(hookProps),
+      { initialProps: props }
+    );
+
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalledTimes(1));
+
+    rerender({
+      ...props,
+      lastUpdated: 1,
+      files: [
+        {
+          ...makeDirectory("/Users/back/Downloads"),
+          size: 1024,
+          sizeStatus: "partial" as const,
+        },
+      ],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockScanDirSize).toHaveBeenCalledTimes(1);
+  });
+
+  it("revalidates stale cached directory sizes outside roots", async () => {
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "exact" as const,
+        },
+      ],
+      sizeCacheStale: {
+        "/Users/sam/Projects": true,
+      },
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() =>
+      expect(mockScanDirSize).toHaveBeenCalledWith(
+        "/Users/sam/Projects",
+        expect.stringMatching(/^left-/)
+      )
+    );
+  });
+
+  it("applies scan progress events to the matching active scan", async () => {
+    let resolveScan: (value: {
+      size: number;
+      isPartial: boolean;
+      scannedEntries: number;
+      errorCount: number;
+    }) => void = () => {};
+    mockScanDirSize.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveScan = resolve;
+        })
+    );
+    const props = makeProps({
+      currentPath: "/Users/sam",
+      files: [
+        {
+          ...makeDirectory("/Users/sam/Projects"),
+          size: 1024,
+          sizeStatus: "estimated" as const,
+        },
+      ],
+    });
+
+    renderHook((hookProps: ReturnType<typeof makeProps>) =>
+      useBackgroundDirSizes(hookProps), {
+      initialProps: props,
+    });
+
+    await waitFor(() => expect(mockScanDirSize).toHaveBeenCalledTimes(1));
+    const scanId = mockScanDirSize.mock.calls[0][1];
+    listenHandlers.get("dir-size-progress")?.({
+      payload: {
+        scanId,
+        path: "/Users/sam/Projects",
+        size: 1536,
+        isPartial: false,
+        scannedEntries: 4,
+        completed: false,
+      },
+    });
+
+    expect(props.updateEntrySizeProgress).toHaveBeenCalledWith(
+      "left",
+      "/Users/sam/Projects",
+      1536
+    );
+
+    resolveScan({
+      size: 2048,
+      isPartial: false,
+      scannedEntries: 5,
+      errorCount: 0,
+    });
+  });
+});

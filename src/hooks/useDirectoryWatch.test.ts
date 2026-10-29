@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDirectoryWatch } from "./useDirectoryWatch";
 import { usePanelStore } from "../store/panelStore";
 import { useToastStore } from "../store/toastStore";
+import {
+  __resetSessionVerifiedSizesForTests,
+  isSizeVerifiedThisSession,
+  markSizeVerifiedThisSession,
+} from "../store/panelStoreFileHelpers";
 
 const { listenHandlers, mockSyncWatchedDirectories } = vi.hoisted(() => ({
   listenHandlers: new Map<string, (event: { payload: unknown }) => void>(),
@@ -31,6 +36,7 @@ describe("useDirectoryWatch", () => {
     vi.useFakeTimers();
     usePanelStore.setState(usePanelStore.getInitialState());
     useToastStore.getState().clearToasts();
+    __resetSessionVerifiedSizesForTests();
     listenHandlers.clear();
     mockSyncWatchedDirectories.mockReset();
     mockSyncWatchedDirectories.mockResolvedValue(undefined);
@@ -63,6 +69,32 @@ describe("useDirectoryWatch", () => {
     });
 
     expect(usePanelStore.getState().leftPanel.lastUpdated).toBeGreaterThan(beforeRefresh);
+  });
+
+  it("keeps watching a path the panel left so its folder sizes stay trusted", async () => {
+    usePanelStore.getState().setPath("left", "/work/a");
+    usePanelStore.getState().setPath("right", "/tmp");
+    markSizeVerifiedThisSession("/work/a/child");
+    markSizeVerifiedThisSession("/elsewhere/child");
+
+    renderHook(() => useDirectoryWatch());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      usePanelStore.getState().setPath("left", "/data");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const { calls } = mockSyncWatchedDirectories.mock;
+    const lastWatched = calls[calls.length - 1]?.[0] as string[];
+    expect(lastWatched).toEqual(expect.arrayContaining(["/data", "/tmp", "/work/a"]));
+    expect(isSizeVerifiedThisSession("/work/a/child")).toBe(true);
+    // 감시한 적 없는 경로의 확인 표시는 지운다(그동안의 변경을 알 수 없다).
+    expect(isSizeVerifiedThisSession("/elsewhere/child")).toBe(false);
   });
 
   it("shows a warning toast when watched directories cannot be synced", async () => {

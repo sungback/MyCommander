@@ -3,9 +3,11 @@ import type { DirectorySizeStatus, PanelId } from "../../types/file";
 import {
   cancelManualDirectorySizeScan,
   scanDirectorySizeWithProgress,
+  type UpdateEntrySizeHandler,
 } from "../../hooks/manualDirectorySizeScan";
 import type { DirectorySizeScanResult } from "../../hooks/tauriCommands/fileCommands";
 import { showTransientToast } from "../../store/toastStore";
+import { getExtension } from "../dialogs/preview/quickPreviewFileTypes";
 import { isSelectableEntry, type VisibleEntryRow } from "./fileListRows";
 
 interface UseFileListKeyboardProps {
@@ -29,7 +31,7 @@ interface UseFileListKeyboardProps {
   ) => void;
   setSelection: (panel: PanelId, paths: string[]) => void;
   showHiddenFiles: boolean;
-  updateEntrySize: (panel: PanelId, path: string, size: number) => void;
+  updateEntrySize: UpdateEntrySizeHandler;
   updateEntrySizeEstimate: (
     panel: PanelId,
     path: string,
@@ -140,12 +142,19 @@ export const useFileListKeyboard = ({
       return;
     }
 
-    if (event.code === "Space") {
+    const isSpaceKey =
+      event.code === "Space" || event.key === " " || event.key === "Spacebar";
+
+    if (isSpaceKey) {
       event.preventDefault();
       event.stopPropagation();
       if (!current) return;
 
-      if (current.kind === "file") {
+      const isFileEntry =
+        current.kind === "file" ||
+        (current.kind === "symlink" && Boolean(getExtension(current.path)));
+
+      if (isFileEntry) {
         openPreviewDialog({ panelId, path: current.path });
         return;
       }

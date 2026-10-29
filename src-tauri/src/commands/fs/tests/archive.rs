@@ -1,12 +1,31 @@
 use super::super::archive::{
-    extract_zip_archive, flatten_matching_archive_root_dir, get_hidden_temp_archive_path,
-    get_unique_archive_path, get_unique_archive_path_named, get_unique_extraction_dir,
-    validate_zip_source_directory,
+    decode_zip_entry_name, extract_zip_archive, extract_zip_entries_native,
+    flatten_matching_archive_root_dir, get_hidden_temp_archive_path, get_unique_archive_path,
+    get_unique_archive_path_named, get_unique_extraction_dir, preview_zip_archive_sync,
+    safe_enclosed_path, validate_zip_source_directory,
 };
 use super::create_test_dir;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+
+fn create_test_zip_archive(archive_path: &Path, files: &[(&str, &[u8])], dirs: &[&str]) {
+    use std::io::Write;
+    if let Some(parent) = archive_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let file = fs::File::create(archive_path).unwrap();
+    let mut zip = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default();
+
+    for dir in dirs {
+        zip.add_directory(*dir, options).unwrap();
+    }
+    for (name, content) in files {
+        zip.start_file(*name, options).unwrap();
+        zip.write_all(content).unwrap();
+    }
+    zip.finish().unwrap();
+}
 
 #[test]
 fn unique_extraction_dir_base_name() {
@@ -118,6 +137,22 @@ fn keeps_single_top_level_directory_when_name_differs_from_archive() {
 }
 
 #[test]
+fn keeps_nested_directory_when_it_has_same_name_as_top_level_directory() {
+    let tmp = create_test_dir("keep_same_name_nested_root");
+    let extraction_dir = tmp.join("abc");
+    let nested_child = extraction_dir.join("abc").join("abc").join("notes.txt");
+
+    fs::create_dir_all(nested_child.parent().unwrap()).unwrap();
+    fs::write(&nested_child, b"hello").unwrap();
+
+    flatten_matching_archive_root_dir(&extraction_dir, Path::new("abc.zip")).unwrap();
+
+    assert!(nested_child.exists());
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn create_zip_archive_rejects_non_directory() {
     let tmp = std::env::temp_dir().join("test_create_zip_file.txt");
     let _ = fs::remove_file(&tmp);
@@ -151,17 +186,8 @@ fn extract_zip_archive_rejects_non_zip_extension() {
 #[test]
 fn extract_zip_archive_extracts_contents() {
     let tmp = create_test_dir("extract_zip_contents");
-    let source_dir = tmp.join("source");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(source_dir.join("hello.txt"), b"world").unwrap();
-
     let archive = tmp.join("source.zip");
-    let status = Command::new("zip")
-        .current_dir(&tmp)
-        .args(["-r", "-1", "source.zip", "source"])
-        .status()
-        .expect("zip command must be available");
-    assert!(status.success(), "zip failed to create test archive");
+    create_test_zip_archive(&archive, &[("source/hello.txt", b"world")], &["source"]);
 
     let result = extract_zip_archive(archive.to_str().unwrap());
     assert!(result.is_ok(), "extract failed: {:?}", result);
@@ -229,4 +255,165 @@ fn hidden_temp_archive_path_increments_when_partial_exists() {
     let result = get_hidden_temp_archive_path(&archive).unwrap();
     assert_eq!(result, tmp.join(".data.zip.partial.2"));
     let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn preview_zip_archive_sync_reads_zip_metadata_and_entries() {
+    let tmp = create_test_dir("preview_zip_test");
+    let archive = tmp.join("test.zip");
+    create_test_zip_archive(
+        &archive,
+        &[
+            ("document.txt", b"Hello Zip World!"),
+            ("subfolder/data.json", b"{\"key\":\"value\"}"),
+        ],
+        &["subfolder"],
+    );
+
+    let preview = preview_zip_archive_sync(archive.to_str().unwrap()).unwrap();
+    assert_eq!(preview.file_name, "test.zip");
+    assert!(preview.file_size > 0);
+    assert_eq!(preview.total_files, 2);
+    assert!(preview.total_dirs >= 1);
+    assert_eq!(preview.total_uncompressed_size, 16 + 15);
+
+    let doc_entry = preview
+        .entries
+        .iter()
+        .find(|e| e.name == "document.txt")
+        .expect("document.txt entry must exist");
+    assert!(!doc_entry.is_dir);
+    assert_eq!(doc_entry.size, 16);
+
+    let json_entry = preview
+        .entries
+        .iter()
+        .find(|e| e.name == "data.json")
+        .expect("data.json entry must exist");
+    assert!(!json_entry.is_dir);
+    assert_eq!(json_entry.size, 15);
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn extract_zip_entries_native_extracts_nested_and_unicode_files() {
+    let tmp = create_test_dir("native_extract_test");
+    let archive = tmp.join("lecture-data-analysis.zip");
+    create_test_zip_archive(
+        &archive,
+        &[
+            ("data/분석_1004.txt", "강의 데이터 분석 결과".as_bytes()),
+            ("notes with space.txt", b"sample content"),
+        ],
+        &["data", "empty_folder"],
+    );
+
+    let target_dir = tmp.join("extracted");
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let result = extract_zip_entries_native(&archive, &target_dir);
+    assert!(result.is_ok(), "native extract failed: {:?}", result);
+
+    assert!(target_dir.join("data/분석_1004.txt").exists());
+    assert_eq!(
+        fs::read(target_dir.join("data/분석_1004.txt")).unwrap(),
+        "강의 데이터 분석 결과".as_bytes()
+    );
+    assert!(target_dir.join("notes with space.txt").exists());
+    assert_eq!(
+        fs::read(target_dir.join("notes with space.txt")).unwrap(),
+        b"sample content"
+    );
+    assert!(target_dir.join("empty_folder").is_dir());
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn extract_zip_entries_native_rejects_zip_slip() {
+    let tmp = create_test_dir("native_zip_slip_test");
+    let archive = tmp.join("malicious.zip");
+    create_test_zip_archive(&archive, &[("../escape.txt", b"malicious payload")], &[]);
+
+    let target_dir = tmp.join("extracted");
+    fs::create_dir_all(&target_dir).unwrap();
+
+    let result = extract_zip_entries_native(&archive, &target_dir);
+    assert!(result.is_err(), "should reject zip slip entry");
+    assert!(
+        result.unwrap_err().contains("unsafe path entry"),
+        "error message should mention unsafe path"
+    );
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn preview_zip_archive_sync_rejects_non_zip_or_missing_file() {
+    let result = preview_zip_archive_sync("/nonexistent/file.zip");
+    assert!(result.is_err());
+
+    let tmp = create_test_dir("preview_not_zip");
+    fs::create_dir_all(&tmp).unwrap();
+    let invalid_file = tmp.join("not_zip.zip");
+    fs::write(&invalid_file, b"This is not a zip file").unwrap();
+
+    let result = preview_zip_archive_sync(invalid_file.to_str().unwrap());
+    assert!(result.is_err());
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn test_decode_zip_entry_name_utf8_and_cp949() {
+    // 1. Valid UTF-8 byte sequence for "01-강의-데이터.txt"
+    let utf8_bytes = "01-강의-데이터.txt".as_bytes();
+    assert_eq!(
+        decode_zip_entry_name(utf8_bytes, "fallback"),
+        "01-강의-데이터.txt"
+    );
+
+    // 2. CP949 / EUC-KR bytes for "01-강의-데이터.txt"
+    let cp949_bytes: &[u8] = &[
+        0x30, 0x31, 0x2d, 0xb0, 0xad, 0xc0, 0xc7, 0x2d, 0xb5, 0xa5, 0xc0, 0xcc, 0xc5, 0xcd, 0x2e,
+        0x74, 0x78, 0x74,
+    ];
+    assert_eq!(
+        decode_zip_entry_name(cp949_bytes, "fallback"),
+        "01-강의-데이터.txt"
+    );
+
+    // 3. Fallback when invalid bytes
+    let invalid_bytes: &[u8] = &[0xff, 0xff];
+    assert_eq!(
+        decode_zip_entry_name(invalid_bytes, "fallback_name.txt"),
+        "fallback_name.txt"
+    );
+}
+
+#[test]
+fn test_safe_enclosed_path_validation() {
+    use std::path::PathBuf;
+
+    // Normal paths
+    assert_eq!(
+        safe_enclosed_path("data/강의_1004.txt"),
+        Some(PathBuf::from("data").join("강의_1004.txt"))
+    );
+    assert_eq!(
+        safe_enclosed_path("data\\강의_1004.txt"),
+        Some(PathBuf::from("data").join("강의_1004.txt"))
+    );
+
+    // Directory paths
+    assert_eq!(safe_enclosed_path("data/"), Some(PathBuf::from("data")));
+
+    // Unsafe Zip Slip paths
+    assert_eq!(safe_enclosed_path("../escape.txt"), None);
+    assert_eq!(safe_enclosed_path("data/../../escape.txt"), None);
+    assert_eq!(safe_enclosed_path("/absolute/path.txt"), None);
+    assert_eq!(safe_enclosed_path(""), None);
+    assert_eq!(safe_enclosed_path("."), None);
+    assert_eq!(safe_enclosed_path("null\0byte.txt"), None);
 }

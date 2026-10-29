@@ -26,6 +26,23 @@ describe("panelRefresh", () => {
     nowSpy.mockRestore();
   });
 
+  it("keeps cached sizes (marked stale) for filesystem-changed but invalidates them for file operations", () => {
+    usePanelStore.getState().hydrateEntrySizesFromCache([
+      { path: "/proj", size: 9_000, status: "exact", isStale: false },
+    ]);
+
+    refreshPanelsForDirectories(["/proj/src"], "filesystem-changed");
+
+    let state = usePanelStore.getState();
+    expect(state.sizeCache["/proj"]).toBe(9_000);
+    expect(state.sizeCacheStale["/proj"]).toBe(true);
+
+    refreshPanelsForDirectories(["/proj/src"], "file-operation");
+
+    state = usePanelStore.getState();
+    expect(state.sizeCache["/proj"]).toBeUndefined();
+  });
+
   it("refreshes only panels viewing affected directories", () => {
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(555);
 

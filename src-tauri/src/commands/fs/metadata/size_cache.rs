@@ -54,6 +54,8 @@ pub struct DirectorySizeCacheEntryUpdate {
     pub size: u64,
     pub status: String,
     pub scanned_at: Option<u64>,
+    /// 사용자가 이 경로를 쓴 시각. 없으면 기존 값을 유지하고, 새 항목이면 0으로 둬 가장 먼저 정리되게 한다
+    /// (상위 폴더를 계산하며 함께 저장한 하위 폴더가 실제로 쓰던 항목을 밀어내지 않게 한다).
     pub last_used_at: Option<u64>,
 }
 
@@ -61,7 +63,11 @@ pub async fn load_dir_size_cache(app: AppHandle) -> Result<DirectorySizeCacheLoa
     tokio::task::spawn_blocking(move || {
         let file_path = cache_file_path(&app)?;
         let now_ms = now_ms();
-        let snapshot = read_snapshot_from_path(&file_path)?;
+        let mut snapshot = read_snapshot_from_path(&file_path)?;
+        // 삭제되었거나 이동한 폴더의 오래된 크기가 다시 나타나지 않도록 로드할 때 정리한다.
+        if remove_missing_entries(&mut snapshot) > 0 {
+            write_snapshot_to_path(&file_path, &snapshot)?;
+        }
         Ok(build_load_result(snapshot, now_ms, DEFAULT_MAX_ENTRIES))
     })
     .await
@@ -79,26 +85,7 @@ pub async fn upsert_dir_size_cache_entries(
 
         let file_path = cache_file_path(&app)?;
         let mut snapshot = read_snapshot_from_path(&file_path)?;
-        let now_ms = now_ms();
-
-        for entry in entries {
-            let path = entry.path.trim();
-            if path.is_empty() || !is_stable_status(&entry.status) {
-                continue;
-            }
-
-            let scanned_at = entry.scanned_at.unwrap_or(now_ms);
-            snapshot.entries.insert(
-                path.to_string(),
-                DirectorySizeCacheEntry {
-                    size: entry.size,
-                    status: entry.status,
-                    scanned_at,
-                    last_used_at: entry.last_used_at.unwrap_or(scanned_at),
-                },
-            );
-        }
-
+        apply_entry_updates(&mut snapshot, entries, now_ms());
         prune_snapshot(&mut snapshot, DEFAULT_MAX_ENTRIES);
         write_snapshot_to_path(&file_path, &snapshot)
     })
@@ -227,9 +214,84 @@ fn prune_snapshot(snapshot: &mut DirectorySizeCacheSnapshot, max_entries: usize)
     }
 }
 
+const CLOUD_PATH_MARKERS: [&str; 10] = [
+    "cloudstorage",
+    "mobile documents",
+    "icloud",
+    "onedrive",
+    "dropbox",
+    "drivefs",
+    "google drive",
+    "my drive",
+    "shared drives",
+    "드라이브",
+];
+
+/// 스냅샷에서 실제로 사라진 경로의 항목을 제거하고 제거한 개수를 반환한다.
+fn remove_missing_entries(snapshot: &mut DirectorySizeCacheSnapshot) -> usize {
+    let before = snapshot.entries.len();
+    snapshot
+        .entries
+        .retain(|path, _| !is_confirmed_missing_path(Path::new(path)));
+    before - snapshot.entries.len()
+}
+
+/// 경로가 사라졌다고 확신할 수 있을 때만 true.
+/// 분리된 외장 볼륨, 클라우드 경로, 권한 오류처럼 판단할 수 없는 경우에는 항목을 유지한다.
+fn is_confirmed_missing_path(path: &Path) -> bool {
+    if !path.is_absolute() {
+        return false;
+    }
+
+    let lowered = path.to_string_lossy().to_lowercase();
+    if CLOUD_PATH_MARKERS
+        .iter()
+        .any(|marker| lowered.contains(marker))
+    {
+        return false;
+    }
+
+    if let Some(volume_root) = volume_root_of(path) {
+        if !volume_root.exists() {
+            return false;
+        }
+    }
+
+    matches!(
+        fs::symlink_metadata(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    )
+}
+
+/// 외장 볼륨/드라이브 루트(`/Volumes/<name>`, `D:\`)를 반환한다. 해당하지 않으면 None.
+fn volume_root_of(path: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+
+    let mut components = path.components();
+    let first = components.next()?;
+
+    if let Component::Prefix(prefix) = first {
+        let mut root = PathBuf::from(prefix.as_os_str());
+        root.push(std::path::MAIN_SEPARATOR_STR);
+        return Some(root);
+    }
+
+    if !matches!(first, Component::RootDir) {
+        return None;
+    }
+
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(top)), Some(Component::Normal(name))) if top == "Volumes" => {
+            Some(PathBuf::from("/Volumes").join(name))
+        }
+        _ => None,
+    }
+}
+
 fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
     let ttl = match entry.status.as_str() {
-        "exact" => EXACT_TTL_MS,
+        // limited: 끝까지 계산했지만 권한이 없는 항목을 뺀 하한값. 다시 계산해도 같으므로 exact와 같은 TTL을 쓴다.
+        "exact" | "limited" => EXACT_TTL_MS,
         "estimated" | "partial" => ESTIMATE_TTL_MS,
         _ => return true,
     };
@@ -241,7 +303,7 @@ fn is_entry_stale(entry: &DirectorySizeCacheEntry, now_ms: u64) -> bool {
 }
 
 fn is_stable_status(status: &str) -> bool {
-    matches!(status, "exact" | "estimated" | "partial")
+    matches!(status, "exact" | "limited" | "estimated" | "partial")
 }
 
 fn write_snapshot_to_path(
@@ -268,6 +330,36 @@ fn write_snapshot_to_path(
         .map_err(|error| format!("Failed to finalize directory size cache: {error}"))
 }
 
+fn apply_entry_updates(
+    snapshot: &mut DirectorySizeCacheSnapshot,
+    entries: Vec<DirectorySizeCacheEntryUpdate>,
+    now_ms: u64,
+) {
+    for entry in entries {
+        let path = entry.path.trim();
+        if path.is_empty() || !is_stable_status(&entry.status) {
+            continue;
+        }
+
+        let scanned_at = entry.scanned_at.unwrap_or(now_ms);
+        let last_used_at = entry.last_used_at.unwrap_or_else(|| {
+            snapshot
+                .entries
+                .get(path)
+                .map_or(0, |existing| existing.last_used_at)
+        });
+        snapshot.entries.insert(
+            path.to_string(),
+            DirectorySizeCacheEntry {
+                size: entry.size,
+                status: entry.status,
+                scanned_at,
+                last_used_at,
+            },
+        );
+    }
+}
+
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -278,8 +370,9 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_load_result, empty_snapshot, parse_snapshot, prune_snapshot, write_snapshot_to_path,
-        DirectorySizeCacheEntry, DirectorySizeCacheSnapshot,
+        apply_entry_updates, build_load_result, empty_snapshot, parse_snapshot, prune_snapshot,
+        remove_missing_entries, write_snapshot_to_path, DirectorySizeCacheEntry,
+        DirectorySizeCacheEntryUpdate, DirectorySizeCacheSnapshot,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -335,6 +428,10 @@ mod tests {
             "/stale-estimate".to_string(),
             entry(1, "estimated", now_ms - 2 * 24 * 60 * 60 * 1000),
         );
+        snapshot.entries.insert(
+            "/fresh-limited".to_string(),
+            entry(1, "limited", now_ms - 2 * 24 * 60 * 60 * 1000),
+        );
 
         let result = build_load_result(snapshot, now_ms, 10);
 
@@ -353,10 +450,50 @@ mod tests {
             .iter()
             .find(|entry| entry.path == "/stale-estimate")
             .unwrap();
+        let fresh_limited = result
+            .entries
+            .iter()
+            .find(|entry| entry.path == "/fresh-limited")
+            .unwrap();
 
         assert!(!fresh.is_stale);
         assert!(stale_exact.is_stale);
         assert!(stale_estimate.is_stale);
+        assert!(!fresh_limited.is_stale);
+    }
+
+    #[test]
+    fn apply_entry_updates_keeps_last_used_when_update_omits_it() {
+        let mut snapshot = empty_snapshot();
+        snapshot
+            .entries
+            .insert("/visited".to_string(), entry(1, "exact", 500));
+        let update = |path: &str, last_used_at: Option<u64>| DirectorySizeCacheEntryUpdate {
+            path: path.to_string(),
+            size: 9,
+            status: "exact".to_string(),
+            scanned_at: Some(900),
+            last_used_at,
+        };
+
+        apply_entry_updates(
+            &mut snapshot,
+            vec![
+                update("/visited", None),
+                update("/new-child", None),
+                update("/touched", Some(950)),
+            ],
+            1_000,
+        );
+
+        let visited = &snapshot.entries["/visited"];
+        assert_eq!(
+            (visited.size, visited.scanned_at, visited.last_used_at),
+            (9, 900, 500)
+        );
+        // 사용자가 쓴 적 없는 새 항목은 가장 먼저 정리된다.
+        assert_eq!(snapshot.entries["/new-child"].last_used_at, 0);
+        assert_eq!(snapshot.entries["/touched"].last_used_at, 950);
     }
 
     #[test]
@@ -391,6 +528,42 @@ mod tests {
         let parsed = parse_snapshot(&content).unwrap();
 
         assert_eq!(parsed.entries.get("/dir").unwrap().size, 123);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn remove_missing_entries_drops_only_confirmed_missing_paths() {
+        let root = make_temp_dir("size-cache-missing");
+        let existing = root.join("existing");
+        fs::create_dir_all(&existing).unwrap();
+        let missing = root.join("missing");
+        let cloud_missing = root.join("CloudStorage").join("missing");
+        let mut snapshot = empty_snapshot();
+        for path in [
+            existing.to_str().unwrap(),
+            missing.to_str().unwrap(),
+            cloud_missing.to_str().unwrap(),
+            "/Volumes/__mycommander_unplugged_volume__/project",
+            "relative/path",
+        ] {
+            snapshot
+                .entries
+                .insert(path.to_string(), entry(1, "exact", 100));
+        }
+
+        let removed = remove_missing_entries(&mut snapshot);
+
+        assert_eq!(removed, 1);
+        assert!(snapshot.entries.contains_key(existing.to_str().unwrap()));
+        assert!(!snapshot.entries.contains_key(missing.to_str().unwrap()));
+        assert!(snapshot
+            .entries
+            .contains_key(cloud_missing.to_str().unwrap()));
+        assert!(snapshot
+            .entries
+            .contains_key("/Volumes/__mycommander_unplugged_volume__/project"));
+        assert!(snapshot.entries.contains_key("relative/path"));
 
         fs::remove_dir_all(root).unwrap();
     }

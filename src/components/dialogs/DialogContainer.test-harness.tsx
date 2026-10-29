@@ -8,7 +8,8 @@ const dialogContainerMocks = vi.hoisted(() => ({
   mockCreateDirectory: vi.fn(),
   mockCreateFile: vi.fn(),
   mockRenameFile: vi.fn(),
-  mockGetDirSize: vi.fn(),
+  mockScanDirSize: vi.fn(),
+  mockCancelDirSizeScan: vi.fn(),
   mockSubmitJob: vi.fn(),
   mockCheckCopyConflicts: vi.fn(),
   mockShowTransientStatusMessage: vi.fn(),
@@ -18,7 +19,8 @@ const dialogContainerMocks = vi.hoisted(() => ({
 export const mockCreateDirectory = dialogContainerMocks.mockCreateDirectory;
 export const mockCreateFile = dialogContainerMocks.mockCreateFile;
 export const mockRenameFile = dialogContainerMocks.mockRenameFile;
-export const mockGetDirSize = dialogContainerMocks.mockGetDirSize;
+export const mockScanDirSize = dialogContainerMocks.mockScanDirSize;
+export const mockCancelDirSizeScan = dialogContainerMocks.mockCancelDirSizeScan;
 export const mockSubmitJob = dialogContainerMocks.mockSubmitJob;
 export const mockCheckCopyConflicts = dialogContainerMocks.mockCheckCopyConflicts;
 export const mockShowTransientStatusMessage = dialogContainerMocks.mockShowTransientStatusMessage;
@@ -33,7 +35,8 @@ vi.mock('../../hooks/useFileSystem', () => ({
     copyFiles: vi.fn(),
     moveFiles: vi.fn(),
     checkCopyConflicts: dialogContainerMocks.mockCheckCopyConflicts,
-    getDirSize: dialogContainerMocks.mockGetDirSize,
+    scanDirSize: dialogContainerMocks.mockScanDirSize,
+    cancelDirSizeScan: dialogContainerMocks.mockCancelDirSizeScan,
   }),
   getErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : typeof error === 'string' ? error : fallback,
@@ -43,12 +46,16 @@ vi.mock('../../store/panelRefresh', () => ({
   refreshPanelsForDirectories: dialogContainerMocks.mockRefreshPanelsForDirectories,
 }));
 
-vi.mock('./QuickPreviewDialog', () => ({
+vi.mock('./preview/QuickPreviewDialog', () => ({
   QuickPreviewDialog: () => null,
 }));
 
 vi.mock('./SettingsDialog', () => ({
   SettingsDialog: () => null,
+}));
+
+vi.mock('./UpdateDialog', () => ({
+  UpdateDialog: () => null,
 }));
 
 vi.mock('../../hooks/useAppCommands', () => ({
@@ -107,12 +114,21 @@ export const registerDialogContainerTestLifecycle = () => {
     dialogContainerMocks.mockCreateDirectory.mockReset();
     dialogContainerMocks.mockCreateFile.mockReset();
     dialogContainerMocks.mockRenameFile.mockReset();
-    dialogContainerMocks.mockGetDirSize.mockReset();
+    dialogContainerMocks.mockScanDirSize.mockReset();
+    dialogContainerMocks.mockCancelDirSizeScan.mockReset();
     dialogContainerMocks.mockSubmitJob.mockReset();
     dialogContainerMocks.mockCheckCopyConflicts.mockReset();
     dialogContainerMocks.mockShowTransientStatusMessage.mockReset();
     dialogContainerMocks.mockRefreshPanelsForDirectories.mockReset();
-    dialogContainerMocks.mockGetDirSize.mockResolvedValue(0);
+    dialogContainerMocks.mockScanDirSize.mockResolvedValue({
+      size: 0,
+      isPartial: false,
+      scannedEntries: 0,
+      errorCount: 0,
+      inaccessibleCount: 0,
+      startedAtMs: 0,
+    });
+    dialogContainerMocks.mockCancelDirSizeScan.mockResolvedValue(undefined);
     dialogContainerMocks.mockCheckCopyConflicts.mockResolvedValue([]);
     dialogContainerMocks.mockSubmitJob.mockResolvedValue({
       id: 'job-1',

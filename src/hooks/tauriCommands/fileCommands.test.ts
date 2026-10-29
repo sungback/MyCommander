@@ -146,6 +146,25 @@ describe("fileCommands", () => {
     });
   });
 
+  describe("checkTransferSpace", () => {
+    it("calls check_transfer_space with source_paths, target_path and is_move", async () => {
+      const check = {
+        requiredBytes: 10,
+        availableBytes: 5,
+        complete: true,
+        insufficient: true,
+      };
+      mockInvoke.mockResolvedValue(check);
+      const result = await fileCommands.checkTransferSpace(["/src/a.txt"], "/dst", true);
+      expect(mockInvoke).toHaveBeenCalledWith("check_transfer_space", {
+        source_paths: ["/src/a.txt"],
+        target_path: "/dst",
+        is_move: true,
+      });
+      expect(result).toEqual(check);
+    });
+  });
+
   describe("renameFile", () => {
     it("calls rename_file with old_path and new_path", async () => {
       mockInvoke.mockResolvedValue(undefined);
@@ -193,6 +212,27 @@ describe("fileCommands", () => {
     });
   });
 
+  describe("readFileBinary", () => {
+    it("calls read_file_binary and returns array buffer", async () => {
+      const buffer = new ArrayBuffer(8);
+      mockInvoke.mockResolvedValue(buffer);
+      const result = await fileCommands.readFileBinary("/some/file.pptx");
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_binary", { path: "/some/file.pptx" });
+      expect(result).toBe(buffer);
+    });
+
+    it("passes an optional max_bytes limit", async () => {
+      const buffer = new ArrayBuffer(16);
+      mockInvoke.mockResolvedValue(buffer);
+      const result = await fileCommands.readFileBinary("/some/file.pptx", 20 * 1024 * 1024);
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_binary", {
+        path: "/some/file.pptx",
+        max_bytes: 20 * 1024 * 1024,
+      });
+      expect(result).toBe(buffer);
+    });
+  });
+
   describe("previewSqliteDatabase", () => {
     it("calls preview_sqlite_database and returns preview data", async () => {
       const preview = {
@@ -214,15 +254,6 @@ describe("fileCommands", () => {
         path: "/some/app.db",
       });
       expect(result).toBe(preview);
-    });
-  });
-
-  describe("getDirSize", () => {
-    it("calls get_dir_size and returns number", async () => {
-      mockInvoke.mockResolvedValue(1024);
-      const result = await fileCommands.getDirSize("/some/dir");
-      expect(mockInvoke).toHaveBeenCalledWith("get_dir_size", { path: "/some/dir" });
-      expect(result).toBe(1024);
     });
   });
 
@@ -259,6 +290,11 @@ describe("fileCommands", () => {
         isPartial: false,
         scannedEntries: 30,
         errorCount: 0,
+        inaccessibleCount: 3,
+        startedAtMs: 1_700_000_000_000,
+        children: [
+          { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },
+        ],
       });
 
       const result = await fileCommands.scanDirSize("/some/dir", "scan-1");
@@ -272,6 +308,11 @@ describe("fileCommands", () => {
         isPartial: false,
         scannedEntries: 30,
         errorCount: 0,
+        inaccessibleCount: 3,
+        startedAtMs: 1_700_000_000_000,
+        children: [
+          { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },
+        ],
       });
     });
   });

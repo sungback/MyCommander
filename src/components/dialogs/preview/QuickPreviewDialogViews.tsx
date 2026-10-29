@@ -1,0 +1,394 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  AlertCircle,
+  Code2,
+  Eye,
+  FileText,
+  ImageIcon,
+  Loader2,
+  VideoIcon,
+  X,
+} from "lucide-react";
+import { useFileSystem } from "../../../hooks/useFileSystem";
+import { getExtension, getImageMimeType } from "./quickPreviewFileTypes";
+import { QuickPreviewJsonView } from "./QuickPreviewJsonView";
+import { QuickPreviewZipView } from "./QuickPreviewZipView";
+import { QuickPreviewPdfView } from "./pdf/QuickPreviewPdfView";
+import { QuickPreviewPptxView } from "./pptx/QuickPreviewPptxView";
+import type { PreviewState } from "./quickPreviewLoader";
+import type { PreviewStatusContent } from "./quickPreviewStatus";
+
+const getStatusIcon = (status: PreviewStatusContent) => {
+  if (status.kind === "loading") {
+    return <Loader2 size={24} className="animate-spin" />;
+  }
+
+  if (status.kind === "unsupported") {
+    return <FileText size={24} />;
+  }
+
+  return <AlertCircle size={24} className="text-red-500" />;
+};
+
+const getHeaderIcon = (preview: PreviewState, isRendered: boolean) => {
+  if (preview.type === "image") {
+    return <ImageIcon size={14} className="text-text-secondary shrink-0" />;
+  }
+
+  if (preview.type === "video") {
+    return <VideoIcon size={14} className="text-text-secondary shrink-0" />;
+  }
+
+  if (isRendered) {
+    return <Eye size={14} className="text-text-secondary shrink-0" />;
+  }
+
+  return <FileText size={14} className="text-text-secondary shrink-0" />;
+};
+
+interface QuickPreviewHeaderProps {
+  preview: PreviewState;
+  fileName: string;
+  isRendered: boolean;
+  canToggleSource: boolean;
+  showSource: boolean;
+  onToggleSource: () => void;
+  onClose: () => void;
+}
+
+export const QuickPreviewHeader: React.FC<QuickPreviewHeaderProps> = ({
+  preview,
+  fileName,
+  isRendered,
+  canToggleSource,
+  showSource,
+  onToggleSource,
+  onClose,
+}) => (
+  <div className="flex items-center justify-between px-4 py-3 border-b border-border-color shrink-0">
+    <div className="flex items-center gap-2 min-w-0">
+      {getHeaderIcon(preview, isRendered)}
+      {preview.type === "pdf" && (
+        <span className="shrink-0 text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono">
+          PDF
+        </span>
+      )}
+      {preview.type === "pptx" && (
+        <span className="shrink-0 text-xs text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded font-mono">
+          PPTX
+        </span>
+      )}
+      <Dialog.Title className="text-sm font-medium text-text-primary truncate">
+        {fileName}
+      </Dialog.Title>
+      {preview.language && (
+        <span
+          className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
+            preview.language === "json"
+              ? "text-amber-400 bg-amber-500/10 border border-amber-500/20"
+              : "text-text-secondary bg-bg-secondary"
+          }`}
+        >
+          {preview.language}
+        </span>
+      )}
+      {preview.renderExt && (
+        <span
+          className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
+            preview.renderExt === "zip"
+              ? "text-sky-400 bg-sky-500/10 border border-sky-500/20"
+              : "text-text-secondary bg-bg-secondary"
+          }`}
+        >
+          {preview.renderExt}
+        </span>
+      )}
+    </div>
+    <div className="flex items-center gap-1 ml-4 shrink-0">
+      {canToggleSource && (
+        <button
+          onClick={onToggleSource}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-border-color text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          title={showSource ? "렌더링 보기" : "소스 보기"}
+        >
+          {showSource ? <Eye size={12} /> : <Code2 size={12} />}
+          <span>{showSource ? "렌더링" : "소스"}</span>
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+        aria-label="Close preview"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  </div>
+);
+
+interface QuickPreviewStatusViewProps {
+  status: PreviewStatusContent;
+}
+
+const QuickPreviewStatusView: React.FC<QuickPreviewStatusViewProps> = ({ status }) => (
+  <div className="flex flex-col items-center justify-center h-64 gap-3 px-6 text-center text-text-secondary">
+    {getStatusIcon(status)}
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-text-primary">{status.title}</p>
+      <p className="text-xs">{status.description}</p>
+    </div>
+    {status.detail && (
+      <p className="max-w-xs break-all font-mono text-xs text-red-400">
+        {status.detail}
+      </p>
+    )}
+  </div>
+);
+
+interface QuickPreviewImageViewProps {
+  initialSrc: string;
+  filePath?: string;
+  fileName: string;
+  readFileBinary?: (path: string) => Promise<ArrayBuffer>;
+}
+
+export const QuickPreviewImageView: React.FC<QuickPreviewImageViewProps> = ({
+  initialSrc,
+  filePath,
+  fileName,
+  readFileBinary,
+}) => {
+  const { readFileBinary: fsReadFileBinary } = useFileSystem();
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [isFallbackLoading, setIsFallbackLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const attemptedFallbackRef = useRef(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setCurrentSrc(initialSrc);
+    setIsFallbackLoading(false);
+    setHasError(false);
+    setErrorDetail(null);
+    attemptedFallbackRef.current = false;
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [initialSrc, filePath]);
+
+  const handleImageError = useCallback(async () => {
+    if (attemptedFallbackRef.current || !filePath) {
+      setHasError(true);
+      return;
+    }
+
+    attemptedFallbackRef.current = true;
+    setIsFallbackLoading(true);
+
+    try {
+      const readBinary = readFileBinary ?? fsReadFileBinary;
+      const buffer = await readBinary(filePath);
+      const ext = getExtension(filePath);
+      const mimeType = getImageMimeType(ext);
+      const blob = new Blob([buffer], { type: mimeType });
+      const objectUrl = URL.createObjectURL(blob);
+
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      objectUrlRef.current = objectUrl;
+      setCurrentSrc(objectUrl);
+      setIsFallbackLoading(false);
+    } catch (error) {
+      setIsFallbackLoading(false);
+      setHasError(true);
+      setErrorDetail(error instanceof Error ? error.message : String(error));
+    }
+  }, [filePath, readFileBinary, fsReadFileBinary]);
+
+  if (hasError) {
+    return (
+      <QuickPreviewStatusView
+        status={{
+          kind: "error",
+          title: "이미지를 불러오지 못했습니다",
+          description: "파일이 손상되었거나 접근 권한이 없습니다.",
+          detail: errorDetail ?? undefined,
+        }}
+      />
+    );
+  }
+
+  if (isFallbackLoading) {
+    return (
+      <QuickPreviewStatusView
+        status={{
+          kind: "loading",
+          title: "이미지를 불러오는 중입니다",
+          description: "파일 데이터를 직접 읽어오고 있습니다.",
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center p-4 overflow-auto flex-1">
+      <img
+        src={currentSrc}
+        alt={fileName}
+        className="max-w-full max-h-full object-contain rounded select-none"
+        draggable={false}
+        onError={() => void handleImageError()}
+      />
+    </div>
+  );
+};
+
+interface QuickPreviewBodyProps {
+  preview: PreviewState;
+  previewStatus: PreviewStatusContent | null;
+  fileName: string;
+  filePath?: string;
+  showSource: boolean;
+  sourceHighlightHtml: string | null;
+  sourceHighlightError: string | null;
+  readFileBinary?: (path: string) => Promise<ArrayBuffer>;
+}
+
+export const QuickPreviewBody: React.FC<QuickPreviewBodyProps> = ({
+  preview,
+  previewStatus,
+  fileName,
+  filePath,
+  showSource,
+  sourceHighlightHtml,
+  sourceHighlightError,
+  readFileBinary,
+}) => (
+  <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+    {previewStatus && <QuickPreviewStatusView status={previewStatus} />}
+
+    {preview.type === "image" && preview.src && (
+      <QuickPreviewImageView
+        initialSrc={preview.src}
+        filePath={filePath}
+        fileName={fileName}
+        readFileBinary={readFileBinary}
+      />
+    )}
+
+    {preview.type === "video" && preview.src && (
+      <div className="flex items-center justify-center flex-1 bg-black">
+        <video
+          src={preview.src}
+          controls
+          className="max-w-full max-h-full"
+          style={{ maxHeight: "calc(100% - 0px)" }}
+        >
+          지원하지 않는 형식입니다.
+        </video>
+      </div>
+    )}
+
+    {preview.type === "pdf" && preview.src && (
+      <QuickPreviewPdfView
+        src={preview.src}
+        filePath={filePath ?? ""}
+        readFileBinary={readFileBinary}
+      />
+    )}
+
+    {preview.type === "pptx" && preview.src && (
+      <QuickPreviewPptxView
+        src={preview.src}
+        filePath={filePath ?? ""}
+        readFileBinary={readFileBinary}
+      />
+    )}
+
+    {preview.type === "rendered" && !showSource && (
+      preview.renderExt === "zip" && preview.archive ? (
+        <QuickPreviewZipView archive={preview.archive} />
+      ) : preview.renderedHtml ? (
+        <iframe
+          srcDoc={preview.renderedHtml}
+          className="w-full flex-1 border-none"
+          sandbox="allow-same-origin"
+          title="rendered preview"
+        />
+      ) : null
+    )}
+
+    {preview.type === "rendered" && showSource && (
+      sourceHighlightHtml ? (
+        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0 select-text">
+          <code
+            className="hljs block p-4 min-h-full select-text"
+            dangerouslySetInnerHTML={{ __html: sourceHighlightHtml }}
+          />
+        </pre>
+      ) : (
+        <div className="flex-1 min-h-0 flex flex-col">
+          {sourceHighlightError ? (
+            <div
+              role="status"
+              className="border-b border-amber-400/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-100"
+            >
+              소스 하이라이트를 적용하지 못해 원문으로 표시합니다: {sourceHighlightError}
+            </div>
+          ) : null}
+          <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
+            {preview.content}
+          </pre>
+        </div>
+      )
+    )}
+
+    {preview.type === "text" && (
+      preview.language === "json" ? (
+        <QuickPreviewJsonView
+          content={preview.content ?? ""}
+          highlightedHtml={preview.highlightedHtml}
+        />
+      ) : preview.highlightedHtml ? (
+        <pre className="flex-1 overflow-auto text-xs font-mono leading-relaxed m-0 select-text">
+          <code
+            className="hljs block p-4 min-h-full select-text"
+            dangerouslySetInnerHTML={{ __html: preview.highlightedHtml }}
+          />
+        </pre>
+      ) : (
+        <pre className="flex-1 overflow-auto p-4 text-xs font-mono text-text-primary whitespace-pre-wrap break-words leading-relaxed select-text">
+          {preview.content}
+        </pre>
+      )
+    )}
+  </div>
+);
+
+interface QuickPreviewFooterProps {
+  filePath: string;
+}
+
+export const QuickPreviewFooter: React.FC<QuickPreviewFooterProps> = ({ filePath }) => (
+  <div className="px-4 py-2 border-t border-border-color shrink-0 flex justify-between items-center">
+    <span className="text-xs text-text-secondary font-mono truncate">{filePath}</span>
+    <span className="text-xs text-text-secondary shrink-0 ml-4">
+      Press{" "}
+      <kbd className="px-1 py-0.5 bg-bg-secondary border border-border-color rounded text-xs">
+        Space
+      </kbd>
+      {" "}or{" "}
+      <kbd className="px-1 py-0.5 bg-bg-secondary border border-border-color rounded text-xs">
+        Esc
+      </kbd>
+      {" "}to close
+    </span>
+  </div>
+);

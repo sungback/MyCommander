@@ -18,6 +18,7 @@ export type DialogType =
   | "jobcenter"
   | "settings"
   | "commandPalette"
+  | "update"
   | null;
 
 export type CopyMoveDialogType = Extract<DialogType, "copy" | "move">;

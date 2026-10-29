@@ -8,18 +8,21 @@ mod preview;
 mod size_cache;
 #[path = "metadata/sqlite_preview.rs"]
 mod sqlite_preview;
+#[path = "metadata/storage_kind.rs"]
+mod storage_kind;
 
+pub(crate) use dir_size::scan_path_size_for_space_check;
 pub use dir_size::{DirSizeScanState, DirectorySizeEstimate, DirectorySizeScanResult};
 pub(crate) use listing::is_hidden_entry;
 pub use listing::FileEntry;
 pub use size_cache::{DirectorySizeCacheEntryUpdate, DirectorySizeCacheLoadResult};
 pub use sqlite_preview::SqliteDatabasePreview;
+pub use storage_kind::StorageKind;
 
 #[cfg(test)]
-pub(crate) use dir_size::compute_path_size;
-#[cfg(test)]
 pub(crate) use preview::{
-    decode_preview_bytes, path_matches_denied_home_path, read_preview_file_content_for_test,
+    decode_preview_bytes, path_matches_denied_home_path, read_preview_file_binary_for_test,
+    read_preview_file_content_for_test,
 };
 #[cfg(test)]
 pub(crate) use sqlite_preview::preview_sqlite_database_for_test;
@@ -35,13 +38,21 @@ pub async fn read_file_content(path: String, max_bytes: Option<u64>) -> Result<S
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn read_file_binary(
+    path: String,
+    max_bytes: Option<u64>,
+) -> Result<tauri::ipc::Response, String> {
+    preview::read_file_binary(path, max_bytes).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn preview_sqlite_database(path: String) -> Result<SqliteDatabasePreview, String> {
     sqlite_preview::preview_sqlite_database(path).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_dir_size(path: String) -> Result<u64, String> {
-    dir_size::get_dir_size(path).await
+pub async fn classify_storage_paths(paths: Vec<String>) -> Result<Vec<StorageKind>, String> {
+    storage_kind::classify_storage_paths(paths).await
 }
 
 #[tauri::command(rename_all = "snake_case")]

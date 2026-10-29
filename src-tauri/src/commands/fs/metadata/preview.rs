@@ -5,11 +5,21 @@ use std::path::{Path, PathBuf};
 
 const MAX_PREVIEW_BYTES: u64 = 100 * 1024;
 const MAX_EXPLICIT_PREVIEW_BYTES: u64 = 5 * 1024 * 1024;
+const MAX_BINARY_PREVIEW_BYTES: u64 = 20 * 1024 * 1024;
+const MAX_EXPLICIT_BINARY_PREVIEW_BYTES: u64 = 50 * 1024 * 1024;
 const TOO_LARGE_PREVIEW_ERROR: &str =
     "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다.";
 
 pub async fn read_file_content(path: String, max_bytes: Option<u64>) -> Result<String, String> {
     read_preview_file_content(Path::new(&path), preview_read_limit(max_bytes))
+}
+
+pub async fn read_file_binary(
+    path: String,
+    max_bytes: Option<u64>,
+) -> Result<tauri::ipc::Response, String> {
+    read_preview_file_binary(Path::new(&path), binary_preview_read_limit(max_bytes))
+        .map(tauri::ipc::Response::new)
 }
 
 #[derive(Clone, Copy)]
@@ -31,6 +41,19 @@ fn preview_read_limit(max_bytes: Option<u64>) -> PreviewReadLimit {
     }
 }
 
+fn binary_preview_read_limit(max_bytes: Option<u64>) -> PreviewReadLimit {
+    match max_bytes {
+        Some(bytes) => PreviewReadLimit {
+            bytes: bytes.clamp(1, MAX_EXPLICIT_BINARY_PREVIEW_BYTES),
+            enforce: true,
+        },
+        None => PreviewReadLimit {
+            bytes: MAX_BINARY_PREVIEW_BYTES,
+            enforce: true,
+        },
+    }
+}
+
 fn read_preview_file_content(path: &Path, limit: PreviewReadLimit) -> Result<String, String> {
     let path = validate_preview_read_path(path)?;
     let file = fs::File::open(&path).map_err(|e| e.to_string())?;
@@ -48,12 +71,46 @@ fn read_preview_file_content(path: &Path, limit: PreviewReadLimit) -> Result<Str
     Ok(decode_preview_bytes(&buffer))
 }
 
+fn read_preview_file_binary(path: &Path, limit: PreviewReadLimit) -> Result<Vec<u8>, String> {
+    let path = validate_preview_read_path(path)?;
+    let file = fs::File::open(&path).map_err(|e| e.to_string())?;
+
+    let mut buffer = Vec::new();
+    let read_limit = limit.bytes + u64::from(limit.enforce);
+    file.take(read_limit)
+        .read_to_end(&mut buffer)
+        .map_err(|e| e.to_string())?;
+
+    if limit.enforce && buffer.len() as u64 > limit.bytes {
+        let mb = (limit.bytes as f64) / (1024.0 * 1024.0);
+        let mb_str = if mb.fract() == 0.0 {
+            format!("{:.0}", mb)
+        } else {
+            format!("{:.1}", mb)
+        };
+        return Err(format!(
+            "파일이 너무 큽니다 ({}MB 초과). 미리보기를 지원하지 않습니다.",
+            mb_str
+        ));
+    }
+
+    Ok(buffer)
+}
+
 #[cfg(test)]
 pub(crate) fn read_preview_file_content_for_test(
     path: &Path,
     max_bytes: Option<u64>,
 ) -> Result<String, String> {
     read_preview_file_content(path, preview_read_limit(max_bytes))
+}
+
+#[cfg(test)]
+pub(crate) fn read_preview_file_binary_for_test(
+    path: &Path,
+    max_bytes: Option<u64>,
+) -> Result<Vec<u8>, String> {
+    read_preview_file_binary(path, binary_preview_read_limit(max_bytes))
 }
 
 pub(super) fn validate_preview_read_path(path: &Path) -> Result<PathBuf, String> {
@@ -134,6 +191,7 @@ pub(crate) fn decode_preview_bytes(bytes: &[u8]) -> String {
     }
 }
 
+#[allow(clippy::chunks_exact_to_as_chunks)]
 fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> String {
     let units = bytes
         .chunks_exact(2)
@@ -157,6 +215,7 @@ fn looks_like_utf16_be(bytes: &[u8]) -> bool {
     looks_like_utf16_with_zero_stride(bytes, false)
 }
 
+#[allow(clippy::chunks_exact_to_as_chunks)]
 fn looks_like_utf16_with_zero_stride(bytes: &[u8], zero_on_odd: bool) -> bool {
     let sample_len = bytes.len().min(64);
     if sample_len < 4 {

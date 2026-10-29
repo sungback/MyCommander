@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ZipArchivePreview } from "../../types/zipPreview";
 
 export const archiveCommands = {
   extractZip: async (path: string): Promise<string> => {
@@ -23,5 +24,9 @@ export const archiveCommands = {
 
   cancelZipOperation: async (): Promise<void> => {
     await invoke("cancel_zip_operation");
+  },
+
+  previewZipArchive: async (path: string): Promise<ZipArchivePreview> => {
+    return await invoke<ZipArchivePreview>("preview_zip_archive", { path });
   },
 };

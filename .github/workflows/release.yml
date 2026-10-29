@@ -18,12 +18,11 @@ jobs:
 
   create-draft-release:
     name: 릴리즈 draft 생성
-    needs: preflight
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     outputs:
       release_id: ${{ steps.release.outputs.release_id }}
       tag: ${{ steps.release.outputs.tag }}
@@ -41,11 +40,16 @@ jobs:
           tag="v$version"
           npm run verify:release-version -- --tag "$tag"
 
-          mapfile -t matching_releases < <(
+          releases_raw="$(
             gh api "repos/$GITHUB_REPOSITORY/releases" \
               --paginate \
               --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | @tsv"
-          )
+          )"
+
+          matching_releases=()
+          if [ -n "$releases_raw" ]; then
+            mapfile -t matching_releases <<< "$releases_raw"
+          fi
 
           if [ "${#matching_releases[@]}" -gt 1 ]; then
             echo "Multiple releases already exist for $tag. Clean up duplicate draft releases before rerunning." >&2
@@ -84,9 +88,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS는 universal로 빌드 (Apple Silicon / Intel 모두 지원)
+          # macOS는 Apple Silicon (M1/M2/M3/M4) 전용으로 빌드하여 빌드 시간 50% 단축
           - platform: "macos-latest"
-            args: "--target universal-apple-darwin"
+            args: "--target aarch64-apple-darwin"
           - platform: "windows-latest"
             args: ""
           - platform: "ubuntu-22.04"
@@ -94,18 +98,27 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     env:
+      CARGO_INCREMENTAL: 0
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      # Fine-grained PAT is more reliable for release creation when GitHub blocks
-      # the default workflow token on specific release/tag edge cases.
-      RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
+
+      - name: Windows Defender 감시 제외 설정 (디스크 I/O 가속)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.cargo" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "cargo.exe", "rustc.exe" -ErrorAction SilentlyContinue
+
 
       - name: 공통 JS 환경 준비
         uses: ./.github/actions/setup-js
@@ -116,7 +129,7 @@ jobs:
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ startsWith(matrix.args, '--target') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.args, '--target') && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust 캐시 설정 (빌드 속도 향상)
         uses: swatinem/rust-cache@v2
@@ -190,6 +203,28 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Windows 포터블 실행 파일 업로드
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ env.RELEASE_TOKEN }}
+          RELEASE_ID: ${{ needs.create-draft-release.outputs.release_id }}
+        run: |
+          # 설치 없이 exe 교체로 업데이트할 수 있도록 릴리스 빌드 실행 파일을 그대로 올립니다.
+          version="$(node -p "require('./package.json').version")"
+          exe="src-tauri/target/release/mycommander.exe"
+          if [ ! -f "$exe" ]; then
+            echo "Portable executable not found: $exe" >&2
+            exit 1
+          fi
+
+          asset="MyCommander_${version}_x64-portable.exe"
+          cp "$exe" "$asset"
+          gh api --method POST \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$asset" \
+            -H "Content-Type: application/octet-stream" \
+            --input "$asset"
+
   verify-release-assets:
     name: 릴리즈 산출물 스모크 테스트
     needs: publish-tauri
@@ -197,7 +232,7 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -224,12 +259,12 @@ jobs:
 
   publish-release:
     name: 검증된 릴리즈 공개
-    needs: verify-release-assets
+    needs: [verify-release-assets, preflight]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN != '' && secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5

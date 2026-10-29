@@ -6,6 +6,9 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 이전 포터블 업데이트에서 남은 실행 파일 백업을 정리한다.
+    commands::system::update::cleanup_replaced_executable();
+
     tauri::Builder::default()
         .manage(commands::file_watch_commands::FileWatcherState::default())
         .manage(commands::fs::metadata::DirSizeScanState::default())
@@ -34,6 +37,7 @@ pub fn run() {
             commands::system::launch::open_in_editor,
             commands::system::launch::open_file,
             commands::system::launch::run_shell_command,
+            commands::system::update::apply_self_update,
             commands::system::menu::quit_app,
             commands::system::context_menu::show_context_menu,
             commands::system::menu::set_show_hidden_menu_checked,
@@ -48,19 +52,22 @@ pub fn run() {
             commands::fs::operations::copy::copy_files,
             commands::fs::operations::move_ops::move_files,
             commands::fs::operations::copy::check_copy_conflicts,
+            commands::fs::operations::copy_space::check_transfer_space,
             commands::fs::archive::extract_zip,
             commands::fs::archive::create_zip,
             commands::fs::archive::create_zip_from_paths,
             commands::fs::archive::cancel_zip_operation,
+            commands::fs::archive::preview_zip_archive,
             commands::jobs::commands::submit_job,
             commands::jobs::commands::list_jobs,
             commands::jobs::commands::cancel_job,
             commands::jobs::commands::retry_job,
             commands::jobs::commands::clear_finished_jobs,
             commands::fs::metadata::read_file_content,
+            commands::fs::metadata::read_file_binary,
             commands::fs::metadata::preview_sqlite_database,
             commands::search_commands::search_files,
-            commands::fs::metadata::get_dir_size,
+            commands::fs::metadata::classify_storage_paths,
             commands::fs::metadata::estimate_dir_size,
             commands::fs::metadata::scan_dir_size,
             commands::fs::metadata::cancel_dir_size_scan,

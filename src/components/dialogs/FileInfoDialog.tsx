@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import type { FileEntry } from "../../types/file";
+import type { DirectorySizeStatus, FileEntry } from "../../types/file";
 import { formatDate, formatSize } from "../../utils/format";
 
 interface FileInfoDialogProps {
@@ -7,15 +7,36 @@ interface FileInfoDialogProps {
   onClose: () => void;
   infoEntry: FileEntry | null;
   infoSize: number | null;
+  infoSizeStatus?: DirectorySizeStatus;
   infoLoading: boolean;
   infoError: string | null;
 }
+
+// 패널 목록과 같은 기호로 폴더 크기의 정확도를 표시한다.
+const formatDirectorySize = (size: number | null, status?: DirectorySizeStatus) => {
+  const text = formatSize(size);
+  if (!text) {
+    return text;
+  }
+
+  switch (status) {
+    case "limited":
+      return `≥${text}`;
+    case "partial":
+      return `${text}+`;
+    case "estimated":
+      return `~${text}`;
+    default:
+      return text;
+  }
+};
 
 export const FileInfoDialog = ({
   isOpen,
   onClose,
   infoEntry,
   infoSize,
+  infoSizeStatus,
   infoLoading,
   infoError,
 }: FileInfoDialogProps) => (
@@ -55,12 +76,15 @@ export const FileInfoDialog = ({
                     ? "Calculating..."
                     : infoError
                       ? infoError
-                      : formatSize(
-                          infoEntry.kind === "directory"
-                            ? infoSize
-                            : infoEntry.size
-                        ) || "Unknown"}
+                      : (infoEntry.kind === "directory"
+                          ? formatDirectorySize(infoSize, infoSizeStatus)
+                          : formatSize(infoEntry.size)) || "Unknown"}
                 </p>
+                {!infoLoading && !infoError && infoSizeStatus === "limited" ? (
+                  <p className="text-xs text-text-secondary mt-1">
+                    Excludes items without read permission.
+                  </p>
+                ) : null}
               </div>
               <div>
                 <p className="text-xs text-text-secondary mb-1">Modified</p>

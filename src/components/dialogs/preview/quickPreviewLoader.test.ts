@@ -1,0 +1,353 @@
+import { describe, expect, it, vi } from "vitest";
+import { loadPreviewForPath } from "./quickPreviewLoader";
+import { MAX_NOTEBOOK_BYTES } from "./quickPreviewRenderers/shared";
+
+describe("loadPreviewForPath", () => {
+  it("returns image previews without loading heavyweight renderers", async () => {
+    const loadTextHighlighter = vi.fn();
+    const loadMarkdownRenderer = vi.fn();
+    const loadNotebookRenderer = vi.fn();
+    const loadHwpxRenderer = vi.fn();
+    const loadXlsxRenderer = vi.fn();
+    const loadSqliteRenderer = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/photo.png", {
+      convertFileSrcImpl: (path) => `asset://${path}`,
+      loadTextHighlighter,
+      loadMarkdownRenderer,
+      loadNotebookRenderer,
+      loadHwpxRenderer,
+      loadXlsxRenderer,
+      loadSqliteRenderer,
+    });
+
+    expect(result).toEqual({
+      type: "image",
+      src: "asset:///tmp/photo.png",
+    });
+    expect(loadTextHighlighter).not.toHaveBeenCalled();
+    expect(loadMarkdownRenderer).not.toHaveBeenCalled();
+    expect(loadNotebookRenderer).not.toHaveBeenCalled();
+    expect(loadHwpxRenderer).not.toHaveBeenCalled();
+    expect(loadXlsxRenderer).not.toHaveBeenCalled();
+    expect(loadSqliteRenderer).not.toHaveBeenCalled();
+  });
+
+  it("loads the text highlighter only for text previews", async () => {
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: "<span>const a = 1;</span>",
+      language: "javascript",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue("const a = 1;");
+
+    const result = await loadPreviewForPath("/tmp/file.js", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", { path: "/tmp/file.js" });
+    expect(loadTextHighlighter).toHaveBeenCalledTimes(1);
+    expect(highlightText).toHaveBeenCalledWith("const a = 1;", "js");
+    expect(result).toEqual({
+      type: "text",
+      content: "const a = 1;",
+      highlightedHtml: "<span>const a = 1;</span>",
+      language: "javascript",
+    });
+  });
+
+  it("treats .R files as text previews with the r language hint", async () => {
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: "<span>plot(x, y)</span>",
+      language: "r",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue("plot(x, y)");
+
+    const result = await loadPreviewForPath("/tmp/script.R", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadDocxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", { path: "/tmp/script.R" });
+    expect(loadTextHighlighter).toHaveBeenCalledTimes(1);
+    expect(highlightText).toHaveBeenCalledWith("plot(x, y)", "r");
+    expect(result).toEqual({
+      type: "text",
+      content: "plot(x, y)",
+      highlightedHtml: "<span>plot(x, y)</span>",
+      language: "r",
+    });
+  });
+
+  it("loads the markdown renderer only for markdown previews", async () => {
+    const renderMarkdown = vi.fn().mockResolvedValue("<html><body><h1>Doc</h1></body></html>");
+    const loadMarkdownRenderer = vi.fn().mockResolvedValue({ renderMarkdown });
+    const invokeImpl = vi.fn().mockResolvedValue("# Doc");
+
+    const result = await loadPreviewForPath("/tmp/readme.md", {
+      invokeImpl,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer,
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(loadMarkdownRenderer).toHaveBeenCalledTimes(1);
+    expect(renderMarkdown).toHaveBeenCalledWith("# Doc");
+    expect(result).toEqual({
+      type: "rendered",
+      content: "# Doc",
+      renderedHtml: "<html><body><h1>Doc</h1></body></html>",
+      renderExt: "markdown",
+    });
+  });
+
+  it("loads Windows tilde notebook paths through IPC instead of asset fetch", async () => {
+    const windowsPath = "C:\\Users\\me\\Documents\\~.ipynb";
+    const notebookJson = JSON.stringify({
+      cells: [],
+      metadata: { kernelspec: { language: "python" } },
+    });
+    const renderNotebook = vi.fn().mockResolvedValue("<html><body>notebook</body></html>");
+    const loadNotebookRenderer = vi.fn().mockResolvedValue({ renderNotebook });
+    const invokeImpl = vi.fn().mockResolvedValue(notebookJson);
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+
+    const result = await loadPreviewForPath(windowsPath, {
+      invokeImpl,
+      fetchImpl,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer,
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", {
+      path: windowsPath,
+      max_bytes: MAX_NOTEBOOK_BYTES,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(loadNotebookRenderer).toHaveBeenCalledTimes(1);
+    expect(renderNotebook).toHaveBeenCalledWith(notebookJson);
+    expect(result).toEqual({
+      type: "rendered",
+      content: notebookJson,
+      renderedHtml: "<html><body>notebook</body></html>",
+      renderExt: "ipynb",
+    });
+  });
+
+  it("loads the spreadsheet renderer only for xlsx previews", async () => {
+    const renderXlsx = vi.fn().mockResolvedValue("<html><body>sheet</body></html>");
+    const loadXlsxRenderer = vi.fn().mockResolvedValue({ renderXlsx });
+
+    const result = await loadPreviewForPath("/tmp/book.xlsx", {
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer,
+    });
+
+    expect(loadXlsxRenderer).toHaveBeenCalledTimes(1);
+    expect(renderXlsx).toHaveBeenCalledWith("/tmp/book.xlsx");
+    expect(result).toEqual({
+      type: "rendered",
+      renderedHtml: "<html><body>sheet</body></html>",
+      renderExt: "xlsx",
+    });
+  });
+
+  it("does not preview legacy xls files with the xlsx renderer", async () => {
+    const loadXlsxRenderer = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/legacy.xls", {
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer,
+    });
+
+    expect(loadXlsxRenderer).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: "unsupported",
+    });
+  });
+
+  it("loads the docx renderer only for docx previews", async () => {
+    const renderDocx = vi.fn().mockResolvedValue("<html><body>docx</body></html>");
+    const loadDocxRenderer = vi.fn().mockResolvedValue({ renderDocx });
+
+    const result = await loadPreviewForPath("/tmp/report.docx", {
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadDocxRenderer,
+    });
+
+    expect(loadDocxRenderer).toHaveBeenCalledTimes(1);
+    expect(renderDocx).toHaveBeenCalledWith("/tmp/report.docx");
+    expect(result).toEqual({
+      type: "rendered",
+      renderedHtml: "<html><body>docx</body></html>",
+      renderExt: "docx",
+    });
+  });
+
+  it("returns an asset-backed pptx preview without parsing the file", async () => {
+    const convertFileSrcImpl = vi.fn((path: string) => `asset://localhost${path}`);
+    const readFileBinary = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/presentation.pptx", {
+      convertFileSrcImpl,
+      readFileBinary,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadDocxRenderer: vi.fn(),
+    });
+
+    expect(result).toEqual({
+      type: "pptx",
+      src: "asset://localhost/tmp/presentation.pptx",
+    });
+    expect(readFileBinary).not.toHaveBeenCalled();
+  });
+
+  it("loads the sqlite renderer only for sqlite database previews", async () => {
+    const renderSqlite = vi.fn().mockResolvedValue("<html><body>database</body></html>");
+    const loadSqliteRenderer = vi.fn().mockResolvedValue({ renderSqlite });
+    const invokeImpl = vi.fn();
+
+    const result = await loadPreviewForPath("/tmp/app.db", {
+      invokeImpl,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+      loadSqliteRenderer,
+      loadDocxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).not.toHaveBeenCalled();
+    expect(loadSqliteRenderer).toHaveBeenCalledTimes(1);
+    expect(renderSqlite).toHaveBeenCalledWith("/tmp/app.db");
+    expect(result).toEqual({
+      type: "rendered",
+      renderedHtml: "<html><body>database</body></html>",
+      renderExt: "sqlite",
+    });
+  });
+
+  it("auto-formats minified JSON before highlighting for json previews", async () => {
+    const rawJson = '{"name":"app","count":1,"features":["alpha"]}';
+    const formatted = JSON.stringify(JSON.parse(rawJson), null, 2);
+
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: `<span>${formatted}</span>`,
+      language: "json",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue(rawJson);
+
+    const result = await loadPreviewForPath("/tmp/package.json", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(invokeImpl).toHaveBeenCalledWith("read_file_content", { path: "/tmp/package.json" });
+    expect(highlightText).toHaveBeenCalledWith(formatted, "json");
+    expect(result).toEqual({
+      type: "text",
+      content: formatted,
+      highlightedHtml: `<span>${formatted}</span>`,
+      language: "json",
+    });
+  });
+
+  it("keeps raw content if JSON parsing fails", async () => {
+    const brokenJson = "{ invalid json: 123 ";
+    const highlightText = vi.fn().mockResolvedValue({
+      highlightedHtml: `<span>${brokenJson}</span>`,
+      language: "json",
+    });
+    const loadTextHighlighter = vi.fn().mockResolvedValue({ highlightText });
+    const invokeImpl = vi.fn().mockResolvedValue(brokenJson);
+
+    const result = await loadPreviewForPath("/tmp/broken.json", {
+      invokeImpl,
+      loadTextHighlighter,
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(highlightText).toHaveBeenCalledWith(brokenJson, "json");
+    expect(result).toEqual({
+      type: "text",
+      content: brokenJson,
+      highlightedHtml: `<span>${brokenJson}</span>`,
+      language: "json",
+    });
+  });
+
+  it("loads the zip renderer for zip archives", async () => {
+    const mockArchive = {
+      fileName: "bundle.zip",
+      fileSize: 4096,
+      totalEntries: 1,
+      totalFiles: 1,
+      totalDirs: 0,
+      totalUncompressedSize: 100,
+      totalCompressedSize: 50,
+      entries: [],
+    };
+    const renderZip = vi.fn().mockResolvedValue({
+      archive: mockArchive,
+      renderedHtml: "<html><body>zip content</body></html>",
+    });
+    const loadZipRenderer = vi.fn().mockResolvedValue({ renderZip });
+
+    const result = await loadPreviewForPath("/tmp/bundle.zip", {
+      loadZipRenderer,
+      loadTextHighlighter: vi.fn(),
+      loadMarkdownRenderer: vi.fn(),
+      loadNotebookRenderer: vi.fn(),
+      loadHwpxRenderer: vi.fn(),
+      loadXlsxRenderer: vi.fn(),
+    });
+
+    expect(loadZipRenderer).toHaveBeenCalledTimes(1);
+    expect(renderZip).toHaveBeenCalledWith("/tmp/bundle.zip");
+    expect(result).toEqual({
+      type: "rendered",
+      archive: mockArchive,
+      renderedHtml: "<html><body>zip content</body></html>",
+      renderExt: "zip",
+    });
+  });
+});

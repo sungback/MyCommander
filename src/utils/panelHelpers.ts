@@ -46,6 +46,25 @@ export const sortEntries = (
   return [...dirs.sort(sortFn), ...files.sort(sortFn)];
 };
 
+export const preserveCursorIndex = (
+  currentFiles: FileEntry[],
+  currentCursorIndex: number,
+  sortedFiles: FileEntry[]
+): number => {
+  const currentCursorEntry = currentFiles[currentCursorIndex];
+  if (!currentCursorEntry) {
+    return Math.min(currentCursorIndex, Math.max(0, sortedFiles.length - 1));
+  }
+
+  const foundIndex = sortedFiles.findIndex(
+    (entry) => entry.path === currentCursorEntry.path
+  );
+
+  return foundIndex !== -1
+    ? foundIndex
+    : Math.min(currentCursorIndex, Math.max(0, sortedFiles.length - 1));
+};
+
 export const getDefaultPathForPanel = (id: PanelId) => {
   if (typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC")) {
     return "/";
@@ -246,7 +265,22 @@ export const updatePanelEntrySize = (
       return entry;
     });
 
-    return tabChanged ? { ...tab, files } : tab;
+    if (!tabChanged) {
+      return tab;
+    }
+
+    if (tab.sortField === "size" && status !== "calculating") {
+      const sortedFiles = sortEntries(files, tab.sortField, tab.sortDirection);
+      const cursorIndex = preserveCursorIndex(tab.files, tab.cursorIndex, sortedFiles);
+
+      return {
+        ...tab,
+        files: sortedFiles,
+        cursorIndex,
+      };
+    }
+
+    return { ...tab, files };
   });
 
   return changed ? syncPanelWithActiveTab({ ...panelState, tabs }) : panelState;

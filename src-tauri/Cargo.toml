@@ -1,6 +1,6 @@
 [package]
 name = "mycommander"
-version = "1.2.15"
+version = "1.2.72"
 description = "MyCommander desktop file manager"
 authors = ["you"]
 edition = "2021"
@@ -38,10 +38,12 @@ notify = "8.2.0"
 encoding_rs = "0.8.35"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
+rayon = "1.11"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"
 objc = "0.2"
+libc = "0.2.183"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58.0", features = ["Win32_Storage_FileSystem"] }
@@ -51,3 +53,8 @@ tauri = { version = "2", features = ["test"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "allow" }
+
+[profile.release]
+codegen-units = 16
+lto = "thin"
+panic = "abort"

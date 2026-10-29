@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-classify-storage-paths"
+description = "Enables the classify_storage_paths command without any pre-configured scope."
+commands.allow = ["classify_storage_paths"]
+
+[[permission]]
+identifier = "deny-classify-storage-paths"
+description = "Denies the classify_storage_paths command without any pre-configured scope."
+commands.deny = ["classify_storage_paths"]

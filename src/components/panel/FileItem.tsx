@@ -5,7 +5,10 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import { formatDate, formatSize } from "../../utils/format";
 import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
-import { resolveEntryVisual } from "./fileVisuals";
+import { resolveEntryVisual } from "./visuals/fileVisuals";
+import { isLikelyCloudStoragePath } from "./size/backgroundDirSizeHelpers";
+import { getSizeScannedAt } from "../../store/panelStoreFileHelpers";
+import { formatElapsedSince } from "../../utils/format";
 
 const THUMBNAIL_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "avif",
@@ -26,9 +29,11 @@ const getEntrySizeText = (entry: FileEntry) => {
         ? "calc..."
         : `${formatSize(entry.size)}+`;
     case "estimated":
-      return entry.size === undefined || entry.size === null
-        ? "..."
-        : `~${formatSize(entry.size)}`;
+      if (entry.size === undefined || entry.size === null) {
+        return "...";
+      }
+      // 추정에서 하위 폴더를 세지 못해 0이 나온 값은 빈 폴더로 오해하지 않게 숨긴다.
+      return entry.size === 0 ? "-" : `~${formatSize(entry.size)}`;
     case "partial":
       return entry.size === undefined || entry.size === null
         ? "-"
@@ -37,6 +42,10 @@ const getEntrySizeText = (entry: FileEntry) => {
       return entry.size === undefined || entry.size === null
         ? "-"
         : formatSize(entry.size);
+    case "limited":
+      return entry.size === undefined || entry.size === null
+        ? "-"
+        : `≥${formatSize(entry.size)}`;
     case "error":
     case "unknown":
       return "-";
@@ -48,6 +57,23 @@ const getEntrySizeText = (entry: FileEntry) => {
 };
 
 const getEntrySizeTitle = (entry: FileEntry) => {
+  const title = getEntrySizeBaseTitle(entry);
+  if (!title) {
+    return title;
+  }
+
+  // 값이 있는 상태에서만 계산 시각을 덧붙인다(계산 중이거나 실패한 경우는 제외).
+  const hasValue =
+    entry.sizeStatus === "exact" ||
+    entry.sizeStatus === "limited" ||
+    entry.sizeStatus === "estimated" ||
+    entry.sizeStatus === "partial";
+  const elapsed = hasValue ? formatElapsedSince(getSizeScannedAt(entry.path)) : "";
+
+  return elapsed ? `${title} ${elapsed}에 계산한 값입니다.` : title;
+};
+
+const getEntrySizeBaseTitle = (entry: FileEntry) => {
   if (entry.kind !== "directory" || entry.name === "..") {
     return undefined;
   }
@@ -58,11 +84,20 @@ const getEntrySizeTitle = (entry: FileEntry) => {
     case "calculating":
       return "정확한 크기를 계산하는 중입니다.";
     case "estimated":
-      return "빠른 추정 크기입니다.";
+      if (entry.size === 0) {
+        return "빠른 추정으로는 크기를 알 수 없습니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다.";
+      }
+      return isLikelyCloudStoragePath(entry.path)
+        ? "클라우드 동기화 폴더라 자동으로 정확히 계산하지 않습니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다."
+        : "빠른 추정 크기입니다.";
     case "partial":
-      return "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
+      return isLikelyCloudStoragePath(entry.path)
+        ? "클라우드 동기화 폴더의 부분 계산 결과입니다. 폴더 용량 계산을 실행하면 정확한 크기를 확인할 수 있습니다."
+        : "부분 계산 결과입니다. 접근할 수 없는 항목이 있을 수 있습니다.";
     case "exact":
       return "정확히 계산된 크기입니다.";
+    case "limited":
+      return "접근 권한이 없는 항목을 뺀 크기입니다. 실제 크기는 이보다 클 수 있습니다.";
     case "error":
       return "크기를 계산하지 못했습니다.";
     case "unknown":

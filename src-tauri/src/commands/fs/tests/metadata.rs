@@ -1,6 +1,7 @@
 use super::super::metadata::{
     decode_preview_bytes, is_hidden_entry, path_matches_denied_home_path,
-    preview_sqlite_database_for_test, read_preview_file_content_for_test,
+    preview_sqlite_database_for_test, read_preview_file_binary_for_test,
+    read_preview_file_content_for_test,
 };
 use encoding_rs::EUC_KR;
 use rusqlite::Connection;
@@ -102,6 +103,29 @@ fn explicit_preview_read_limit_rejects_files_over_limit() {
         error,
         "파일이 너무 큽니다 (5MB 초과). 미리보기를 지원하지 않습니다."
     );
+    fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn explicit_preview_read_binary_limit_allows_binary_files() {
+    let file_path = unique_preview_test_path("sample.pptx");
+    let content = [0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x08, 0x00];
+    fs::write(&file_path, content).unwrap();
+
+    let bytes = read_preview_file_binary_for_test(&file_path, Some(20 * 1024 * 1024)).unwrap();
+
+    assert_eq!(bytes, content);
+    fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn explicit_preview_read_binary_limit_rejects_files_over_limit() {
+    let file_path = unique_preview_test_path("large.pptx");
+    fs::write(&file_path, [0u8; 100]).unwrap();
+
+    let error = read_preview_file_binary_for_test(&file_path, Some(50)).unwrap_err();
+
+    assert!(error.contains("파일이 너무 큽니다"));
     fs::remove_dir_all(file_path.parent().unwrap()).unwrap();
 }
 

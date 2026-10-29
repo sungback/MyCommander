@@ -37,7 +37,6 @@ export const createMockInvoke = () =>
       case 'resolve_path':        return Promise.resolve('/home/user');
       case 'get_drives':          return Promise.resolve(mockDrives);
       case 'get_available_space': return Promise.resolve(100_000_000_000);
-      case 'get_dir_size':        return Promise.resolve(4096);
       case 'create_directory':    return Promise.resolve(undefined);
       case 'create_file':         return Promise.resolve(undefined);
       case 'delete_files':        return Promise.resolve(undefined);
@@ -80,6 +79,7 @@ export const createMockInvoke = () =>
       case 'extract_zip':         return Promise.resolve('/home/user/archive');
       case 'create_zip':          return Promise.resolve('/home/user/Downloads.zip');
       case 'read_file_content':   return Promise.resolve('file content here');
+      case 'read_file_binary':    return Promise.resolve(new ArrayBuffer(0));
       case 'preview_sqlite_database':
         return Promise.resolve({
           fileSize: 4096,

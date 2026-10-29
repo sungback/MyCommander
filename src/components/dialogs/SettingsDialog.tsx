@@ -3,7 +3,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useDialogStore } from "../../store/dialogStore";
 import { useSettingsStore } from "../../store/settingsStore";
-import { Settings } from "lucide-react";
+import { useUpdateStore } from "../../store/updateStore";
+import { CheckCircle2, Loader2, RefreshCw, Settings } from "lucide-react";
 import {
   buildFontFamilyStack,
   DEFAULT_FONT_FAMILY,
@@ -164,6 +165,52 @@ export const SettingsDialog: React.FC = () => {
               <p className="text-[11px] text-text-secondary mt-1">
                 수동으로 창 크기를 조절하면 그 값이 자동으로 기억됩니다.
               </p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border-color">
+              <label className="block text-sm font-medium">버전 및 업데이트</label>
+              <div className="flex items-center justify-between bg-bg-primary border border-border-color rounded p-3 text-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-text-secondary">현재 버전:</span>
+                    <span className="font-mono font-bold text-text-primary">
+                      v{useUpdateStore((s) => s.currentVersion)}
+                    </span>
+                  </div>
+                  {useUpdateStore((s) => s.status === "checking") && (
+                    <div className="flex items-center space-x-1.5 text-blue-500">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>최신 버전 확인 중...</span>
+                    </div>
+                  )}
+                  {useUpdateStore((s) => s.status === "latest") && (
+                    <div className="flex items-center space-x-1.5 text-green-500">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>현재 최신 버전을 사용하고 있습니다.</span>
+                    </div>
+                  )}
+                  {useUpdateStore((s) => s.status === "available") && (
+                    <div className="flex items-center space-x-1.5 text-blue-500 font-medium">
+                      <span>새 버전(v{useUpdateStore.getState().updateInfo?.version}) 사용 가능</span>
+                    </div>
+                  )}
+                  {useUpdateStore((s) => s.status === "error") && (
+                    <div className="text-red-500">
+                      {useUpdateStore.getState().errorMessage || "업데이트 확인 실패"}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => useUpdateStore.getState().checkForUpdates({ force: true })}
+                  disabled={useUpdateStore((s) => s.status === "checking")}
+                  className="flex items-center space-x-1 px-3 py-1.5 rounded border border-border-color bg-bg-secondary hover:bg-hover-item disabled:opacity-50 transition-colors font-medium cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>업데이트 확인</span>
+                </button>
+              </div>
             </div>
           </div>
 

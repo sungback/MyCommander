@@ -7,11 +7,10 @@ import { clsx } from "clsx";
 import { DriveList } from "./DriveList";
 import { TabBar } from "./TabBar";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
-import { getParentPath } from "../../utils/path";
 import { getPanelAccessPath } from "../../utils/panelPath";
 import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
 import type { FileEntry } from "../../types/file";
-import { useBackgroundDirSizes } from "./useBackgroundDirSizes";
+import { useBackgroundDirSizes } from "./size/useBackgroundDirSizes";
 import { useDirectoryLoader } from "./useDirectoryLoader";
 import { FileListSkeleton } from "./FileListSkeleton";
 import { usePanelContextMenu } from "./usePanelContextMenu";
@@ -182,7 +181,7 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
           .replace(/\\/g, "/")
           .split("/")
           .pop();
-        setPath(id, getParentPath(panelState.currentPath), currentName);
+        setPath(id, entry.path, currentName);
         return;
       }
 

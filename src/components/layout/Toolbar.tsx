@@ -1,4 +1,4 @@
-import React from "react";
+import packageJson from "../../../package.json";
 import { isMacPlatform, useAppCommands } from "../../hooks/useAppCommands";
 import { createBottomActionDefinitions } from "./bottomActions";
 import { useDialogStore } from "../../store/dialogStore";
@@ -22,7 +22,10 @@ export const Toolbar: React.FC = () => {
           </button>
         ))}
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-text-secondary select-none px-1 tracking-tight">
+          {`MyCommander v${packageJson.version}`}
+        </span>
         <button
           onClick={() => {
             useDialogStore.getState().setOpenDialog("settings");
