@@ -123,7 +123,7 @@ where
                 fs::remove_file(path).map_err(|e| e.to_string())?;
             }
         } else {
-            move_to_trash(path).map_err(|e| e.to_string())?;
+            move_to_trash(path)?;
         }
 
         emit_delete_progress(&emit_progress, index as u64 + 1, total, &current_file);
@@ -145,16 +145,55 @@ where
     });
 }
 
-fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
+fn move_to_trash(path: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let mut ctx = trash::TrashContext::new();
-        ctx.set_delete_method(DeleteMethod::NsFileManager);
-        ctx.delete(path)
+        move_to_trash_with_methods(path, |path, method| {
+            let mut ctx = trash::TrashContext::new();
+            ctx.set_delete_method(method);
+            ctx.delete(path).map_err(|error| error.to_string())
+        })
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        trash::delete(path)
+        trash::delete(path).map_err(|error| error.to_string())
     }
 }
+
+/// Retry native trash failures through Finder without ever falling back to permanent deletion.
+#[cfg(target_os = "macos")]
+fn move_to_trash_with_methods<F>(path: &Path, mut delete: F) -> Result<(), String>
+where
+    F: FnMut(&Path, DeleteMethod) -> Result<(), String>,
+{
+    let native_error = match delete(path, DeleteMethod::NsFileManager) {
+        Ok(()) => return Ok(()),
+        Err(error) => error,
+    };
+
+    // trash's Finder backend percent-encodes invalid UTF-8, which could address a
+    // different file with a literal percent-encoded name. Do not retry such paths.
+    if path.to_str().is_none() {
+        return Err(native_error);
+    }
+
+    // Do not retry an item already moved by the native API. Use lstat so a symlink,
+    // including a broken one, is retried as the selected entry rather than its target.
+    if matches!(fs::symlink_metadata(path), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+    {
+        return Err(native_error);
+    }
+
+    delete(path, DeleteMethod::Finder).map_err(|finder_error| {
+        format!(
+            "Could not move '{}' to Trash. Native trash: {native_error}. Finder: {finder_error}. \
+             Check MyCommander access in System Settings > Privacy & Security > Files and Folders \
+             and Automation (Finder), and the item's permissions.",
+            path.display()
+        )
+    })
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests;
