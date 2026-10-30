@@ -33,6 +33,10 @@ export const systemCommands = {
     }
   },
 
+  ejectDrive: async (mountPoint: string): Promise<void> => {
+    await invoke("eject_drive", { mount_point: mountPoint });
+  },
+
   getHomeDir: async (): Promise<string> => {
     try {
       return await invoke<string>("get_home_dir");

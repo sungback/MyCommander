@@ -27,6 +27,64 @@ pub struct DriveInfo {
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
+    Ok(collect_drives())
+}
+
+/// Ejects or unmounts a drive that `get_drives` reports as ejectable.
+///
+/// The target must match a listed drive, so the system root and paths outside
+/// `/Volumes/` are rejected. Ejecting is never forced; a busy volume fails.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn eject_drive(mount_point: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || eject_drive_blocking(&mount_point))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(not(target_os = "macos"))]
+fn eject_drive_blocking(_mount_point: &str) -> Result<(), String> {
+    Err("Ejecting drives is only supported on macOS.".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn eject_drive_blocking(mount_point: &str) -> Result<(), String> {
+    let drive = collect_drives()
+        .into_iter()
+        .find(|drive| drive.mount_point == mount_point && drive.is_ejectable)
+        .ok_or_else(|| format!("{mount_point} is not an ejectable drive."))?;
+
+    let output = std::process::Command::new("diskutil")
+        .args(eject_diskutil_args(&drive.device_type, &drive.mount_point))
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Err(if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("Failed to eject {}", drive.name)
+    })
+}
+
+/// Disk images and external disks are ejected whole; network and other
+/// volumes are only unmounted.
+#[cfg(target_os = "macos")]
+fn eject_diskutil_args(device_type: &str, mount_point: &str) -> [String; 2] {
+    let action = match device_type {
+        "disk-image" | "external" => "eject",
+        _ => "unmount",
+    };
+    [action.to_string(), mount_point.to_string()]
+}
+
+fn collect_drives() -> Vec<DriveInfo> {
     let mut drives = Vec::new();
 
     #[cfg(target_os = "windows")]
@@ -69,7 +127,7 @@ pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
     }
 
     sort_drives(&mut drives);
-    Ok(drives)
+    drives
 }
 
 #[cfg(target_os = "windows")]
@@ -181,5 +239,40 @@ fn drive_sort_rank(device_type: &str) -> u8 {
         "network" => 2,
         "disk-image" => 3,
         _ => 4,
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disk_images_and_external_disks_are_ejected() {
+        for device_type in ["disk-image", "external"] {
+            assert_eq!(
+                eject_diskutil_args(device_type, "/Volumes/Aside Browser"),
+                ["eject".to_string(), "/Volumes/Aside Browser".to_string()]
+            );
+        }
+    }
+
+    #[test]
+    fn network_and_other_volumes_are_only_unmounted() {
+        for device_type in ["network", "volume"] {
+            assert_eq!(
+                eject_diskutil_args(device_type, "/Volumes/Share"),
+                ["unmount".to_string(), "/Volumes/Share".to_string()]
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_roots_and_unlisted_paths() {
+        for path in ["/", "/Users", "/Volumes/definitely-not-mounted-xyz", ""] {
+            assert!(
+                eject_drive_blocking(path).is_err(),
+                "should reject {path:?}"
+            );
+        }
     }
 }

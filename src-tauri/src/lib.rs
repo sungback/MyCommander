@@ -30,6 +30,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::system::drives::get_drives,
+            commands::system::drives::eject_drive,
             commands::system::paths::get_home_dir,
             commands::system::paths::resolve_path,
             commands::system::paths::get_available_space,

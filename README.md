@@ -11,7 +11,7 @@ Tauri v2 + React 19 + TypeScript + Rust로 만든 듀얼 패널 데스크톱 파
 - 고급 검색, 현재 폴더 필터, brief / detailed 보기, Git 상태 표시
 - 빠른 미리보기: 이미지·비디오·PDF·텍스트·Markdown·HTML·Excel·SQLite·Word·Jupyter Notebook·PowerPoint·HWPX
 - 폴더 비교·동기화, 디렉터리 크기 추정·정확 계산·캐시
-- 패널 간·앱 외부 드래그 드롭, Command Palette, 마지막 이름 변경·이동 Undo
+- `.dmg` 더블클릭 마운트와 드라이브 막대의 ⏏ 버튼 추출(macOS), 패널 간·앱 외부 드래그 드롭, Command Palette, 마지막 이름 변경·이동 Undo
 - 글꼴·패널 비율·창 크기 설정, 자동 테마, 창 상태 복원
 
 ## 개발 환경과 실행

@@ -8,7 +8,13 @@ import { DriveList } from "./DriveList";
 import { TabBar } from "./TabBar";
 import { getErrorMessage, useFileSystem } from "../../hooks/useFileSystem";
 import { getPanelAccessPath } from "../../utils/panelPath";
-import { enterArchiveEntry, isArchiveEntry, isZipArchiveEntry } from "./archiveEnter";
+import {
+  enterArchiveEntry,
+  isArchiveEntry,
+  isDmgEntry,
+  isZipArchiveEntry,
+} from "./archiveEnter";
+import { notifyDrivesChanged } from "./driveEvents";
 import type { FileEntry } from "../../types/file";
 import { useBackgroundDirSizes } from "./size/useBackgroundDirSizes";
 import { useDirectoryLoader } from "./useDirectoryLoader";
@@ -217,6 +223,9 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
               }
             : undefined,
         });
+        if (isDmgEntry(entry)) {
+          notifyDrivesChanged();
+        }
       } catch (error) {
         console.error("Failed to open archive file:", error);
         window.alert(
