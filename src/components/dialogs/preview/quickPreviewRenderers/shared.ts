@@ -34,6 +34,10 @@ export interface XlsxRendererModule {
   renderXlsx: (filePath: string) => MaybePromise<string>;
 }
 
+export interface CsvRendererModule {
+  renderCsv: (content: string, extension: string) => MaybePromise<string>;
+}
+
 export interface SqliteRendererModule {
   renderSqlite: (filePath: string) => MaybePromise<string>;
 }

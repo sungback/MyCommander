@@ -1,5 +1,6 @@
 import {
   ARCHIVE_EXTENSIONS,
+  CSV_EXTENSIONS,
   DOCX_EXTENSIONS,
   HWPX_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -96,6 +97,21 @@ const officePreviewHandler: QuickPreviewHandler = async (path, context) => {
   }
 
   return null;
+};
+
+const csvPreviewHandler: QuickPreviewHandler = async (path, context) => {
+  if (!CSV_EXTENSIONS.has(context.extension)) {
+    return null;
+  }
+
+  const content = await context.readFileContent(path);
+  const renderer = await context.loadCsvRenderer();
+  return {
+    type: "rendered",
+    content,
+    renderedHtml: await renderer.renderCsv(content, context.extension),
+    renderExt: context.extension,
+  };
 };
 
 const sqlitePreviewHandler: QuickPreviewHandler = async (path, context) => {
@@ -203,6 +219,7 @@ export const QUICK_PREVIEW_HANDLERS: QuickPreviewHandler[] = [
   assetPreviewHandler,
   officePreviewHandler,
   zipPreviewHandler,
+  csvPreviewHandler,
   sqlitePreviewHandler,
   notebookPreviewHandler,
   renderedTextPreviewHandler,

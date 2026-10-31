@@ -1,6 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useFileSystem } from "../../../hooks/useFileSystem";
 import {
+  type CsvRendererModule,
   type MarkdownRendererModule,
   type NotebookRendererModule,
   type HwpxRendererModule,
@@ -75,6 +76,14 @@ const defaultLoadXlsxRenderer = async (
   return loadRenderer({ readFileBinary });
 };
 
+const defaultLoadCsvRenderer = async (): Promise<CsvRendererModule> => {
+  const { defaultLoadCsvRenderer: loadRenderer } = await import(
+    "./quickPreviewRenderers/csvRenderer"
+  );
+
+  return loadRenderer();
+};
+
 const defaultLoadSqliteRenderer = async (): Promise<SqliteRendererModule> => {
   const { defaultLoadSqliteRenderer: loadRenderer } = await import(
     "./quickPreviewRenderers/sqliteRenderer"
@@ -136,6 +145,7 @@ export const loadPreviewForPath = async (
     options.loadHwpxRenderer ?? (() => defaultLoadHwpxRenderer(readFileBinary));
   const loadXlsxRenderer =
     options.loadXlsxRenderer ?? (() => defaultLoadXlsxRenderer(readFileBinary));
+  const loadCsvRenderer = options.loadCsvRenderer ?? defaultLoadCsvRenderer;
   const loadSqliteRenderer = options.loadSqliteRenderer ?? defaultLoadSqliteRenderer;
   const loadDocxRenderer =
     options.loadDocxRenderer ?? (() => defaultLoadDocxRenderer(readFileBinary));
@@ -152,6 +162,7 @@ export const loadPreviewForPath = async (
     loadNotebookRenderer,
     loadHwpxRenderer,
     loadXlsxRenderer,
+    loadCsvRenderer,
     loadSqliteRenderer,
     loadDocxRenderer,
     loadZipRenderer,

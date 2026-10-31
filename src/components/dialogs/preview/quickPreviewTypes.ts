@@ -1,4 +1,5 @@
 import type {
+  CsvRendererModule,
   HwpxRendererModule,
   MarkdownRendererModule,
   NotebookRendererModule,
@@ -52,6 +53,7 @@ export interface QuickPreviewLoaderOptions {
   loadNotebookRenderer?: () => Promise<NotebookRendererModule>;
   loadHwpxRenderer?: () => Promise<HwpxRendererModule>;
   loadXlsxRenderer?: () => Promise<XlsxRendererModule>;
+  loadCsvRenderer?: () => Promise<CsvRendererModule>;
   loadSqliteRenderer?: () => Promise<SqliteRendererModule>;
   loadDocxRenderer?: () => Promise<DocxRendererModule>;
   loadZipRenderer?: () => Promise<ZipRendererModule>;
