@@ -6,16 +6,21 @@ import {
 } from "./shared";
 
 const MAX_ROWS = 500;
+const MAX_COLS = 100;
 
 /** RFC 4180 방식 파서: 따옴표 안의 구분자·줄바꿈·"" 이스케이프를 처리한다. */
-export const parseCsv = (content: string, delimiter: string): string[][] => {
+export const parseCsv = (
+  content: string,
+  delimiter: string,
+  maxRows = Infinity
+): string[][] => {
   const text = content.replace(/^﻿/, "");
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
 
-  for (let i = 0; i < text.length; i += 1) {
+  for (let i = 0; i < text.length && rows.length < maxRows; i += 1) {
     const char = text[i];
 
     if (inQuotes) {
@@ -46,7 +51,7 @@ export const parseCsv = (content: string, delimiter: string): string[][] => {
   }
 
   // 마지막 줄이 줄바꿈 없이 끝난 경우
-  if (cell !== "" || row.length > 0) {
+  if (rows.length < maxRows && (cell !== "" || row.length > 0)) {
     row.push(cell);
     rows.push(row);
   }
@@ -56,10 +61,12 @@ export const parseCsv = (content: string, delimiter: string): string[][] => {
 
 export const buildCsvHtml = (content: string, extension: string): string => {
   const theme = getPreviewTheme();
-  const allRows = parseCsv(content, extension === "tsv" ? "\t" : ",");
-  const truncated = allRows.length > MAX_ROWS;
-  const rows = allRows.slice(0, MAX_ROWS);
-  const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  // 한 행 더 읽어 잘렸는지만 판단하고, 거기서 파싱을 멈춘다.
+  const parsedRows = parseCsv(content, extension === "tsv" ? "\t" : ",", MAX_ROWS + 1);
+  const rowsTruncated = parsedRows.length > MAX_ROWS;
+  const rows = parsedRows.slice(0, MAX_ROWS);
+  const widestRow = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  const maxCols = Math.min(widestRow, MAX_COLS);
 
   const cells = (row: string[], tag: "th" | "td") =>
     Array.from(
@@ -74,8 +81,12 @@ export const buildCsvHtml = (content: string, extension: string): string => {
         .join("")}</tbody></table>`
     : `<div class="empty">( 데이터 없음 )</div>`;
 
-  const note = truncated
-    ? `<div class="note">처음 ${MAX_ROWS}행만 표시됩니다 (전체 ${allRows.length}행)</div>`
+  const notes = [
+    rowsTruncated ? `처음 ${MAX_ROWS}행` : "",
+    widestRow > MAX_COLS ? `처음 ${MAX_COLS}열` : "",
+  ].filter(Boolean);
+  const note = notes.length
+    ? `<div class="note">${notes.join(", ")}만 표시됩니다</div>`
     : "";
 
   return buildPreviewHtmlDocument({

@@ -21,4 +21,13 @@ describe("csvRenderer", () => {
     expect(html).toContain("<th>type</th>");
     expect(html).toContain("<td>&lt;b&gt;x&lt;/b&gt;</td>");
   });
+
+  it("caps rows and columns and notes the cut", () => {
+    const wide = Array.from({ length: 150 }, (_, i) => `c${i}`).join(",");
+    const html = buildCsvHtml(Array.from({ length: 600 }, () => wide).join("\n"), "csv");
+    expect(html).toContain("처음 500행, 처음 100열만 표시됩니다");
+    expect(html).toContain("<th>c99</th>");
+    expect(html).not.toContain("<th>c100</th>");
+    expect(parseCsv("a\nb\nc", ",", 2)).toEqual([["a"], ["b"]]);
+  });
 });
