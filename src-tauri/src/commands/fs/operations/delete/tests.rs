@@ -1,12 +1,17 @@
 use super::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// 병렬 테스트가 같은 시각을 읽어도 폴더 이름이 겹치지 않도록 호출마다 번호를 붙인다
+static DIRECTORY_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn test_directory() -> PathBuf {
     let suffix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("mycommander_trash_{suffix}"));
+    let counter = DIRECTORY_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("mycommander_trash_{suffix}_{counter}"));
     fs::create_dir_all(&path).unwrap();
     path
 }
