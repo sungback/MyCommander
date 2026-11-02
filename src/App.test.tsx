@@ -112,6 +112,46 @@ describe('App — Tab 키 패널 전환', () => {
     expect(usePanelStore.getState().activePanel).toBe('left');
   });
 
+  it('Tab → 필터 입력창이 아니라 새 활성 패널의 파일 목록으로 포커스 이동', () => {
+    render(<App />);
+    const lists = (['left', 'right'] as const).map((panelId) => {
+      const list = document.createElement('div');
+      list.setAttribute('role', 'listbox');
+      list.setAttribute('data-panel-id', panelId);
+      list.tabIndex = 0;
+      document.body.appendChild(list);
+      return list;
+    });
+    const filter = document.createElement('input');
+    document.body.appendChild(filter);
+    filter.focus();
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(document.activeElement).toBe(lists[1]);
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(document.activeElement).toBe(lists[0]);
+
+    [...lists, filter].forEach((element) => element.remove());
+  });
+
+  it('대화상자가 열려 있으면 Tab으로 패널 목록에 포커스를 뺏지 않음', () => {
+    render(<App />);
+    const list = document.createElement('div');
+    list.setAttribute('role', 'listbox');
+    list.setAttribute('data-panel-id', 'right');
+    list.tabIndex = 0;
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.append(list, dialog);
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(document.activeElement).not.toBe(list);
+
+    list.remove();
+    dialog.remove();
+  });
+
   it('right 패널 활성 상태에서 Tab → left로 전환', () => {
     usePanelStore.getState().setActivePanel('right');
     render(<App />);

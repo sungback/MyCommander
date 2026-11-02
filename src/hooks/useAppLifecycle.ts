@@ -110,7 +110,16 @@ export const usePanelFocusShortcut = (
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
         event.preventDefault();
-        setActivePanel(activePanelId === "left" ? "right" : "left");
+        const nextPanelId = activePanelId === "left" ? "right" : "left";
+        setActivePanel(nextPanelId);
+
+        // 필터 입력창 등에 포커스가 남지 않도록 새 활성 패널의 파일 목록으로 옮긴다.
+        // 열린 대화상자의 포커스는 빼앗지 않는다.
+        if (!document.querySelector('[role="dialog"]')) {
+          document
+            .querySelector<HTMLElement>(`[role="listbox"][data-panel-id="${nextPanelId}"]`)
+            ?.focus({ preventScroll: true });
+        }
       }
     };
 
