@@ -9,13 +9,14 @@ const {
   mockOpenPreview, mockOpenEditor, mockOpenCopy, mockOpenMove,
   mockOpenMkdir, mockOpenNewFile, mockOpenDelete, mockOpenSearch,
   mockOpenCommandPalette, mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
-  mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard,
+  mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard, mockNormalizeSelectionToNfc,
   mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
   mockUpdateEntrySize, mockSetEntrySizeStatus, mockSetPanelViewMode,
   mockUpdateEntrySizeEstimate, mockUpdateEntrySizeProgress,
   mockCancelDirSizeScan, mockScanDirSize, mockIsMacPlatform,
 } = vi.hoisted(() => ({
+  mockNormalizeSelectionToNfc: vi.fn().mockResolvedValue(undefined),
   mockOpenPreview:     vi.fn(),
   mockOpenEditor:      vi.fn().mockResolvedValue(undefined),
   mockOpenCopy:        vi.fn(),
@@ -75,6 +76,7 @@ vi.mock('./useAppCommands', () => ({
     copyCurrentPath:            mockCopyCurrentPath,
     copyToClipboard:            mockCopyToClipboard,
     cutToClipboard:             mockCutToClipboard,
+    normalizeSelectionToNfc:    mockNormalizeSelectionToNfc,
     pasteFromClipboard:         mockPasteFromClipboard,
   }),
 }));
@@ -224,6 +226,37 @@ describe('useKeyboard', () => {
       renderKeyboard();
       press('c', { code: 'KeyC', ctrlKey: true, shiftKey: true });
       expect(mockCopyCurrentPath).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+Shift+N → 선택 항목 파일명을 NFC로 변환', () => {
+      renderKeyboard();
+      press('N', { code: 'KeyN', ctrlKey: true, shiftKey: true });
+      expect(mockNormalizeSelectionToNfc).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cmd+Shift+N(macOS) → 선택 항목 파일명을 NFC로 변환', () => {
+      renderKeyboard();
+      press('N', { code: 'KeyN', metaKey: true, shiftKey: true });
+      expect(mockNormalizeSelectionToNfc).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+N(Shift 없음)은 NFC 변환을 실행하지 않음', () => {
+      renderKeyboard();
+      press('n', { code: 'KeyN', ctrlKey: true });
+      expect(mockNormalizeSelectionToNfc).not.toHaveBeenCalled();
+    });
+
+    it('입력창에 포커스가 있으면 Ctrl+Shift+N이 NFC 변환을 실행하지 않음', () => {
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      try {
+        input.focus();
+        renderKeyboard();
+        press('N', { code: 'KeyN', ctrlKey: true, shiftKey: true });
+        expect(mockNormalizeSelectionToNfc).not.toHaveBeenCalled();
+      } finally {
+        input.remove();
+      }
     });
 
     it('Ctrl+U → swapPanels 호출', () => {

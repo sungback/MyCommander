@@ -47,6 +47,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   copyCurrentPath: vi.fn(),
   copyToClipboard: vi.fn().mockResolvedValue(undefined),
   cutToClipboard: vi.fn().mockResolvedValue(undefined),
+  normalizeSelectionToNfc: vi.fn().mockResolvedValue(undefined),
   openCopy: vi.fn(),
   openDelete: vi.fn(),
   openDialog: null,

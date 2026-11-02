@@ -45,6 +45,7 @@ npm run tauri dev
 | `F11` | 폴더 동기화 |
 | `Cmd/Ctrl+F` | 검색 |
 | `Cmd/Ctrl+Shift+P` | Command Palette |
+| `Cmd/Ctrl+Shift+N` | 선택 항목(없으면 커서 항목)의 파일명을 NFC로 변환 |
 | `Cmd/Ctrl+F1` / `Cmd/Ctrl+F2` | brief / detailed 보기 |
 | `/` | 현재 폴더 필터 |
 | `Space` | 선택한 디렉터리 크기 계산 시작·취소 |

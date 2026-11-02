@@ -6,10 +6,18 @@ import { useClipboardStore } from "../store/clipboardStore";
 import { useDialogStore } from "../store/dialogStore";
 
 const mockWriteFilesToPasteboard = vi.fn().mockResolvedValue(undefined);
+const { mockRenameFile, mockRefreshPanelsForDirectories, mockShowTransientToast } = vi.hoisted(
+  () => ({
+    mockRenameFile: vi.fn(),
+    mockRefreshPanelsForDirectories: vi.fn(),
+    mockShowTransientToast: vi.fn(),
+  })
+);
 
 vi.mock("./useFileSystem", () => ({
   useFileSystem: () => ({
     writeFilesToPasteboard: mockWriteFilesToPasteboard,
+    renameFile: mockRenameFile,
     openInEditor: vi.fn().mockResolvedValue(undefined),
     quitApp: vi.fn().mockResolvedValue(undefined),
     runShellCommand: vi.fn().mockResolvedValue(undefined),
@@ -17,6 +25,14 @@ vi.mock("./useFileSystem", () => ({
     listJobs: vi.fn().mockResolvedValue([]),
   }),
   getErrorMessage: (_e: unknown, fallback: string) => fallback,
+}));
+
+vi.mock("../store/panelRefresh", () => ({
+  refreshPanelsForDirectories: mockRefreshPanelsForDirectories,
+}));
+
+vi.mock("../store/toastStore", () => ({
+  showTransientToast: mockShowTransientToast,
 }));
 
 vi.mock("../utils/clipboard", () => ({
@@ -252,5 +268,60 @@ describe("useAppCommands — pasteFromClipboard", () => {
     result.current.pasteFromClipboard();
 
     expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+});
+
+// ── normalizeSelectionToNfc ───────────────────────────────────────────────────
+
+describe("useAppCommands — normalizeSelectionToNfc", () => {
+  const nfd = (text: string) => text.normalize("NFD");
+
+  beforeEach(() => {
+    usePanelStore.setState(usePanelStore.getInitialState());
+    mockRenameFile.mockReset();
+    mockRenameFile.mockResolvedValue(undefined);
+    mockRefreshPanelsForDirectories.mockClear();
+    mockShowTransientToast.mockClear();
+  });
+
+  it("선택한 항목 전체를 NFC로 바꾸고 폴더를 갱신한다", async () => {
+    const first = `/work/${nfd("가나.txt")}`;
+    const second = `/work/${nfd("다라.txt")}`;
+    usePanelStore.getState().setSelection("left", [first, second, "/work/plain.txt"]);
+    const { result } = renderHook(() => useAppCommands());
+
+    await result.current.normalizeSelectionToNfc();
+
+    expect(mockRenameFile).toHaveBeenCalledTimes(2);
+    expect(mockRenameFile).toHaveBeenCalledWith(first, "/work/가나.txt");
+    expect(mockRenameFile).toHaveBeenCalledWith(second, "/work/다라.txt");
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/work"]);
+    expect(mockShowTransientToast).toHaveBeenCalledWith("2개 파일명을 NFC로 변환했습니다.", {
+      tone: "info",
+    });
+  });
+
+  it("선택이 없으면 커서 항목을 바꾼다", async () => {
+    const entryPath = `/work/${nfd("머신.txt")}`;
+    usePanelStore.getState().setFiles("left", [
+      { name: nfd("머신.txt"), path: entryPath, kind: "file" },
+    ]);
+    usePanelStore.getState().setCursor("left", 0);
+    const { result } = renderHook(() => useAppCommands());
+
+    await result.current.normalizeSelectionToNfc();
+
+    expect(mockRenameFile).toHaveBeenCalledWith(entryPath, "/work/머신.txt");
+  });
+
+  it("대상이 없으면 이름을 바꾸지 않고 알린다", async () => {
+    const { result } = renderHook(() => useAppCommands());
+
+    await result.current.normalizeSelectionToNfc();
+
+    expect(mockRenameFile).not.toHaveBeenCalled();
+    expect(mockShowTransientToast).toHaveBeenCalledWith("변환할 항목이 없습니다", {
+      durationMs: 1400,
+    });
   });
 });

@@ -7,6 +7,7 @@ import {
   arePanelAccessPathsEquivalent,
   getPanelAccessPath,
 } from "../utils/panelPath";
+import { runNfcRename } from "../features/normalizeFilenamesToNfc";
 import { isMacPlatform } from "../utils/platform";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 
@@ -109,6 +110,16 @@ export function useAppCommands() {
     const cursor = panel.files[panel.cursorIndex];
     if (cursor && cursor.name !== "..") return [cursor.path];
     return [];
+  };
+
+  const normalizeSelectionToNfc = async () => {
+    const paths = getActiveSelectedPaths();
+    if (paths.length === 0) {
+      showTransientStatusMessage("변환할 항목이 없습니다");
+      return;
+    }
+
+    await runNfcRename(paths, fs.renameFile);
   };
 
   const copyToClipboard = async () => {
@@ -217,6 +228,7 @@ export function useAppCommands() {
     closeApp,
     syncOtherPanelToCurrentPath,
     copyCurrentPath,
+    normalizeSelectionToNfc,
     runCommandInCurrentPath,
     copyToClipboard,
     cutToClipboard,

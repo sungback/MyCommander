@@ -18,10 +18,7 @@ import {
 } from "../../hooks/manualDirectorySizeScan";
 import { formatSize } from "../../utils/format";
 import { writeClipboardText } from "../../utils/clipboard";
-import {
-  buildNfcRenameTargetPath,
-  hasDecomposedUnicodeFilename,
-} from "../../utils/unicodeFilename";
+import { runNfcRename } from "../../features/normalizeFilenamesToNfc";
 import { showTransientToast } from "../../store/toastStore";
 
 const resolveContext = () => {
@@ -223,22 +220,17 @@ export const ContextMenu: React.FC = () => {
               closeContextMenu();
               return;
             case "normalize-filename-nfc": {
-              if (
-                !targetPath ||
-                !targetEntry ||
-                targetEntry.name === ".." ||
-                !hasDecomposedUnicodeFilename(targetEntry.name)
-              ) {
+              if (!targetPath || !targetEntry || targetEntry.name === "..") {
                 return;
               }
 
               setActivePanel(panelId);
-              await fs.renameFile(
-                targetPath,
-                buildNfcRenameTargetPath(targetPath, targetEntry.name)
-              );
-              refreshPanel(panelId);
-              showTransientToast("파일명을 NFC로 변환했습니다.");
+              // 선택한 여러 항목 중 하나를 우클릭했으면 선택 전체를, 아니면 우클릭한 항목만 바꾼다.
+              const nfcPaths =
+                panel.selectedItems.size > 1 && panel.selectedItems.has(targetPath)
+                  ? [...panel.selectedItems]
+                  : [targetPath];
+              await runNfcRename(nfcPaths, fs.renameFile);
               closeContextMenu();
               return;
             }

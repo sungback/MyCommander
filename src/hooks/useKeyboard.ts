@@ -25,6 +25,7 @@ export function useKeyboard() {
     copyCurrentPath,
     copyToClipboard,
     cutToClipboard,
+    normalizeSelectionToNfc,
     pasteFromClipboard,
   } = useAppCommands();
   const { cancelDirSizeScan, scanDirSize } = useFileSystem();
@@ -43,6 +44,7 @@ export function useKeyboard() {
       copyCurrentPath,
       copyToClipboard,
       cutToClipboard,
+      normalizeSelectionToNfc,
       cancelDirSizeScan,
       goBack,
       goForward,
@@ -96,6 +98,7 @@ export function useKeyboard() {
     updateEntrySize,
     copyToClipboard,
     cutToClipboard,
+    normalizeSelectionToNfc,
     pasteFromClipboard,
     scanDirSize,
     updateEntrySizeEstimate,

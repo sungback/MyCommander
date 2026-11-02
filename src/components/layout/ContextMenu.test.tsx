@@ -10,6 +10,7 @@ const {
   mockOpenInfoDialog,
   mockCloseDialog,
   mockRefreshPanel,
+  mockRefreshPanelsForDirectories,
   mockSetEntrySizeStatus,
   mockUpdateEntrySize,
   mockUpdateEntrySizeEstimate,
@@ -32,6 +33,7 @@ const {
   mockOpenInfoDialog: vi.fn(),
   mockCloseDialog: vi.fn(),
   mockRefreshPanel: vi.fn(),
+  mockRefreshPanelsForDirectories: vi.fn(),
   mockSetEntrySizeStatus: vi.fn(),
   mockUpdateEntrySize: vi.fn(),
   mockUpdateEntrySizeEstimate: vi.fn(),
@@ -114,6 +116,10 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 
 vi.mock("../../utils/clipboard", () => ({
   writeClipboardText: mockWriteClipboardText,
+}));
+
+vi.mock("../../store/panelRefresh", () => ({
+  refreshPanelsForDirectories: mockRefreshPanelsForDirectories,
 }));
 
 vi.mock("../../store/toastStore", () => ({
@@ -279,9 +285,47 @@ describe("ContextMenu", () => {
       `/home/user/${nfdName}`,
       "/home/user/머신.txt"
     );
-    expect(mockRefreshPanel).toHaveBeenCalledWith("left");
-    expect(mockShowTransientToast).toHaveBeenCalledWith("파일명을 NFC로 변환했습니다.");
+    expect(mockRefreshPanelsForDirectories).toHaveBeenCalledWith(["/home/user"]);
+    expect(mockShowTransientToast).toHaveBeenCalledWith("파일명을 NFC로 변환했습니다.", {
+      tone: "info",
+    });
     expect(mockCloseContextMenu).toHaveBeenCalled();
+  });
+
+  it("선택한 여러 항목 중 하나를 우클릭하면 선택 전체를 NFC로 변환한다", async () => {
+    const first = `/home/user/${"머신.txt".normalize("NFD")}`;
+    const second = `/home/user/${"다라.txt".normalize("NFD")}`;
+    mockContextState.targetPath = first;
+    mockPanelState.leftPanel.selectedItems = new Set([first, second]);
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "normalize-filename-nfc" });
+
+    expect(mockRenameFile).toHaveBeenCalledTimes(2);
+    expect(mockRenameFile).toHaveBeenCalledWith(first, "/home/user/머신.txt");
+    expect(mockRenameFile).toHaveBeenCalledWith(second, "/home/user/다라.txt");
+    expect(mockShowTransientToast).toHaveBeenCalledWith("2개 파일명을 NFC로 변환했습니다.", {
+      tone: "info",
+    });
+  });
+
+  it("선택 밖의 항목을 우클릭하면 그 항목만 NFC로 변환한다", async () => {
+    const target = `/home/user/${"머신.txt".normalize("NFD")}`;
+    mockContextState.targetPath = target;
+    mockPanelState.leftPanel.selectedItems = new Set([
+      `/home/user/${"가나.txt".normalize("NFD")}`,
+      `/home/user/${"다라.txt".normalize("NFD")}`,
+    ]);
+
+    render(<ContextMenu />);
+
+    await Promise.resolve();
+    await listenHandlers.get("context-menu-action")?.({ payload: "normalize-filename-nfc" });
+
+    expect(mockRenameFile).toHaveBeenCalledTimes(1);
+    expect(mockRenameFile).toHaveBeenCalledWith(target, "/home/user/머신.txt");
   });
 
   it("NFC 변환 실패 시 오류 토스트를 표시한다", async () => {

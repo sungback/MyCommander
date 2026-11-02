@@ -20,6 +20,7 @@ export interface KeyboardHandlerDependencies
     | "copyCurrentPath"
     | "copyToClipboard"
     | "cutToClipboard"
+    | "normalizeSelectionToNfc"
     | "openCopy"
     | "openDelete"
     | "openDialog"
@@ -225,6 +226,14 @@ const handleModifiedShortcut = (
   if (hasCommandModifier && event.shiftKey && event.code === "KeyM") {
     event.preventDefault();
     deps.syncOtherPanelToCurrentPath();
+    return true;
+  }
+
+  if (hasCommandModifier && event.shiftKey && event.code === "KeyN") {
+    if (!isInputFocused()) {
+      event.preventDefault();
+      void deps.normalizeSelectionToNfc();
+    }
     return true;
   }
 
