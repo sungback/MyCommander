@@ -8,7 +8,7 @@
 
 - 최신 릴리즈: `v1.2.78`(`2af825a`). 로컬 `verify:release` 통과, v1.2.76~v1.2.78 GitHub 릴리즈 워크플로 모두 성공, 릴리즈 공개 확인(각 산출물 8개).
 - v1.2.77(`ce6a94b`): Tab으로 패널을 전환하면 새 활성 패널의 파일 목록으로 DOM 포커스를 옮깁니다(대화상자가 열려 있으면 제외). Filter 입력창이 포커스를 받던 원인은 코드에서 확정하지 못했습니다.
-- 리팩토링(`241eb4f`, main에 푸시, 릴리즈 없음): `panelStoreFileActions.ts`의 크기 캐시 액션 8개를 `panelStoreSizeActions.ts`로 옮겼습니다(본문 `diff` 동일). 먼저 동작 고정 테스트 16개(`panelStore.size-actions.test.ts`, `2740636`)를 추가했고 일부러 코드를 망가뜨려 테스트가 잡는 것을 확인했습니다. `verify:frontend` 통과, 푸시 후 GitHub CI는 진행 중이라 결과를 확인하지 못했습니다. Rust 검사는 이번 변경과 무관해 돌리지 않았습니다.
+- 리팩토링(`241eb4f`, main에 푸시, 릴리즈 없음): `panelStoreFileActions.ts`의 크기 캐시 액션 8개를 `panelStoreSizeActions.ts`로 옮겼습니다(본문 `diff` 동일). 먼저 동작 고정 테스트 16개(`panelStore.size-actions.test.ts`, `2740636`)를 추가했고 일부러 코드를 망가뜨려 테스트가 잡는 것을 확인했습니다. `verify:frontend` 통과. 푸시 후 GitHub CI는 `241eb4f`에서 `test` 잡이 실패했고(`QuickPreviewPptxView.test.tsx`의 "releases thumbnail documents that scroll out of the list", `getByTitle("2번 슬라이드 썸네일")`을 찾지 못함), 같은 코드를 담은 다음 커밋 `39ed9ef`의 CI는 성공했습니다. 로컬에서 6번 반복 실행은 모두 통과했습니다. 이번 변경(스토어)과 무관한 기존 flaky 테스트로 추정합니다. 원인은 확정하지 못했고, `IntersectionObserver` 등록 시점과 `setVisible`의 동기 호출 사이 경합일 가능성이 있습니다. Rust 검사는 이번 변경과 무관해 돌리지 않았습니다.
 - v1.2.78(`4d4f4ef`): 활성 패널의 커서 행을 강조색 배경·테두리로 표시합니다(`FileItem.tsx`). 사용자가 Windows 앱에서 구분이 잘 된다고 확인했습니다. 다른 두 테마의 대비는 미확인입니다.
 - 새 앱 아이콘(`d888e90`, v1.2.76에 포함): 듀얼 패널 폴더 로고. 마스터는 `src-tauri/icons/source/icon.svg`이고 `tauri icon`으로 데스크톱 아이콘을 생성했습니다(Android·iOS 출력은 제거). Windows 탐색기·작업 표시줄·바로가기에서 새 로고를 사용자가 확인했습니다. 옛 아이콘이 보이면 Windows 아이콘 캐시나 바로가기 설정 문제였습니다.
 - 테스트 불안정 수정(`407cb1f`): delete 테스트의 임시 폴더 이름이 병렬 실행에서 겹쳐 가끔 실패하던 문제로 추정해 카운터를 붙였습니다. 재현하지 못해 효과는 입증되지 않았습니다.
