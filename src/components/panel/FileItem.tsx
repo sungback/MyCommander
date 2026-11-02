@@ -227,9 +227,9 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
         "flex items-center border-b border-transparent group select-none font-mono cursor-default",
         {
           "bg-bg-selected theme-selection-text": isSelectionRow,
-          "border-dotted border-accent-color": isCursor && isActivePanel,
-          "border-dotted border-border-color": isCursor && !isActivePanel,
-          "bg-bg-hover": isCursor,
+          // 활성 패널의 커서 행은 강조색 배경·테두리로 눈에 띄게, 비활성 패널은 옅게 표시한다
+          "bg-accent-color/20 ring-1 ring-inset ring-accent-color/70": isCursor && isActivePanel,
+          "border-dotted border-border-color bg-bg-hover": isCursor && !isActivePanel,
           "text-text-primary hover:bg-bg-hover/50": !isSelected && !isCursor,
           "text-error-color/80": isSelected && isCursor,
           "opacity-60": isHidden && !isSelected,
