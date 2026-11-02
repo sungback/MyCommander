@@ -175,6 +175,12 @@ describe("QuickPreviewPptxView", () => {
       const { deck } = makeDeck(3);
       renderView({ deckModule: { parsePptxDeck: vi.fn().mockResolvedValue(deck) } });
       await screen.findByText("1 / 3");
+      // 화면이 그려진 직후에는 observer 등록(useEffect)이 아직일 수 있어, 부하가 큰 CI에서 먼저 호출하면 무시된다.
+      await waitFor(() =>
+        expect(
+          observers.some(({ element }) => element.getAttribute("aria-label") === "2번 슬라이드로 이동")
+        ).toBe(true)
+      );
 
       setVisible("2번 슬라이드로 이동", true);
       expect(screen.getByTitle("2번 슬라이드 썸네일")).toBeInTheDocument();
