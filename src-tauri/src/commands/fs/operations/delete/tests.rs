@@ -128,3 +128,37 @@ fn finder_retry_preserves_symlink_paths_including_broken_links() {
     assert_eq!(fs::read(&target).unwrap(), b"keep target");
     fs::remove_dir_all(directory).unwrap();
 }
+
+// 아래 두 테스트는 실제 휴지통을 사용하므로 기본 실행에서 제외한다.
+// 실행: cargo test --lib real_ -- --ignored --test-threads=1
+// 휴지통에 작은 파일이 남으므로 확인 후 직접 비운다.
+
+#[test]
+#[ignore = "실제 휴지통에 파일을 보낸다"]
+fn real_move_to_trash_removes_the_file() {
+    let directory = test_directory();
+    let path = directory.join("mycommander_real_trash_test.txt");
+    fs::write(&path, b"trash me").unwrap();
+
+    let result = move_to_trash(&path);
+
+    assert_eq!(result, Ok(()));
+    assert!(!path.exists());
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "Finder 자동화 권한 창이 뜰 수 있다"]
+fn real_finder_method_moves_the_file_to_trash() {
+    let directory = test_directory();
+    let path = directory.join("mycommander_real_finder_test.txt");
+    fs::write(&path, b"trash me via finder").unwrap();
+
+    let mut ctx = trash::TrashContext::new();
+    ctx.set_delete_method(DeleteMethod::Finder);
+    let result = ctx.delete(&path);
+
+    assert!(result.is_ok(), "Finder 휴지통 이동 실패: {result:?}");
+    assert!(!path.exists());
+    fs::remove_dir_all(directory).unwrap();
+}
