@@ -291,6 +291,7 @@ describe("fileCommands", () => {
         scannedEntries: 30,
         errorCount: 0,
         inaccessibleCount: 3,
+        hasHardLinks: true,
         startedAtMs: 1_700_000_000_000,
         children: [
           { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },
@@ -309,6 +310,7 @@ describe("fileCommands", () => {
         scannedEntries: 30,
         errorCount: 0,
         inaccessibleCount: 3,
+        hasHardLinks: true,
         startedAtMs: 1_700_000_000_000,
         children: [
           { path: "/some/dir/a", size: 10, isPartial: false, inaccessibleCount: 0, depth: 1 },

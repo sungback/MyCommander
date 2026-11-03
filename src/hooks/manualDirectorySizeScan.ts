@@ -193,7 +193,7 @@ export const scanDirectorySizeWithProgress = async ({
 
   try {
     const result = await scanDirSize(path, scanId);
-    recordScannedChildSizes(result);
+    recordScannedChildSizes(result, path);
 
     const isLimited = !result.isPartial && result.inaccessibleCount > 0;
     if (result.isPartial) {

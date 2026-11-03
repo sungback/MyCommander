@@ -28,6 +28,8 @@ export interface DirectorySizeScanResult {
   errorCount: number;
   // 권한이 없어 읽지 못한 항목 수. 0보다 크면 size는 하한값이다.
   inaccessibleCount: number;
+  // 하드링크 파일이 하나라도 있으면 true. 공유 파일은 폴더마다 전체 크기로 잡힌다.
+  hasHardLinks: boolean;
   // 스캔을 실제로 시작한 시각(Unix ms). 같은 경로의 진행 중인 스캔에 합류한 요청도 이 값을 받는다.
   startedAtMs: number;
   // 스캔하며 함께 구한 하위 폴더 결과(깊이 1~2, 큰 폴더부터 최대 2,000개)
@@ -81,6 +83,7 @@ interface DirectorySizeScanResponse {
   scannedEntries: number;
   errorCount: number;
   inaccessibleCount: number;
+  hasHardLinks: boolean;
   startedAtMs: number;
   children: ScannedChildDirectorySize[];
 }
@@ -238,6 +241,7 @@ export const fileCommands = {
       scannedEntries: result.scannedEntries,
       errorCount: result.errorCount,
       inaccessibleCount: result.inaccessibleCount,
+      hasHardLinks: result.hasHardLinks ?? false,
       startedAtMs: result.startedAtMs,
       children: result.children ?? [],
     };

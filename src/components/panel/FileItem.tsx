@@ -7,7 +7,7 @@ import { formatDate, formatSize } from "../../utils/format";
 import { getUnicodeFilenameDisplay } from "../../utils/unicodeFilename";
 import { resolveEntryVisual } from "./visuals/fileVisuals";
 import { isLikelyCloudStoragePath } from "./size/backgroundDirSizeHelpers";
-import { getSizeScannedAt } from "../../store/panelStoreFileHelpers";
+import { getHasHardLinks, getSizeScannedAt } from "../../store/panelStoreFileHelpers";
 import { formatElapsedSince } from "../../utils/format";
 
 const THUMBNAIL_EXTENSIONS = new Set([
@@ -70,7 +70,11 @@ const getEntrySizeTitle = (entry: FileEntry) => {
     entry.sizeStatus === "partial";
   const elapsed = hasValue ? formatElapsedSince(getSizeScannedAt(entry.path)) : "";
 
-  return elapsed ? `${title} ${elapsed}에 계산한 값입니다.` : title;
+  const withElapsed = elapsed ? `${title} ${elapsed}에 계산한 값입니다.` : title;
+  // 다른 폴더와 공유하는 하드링크 파일이 있으면 합계가 맞지 않아 보일 수 있다.
+  return hasValue && getHasHardLinks(entry.path)
+    ? `${withElapsed} 하드링크 파일을 포함합니다. 같은 파일을 여러 폴더가 공유하면 각 폴더에 전체 크기가 잡히고, 상위 폴더에서는 한 번만 계산됩니다.`
+    : withElapsed;
 };
 
 const getEntrySizeBaseTitle = (entry: FileEntry) => {

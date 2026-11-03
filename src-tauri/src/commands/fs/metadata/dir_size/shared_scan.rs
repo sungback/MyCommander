@@ -278,6 +278,7 @@ mod tests {
             scanned_entries: 1,
             error_count: 0,
             inaccessible_count: 0,
+            has_hard_links: false,
             started_at_ms: 1_000,
             children: Vec::new(),
         }

@@ -20,6 +20,7 @@ export interface ScannedChildDirectorySize {
   size: number;
   isPartial: boolean;
   inaccessibleCount: number;
+  hasHardLinks: boolean;
   // 스캔한 폴더로부터의 깊이(바로 아래가 1)
   depth: number;
 }

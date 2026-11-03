@@ -9,9 +9,11 @@ import {
   getSizeScannedAt,
   isSizeVerifiedThisSession,
   markSizeVerifiedThisSession,
+  getHasHardLinks,
   recordSizeChange,
   recordSizeScannedAt,
 } from './panelStoreFileHelpers';
+import { recordScannedChildSizes } from './scannedChildSizes';
 import type { ScannedChildDirectorySize } from '../types/file';
 
 registerPanelStoreReset();
@@ -24,8 +26,22 @@ const child = (
   size: 1000,
   isPartial: false,
   inaccessibleCount: 0,
+  hasHardLinks: false,
   depth: 1,
   ...overrides,
+});
+
+describe('recordScannedChildSizes — hard links', () => {
+  it('remembers which scanned folders contain hard links', () => {
+    recordScannedChildSizes(
+      { hasHardLinks: true, children: [child('/hl/a', { hasHardLinks: true }), child('/hl/b')] },
+      '/hl'
+    );
+
+    expect(getHasHardLinks('/hl')).toBe(true);
+    expect(getHasHardLinks('/hl/a')).toBe(true);
+    expect(getHasHardLinks('/hl/b')).toBe(false);
+  });
 });
 
 describe('panelStore — applyScannedChildSizes', () => {

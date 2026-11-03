@@ -54,6 +54,20 @@ export const recordSizeScannedAt = (path: string, scannedAt: number) => {
 export const getSizeScannedAt = (path: string) =>
   sizeScannedAtByPath.get(normalizePathKey(path));
 
+// 하드링크 파일이 들어 있는 폴더 경로. 툴팁 안내에만 쓰므로 이번 실행의 메모리에만 둔다.
+const hardLinkPaths = new Set<string>();
+
+export const recordHasHardLinks = (path: string, hasHardLinks: boolean) => {
+  const key = normalizePathKey(path);
+  if (hasHardLinks) {
+    hardLinkPaths.add(key);
+  } else {
+    hardLinkPaths.delete(key);
+  }
+};
+
+export const getHasHardLinks = (path: string) => hardLinkPaths.has(normalizePathKey(path));
+
 // scannedAt: 값이 계산된 시각. 하위 폴더 결과처럼 상위 스캔에서 구한 값은 그 스캔의 시작 시각을 넘긴다.
 // touchLastUsed: false면 최근 사용 시각을 바꾸지 않는다. 사용자가 열지 않은 하위 폴더 결과가
 // 디스크 캐시 정리(최근 사용 순) 때 실제로 쓰던 항목을 밀어내지 않게 한다.

@@ -74,7 +74,7 @@ export const useDialogInfo = ({
       .then((result) => {
         finished = true;
         // 다이얼로그를 닫았어도 끝난 계산의 하위 폴더 결과는 유효하다.
-        recordScannedChildSizes(result);
+        recordScannedChildSizes(result, infoEntry.path);
         if (cancelled) return;
         setInfoSize(result.size);
         if (result.isPartial) {

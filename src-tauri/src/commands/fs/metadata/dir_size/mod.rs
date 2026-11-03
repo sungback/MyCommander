@@ -300,6 +300,13 @@ mod tests {
             scan_path_size_with_progress(root.to_str().unwrap(), &cancel_flag, |_| {}).unwrap();
 
         assert_eq!(result.size, 110);
+        assert!(result.has_hard_links);
+        let nested = result
+            .children
+            .iter()
+            .find(|child| child.path.ends_with("nested"))
+            .unwrap();
+        assert!(nested.has_hard_links);
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -573,6 +580,7 @@ mod tests {
             size,
             is_partial: false,
             inaccessible_count: 0,
+            has_hard_links: false,
             depth: 1,
         };
 

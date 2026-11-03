@@ -340,7 +340,7 @@ export const useBackgroundDirSizes = ({
           .scanDirSize(queuedEntry.path, scanId)
           .then((result) => {
             // 하위 폴더 결과는 사용자가 다른 폴더로 옮겨 가도 유효하므로 먼저 반영한다.
-            recordScannedChildSizes(result);
+            recordScannedChildSizes(result, queuedEntry.path);
             if (backgroundSchedulerRef.current !== scheduler) {
               return;
             }

@@ -317,6 +317,10 @@ impl SubtreeStats {
         self
     }
 
+    fn has_hard_links(&self) -> bool {
+        !self.hard_links.is_empty()
+    }
+
     /// 하드링크를 (dev, ino) 기준으로 한 번만 더한 하위 트리 전체 크기.
     fn total_size(&self) -> u64 {
         self.size
@@ -404,6 +408,7 @@ impl<'a> ParallelScan<'a> {
                     size: stats.total_size(),
                     is_partial: stats.error_count > 0,
                     inaccessible_count: stats.inaccessible_count,
+                    has_hard_links: stats.has_hard_links(),
                     depth,
                 });
             }
@@ -640,6 +645,7 @@ where
         scanned_entries: 0,
         error_count: 0,
         inaccessible_count: 0,
+        has_hard_links: false,
         started_at_ms,
         children: Vec::new(),
     };
@@ -658,6 +664,7 @@ where
         result.scanned_entries = stats.scanned_entries;
         result.error_count = stats.error_count;
         result.inaccessible_count = stats.inaccessible_count;
+        result.has_hard_links = stats.has_hard_links();
         result.children = select_recorded_children(stats.children, MAX_RECORDED_CHILDREN);
     }
 
