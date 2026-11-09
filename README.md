@@ -41,7 +41,8 @@ npm run tauri dev
 | `Tab` | 활성 패널 전환 |
 | `F3` / `F4` | 보기 / 편집 |
 | `Shift+F4` / `F7` | 새 파일 / 새 폴더 |
-| `F5` / `F6` / `F8` | 복사 / 이동 / 삭제 |
+| `F5` / `F6` / `F8` | 복사 / 이동 / 삭제(휴지통) |
+| `Shift+F8` | 영구 삭제(확인창 후 휴지통을 거치지 않고 삭제) |
 | `F11` | 폴더 동기화 |
 | `Cmd/Ctrl+F` | 검색 |
 | `Cmd/Ctrl+Shift+P` | Command Palette |

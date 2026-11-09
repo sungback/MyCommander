@@ -95,7 +95,7 @@ export const useBasicFileOperationHandlers = ({
     }
   };
 
-  const handleDelete = async () => {
+  const submitDelete = async (permanent: boolean) => {
     if (selectedPaths.length === 0) {
       return;
     }
@@ -107,13 +107,13 @@ export const useBasicFileOperationHandlers = ({
       const job = await fs.submitJob({
         kind: "delete",
         paths: deleteTargets,
-        permanent: false,
+        permanent,
       });
       useJobStore.getState().upsertJob(job);
       setOpenDialog("progress");
     } catch (error) {
       console.error(error);
-      setOpenDialog("delete");
+      setOpenDialog(permanent ? "permanentDelete" : "delete");
       setOperationError(
         getErrorMessage(error, "Failed to delete selected items.")
       );
@@ -126,6 +126,7 @@ export const useBasicFileOperationHandlers = ({
     handleMkdir,
     handleNewFile,
     handleRename,
-    handleDelete,
+    handleDelete: () => submitDelete(false),
+    handlePermanentDelete: () => submitDelete(true),
   };
 };

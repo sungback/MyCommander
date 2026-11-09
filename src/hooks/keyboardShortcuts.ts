@@ -23,6 +23,7 @@ export interface KeyboardHandlerDependencies
     | "normalizeSelectionToNfc"
     | "openCopy"
     | "openDelete"
+    | "openPermanentDelete"
     | "openDialog"
     | "openCommandPalette"
     | "openEditor"
@@ -102,6 +103,7 @@ const handleFunctionShortcut = (
     KeyboardHandlerDependencies,
     | "openCopy"
     | "openDelete"
+    | "openPermanentDelete"
     | "openEditor"
     | "openMkdir"
     | "openMove"
@@ -147,7 +149,11 @@ const handleFunctionShortcut = (
     case "Delete":
       if (!isInputFocused()) {
         event.preventDefault();
-        commands.openDelete();
+        if (event.key === "F8" && event.shiftKey) {
+          commands.openPermanentDelete();
+        } else {
+          commands.openDelete();
+        }
       }
       return true;
     case "F11":

@@ -50,6 +50,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   normalizeSelectionToNfc: vi.fn().mockResolvedValue(undefined),
   openCopy: vi.fn(),
   openDelete: vi.fn(),
+  openPermanentDelete: vi.fn(),
   openDialog: null,
   openEditor: vi.fn().mockResolvedValue(undefined),
   openMkdir: vi.fn(),
@@ -333,6 +334,14 @@ describe('createKeyboardHandler', () => {
     // jsdom default activeElement is document.body (tagName BODY), not INPUT
     handler(makeEvent('F8'));
     expect(deps.openDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('Shift+F8 → calls deps.openPermanentDelete() only', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('F8', { shiftKey: true }));
+    expect(deps.openPermanentDelete).toHaveBeenCalledTimes(1);
+    expect(deps.openDelete).not.toHaveBeenCalled();
   });
 
   it('Ctrl+F → calls deps.openSearch()', () => {

@@ -7,6 +7,7 @@ interface DeleteConfirmationDialogProps {
   itemLabel: string;
   onClose: () => void;
   onSubmit: () => void;
+  permanent?: boolean;
 }
 
 export const DeleteConfirmationDialog = ({
@@ -16,13 +17,20 @@ export const DeleteConfirmationDialog = ({
   itemLabel,
   onClose,
   onSubmit,
+  permanent = false,
 }: DeleteConfirmationDialogProps) => (
   <BaseDialog
     isOpen={isOpen}
     onClose={onClose}
     onSubmit={onSubmit}
-    title="Confirm Deletion"
-    submitLabel={isSubmitting ? "Deleting..." : "Delete"}
+    title={permanent ? "Confirm Permanent Deletion" : "Confirm Deletion"}
+    submitLabel={
+      isSubmitting
+        ? "Deleting..."
+        : permanent
+          ? "Delete Permanently"
+          : "Delete"
+    }
     isSubmitting={isSubmitting}
     errorMessage={errorMessage}
   >
@@ -33,5 +41,10 @@ export const DeleteConfirmationDialog = ({
       </span>
       ?
     </p>
+    {permanent && (
+      <p className="text-xs text-red-500 mt-2">
+        휴지통을 거치지 않고 바로 삭제되며 되돌릴 수 없습니다.
+      </p>
+    )}
   </BaseDialog>
 );

@@ -9,6 +9,7 @@ export type DialogType =
   | "newfile"
   | "rename"
   | "delete"
+  | "permanentDelete"
   | "search"
   | "preview"
   | "info"

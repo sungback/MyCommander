@@ -45,6 +45,7 @@ export function useAppCommands() {
   const openMkdir = () => setOpenDialog("mkdir");
   const openNewFile = () => setOpenDialog("newfile");
   const openDelete = () => setOpenDialog("delete");
+  const openPermanentDelete = () => setOpenDialog("permanentDelete");
   const openSearch = () => setOpenDialog("search");
   const openSync = () => setOpenDialog("sync");
   const openCommandPalette = () => setOpenDialog("commandPalette");
@@ -221,6 +222,7 @@ export function useAppCommands() {
     openMkdir,
     openNewFile,
     openDelete,
+    openPermanentDelete,
     openSearch,
     openSync,
     openCommandPalette,

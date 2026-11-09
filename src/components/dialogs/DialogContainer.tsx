@@ -129,6 +129,7 @@ export const DialogContainer: React.FC = () => {
     handleNewFile,
     handleRename,
     handleDelete,
+    handlePermanentDelete,
   } = useBasicFileOperationHandlers({
     activePanel,
     dialogTarget,
@@ -202,6 +203,16 @@ export const DialogContainer: React.FC = () => {
         isSubmitting={isSubmitting}
         errorMessage={operationError}
         itemLabel={getSelectedItemsText(selectedPaths)}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={openDialog === "permanentDelete"}
+        onClose={closeDialog}
+        onSubmit={handlePermanentDelete}
+        isSubmitting={isSubmitting}
+        errorMessage={operationError}
+        itemLabel={getSelectedItemsText(selectedPaths)}
+        permanent
       />
 
       <TextInputOperationDialog

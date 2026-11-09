@@ -430,4 +430,32 @@ describe('DialogContainer', () => {
     expect(useJobStore.getState().activeJob?.id).toBe("job-1");
     expect(useJobStore.getState().activeJob?.kind).toBe("delete");
   });
+
+  it("submits a permanent delete job from the permanent delete dialog", async () => {
+    mockSubmitJob.mockResolvedValue({
+      id: "job-2",
+      kind: "delete",
+      status: "queued",
+      createdAt: 1,
+      updatedAt: 1,
+      progress: { current: 0, total: 0, currentFile: "", unit: "items" },
+      error: null,
+      result: null,
+    });
+    useDialogStore.getState().setOpenDialog("permanentDelete");
+
+    render(<DialogContainer />);
+
+    expect(screen.getByText(/되돌릴 수 없습니다/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Permanently" }));
+
+    await waitFor(() => {
+      expect(mockSubmitJob).toHaveBeenCalledWith({
+        kind: "delete",
+        paths: ["/home/user/LargeFolder"],
+        permanent: true,
+      });
+    });
+    expect(useDialogStore.getState().openDialog).toBe("progress");
+  });
 });
