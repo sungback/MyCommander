@@ -12,6 +12,7 @@ import {
 } from "../../../features/fileOperationJobs";
 import { refreshPanelsForDirectories } from "../../../store/panelRefresh";
 import { usePanelStore } from "../../../store/panelStore";
+import { useDialogPanels } from "../useDialogPanels";
 import { useUpdateStore } from "../../../store/updateStore";
 import { showTransientToast } from "../../../store/toastStore";
 import { writeClipboardText } from "../../../utils/clipboard";
@@ -23,15 +24,16 @@ import {
   type CommandPaletteActions,
 } from "./commandPaletteActions";
 
-export const useCommandPaletteActions = (): CommandPaletteActions => {
+export const useCommandPaletteActions = (
+  isIdle: boolean
+): CommandPaletteActions => {
   const closeDialog = useDialogStore((state) => state.closeDialog);
   const setOpenDialog = useDialogStore((state) => state.setOpenDialog);
   const openRenameDialog = useDialogStore((state) => state.openRenameDialog);
   const openInfoDialog = useDialogStore((state) => state.openInfoDialog);
   const openPreviewDialog = useDialogStore((state) => state.openPreviewDialog);
   const activePanelId = usePanelStore((state) => state.activePanel);
-  const leftPanel = usePanelStore((state) => state.leftPanel);
-  const rightPanel = usePanelStore((state) => state.rightPanel);
+  const { leftPanel, rightPanel } = useDialogPanels(isIdle);
   const showHiddenFiles = usePanelStore((state) => state.showHiddenFiles);
   const setShowHiddenFiles = usePanelStore((state) => state.setShowHiddenFiles);
   const swapPanels = usePanelStore((state) => state.swapPanels);

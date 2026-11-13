@@ -41,6 +41,7 @@ import {
   type CommandPaletteItem,
   type CommandPaletteLocation,
 } from "./commandPaletteActions";
+import { useDialogPanels } from "../useDialogPanels";
 import { useCommandPaletteActions } from "./useCommandPaletteActions";
 
 const ITEM_ICONS: Record<string, LucideIcon> = {
@@ -129,8 +130,6 @@ export const CommandPalette: React.FC = () => {
   const openDialog = useDialogStore((state) => state.openDialog);
   const closeDialog = useDialogStore((state) => state.closeDialog);
   const activePanelId = usePanelStore((state) => state.activePanel);
-  const leftPanel = usePanelStore((state) => state.leftPanel);
-  const rightPanel = usePanelStore((state) => state.rightPanel);
   const showHiddenFiles = usePanelStore((state) => state.showHiddenFiles);
   const locations = useLocationHistoryStore((state) => state.locations);
   const lastUndoOperation = useFileOperationUndoStore(
@@ -140,6 +139,7 @@ export const CommandPalette: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isOpen = openDialog === "commandPalette";
+  const { leftPanel, rightPanel } = useDialogPanels(!isOpen);
   const isMac = isMacPlatform();
   const activePanel = activePanelId === "left" ? leftPanel : rightPanel;
   const selectedPaths = useMemo(
@@ -180,7 +180,7 @@ export const CommandPalette: React.FC = () => {
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [isOpen]);
 
-  const actions = useCommandPaletteActions();
+  const actions = useCommandPaletteActions(!isOpen);
 
   const items = useMemo(
     () =>
