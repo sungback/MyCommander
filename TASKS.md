@@ -26,9 +26,8 @@
 - **리팩토링(2026-11-13)**: 급한 구조 문제는 없습니다. 크기×변경 빈도로 6개를 봤고 `panelStoreFileActions.ts` 분리는 끝났습니다.
   - 완료(`3749b3c`, `6522a25`, 릴리즈 없음): `DialogContainer`·`CommandPalette`가 대화상자·팔레트가 닫힌 동안 패널 변경(커서 이동)으로 재렌더되지 않게 `useDialogPanels`(`components/dialogs/`)로 구독을 동결했습니다. 닫힌 상태에서 커서 20회 이동 시 `DialogContainer` 추가 렌더링이 40회에서 0회로 줄었습니다(헤드리스 Profiler 측정, 회귀 테스트 `*.render-count.test.tsx` 2개). 실제 앱·대용량 폴더에서의 체감 효과는 측정하지 않았습니다. `TransferSpaceWarningDialog`는 자체 스토어만 구독해 대상이 아닙니다. 테스트 하네스 `registerDialogContainerTestLifecycle`은 `delete` 대화상자를 열어 두므로 닫힘 상태를 측정하려면 `closeDialog()`를 먼저 호출해야 합니다.
   - 완료(`9a49157`, 릴리즈 없음): `FilePanel.tsx`의 빠른 필터 상태·효과·핸들러를 `useQuickFilter.ts`로 옮겼습니다(코드 이동만, 동작 변경 없음). 기존 `FilePanel.quick-filter` 테스트와 패널 테스트 315개가 통과했지만, 코드를 일부러 망가뜨려 테스트가 잡는지는 확인하지 않았습니다.
-  - 남은 후보는 아래입니다.
-  - `FileList.tsx`·`panelStore.ts`·`lib.rs`는 이미 분해되어 있어 불필요합니다. `lib.rs` 변경이 잦은 것은 명령 등록 때문입니다.
-  - `panelStoreSizeActions.ts`(541줄)에 "바뀐 필드만 담는 `{...(같으면 {} : {...})}`" 패턴이 반복됩니다. 헬퍼화는 이번에 하지 않았습니다.
+  - 완료(릴리즈 없음): `panelStoreSizeActions.ts`에서 "같으면 `{}`, 다르면 해당 필드만 새로 담는" 패턴 4곳(`sizeCache` 3곳·`sizeStatusCache` 1곳)을 파일 내부 헬퍼 `withChangedEntry`로 묶었습니다. 순 줄 수는 오히려 3줄 늘어(+35/-32) 효과는 가독성뿐입니다. 헬퍼가 항상 `{}`를 반환하게 망가뜨리면 테스트 18개가 실패합니다. 반대로 항상 새 객체를 반환하게 해도 통과하는데, 값이 같아 동작은 같고 참조만 달라지기 때문입니다. `setEntrySizeStatus`의 `sizeStatusCache`(값이 `undefined`일 수 있음)와 `sizeCacheStale`의 `{...: false}`(참 거짓 검사) 두 곳은 형태가 달라 그대로 뒀습니다.
+  - 남은 리팩토링 후보는 없습니다. `FileList.tsx`·`panelStore.ts`·`lib.rs`는 이미 분해되어 있어 불필요합니다. `lib.rs` 변경이 잦은 것은 명령 등록 때문입니다. 3단계 후보(큰 파일이지만 문제 근거 없음)는 `docs/REFACTORING.md`가 아닌 이번 대화에서만 정리했습니다: `QuickPreviewZipView.tsx`(633줄), `useBackgroundDirSizes.ts`(411줄), `QuickPreviewJsonView.tsx`(438줄), Rust `dir_size/mod.rs`(787줄)·`scan.rs`(720줄)·`system/update.rs`(705줄). 해당 영역의 기능을 바꿀 때 분할을 검토합니다.
 - **Git 훅**: pre-commit이 변경 범위와 무관하게 타입 검사와 프런트엔드 전체 테스트를 실행합니다. 변경 범위 검사로 맞추는 작업은 요청된 적이 없습니다.
 
 ## 참고한 결정
