@@ -21,6 +21,7 @@ import { useBasicFileOperationHandlers } from "./useBasicFileOperationHandlers";
 import { useCopyMoveFlow } from "./useCopyMoveFlow";
 import { useDialogInfo } from "./useDialogInfo";
 import { useDialogInputState } from "./useDialogInputState";
+import { useDialogPanels } from "./useDialogPanels";
 
 export { getRenameSelectionEnd } from "./useDialogInputState";
 
@@ -37,8 +38,9 @@ export const DialogContainer: React.FC = () => {
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
   const activePanelId = usePanelStore((s) => s.activePanel);
-  const leftPanel = usePanelStore((s) => s.leftPanel);
-  const rightPanel = usePanelStore((s) => s.rightPanel);
+  const { leftPanel, rightPanel } = useDialogPanels(
+    openDialog === null && dragCopyRequest === null
+  );
   const clipboard = useClipboardStore((s) => s.clipboard);
   const clearClipboard = useClipboardStore((s) => s.clearClipboard);
 
