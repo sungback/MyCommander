@@ -25,8 +25,8 @@
 - **Windows `uninstall.exe` 아이콘**: 옛 NSIS 기본 아이콘 그대로입니다. `bundle > windows > nsis > uninstallerIcon`이 필요하지만, CLI를 2.12.4로 올려도 Rust `tauri-utils` 2.8.3이 `unknown field uninstallerIcon`으로 빌드를 거부합니다(2026-11-02 확인, 변경은 되돌림). 해결하려면 `tauri`·`tauri-build` 크레이트 업그레이드가 필요해 보류했습니다.
 - **리팩토링(2026-11-13)**: 급한 구조 문제는 없습니다. 크기×변경 빈도로 6개를 봤고 `panelStoreFileActions.ts` 분리는 끝났습니다.
   - 완료(`3749b3c`, `6522a25`, 릴리즈 없음): `DialogContainer`·`CommandPalette`가 대화상자·팔레트가 닫힌 동안 패널 변경(커서 이동)으로 재렌더되지 않게 `useDialogPanels`(`components/dialogs/`)로 구독을 동결했습니다. 닫힌 상태에서 커서 20회 이동 시 `DialogContainer` 추가 렌더링이 40회에서 0회로 줄었습니다(헤드리스 Profiler 측정, 회귀 테스트 `*.render-count.test.tsx` 2개). 실제 앱·대용량 폴더에서의 체감 효과는 측정하지 않았습니다. `TransferSpaceWarningDialog`는 자체 스토어만 구독해 대상이 아닙니다. 테스트 하네스 `registerDialogContainerTestLifecycle`은 `delete` 대화상자를 열어 두므로 닫힘 상태를 측정하려면 `closeDialog()`를 먼저 호출해야 합니다.
+  - 완료(`9a49157`, 릴리즈 없음): `FilePanel.tsx`의 빠른 필터 상태·효과·핸들러를 `useQuickFilter.ts`로 옮겼습니다(코드 이동만, 동작 변경 없음). 기존 `FilePanel.quick-filter` 테스트와 패널 테스트 315개가 통과했지만, 코드를 일부러 망가뜨려 테스트가 잡는지는 확인하지 않았습니다.
   - 남은 후보는 아래입니다.
-  - `FilePanel.tsx`(훅 호출 32개): 빠른 필터 상태·효과·핸들러(약 50줄)를 `useQuickFilter`로 묶을 수 있습니다. 선택 사항입니다.
   - `FileList.tsx`·`panelStore.ts`·`lib.rs`는 이미 분해되어 있어 불필요합니다. `lib.rs` 변경이 잦은 것은 명령 등록 때문입니다.
   - `panelStoreSizeActions.ts`(541줄)에 "바뀐 필드만 담는 `{...(같으면 {} : {...})}`" 패턴이 반복됩니다. 헬퍼화는 이번에 하지 않았습니다.
 - **Git 훅**: pre-commit이 변경 범위와 무관하게 타입 검사와 프런트엔드 전체 테스트를 실행합니다. 변경 범위 검사로 맞추는 작업은 요청된 적이 없습니다.
