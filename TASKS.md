@@ -6,7 +6,7 @@
 
 ## 현재 상태
 
-- 최신 릴리즈: `v1.2.82`(`7c2d9bf`, Shift+F8 영구 삭제 포함). 아래 검증 기록(`verify:release` 통과, GitHub 릴리즈 워크플로 성공, 산출물 8개)은 v1.2.76~v1.2.78 기준이며 v1.2.79~v1.2.82는 이 파일에 기록하지 않았습니다.
+- 최신 릴리즈: `v1.2.83`(`71db645`, 내부 리팩토링만 포함, 2026-11-13 태그 푸시). `main` CI는 성공했지만 GitHub 릴리즈 워크플로의 완료·공개 여부는 이 기록 시점에 미확인입니다. 직전은 `v1.2.82`(`7c2d9bf`, Shift+F8 영구 삭제 포함). 아래 검증 기록(`verify:release` 통과, GitHub 릴리즈 워크플로 성공, 산출물 8개)은 v1.2.76~v1.2.78 기준이며 v1.2.79~v1.2.82는 이 파일에 기록하지 않았습니다.
 - v1.2.77(`ce6a94b`): Tab으로 패널을 전환하면 새 활성 패널의 파일 목록으로 DOM 포커스를 옮깁니다(대화상자가 열려 있으면 제외). Filter 입력창이 포커스를 받던 원인은 코드에서 확정하지 못했습니다.
 - 리팩토링(`241eb4f`, main에 푸시, 릴리즈 없음): `panelStoreFileActions.ts`의 크기 캐시 액션 8개를 `panelStoreSizeActions.ts`로 옮겼습니다(본문 `diff` 동일). 먼저 동작 고정 테스트 16개(`panelStore.size-actions.test.ts`, `2740636`)를 추가했고 일부러 코드를 망가뜨려 테스트가 잡는 것을 확인했습니다. `verify:frontend` 통과. 푸시 후 GitHub CI는 `241eb4f`에서 `test` 잡이 실패했고(`QuickPreviewPptxView.test.tsx`의 "releases thumbnail documents that scroll out of the list", `getByTitle("2번 슬라이드 썸네일")`을 찾지 못함), 같은 코드를 담은 다음 커밋 `39ed9ef`의 CI는 성공했습니다. 로컬에서 6번 반복 실행은 모두 통과했습니다. 이번 변경(스토어)과 무관한 기존 flaky 테스트로 판단했습니다. 실패 시점 DOM에 슬라이드 버튼은 있고 썸네일 iframe은 없었으므로, `useEffect`의 `IntersectionObserver` 등록 전에 테스트가 `setVisible`을 호출한 경합으로 추정하고 `d71803f`에서 등록을 `waitFor`로 기다리게 고쳤습니다. 실패를 재현하지는 못해서 효과는 입증되지 않았고, `d71803f`의 CI는 성공했지만 한 번의 성공입니다. 이후 CI에서 같은 테스트가 다시 실패하면 재조사합니다. Rust 검사는 이번 변경과 무관해 돌리지 않았습니다.
 - 브랜치 정리(2026-11-03): 작업 브랜치 `release-1.2.75`와 로컬 `main`을 `origin/main`(`d71803f`)에 맞췄습니다. 옛 로컬 `main`의 커밋 3개(`4ccd973`·`c9af404`·`081354a`)는 `git cherry`로 원격에 같은 변경이 있음을 확인했고, 옛 끝점 `081354a`는 reflog에 있습니다.
