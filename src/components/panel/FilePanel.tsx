@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { usePanelStore } from "../../store/panelStore";
 import { AddressBar } from "./AddressBar";
 import { ColumnHeader } from "./ColumnHeader";
@@ -21,10 +21,7 @@ import { useDirectoryLoader } from "./useDirectoryLoader";
 import { FileListSkeleton } from "./FileListSkeleton";
 import { usePanelContextMenu } from "./usePanelContextMenu";
 import { QuickFilterBar } from "./QuickFilterBar";
-import {
-  filterEntriesByQuickFilter,
-  normalizeQuickFilterQuery,
-} from "./quickFilter";
+import { useQuickFilter } from "./useQuickFilter";
 
 interface FilePanelProps {
   id: "left" | "right";
@@ -32,8 +29,6 @@ interface FilePanelProps {
 
 export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const panelRef = useRef<HTMLDivElement>(null);
-  const filterInputRef = useRef<HTMLInputElement>(null);
-  const [quickFilterQuery, setQuickFilterQuery] = useState("");
   const [isDirLoading, setIsDirLoading] = useState(true);
   const onLoadStart = useCallback(() => setIsDirLoading(true), []);
   const onLoadEnd = useCallback(() => setIsDirLoading(false), []);
@@ -59,62 +54,25 @@ export const FilePanel: React.FC<FilePanelProps> = ({ id }) => {
   const fs = useFileSystem();
 
   const isActive = activePanelId === id;
-  const normalizedQuickFilter = normalizeQuickFilterQuery(quickFilterQuery);
-  const isQuickFilterActive = normalizedQuickFilter.length > 0;
-  const filteredFiles = useMemo(
-    () => filterEntriesByQuickFilter(panelState.files, quickFilterQuery),
-    [panelState.files, quickFilterQuery]
-  );
-  const totalFilterableFiles = useMemo(
-    () => panelState.files.filter((entry) => entry.name !== "..").length,
-    [panelState.files]
-  );
-
-  useEffect(() => {
-    setQuickFilterQuery("");
-  }, [panelState.currentPath]);
-
-  useEffect(() => {
-    if (!isQuickFilterActive) {
-      return;
-    }
-
-    const visiblePaths = new Set(filteredFiles.map((entry) => entry.path));
-    const selectedPaths = Array.from(panelState.selectedItems);
-    const nextSelection = selectedPaths.filter((path) => visiblePaths.has(path));
-
-    if (nextSelection.length !== selectedPaths.length) {
-      setSelection(id, nextSelection);
-    }
-  }, [filteredFiles, id, isQuickFilterActive, panelState.selectedItems, setSelection]);
-
-  useEffect(() => {
-    if (filteredFiles.length === 0 && panelState.cursorIndex !== 0) {
-      setCursor(id, 0);
-      return;
-    }
-
-    if (panelState.cursorIndex >= filteredFiles.length) {
-      setCursor(id, Math.max(0, filteredFiles.length - 1));
-    }
-  }, [filteredFiles.length, id, panelState.cursorIndex, setCursor]);
-
-  const handleQuickFilterChange = (query: string) => {
-    setQuickFilterQuery(query);
-    setCursor(id, 0);
-  };
-
-  const handleClearQuickFilter = () => {
-    setQuickFilterQuery("");
-    setCursor(id, 0);
-    filterInputRef.current?.focus({ preventScroll: true });
-  };
-
-  const focusQuickFilter = () => {
-    setActivePanel(id);
-    filterInputRef.current?.focus({ preventScroll: true });
-    filterInputRef.current?.select();
-  };
+  const {
+    filterInputRef,
+    quickFilterQuery,
+    isQuickFilterActive,
+    filteredFiles,
+    totalFilterableFiles,
+    handleQuickFilterChange,
+    handleClearQuickFilter,
+    focusQuickFilter,
+  } = useQuickFilter({
+    panelId: id,
+    files: panelState.files,
+    currentPath: panelState.currentPath,
+    selectedItems: panelState.selectedItems,
+    cursorIndex: panelState.cursorIndex,
+    setActivePanel,
+    setCursor,
+    setSelection,
+  });
 
   useDirectoryLoader({
     activeTabId: panelState.activeTabId,
