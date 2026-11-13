@@ -43,6 +43,17 @@ type SizeActions = Pick<
   | "hydrateEntrySizesFromCache"
 >;
 
+// 값이 이미 같으면 아무것도 바꾸지 않고(`{}`), 다르면 해당 필드만 새 객체로 담아 상태에 펼쳐 넣는다.
+const withChangedEntry = <K extends string, V>(
+  field: K,
+  record: Record<string, V>,
+  key: string,
+  value: V
+): { [P in K]?: Record<string, V> } =>
+  record[key] === value ? {} : ({ [field]: { ...record, [key]: value } } as {
+    [P in K]?: Record<string, V>;
+  });
+
 export const createPanelStoreSizeActions = (set: PanelStoreSet): SizeActions => ({
   updateEntrySize: (_panel, path, size, scanStartedAt, status = "exact") => {
     queueStableSizeCacheWrite(path, size, status);
@@ -129,14 +140,12 @@ export const createPanelStoreSizeActions = (set: PanelStoreSet): SizeActions => 
       return {
         sizeStatusCache: nextSizeStatusCache,
         sizeCacheStale: nextSizeCacheStale,
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
+        ...withChangedEntry(
+          "sizeCache",
+          state.sizeCache,
+          nextPanels.normalizedPath,
+          size
+        ),
         leftPanel,
         rightPanel,
       };
@@ -195,22 +204,18 @@ export const createPanelStoreSizeActions = (set: PanelStoreSet): SizeActions => 
       }
 
       return {
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
-        ...(cachedStatus === status
-          ? {}
-          : {
-              sizeStatusCache: {
-                ...state.sizeStatusCache,
-                [nextPanels.normalizedPath]: status,
-              },
-            }),
+        ...withChangedEntry(
+          "sizeCache",
+          state.sizeCache,
+          nextPanels.normalizedPath,
+          size
+        ),
+        ...withChangedEntry(
+          "sizeStatusCache",
+          state.sizeStatusCache,
+          nextPanels.normalizedPath,
+          status
+        ),
         ...(cachedStale
           ? {
               sizeCacheStale: {
@@ -339,14 +344,12 @@ export const createPanelStoreSizeActions = (set: PanelStoreSet): SizeActions => 
       }
 
       return {
-        ...(cachedSize === size
-          ? {}
-          : {
-              sizeCache: {
-                ...state.sizeCache,
-                [nextPanels.normalizedPath]: size,
-              },
-            }),
+        ...withChangedEntry(
+          "sizeCache",
+          state.sizeCache,
+          nextPanels.normalizedPath,
+          size
+        ),
         leftPanel: nextPanels.leftPanel,
         rightPanel: nextPanels.rightPanel,
       };
