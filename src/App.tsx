@@ -69,6 +69,8 @@ function App() {
         "--app-font-family": buildFontFamilyStack(settings.fontFamily),
         "--app-font-size": `${settings.fontSize}px`,
         "--app-row-height": `${Math.max(24, settings.fontSize * 2)}px`,
+        "--col-size-width": `${settings.columnWidths?.size ?? 96}px`,
+        "--col-date-width": `${settings.columnWidths?.date ?? 144}px`,
         fontSize: "var(--app-font-size)",
         fontFamily: "var(--app-font-family)",
       } as React.CSSProperties}

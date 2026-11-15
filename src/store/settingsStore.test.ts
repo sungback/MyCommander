@@ -42,6 +42,33 @@ describe("settingsStore", () => {
     expect(useSettingsStore.getState().panelLeftRatio).toBe(60);
   });
 
+  it("starts with default column widths", () => {
+    const state = useSettingsStore.getState();
+    expect(state.columnWidths).toEqual({ size: 96, date: 144 });
+  });
+
+  it("updates column widths with clamping", () => {
+    const store = useSettingsStore.getState();
+    store.setColumnWidth("size", 150);
+    expect(useSettingsStore.getState().columnWidths.size).toBe(150);
+
+    // 최소치 미만이면 최소치로 clamp
+    store.setColumnWidth("size", 20);
+    expect(useSettingsStore.getState().columnWidths.size).toBe(60);
+
+    // 최대치 초과면 최대치로 clamp
+    store.setColumnWidth("date", 500);
+    expect(useSettingsStore.getState().columnWidths.date).toBe(320);
+  });
+
+  it("resets column widths to default", () => {
+    const store = useSettingsStore.getState();
+    store.setColumnWidth("size", 180);
+    store.setColumnWidth("date", 220);
+    store.resetColumnWidths();
+    expect(useSettingsStore.getState().columnWidths).toEqual({ size: 96, date: 144 });
+  });
+
   it("merge migrates legacy uiFontFamily to fontFamily", () => {
     localStorage.setItem(
       "mycommander-settings",

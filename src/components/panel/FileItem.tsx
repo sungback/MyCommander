@@ -323,16 +323,20 @@ export const FileItem: React.FC<FileItemProps> = React.memo(({
         <>
           <div
             className={clsx(
-              "w-24 px-2 text-right border-r border-border-color/30",
+              "px-2 text-right border-r border-border-color/30 shrink-0",
               secondaryTextClass
             )}
+            style={{ width: "var(--col-size-width, 96px)" }}
             title={entrySizeTitle}
             aria-label={entrySizeTitle ? `Size: ${entrySizeText}. ${entrySizeTitle}` : undefined}
             aria-busy={isSizeBusy || undefined}
           >
             {entrySizeText}
           </div>
-          <div className={clsx("w-36 px-2 whitespace-nowrap", secondaryTextClass)}>
+          <div
+            className={clsx("px-2 whitespace-nowrap shrink-0", secondaryTextClass)}
+            style={{ width: "var(--col-date-width, 144px)" }}
+          >
             {formatDate(entry.lastModified)}
           </div>
         </>
