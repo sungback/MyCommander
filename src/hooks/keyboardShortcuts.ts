@@ -33,6 +33,8 @@ export interface KeyboardHandlerDependencies
     | "openPreview"
     | "openSearch"
     | "openSync"
+    | "openWildcardSelect"
+    | "invertSelection"
     | "pasteFromClipboard"
     | "swapPanels"
     | "syncOtherPanelToCurrentPath"
@@ -235,6 +237,30 @@ const handleModifiedShortcut = (
     return true;
   }
 
+  if (hasCommandModifier && event.shiftKey && event.code === "KeyS") {
+    if (!isInputFocused()) {
+      event.preventDefault();
+      deps.openWildcardSelect("select");
+    }
+    return true;
+  }
+
+  if (hasCommandModifier && event.shiftKey && event.code === "KeyD") {
+    if (!isInputFocused()) {
+      event.preventDefault();
+      deps.openWildcardSelect("unselect");
+    }
+    return true;
+  }
+
+  if (hasCommandModifier && event.shiftKey && event.code === "KeyI") {
+    if (!isInputFocused()) {
+      event.preventDefault();
+      deps.invertSelection();
+    }
+    return true;
+  }
+
   if (hasCommandModifier && event.shiftKey && event.code === "KeyN") {
     if (!isInputFocused()) {
       event.preventDefault();
@@ -319,6 +345,35 @@ const handleNavigationShortcut = (
   return false;
 };
 
+const handleNumpadShortcut = (
+  event: KeyboardEvent,
+  deps: Pick<KeyboardHandlerDependencies, "openWildcardSelect" | "invertSelection">
+) => {
+  if (isInputFocused()) {
+    return false;
+  }
+
+  if (event.code === "NumpadAdd") {
+    event.preventDefault();
+    deps.openWildcardSelect("select");
+    return true;
+  }
+
+  if (event.code === "NumpadSubtract") {
+    event.preventDefault();
+    deps.openWildcardSelect("unselect");
+    return true;
+  }
+
+  if (event.code === "NumpadMultiply") {
+    event.preventDefault();
+    deps.invertSelection();
+    return true;
+  }
+
+  return false;
+};
+
 export const createKeyboardHandler =
   (deps: KeyboardHandlerDependencies) => (event: KeyboardEvent) => {
     const isCloseShortcut =
@@ -342,6 +397,10 @@ export const createKeyboardHandler =
     }
 
     if (clearClipboardOnEscape(event)) {
+      return;
+    }
+
+    if (handleNumpadShortcut(event, deps)) {
       return;
     }
 

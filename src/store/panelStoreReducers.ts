@@ -16,6 +16,8 @@ export {
 } from "./panelStoreNavigation";
 export {
   clearPanelSelection,
+  invertPanelSelection,
+  selectByPatternInPanel,
   selectOnlyInPanel,
   setPanelCursor,
   setPanelSelection,

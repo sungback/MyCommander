@@ -229,6 +229,15 @@ export const useCommandPaletteActions = (
       openSearch: () => setOpenDialog("search"),
       openSettings: () => setOpenDialog("settings"),
       openSync: () => setOpenDialog("sync"),
+      openWildcardSelect: (mode: "select" | "unselect" = "select") => {
+        closeDialog();
+        useDialogStore.getState().openWildcardDialog(mode);
+      },
+      invertSelection: () => {
+        closeDialog();
+        usePanelStore.getState().invertSelection(activePanelId);
+        showTransientToast("선택이 반전되었습니다.");
+      },
       openTerminal: async () => {
         closeDialog();
         try {

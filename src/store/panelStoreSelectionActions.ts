@@ -1,6 +1,8 @@
 import {
   clearPanelSelection,
   getPanelKey,
+  invertPanelSelection,
+  selectByPatternInPanel,
   selectOnlyInPanel,
   setPanelCursor,
   setPanelSelection,
@@ -15,6 +17,8 @@ import {
 type SelectionActions = Pick<
   PanelStoreActions,
   | "clearSelection"
+  | "invertSelection"
+  | "selectByPattern"
   | "selectOnly"
   | "setCursor"
   | "setSelection"
@@ -55,6 +59,30 @@ export const createPanelStoreSelectionActions = (
 
       return panelUpdate(panelKey, nextPanelState);
     }),
+
+  invertSelection: (panel) =>
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const nextPanelState = invertPanelSelection(state[panelKey]);
+
+      return panelUpdate(panelKey, nextPanelState);
+    }),
+
+  selectByPattern: (panel, pattern, mode = "select") => {
+    let count = 0;
+    set((state) => {
+      const panelKey = getPanelKey(panel);
+      const { nextPanelState, changedCount } = selectByPatternInPanel(
+        state[panelKey],
+        pattern,
+        mode
+      );
+      count = changedCount;
+
+      return panelUpdate(panelKey, nextPanelState);
+    });
+    return count;
+  },
 
   setCursor: (panel, cursorIndex) =>
     set((state) => {

@@ -55,6 +55,56 @@ describe("panelStore — selection", () => {
     expect(selected.has("/new1")).toBe(true);
     expect(selected.has("/new2")).toBe(true);
   });
+
+  it("invertSelection inverts selection excluding ..", () => {
+    const { setFiles, toggleSelection, invertSelection } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "..", path: "/parent", kind: "directory" },
+      { name: "file1.txt", path: "/parent/file1.txt", kind: "file" },
+      { name: "file2.jpg", path: "/parent/file2.jpg", kind: "file" },
+      { name: "file3.png", path: "/parent/file3.png", kind: "file" },
+    ]);
+
+    toggleSelection("left", "/parent/file1.txt");
+    expect(usePanelStore.getState().leftPanel.selectedItems.size).toBe(1);
+
+    invertSelection("left");
+    const selected = usePanelStore.getState().leftPanel.selectedItems;
+    expect(selected.has("/parent")).toBe(false); // ".." must never be selected
+    expect(selected.has("/parent/file1.txt")).toBe(false);
+    expect(selected.has("/parent/file2.jpg")).toBe(true);
+    expect(selected.has("/parent/file3.png")).toBe(true);
+  });
+
+  it("selectByPattern selects and unselects matching files", () => {
+    const { setFiles, selectByPattern } = usePanelStore.getState();
+
+    setFiles("left", [
+      { name: "..", path: "/dir/..", kind: "directory" },
+      { name: "photo1.jpg", path: "/dir/photo1.jpg", kind: "file" },
+      { name: "photo2.PNG", path: "/dir/photo2.PNG", kind: "file" },
+      { name: "notes.txt", path: "/dir/notes.txt", kind: "file" },
+      { name: "readme.md", path: "/dir/readme.md", kind: "file" },
+    ]);
+
+    // Select all images
+    const selectedCount = selectByPattern("left", "*.jpg; *.png", "select");
+    expect(selectedCount).toBe(2);
+
+    let selected = usePanelStore.getState().leftPanel.selectedItems;
+    expect(selected.has("/dir/photo1.jpg")).toBe(true);
+    expect(selected.has("/dir/photo2.PNG")).toBe(true);
+    expect(selected.has("/dir/notes.txt")).toBe(false);
+
+    // Unselect *.png
+    const unselectedCount = selectByPattern("left", "*.png", "unselect");
+    expect(unselectedCount).toBe(1);
+
+    selected = usePanelStore.getState().leftPanel.selectedItems;
+    expect(selected.has("/dir/photo1.jpg")).toBe(true);
+    expect(selected.has("/dir/photo2.PNG")).toBe(false);
+  });
 });
 
 describe("panelStore — tabs", () => {

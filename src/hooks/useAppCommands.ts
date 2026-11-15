@@ -49,6 +49,12 @@ export function useAppCommands() {
   const openSearch = () => setOpenDialog("search");
   const openSync = () => setOpenDialog("sync");
   const openCommandPalette = () => setOpenDialog("commandPalette");
+  const openWildcardSelect = (mode: "select" | "unselect" = "select") =>
+    useDialogStore.getState().openWildcardDialog(mode);
+  const invertSelection = () => {
+    const state = usePanelStore.getState();
+    state.invertSelection(state.activePanel);
+  };
   const swapPanels = () => usePanelStore.getState().swapPanels();
 
   const openEditor = async () => {
@@ -226,6 +232,8 @@ export function useAppCommands() {
     openSearch,
     openSync,
     openCommandPalette,
+    openWildcardSelect,
+    invertSelection,
     swapPanels,
     closeApp,
     syncOtherPanelToCurrentPath,

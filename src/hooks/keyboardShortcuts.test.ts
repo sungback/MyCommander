@@ -60,6 +60,8 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   openSearch: vi.fn(),
   openSync: vi.fn(),
   openCommandPalette: vi.fn(),
+  openWildcardSelect: vi.fn(),
+  invertSelection: vi.fn(),
   openInfoDialog: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
@@ -405,5 +407,47 @@ describe('createKeyboardHandler', () => {
     handler(makeEvent('Escape'));
 
     expect(mockClearClipboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('NumpadAdd → calls deps.openWildcardSelect("select")', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('+', { code: 'NumpadAdd' }));
+    expect(deps.openWildcardSelect).toHaveBeenCalledWith('select');
+  });
+
+  it('NumpadSubtract → calls deps.openWildcardSelect("unselect")', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('-', { code: 'NumpadSubtract' }));
+    expect(deps.openWildcardSelect).toHaveBeenCalledWith('unselect');
+  });
+
+  it('NumpadMultiply → calls deps.invertSelection()', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('*', { code: 'NumpadMultiply' }));
+    expect(deps.invertSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+Shift+S / Cmd+Shift+S → calls deps.openWildcardSelect("select")', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('S', { ctrlKey: true, shiftKey: true, code: 'KeyS' }));
+    expect(deps.openWildcardSelect).toHaveBeenCalledWith('select');
+  });
+
+  it('Ctrl+Shift+D / Cmd+Shift+D → calls deps.openWildcardSelect("unselect")', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('D', { ctrlKey: true, shiftKey: true, code: 'KeyD' }));
+    expect(deps.openWildcardSelect).toHaveBeenCalledWith('unselect');
+  });
+
+  it('Ctrl+Shift+I / Cmd+Shift+I → calls deps.invertSelection()', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('I', { ctrlKey: true, shiftKey: true, code: 'KeyI' }));
+    expect(deps.invertSelection).toHaveBeenCalledTimes(1);
   });
 });

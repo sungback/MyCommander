@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { MultiRenameSession } from "../features/multiRename";
 import { FileEntry } from "../types/file";
 
+export type WildcardSelectMode = "select" | "unselect";
+
 export type DialogType =
   | "copy"
   | "move"
@@ -20,6 +22,7 @@ export type DialogType =
   | "settings"
   | "commandPalette"
   | "update"
+  | "wildcardSelect"
   | null;
 
 export type CopyMoveDialogType = Extract<DialogType, "copy" | "move">;
@@ -43,7 +46,9 @@ export interface DialogState {
   dragCopyRequest: DragCopyRequest | null;
   multiRenameSession: MultiRenameSession | null;
   isPasteMode: boolean;
+  wildcardMode: WildcardSelectMode;
   setOpenDialog: (dialog: DialogType) => void;
+  openWildcardDialog: (mode?: WildcardSelectMode) => void;
   openRenameDialog: (target: DialogTarget) => void;
   openInfoDialog: (target: DialogTarget) => void;
   openMultiRenameDialog: (session: MultiRenameSession) => void;
@@ -71,9 +76,19 @@ export const useDialogStore = create<DialogState>((set) => ({
   dragCopyRequest: null,
   multiRenameSession: null,
   isPasteMode: false,
+  wildcardMode: "select",
   setOpenDialog: (dialog) =>
     set({
       openDialog: dialog,
+      dialogTarget: null,
+      dragCopyRequest: null,
+      multiRenameSession: null,
+      isPasteMode: false,
+    }),
+  openWildcardDialog: (wildcardMode = "select") =>
+    set({
+      openDialog: "wildcardSelect",
+      wildcardMode,
       dialogTarget: null,
       dragCopyRequest: null,
       multiRenameSession: null,

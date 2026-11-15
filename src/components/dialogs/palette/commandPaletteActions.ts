@@ -47,6 +47,8 @@ export interface CommandPaletteActions {
   openSettings: () => void;
   openSync: () => void;
   openTerminal: () => void | Promise<void>;
+  openWildcardSelect: (mode?: "select" | "unselect") => void;
+  invertSelection: () => void;
   pasteFromClipboard: () => void;
   swapPanels: () => void;
   syncOtherPanel: () => void;

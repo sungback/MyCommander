@@ -202,6 +202,14 @@ export const useFileListKeyboard = ({
     }
 
     if (
+      event.code === "NumpadAdd" ||
+      event.code === "NumpadSubtract" ||
+      event.code === "NumpadMultiply"
+    ) {
+      return;
+    }
+
+    if (
       event.key.length === 1 &&
       !event.ctrlKey &&
       !event.metaKey &&

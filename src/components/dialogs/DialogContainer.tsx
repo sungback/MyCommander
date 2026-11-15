@@ -12,6 +12,8 @@ import { QuickPreviewDialog } from "./preview/QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { TextInputOperationDialog } from "./TextInputOperationDialog";
 import { UpdateDialog } from "./UpdateDialog";
+import { WildcardSelectDialog } from "./WildcardSelectDialog";
+import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import {
   getDragCopyTargetPath,
   getSelectedItemsText,
@@ -34,10 +36,13 @@ export const DialogContainer: React.FC = () => {
     setOpenDialog,
     openDragCopyDialog,
     isPasteMode,
+    wildcardMode,
   } = useDialogStore();
   const updateEntrySize = usePanelStore((s) => s.updateEntrySize);
   const updateEntrySizeEstimate = usePanelStore((s) => s.updateEntrySizeEstimate);
   const activePanelId = usePanelStore((s) => s.activePanel);
+  const selectByPattern = usePanelStore((s) => s.selectByPattern);
+  const invertSelection = usePanelStore((s) => s.invertSelection);
   const { leftPanel, rightPanel } = useDialogPanels(
     openDialog === null && dragCopyRequest === null
   );
@@ -143,6 +148,38 @@ export const DialogContainer: React.FC = () => {
     setIsSubmitting,
     setOperationError,
   });
+
+  const cursorEntry = activePanel.files[activePanel.cursorIndex];
+  const initialPattern = React.useMemo(() => {
+    if (!cursorEntry || cursorEntry.name === ".." || cursorEntry.kind !== "file") {
+      return "*.*";
+    }
+    const dotIndex = cursorEntry.name.lastIndexOf(".");
+    if (dotIndex > 0 && dotIndex < cursorEntry.name.length - 1) {
+      return `*.${cursorEntry.name.slice(dotIndex + 1)}`;
+    }
+    return "*.*";
+  }, [cursorEntry]);
+
+  const handleApplyWildcard = (pattern: string, mode: "select" | "unselect") => {
+    const count = selectByPattern(activePanelId, pattern, mode);
+    closeDialog();
+    if (mode === "select") {
+      showTransientStatusMessage(
+        count > 0 ? `${count}개 항목이 선택되었습니다` : "일치하는 파일이 없습니다"
+      );
+    } else {
+      showTransientStatusMessage(
+        count > 0 ? `${count}개 항목이 선택 해제되었습니다` : "일치하는 파일이 없습니다"
+      );
+    }
+  };
+
+  const handleInvertSelection = () => {
+    invertSelection(activePanelId);
+    closeDialog();
+    showTransientStatusMessage("선택이 반전되었습니다");
+  };
 
   return (
     <>
@@ -283,6 +320,15 @@ export const DialogContainer: React.FC = () => {
       />
 
       <TransferSpaceWarningDialog />
+
+      <WildcardSelectDialog
+        isOpen={openDialog === "wildcardSelect"}
+        mode={wildcardMode}
+        initialPattern={initialPattern}
+        onClose={closeDialog}
+        onSubmit={handleApplyWildcard}
+        onInvert={handleInvertSelection}
+      />
 
       <QuickPreviewDialog />
       <SettingsDialog />

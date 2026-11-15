@@ -9,6 +9,7 @@ const {
   mockOpenPreview, mockOpenEditor, mockOpenCopy, mockOpenMove,
   mockOpenMkdir, mockOpenNewFile, mockOpenDelete, mockOpenSearch,
   mockOpenCommandPalette, mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
+  mockOpenWildcardSelect, mockInvertSelection,
   mockCopyToClipboard, mockCutToClipboard, mockPasteFromClipboard, mockNormalizeSelectionToNfc,
   mockOpenSync, mockSwapPanels, mockShowTransientStatusMessage,
   mockOpenInfoDialog, mockCloseDialog,
@@ -26,7 +27,9 @@ const {
   mockOpenDelete:      vi.fn(),
   mockOpenSearch:      vi.fn(),
   mockOpenCommandPalette: vi.fn(),
-    mockCloseApp:        vi.fn().mockResolvedValue(undefined),
+  mockOpenWildcardSelect: vi.fn(),
+  mockInvertSelection: vi.fn(),
+  mockCloseApp:        vi.fn().mockResolvedValue(undefined),
     mockSyncOtherPanel:  vi.fn(),
     mockCopyCurrentPath: vi.fn().mockResolvedValue(undefined),
     mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
@@ -69,6 +72,8 @@ vi.mock('./useAppCommands', () => ({
     openDelete:                 mockOpenDelete,
     openSearch:                 mockOpenSearch,
     openCommandPalette:         mockOpenCommandPalette,
+    openWildcardSelect:         mockOpenWildcardSelect,
+    invertSelection:            mockInvertSelection,
     openSync:                   mockOpenSync,
     swapPanels:                 mockSwapPanels,
     closeApp:                   mockCloseApp,
@@ -281,6 +286,18 @@ describe('useKeyboard', () => {
       renderKeyboard();
       press('v', { code: 'KeyV', ctrlKey: true });
       expect(mockPasteFromClipboard).toHaveBeenCalledTimes(1);
+    });
+
+    it('Ctrl+Shift+S → openWildcardSelect 호출', () => {
+      renderKeyboard();
+      press('S', { code: 'KeyS', ctrlKey: true, shiftKey: true });
+      expect(mockOpenWildcardSelect).toHaveBeenCalledWith('select');
+    });
+
+    it('Ctrl+Shift+I → invertSelection 호출', () => {
+      renderKeyboard();
+      press('I', { code: 'KeyI', ctrlKey: true, shiftKey: true });
+      expect(mockInvertSelection).toHaveBeenCalledTimes(1);
     });
   });
 

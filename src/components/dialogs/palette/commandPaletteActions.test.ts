@@ -57,6 +57,8 @@ const commandActions = {
   openSettings: vi.fn(),
   openSync: vi.fn(),
   openTerminal: vi.fn(),
+  openWildcardSelect: vi.fn(),
+  invertSelection: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
   syncOtherPanel: vi.fn(),
@@ -259,5 +261,34 @@ describe("commandPaletteActions", () => {
 
     updateItem?.run();
     expect(commandActions.checkForUpdates).toHaveBeenCalled();
+  });
+
+  it("includes wildcard selection and invert commands", () => {
+    const items = buildCommandPaletteItems({
+      activePanelId: "left",
+      activePanel: makePanel(),
+      isMac: false,
+      selectedPaths: [],
+      primaryTarget: null,
+      showHiddenFiles: false,
+      actions: commandActions,
+    });
+
+    const selectWildcard = items.find((item) => item.id === "select-wildcard");
+    const unselectWildcard = items.find((item) => item.id === "unselect-wildcard");
+    const invertSelection = items.find((item) => item.id === "invert-selection");
+
+    expect(selectWildcard?.title).toBe("Select by Pattern...");
+    expect(unselectWildcard?.title).toBe("Unselect by Pattern...");
+    expect(invertSelection?.title).toBe("Invert Selection");
+
+    selectWildcard?.run();
+    expect(commandActions.openWildcardSelect).toHaveBeenCalledWith("select");
+
+    unselectWildcard?.run();
+    expect(commandActions.openWildcardSelect).toHaveBeenCalledWith("unselect");
+
+    invertSelection?.run();
+    expect(commandActions.invertSelection).toHaveBeenCalled();
   });
 });

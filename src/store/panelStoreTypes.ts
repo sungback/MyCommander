@@ -38,6 +38,12 @@ export interface AppState {
   toggleSelection: (panel: PanelId, path: string) => void;
   selectOnly: (panel: PanelId, path: string | null) => void;
   clearSelection: (panel: PanelId) => void;
+  invertSelection: (panel: PanelId) => void;
+  selectByPattern: (
+    panel: PanelId,
+    pattern: string,
+    mode?: "select" | "unselect"
+  ) => number;
   setCursor: (panel: PanelId, index: number) => void;
   refreshPanel: (panel: PanelId) => void;
   bumpExpandedChildrenVersion: (panel: PanelId) => void;
