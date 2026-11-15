@@ -6,6 +6,7 @@
 
 ## 현재 상태
 
+- 와일드카드 파일 선택 및 선택 반전(`93aa535`, main에 커밋): 와일드카드 패턴 매칭(`wildcardMatch.ts`), 스토어 액션(`selectByPattern`, `invertSelection`), 전용 대화상자(`WildcardSelectDialog.tsx`), 단축키(`Num +`, `Num -`, `Num *`, `Cmd+Shift+S/D/I`), 명령 팔레트(`Select by Pattern...`, `Unselect by Pattern...`, `Invert Selection`)를 구현했습니다. 단위/통합 테스트 28개 추가(총 163개 파일 / 1356개 테스트 전체 통과), TypeScript 타입 검사 및 프로덕션 번들 빌드 통과.
 - 최신 릴리즈: `v1.2.84`(`243602f`, 2026-11-15 태그 푸시).
   - 기능 커밋 `9337837`: `ColumnHeader.tsx`에 Size·Date 컬럼 드래그 리사이즈 핸들과 더블클릭 기본값 리셋을 추가했습니다. 너비 상태는 `settingsStore.ts`에 영속화되며, CSS 변수(`--col-size-width`, `--col-date-width`)를 통해 수천 개 행의 `FileItem`에 개별 리렌더링 없이 즉시 연동됩니다.
   - 단위 테스트 추가: `ColumnHeader.test.tsx`(4개), `settingsStore.test.ts`(10개).
