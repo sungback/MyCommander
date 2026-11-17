@@ -1,12 +1,13 @@
 use super::app_menu::{
     set_panel_view_menu_checks, CHECK_UPDATES_MENU_ITEM_ID, FOLDER_SYNC_MENU_ITEM_ID,
-    LEFT_PANEL_VIEW_MENU_ID, LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
+    INVERT_SELECTION_MENU_ITEM_ID, LEFT_PANEL_VIEW_MENU_ID, LEFT_VIEW_MODE_BRIEF_MENU_ITEM_ID,
     LEFT_VIEW_MODE_DETAILED_MENU_ITEM_ID, MULTI_RENAME_MENU_ITEM_ID, NEW_FILE_MENU_ITEM_ID,
     NEW_FOLDER_MENU_ITEM_ID, RECOVER_RENDERER_MENU_ITEM_ID, RIGHT_PANEL_VIEW_MENU_ID,
     RIGHT_VIEW_MODE_BRIEF_MENU_ITEM_ID, RIGHT_VIEW_MODE_DETAILED_MENU_ITEM_ID,
-    SETTINGS_MENU_ITEM_ID, SHOW_HIDDEN_MENU_ITEM_ID, SWAP_PANELS_MENU_ITEM_ID,
-    TARGET_EQUALS_SOURCE_MENU_ITEM_ID, THEME_AUTO_MENU_ITEM_ID, THEME_DARK_MENU_ITEM_ID,
-    THEME_LIGHT_MENU_ITEM_ID, VIEW_MENU_ID,
+    SELECT_BY_PATTERN_MENU_ITEM_ID, SETTINGS_MENU_ITEM_ID, SHOW_HIDDEN_MENU_ITEM_ID,
+    SWAP_PANELS_MENU_ITEM_ID, TARGET_EQUALS_SOURCE_MENU_ITEM_ID, THEME_AUTO_MENU_ITEM_ID,
+    THEME_DARK_MENU_ITEM_ID, THEME_LIGHT_MENU_ITEM_ID, UNSELECT_BY_PATTERN_MENU_ITEM_ID,
+    VIEW_MENU_ID,
 };
 use crate::commands::system::context_menu::{
     CONTEXT_CALCULATE_SIZE_MENU_ITEM_ID, CONTEXT_COPY_MENU_ITEM_ID, CONTEXT_COPY_PATH_MENU_ITEM_ID,
@@ -43,6 +44,15 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) 
         }
         SWAP_PANELS_MENU_ITEM_ID => {
             let _ = app.emit("swap-panels-requested", ());
+        }
+        SELECT_BY_PATTERN_MENU_ITEM_ID => {
+            let _ = app.emit("select-by-pattern-requested", ());
+        }
+        UNSELECT_BY_PATTERN_MENU_ITEM_ID => {
+            let _ = app.emit("unselect-by-pattern-requested", ());
+        }
+        INVERT_SELECTION_MENU_ITEM_ID => {
+            let _ = app.emit("invert-selection-requested", ());
         }
         RECOVER_RENDERER_MENU_ITEM_ID => {
             if let Some(window) = app.get_webview_window("main") {

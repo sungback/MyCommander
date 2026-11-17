@@ -183,6 +183,24 @@ export const useAppCommandListeners = ({
   );
   useTauriSignal("swap-panels-requested", () => usePanelStore.getState().swapPanels(), []);
   useTauriSignal(
+    "select-by-pattern-requested",
+    () => useDialogStore.getState().openWildcardDialog("select"),
+    []
+  );
+  useTauriSignal(
+    "unselect-by-pattern-requested",
+    () => useDialogStore.getState().openWildcardDialog("unselect"),
+    []
+  );
+  useTauriSignal(
+    "invert-selection-requested",
+    () => {
+      const state = usePanelStore.getState();
+      state.invertSelection(state.activePanel);
+    },
+    []
+  );
+  useTauriSignal(
     "multi-rename-requested",
     () => {
       const state = usePanelStore.getState();

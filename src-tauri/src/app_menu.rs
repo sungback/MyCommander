@@ -27,6 +27,9 @@ pub(crate) const COMMANDS_MENU_ID: &str = "commands";
 pub(crate) const FOLDER_SYNC_MENU_ITEM_ID: &str = "folder_sync";
 pub(crate) const TARGET_EQUALS_SOURCE_MENU_ITEM_ID: &str = "target_equals_source";
 pub(crate) const SWAP_PANELS_MENU_ITEM_ID: &str = "swap_panels";
+pub(crate) const SELECT_BY_PATTERN_MENU_ITEM_ID: &str = "select_by_pattern";
+pub(crate) const UNSELECT_BY_PATTERN_MENU_ITEM_ID: &str = "unselect_by_pattern";
+pub(crate) const INVERT_SELECTION_MENU_ITEM_ID: &str = "invert_selection";
 pub(crate) const CHECK_UPDATES_MENU_ITEM_ID: &str = "check_updates";
 
 fn app_menu_item<R: Runtime>(
@@ -166,12 +169,38 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         "패널 교환",
         Some("CmdOrCtrl+U"),
     )?;
+    let select_by_pattern = app_menu_item(
+        app,
+        SELECT_BY_PATTERN_MENU_ITEM_ID,
+        "패턴으로 선택...",
+        Some("CmdOrCtrl+Shift+S"),
+    )?;
+    let unselect_by_pattern = app_menu_item(
+        app,
+        UNSELECT_BY_PATTERN_MENU_ITEM_ID,
+        "패턴으로 선택 해제...",
+        Some("CmdOrCtrl+Shift+D"),
+    )?;
+    let invert_selection = app_menu_item(
+        app,
+        INVERT_SELECTION_MENU_ITEM_ID,
+        "선택 반전",
+        Some("CmdOrCtrl+Shift+I"),
+    )?;
     let commands_menu = Submenu::with_id_and_items(
         app,
         COMMANDS_MENU_ID,
         "명령",
         true,
-        &[&folder_sync, &target_equals_source, &swap_panels],
+        &[
+            &folder_sync,
+            &target_equals_source,
+            &swap_panels,
+            &PredefinedMenuItem::separator(app)?,
+            &select_by_pattern,
+            &unselect_by_pattern,
+            &invert_selection,
+        ],
     )?;
 
     #[cfg(target_os = "macos")]
