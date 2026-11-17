@@ -10,7 +10,8 @@ export const wildcardToRegExp = (
   pattern: string,
   caseSensitive = false
 ): RegExp => {
-  const trimmed = pattern.trim();
+  // 한글 NFC/NFD 차이로 일치하지 않는 문제를 막기 위해 NFC로 맞춘다
+  const trimmed = pattern.trim().normalize("NFC");
   if (trimmed === "*.*" || trimmed === "*") {
     return /^.*$/;
   }
@@ -49,7 +50,7 @@ export const matchesWildcard = (
   return patterns.some((pattern) => {
     try {
       const regex = wildcardToRegExp(pattern, caseSensitive);
-      return regex.test(filename);
+      return regex.test(filename.normalize("NFC"));
     } catch {
       return false;
     }

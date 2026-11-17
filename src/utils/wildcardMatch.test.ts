@@ -63,4 +63,12 @@ describe("matchesWildcard", () => {
     expect(matchesWildcard("test_unit_01.spec.ts", "test_*.spec.*")).toBe(true);
     expect(matchesWildcard("prod_01.spec.ts", "test_*.spec.*")).toBe(false);
   });
+
+  it("matches Korean names regardless of NFC/NFD form", () => {
+    const nfc = "한글.txt".normalize("NFC");
+    const nfd = "한글.txt".normalize("NFD");
+    expect(matchesWildcard(nfd, "한글*")).toBe(true);
+    expect(matchesWildcard(nfc, "한글*".normalize("NFD"))).toBe(true);
+    expect(matchesWildcard(nfd, "한?.txt")).toBe(true);
+  });
 });
