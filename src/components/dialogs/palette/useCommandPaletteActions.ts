@@ -209,6 +209,12 @@ export const useCommandPaletteActions = (
         if (!primaryTarget) {
           return;
         }
+        // 폴더는 읽을 파일 내용이 없어 미리보기를 열면 "Is a directory" 오류가 난다.
+        if (primaryTarget.entry.kind === "directory") {
+          closeDialog();
+          showTransientToast("폴더는 미리보기를 지원하지 않습니다");
+          return;
+        }
         setActivePanel(primaryTarget.panelId);
         openPreviewDialog({
           panelId: primaryTarget.panelId,

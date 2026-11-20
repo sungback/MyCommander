@@ -6,19 +6,19 @@ import { useClipboardStore } from "../store/clipboardStore";
 import { useDialogStore } from "../store/dialogStore";
 
 const mockWriteFilesToPasteboard = vi.fn().mockResolvedValue(undefined);
-const { mockRenameFile, mockRefreshPanelsForDirectories, mockShowTransientToast } = vi.hoisted(
-  () => ({
+const { mockRenameFile, mockRefreshPanelsForDirectories, mockShowTransientToast, mockOpenInEditor } =
+  vi.hoisted(() => ({
     mockRenameFile: vi.fn(),
     mockRefreshPanelsForDirectories: vi.fn(),
     mockShowTransientToast: vi.fn(),
-  })
-);
+    mockOpenInEditor: vi.fn(),
+  }));
 
 vi.mock("./useFileSystem", () => ({
   useFileSystem: () => ({
     writeFilesToPasteboard: mockWriteFilesToPasteboard,
     renameFile: mockRenameFile,
-    openInEditor: vi.fn().mockResolvedValue(undefined),
+    openInEditor: mockOpenInEditor,
     quitApp: vi.fn().mockResolvedValue(undefined),
     runShellCommand: vi.fn().mockResolvedValue(undefined),
     syncWatchedDirectories: vi.fn().mockResolvedValue(undefined),
@@ -328,6 +328,44 @@ describe("useAppCommands — normalizeSelectionToNfc", () => {
 
 // ── openPreview ───────────────────────────────────────────────────────────────
 
+describe("useAppCommands — openEditor", () => {
+  beforeEach(() => {
+    usePanelStore.setState(usePanelStore.getInitialState());
+    mockOpenInEditor.mockReset().mockResolvedValue(undefined);
+    mockShowTransientToast.mockClear();
+  });
+
+  it("커서 파일을 편집기로 연다", async () => {
+    usePanelStore.getState().setFiles("left", [
+      { name: "a.txt", path: "/d/a.txt", kind: "file", size: 1 },
+    ]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    await result.current.openEditor();
+
+    expect(mockOpenInEditor).toHaveBeenCalledWith("/d/a.txt");
+  });
+
+  it("폴더면 편집기를 열지 않고 안내 토스트를 띄운다", async () => {
+    usePanelStore.getState().setFiles("left", [
+      { name: "Downloads", path: "/d/Downloads", kind: "directory" },
+    ]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    await result.current.openEditor();
+
+    expect(mockOpenInEditor).not.toHaveBeenCalled();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "폴더는 편집할 수 없습니다",
+      expect.anything()
+    );
+  });
+});
+
 describe("useAppCommands — openPreview", () => {
   const file = (name: string) => ({ name, path: `/d/${name}`, kind: "file" as const, size: 1 });
 
@@ -362,6 +400,37 @@ describe("useAppCommands — openPreview", () => {
       panelId: "right",
       path: "/d/a.txt",
     });
+  });
+
+  it("폴더면 대화상자를 열지 않고 안내 토스트를 띄운다", () => {
+    mockShowTransientToast.mockClear();
+    usePanelStore.getState().setFiles("left", [
+      { name: "Downloads", path: "/d/Downloads", kind: "directory" },
+    ]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openPreview();
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "폴더는 미리보기를 지원하지 않습니다",
+      expect.anything()
+    );
+  });
+
+  it("선택 항목이 폴더여도 대화상자를 열지 않는다", () => {
+    usePanelStore.getState().setFiles("right", [
+      { name: "Downloads", path: "/d/Downloads", kind: "directory" },
+    ]);
+    usePanelStore.getState().setSelection("right", ["/d/Downloads"]);
+    usePanelStore.getState().setActivePanel("right");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openPreview();
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
   });
 
   it("대상이 없으면 대화상자를 열지 않는다", () => {

@@ -14,12 +14,16 @@ import { getErrorMessage, useFileSystem } from "./useFileSystem";
 
 export { isMacPlatform };
 
-const getPrimaryTargetPath = () => {
+const getPrimaryTarget = () => {
   const state = usePanelStore.getState();
   const panel = state.activePanel === "left" ? state.leftPanel : state.rightPanel;
   const selectedPath = Array.from(panel.selectedItems)[0];
   if (selectedPath) {
-    return selectedPath;
+    // 펼친 하위 항목은 panel.files에 없으므로 entry는 없을 수 있다.
+    const selectedEntry = panel.files.find(
+      (entry) => entry.path.normalize("NFC") === selectedPath.normalize("NFC")
+    );
+    return { path: selectedPath, kind: selectedEntry?.kind };
   }
 
   const cursorEntry = panel.files[panel.cursorIndex];
@@ -27,8 +31,9 @@ const getPrimaryTargetPath = () => {
     return null;
   }
 
-  return cursorEntry.path;
+  return { path: cursorEntry.path, kind: cursorEntry.kind };
 };
+
 
 export const showTransientStatusMessage = (message: string, durationMs: number = 1400) => {
   showTransientToast(message, { durationMs });
@@ -43,11 +48,16 @@ export function useAppCommands() {
 
   // 미리보기 대화상자는 대상 파일(dialogTarget)이 있어야 열리므로 선택 항목이나 커서 항목을 넘긴다.
   const openPreview = () => {
-    const path = getPrimaryTargetPath();
-    if (!path) {
+    const target = getPrimaryTarget();
+    if (!target) {
       return;
     }
-    openPreviewDialog({ panelId: usePanelStore.getState().activePanel, path });
+    // 폴더는 읽을 파일 내용이 없어 미리보기를 열면 "Is a directory" 오류가 난다.
+    if (target.kind === "directory") {
+      showTransientStatusMessage("폴더는 미리보기를 지원하지 않습니다");
+      return;
+    }
+    openPreviewDialog({ panelId: usePanelStore.getState().activePanel, path: target.path });
   };
   const openCopy = () => setOpenDialog("copy");
   const openMove = () => setOpenDialog("move");
@@ -67,13 +77,18 @@ export function useAppCommands() {
   const swapPanels = () => usePanelStore.getState().swapPanels();
 
   const openEditor = async () => {
-    const path = getPrimaryTargetPath();
-    if (!path) {
+    const target = getPrimaryTarget();
+    if (!target) {
+      return;
+    }
+    // 폴더는 편집할 수 없으므로 시스템 알림 대신 토스트로 안내한다.
+    if (target.kind === "directory") {
+      showTransientStatusMessage("폴더는 편집할 수 없습니다");
       return;
     }
 
     try {
-      await fs.openInEditor(path);
+      await fs.openInEditor(target.path);
     } catch (error) {
       console.error("Failed to open editor:", error);
       window.alert(getErrorMessage(error, "Failed to open the editor."));
