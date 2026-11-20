@@ -2,7 +2,7 @@
 
 React 19·TypeScript·Vite 프런트엔드와 Tauri v2·Rust 백엔드로 구성된 크로스플랫폼 파일 매니저입니다. 스타일은 Tailwind CSS v4, 공유 상태는 Zustand, 프런트엔드 테스트는 Vitest와 Testing Library를 사용합니다. 의존성과 실행 명령의 실제 값은 [package.json](package.json), Rust 의존성은 [Cargo.toml](src-tauri/Cargo.toml)을 확인합니다.
 
-사용법은 [README.md](README.md), 작업 규칙은 [AGENTS.md](AGENTS.md), 이어서 할 일은 [TASKS.md](TASKS.md)를 참고합니다.
+사용법은 [README.md](README.md), 작업 규칙은 [AGENTS.md](AGENTS.md), 이어서 할 일은 `TASKS.md`(로컬 전용, 저장소에 커밋하지 않음)를 참고합니다.
 
 ## 설계 정책
 
