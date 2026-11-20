@@ -1,12 +1,17 @@
 # MyCommander — 작업 인계
 
-최종 갱신: 2026-11-16
+최종 갱신: 2026-11-20
 
 재개할 때 이 파일과 `git status --short`를 먼저 확인합니다. 아래 검사는 실행 당시의 결과이므로 코드가 바뀌었다면 영향 범위에 맞게 다시 확인합니다. 지난 상세 내역은 Git 이력을 봅니다.
 
 ## 현재 상태
 
-- 최신 릴리즈: `v1.2.85`(`40b4fa9`, 2026-11-16 태그 푸시).
+- 최신 릴리즈: `v1.2.87`(`bbab055`, 2026-11-20 태그 푸시). 기능 커밋 `88a828c`.
+  - 기능: 같은 확장자 전체 선택, 선택 저장·복원(앱 실행 중 메모리), 선택을 파일로 저장·불러오기(`.txt`, 한 줄에 경로 하나), 클립보드 복사 4종(이름 / 경로+이름 / 세부정보 / 경로+세부정보). 진입 경로는 명령 > 선택 도구 메뉴, Command Palette, `Alt+Num+`·`Num /`입니다. 코드는 `features/selectionCommands.ts`, `utils/selectionText.ts`이고 메뉴 이벤트는 `selection-command-requested` 하나입니다.
+  - 검증 통과: `npm run verify:release`(전체 Vitest 165개 파일 / 1379개 테스트, Rust fmt·Clippy·test, Tauri 명령 정합성, macOS `.app` 빌드). GitHub CI·Prepare Release Cache·Release Tauri App 모두 성공했고, `gh release view`로 공개(draft·prerelease 아님)와 산출물 8개를 확인했습니다. 설치 파일은 실행하지 않았습니다.
+  - 미검증: 실제 앱에서 선택 도구 메뉴, 파일 저장·열기 대화상자, 클립보드 붙여넣기. 파일 저장·불러오기는 Tauri fs 권한 범위(홈·데스크톱) 밖 경로에서 실패할 수 있습니다. 펼친 하위 폴더 항목은 세부정보 복사에서 이름만 나옵니다.
+- 직전 릴리즈: `v1.2.86`(`87a52f7`, 2026-11-17, 명령 메뉴에 패턴 선택·해제·반전 추가, NFC/NFD 와일드카드 일치 수정).
+- 그 전 릴리즈: `v1.2.85`(`40b4fa9`, 2026-11-16 태그 푸시).
   - 기능 커밋 `93aa535`: 와일드카드 패턴 매칭(`wildcardMatch.ts`), 스토어 액션(`selectByPattern`, `invertSelection`), 전용 대화상자(`WildcardSelectDialog.tsx`), 단축키(`Num +`, `Num -`, `Num *`, `Cmd+Shift+S/D/I`), 명령 팔레트(`Select by Pattern...`, `Unselect by Pattern...`, `Invert Selection`)를 구현했습니다.
   - 단위/통합 테스트 추가: 28개 (총 163개 파일 / 1356개 테스트 전체 통과).
   - 검증 통과: `npm run verify:release` (TypeCheck, Vitest 163개 파일 / 1356개 테스트, Vite 번들 빌드, Cargo fmt, Clippy, Cargo test, macOS `.app` 번들 빌드).
