@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAppCommands } from "./useAppCommands";
 import { usePanelStore } from "../store/panelStore";
@@ -474,6 +474,45 @@ describe("useAppCommands — openPreview", () => {
     result.current.openPreview();
 
     expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+
+  describe("펼친 하위 폴더 선택", () => {
+    const addEntryElement = (path: string, kind: string) => {
+      const element = document.createElement("div");
+      element.dataset.entryPath = path;
+      element.dataset.entryName = path.split("/").pop() ?? "";
+      element.dataset.entryKind = kind;
+      document.body.appendChild(element);
+      return element;
+    };
+
+    afterEach(() => {
+      document.body.replaceChildren();
+    });
+
+    it("화면의 펼친 폴더를 선택하면 대화상자를 열지 않는다", () => {
+      usePanelStore.getState().setFiles("left", [file("a.txt")]);
+      usePanelStore.getState().setSelection("left", ["/d/parent/child"]);
+      usePanelStore.getState().setActivePanel("left");
+      addEntryElement("/d/parent/child", "directory");
+
+      const { result } = renderHook(() => useAppCommands());
+      result.current.openPreview();
+
+      expect(useDialogStore.getState().openDialog).toBeNull();
+    });
+
+    it("화면의 펼친 파일을 선택하면 미리보기를 연다", () => {
+      usePanelStore.getState().setFiles("left", [file("a.txt")]);
+      usePanelStore.getState().setSelection("left", ["/d/parent/note.txt"]);
+      usePanelStore.getState().setActivePanel("left");
+      addEntryElement("/d/parent/note.txt", "file");
+
+      const { result } = renderHook(() => useAppCommands());
+      result.current.openPreview();
+
+      expect(useDialogStore.getState().dialogTarget?.path).toBe("/d/parent/note.txt");
+    });
   });
 
   it("대상이 없으면 대화상자를 열지 않는다", () => {

@@ -31,6 +31,18 @@ export const getFileEntryIndex = (element: HTMLElement | null): number | null =>
   return Number.isFinite(parsedIndex) ? parsedIndex : null;
 };
 
+// 펼친 하위 항목은 패널 files에 없고 화면 DOM에만 있으므로, 경로로 DOM에서 항목을 찾는다.
+export const findFileEntryByPath = (path: string): FileEntry | null => {
+  const normalizedPath = path.normalize("NFC");
+  const elements = document.querySelectorAll<HTMLElement>(FILE_ENTRY_SELECTOR);
+  for (const element of Array.from(elements)) {
+    if (element.dataset.entryPath?.normalize("NFC") === normalizedPath) {
+      return readFileEntryFromElement(element);
+    }
+  }
+  return null;
+};
+
 export const readFileEntryFromElement = (element: HTMLElement | null): FileEntry | null => {
   if (!element) {
     return null;

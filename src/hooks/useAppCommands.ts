@@ -2,6 +2,7 @@ import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
 import { useClipboardStore, ClipboardState } from "../store/clipboardStore";
 import { showTransientToast } from "../store/toastStore";
+import { findFileEntryByPath } from "../components/panel/fileEntryElement";
 import { writeClipboardText } from "../utils/clipboard";
 import {
   arePanelAccessPathsEquivalent,
@@ -19,10 +20,11 @@ const getPrimaryTarget = () => {
   const panel = state.activePanel === "left" ? state.leftPanel : state.rightPanel;
   const selectedPath = Array.from(panel.selectedItems)[0];
   if (selectedPath) {
-    // 펼친 하위 항목은 panel.files에 없으므로 entry는 없을 수 있다.
-    const selectedEntry = panel.files.find(
-      (entry) => entry.path.normalize("NFC") === selectedPath.normalize("NFC")
-    );
+    // 펼친 하위 항목은 panel.files에 없으므로 화면 DOM에서 종류를 찾는다.
+    const selectedEntry =
+      panel.files.find(
+        (entry) => entry.path.normalize("NFC") === selectedPath.normalize("NFC")
+      ) ?? findFileEntryByPath(selectedPath);
     return { path: selectedPath, kind: selectedEntry?.kind };
   }
 
