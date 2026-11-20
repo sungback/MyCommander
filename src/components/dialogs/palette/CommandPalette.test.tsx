@@ -127,6 +127,45 @@ describe("CommandPalette", () => {
     expect(screen.getAllByText("No files selected").length).toBeGreaterThan(0);
   });
 
+  const runQuickPreview = () => {
+    openPalette();
+    fireEvent.change(screen.getByRole("combobox", { name: "Command" }), {
+      target: { value: "quick preview" },
+    });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Command" }), {
+      key: "Enter",
+    });
+  };
+
+  it("opens the quick preview for a selected file", () => {
+    runQuickPreview();
+
+    const dialog = useDialogStore.getState();
+    expect(dialog.openDialog).toBe("preview");
+    expect(dialog.dialogTarget?.path).toBe("/resolved/user/notes.txt");
+  });
+
+  it("does not open the quick preview for a folder and shows a toast", () => {
+    usePanelStore.setState((state) => ({
+      ...state,
+      leftPanel: {
+        ...state.leftPanel,
+        files: [
+          ...state.leftPanel.files,
+          { name: "Downloads", path: "/resolved/user/Downloads", kind: "directory" },
+        ],
+        selectedItems: new Set<string>(["/resolved/user/Downloads"]),
+      },
+    }));
+
+    runQuickPreview();
+
+    expect(useDialogStore.getState().openDialog).not.toBe("preview");
+    expect(commandPaletteMocks.mockShowTransientToast).toHaveBeenCalledWith(
+      "폴더는 미리보기를 지원하지 않습니다"
+    );
+  });
+
   it("runs the terminal command against the resolved active panel path", async () => {
     openPalette();
 
