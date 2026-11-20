@@ -1,6 +1,7 @@
 import { DependencyList, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { buildMultiRenameSession } from "../features/multiRename";
+import { isSelectionCommandId, runSelectionCommand } from "../features/selectionCommands";
 import { useDialogStore } from "../store/dialogStore";
 import { usePanelStore } from "../store/panelStore";
 import { useUpdateStore } from "../store/updateStore";
@@ -197,6 +198,15 @@ export const useAppCommandListeners = ({
     () => {
       const state = usePanelStore.getState();
       state.invertSelection(state.activePanel);
+    },
+    []
+  );
+  useTauriEvent<string>(
+    "selection-command-requested",
+    (payload) => {
+      if (isSelectionCommandId(payload)) {
+        void runSelectionCommand(payload);
+      }
     },
     []
   );

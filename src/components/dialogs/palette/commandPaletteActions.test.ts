@@ -59,6 +59,7 @@ const commandActions = {
   openTerminal: vi.fn(),
   openWildcardSelect: vi.fn(),
   invertSelection: vi.fn(),
+  runSelectionCommand: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
   syncOtherPanel: vi.fn(),
@@ -290,5 +291,12 @@ describe("commandPaletteActions", () => {
 
     invertSelection?.run();
     expect(commandActions.invertSelection).toHaveBeenCalled();
+
+    const sameExtension = items.find((item) => item.id === "select-same-extension");
+    const copyNames = items.find((item) => item.id === "copy-selected-names");
+    sameExtension?.run();
+    expect(commandActions.runSelectionCommand).toHaveBeenCalledWith("select-same-extension");
+    copyNames?.run();
+    expect(commandActions.runSelectionCommand).toHaveBeenCalledWith("copy-selected-names");
   });
 });

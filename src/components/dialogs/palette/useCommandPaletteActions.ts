@@ -15,6 +15,7 @@ import { usePanelStore } from "../../../store/panelStore";
 import { useDialogPanels } from "../useDialogPanels";
 import { useUpdateStore } from "../../../store/updateStore";
 import { showTransientToast } from "../../../store/toastStore";
+import { runSelectionCommand } from "../../../features/selectionCommands";
 import { writeClipboardText } from "../../../utils/clipboard";
 import { getPathDirectoryName } from "../../../utils/path";
 import {
@@ -237,6 +238,10 @@ export const useCommandPaletteActions = (
         closeDialog();
         usePanelStore.getState().invertSelection(activePanelId);
         showTransientToast("선택이 반전되었습니다.");
+      },
+      runSelectionCommand: (id) => {
+        closeDialog();
+        return runSelectionCommand(id);
       },
       openTerminal: async () => {
         closeDialog();

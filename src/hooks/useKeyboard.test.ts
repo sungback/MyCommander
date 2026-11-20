@@ -74,6 +74,7 @@ vi.mock('./useAppCommands', () => ({
     openCommandPalette:         mockOpenCommandPalette,
     openWildcardSelect:         mockOpenWildcardSelect,
     invertSelection:            mockInvertSelection,
+    runSelectionCommand:        vi.fn(),
     openSync:                   mockOpenSync,
     swapPanels:                 mockSwapPanels,
     closeApp:                   mockCloseApp,

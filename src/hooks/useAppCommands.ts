@@ -8,6 +8,7 @@ import {
   getPanelAccessPath,
 } from "../utils/panelPath";
 import { runNfcRename } from "../features/normalizeFilenamesToNfc";
+import { runSelectionCommand } from "../features/selectionCommands";
 import { isMacPlatform } from "../utils/platform";
 import { getErrorMessage, useFileSystem } from "./useFileSystem";
 
@@ -234,6 +235,7 @@ export function useAppCommands() {
     openCommandPalette,
     openWildcardSelect,
     invertSelection,
+    runSelectionCommand,
     swapPanels,
     closeApp,
     syncOtherPanelToCurrentPath,

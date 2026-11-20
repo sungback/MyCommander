@@ -62,6 +62,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   openCommandPalette: vi.fn(),
   openWildcardSelect: vi.fn(),
   invertSelection: vi.fn(),
+  runSelectionCommand: vi.fn().mockResolvedValue(undefined),
   openInfoDialog: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
@@ -421,6 +422,21 @@ describe('createKeyboardHandler', () => {
     const handler = createKeyboardHandler(deps);
     handler(makeEvent('-', { code: 'NumpadSubtract' }));
     expect(deps.openWildcardSelect).toHaveBeenCalledWith('unselect');
+  });
+
+  it('Alt+NumpadAdd → runs select-same-extension, not wildcard dialog', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('+', { code: 'NumpadAdd', altKey: true }));
+    expect(deps.runSelectionCommand).toHaveBeenCalledWith('select-same-extension');
+    expect(deps.openWildcardSelect).not.toHaveBeenCalled();
+  });
+
+  it('NumpadDivide → runs restore-selection', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    handler(makeEvent('/', { code: 'NumpadDivide' }));
+    expect(deps.runSelectionCommand).toHaveBeenCalledWith('restore-selection');
   });
 
   it('NumpadMultiply → calls deps.invertSelection()', () => {

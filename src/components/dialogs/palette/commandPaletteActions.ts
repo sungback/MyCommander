@@ -1,3 +1,4 @@
+import type { SelectionCommandId } from "../../../features/selectionCommands";
 import type { FileEntry, PanelId, PanelState } from "../../../types/file";
 
 export interface CommandTarget {
@@ -49,6 +50,7 @@ export interface CommandPaletteActions {
   openTerminal: () => void | Promise<void>;
   openWildcardSelect: (mode?: "select" | "unselect") => void;
   invertSelection: () => void;
+  runSelectionCommand: (id: SelectionCommandId) => void | Promise<void>;
   pasteFromClipboard: () => void;
   swapPanels: () => void;
   syncOtherPanel: () => void;

@@ -31,6 +31,32 @@ pub(crate) const SELECT_BY_PATTERN_MENU_ITEM_ID: &str = "select_by_pattern";
 pub(crate) const UNSELECT_BY_PATTERN_MENU_ITEM_ID: &str = "unselect_by_pattern";
 pub(crate) const INVERT_SELECTION_MENU_ITEM_ID: &str = "invert_selection";
 pub(crate) const CHECK_UPDATES_MENU_ITEM_ID: &str = "check_updates";
+// 선택 도구 항목 ID는 "selection_command:<명령 ID>" 형식이며, 접두사 뒤 값을 프런트엔드로 그대로 보낸다.
+pub(crate) const SELECTION_COMMAND_MENU_PREFIX: &str = "selection_command:";
+
+const SELECTION_TOOL_MENU_ITEMS: [(&str, &str, Option<&str>); 9] = [
+    ("select-same-extension", "같은 확장자 전체 선택", None),
+    ("save-selection", "선택 저장", None),
+    ("restore-selection", "선택 복원", None),
+    ("save-selection-to-file", "선택을 파일로 저장...", None),
+    (
+        "load-selection-from-file",
+        "선택을 파일에서 불러오기...",
+        None,
+    ),
+    ("copy-selected-names", "클립보드에 복사: 선택한 이름", None),
+    ("copy-selected-paths", "클립보드에 복사: 경로와 이름", None),
+    (
+        "copy-selected-details",
+        "클립보드에 복사: 모든 세부정보",
+        None,
+    ),
+    (
+        "copy-selected-path-details",
+        "클립보드에 복사: 경로+세부정보",
+        None,
+    ),
+];
 
 fn app_menu_item<R: Runtime>(
     app: &AppHandle<R>,
@@ -187,6 +213,22 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         "선택 반전",
         Some("CmdOrCtrl+Shift+I"),
     )?;
+    let selection_tool_items = SELECTION_TOOL_MENU_ITEMS
+        .iter()
+        .map(|(command_id, label, accelerator)| {
+            app_menu_item(
+                app,
+                &format!("{SELECTION_COMMAND_MENU_PREFIX}{command_id}"),
+                label,
+                *accelerator,
+            )
+        })
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let selection_tool_refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = selection_tool_items
+        .iter()
+        .map(|item| item as &dyn tauri::menu::IsMenuItem<R>)
+        .collect();
+    let selection_tools_menu = Submenu::with_items(app, "선택 도구", true, &selection_tool_refs)?;
     let commands_menu = Submenu::with_id_and_items(
         app,
         COMMANDS_MENU_ID,
@@ -200,6 +242,7 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
             &select_by_pattern,
             &unselect_by_pattern,
             &invert_selection,
+            &selection_tools_menu,
         ],
     )?;
 

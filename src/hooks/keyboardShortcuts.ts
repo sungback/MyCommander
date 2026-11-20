@@ -35,6 +35,7 @@ export interface KeyboardHandlerDependencies
     | "openSync"
     | "openWildcardSelect"
     | "invertSelection"
+    | "runSelectionCommand"
     | "pasteFromClipboard"
     | "swapPanels"
     | "syncOtherPanelToCurrentPath"
@@ -347,10 +348,25 @@ const handleNavigationShortcut = (
 
 const handleNumpadShortcut = (
   event: KeyboardEvent,
-  deps: Pick<KeyboardHandlerDependencies, "openWildcardSelect" | "invertSelection">
+  deps: Pick<
+    KeyboardHandlerDependencies,
+    "openWildcardSelect" | "invertSelection" | "runSelectionCommand"
+  >
 ) => {
   if (isInputFocused()) {
     return false;
+  }
+
+  if (event.altKey && event.code === "NumpadAdd") {
+    event.preventDefault();
+    void deps.runSelectionCommand("select-same-extension");
+    return true;
+  }
+
+  if (event.code === "NumpadDivide") {
+    event.preventDefault();
+    void deps.runSelectionCommand("restore-selection");
+    return true;
   }
 
   if (event.code === "NumpadAdd") {
