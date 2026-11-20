@@ -102,6 +102,11 @@ const restoreSelection = () => {
   const paths = panel.files
     .filter((file) => file.name !== ".." && saved.has(file.path.normalize("NFC")))
     .map((file) => file.path);
+  // 일치하는 항목이 없으면 지금 선택을 지우지 않는다.
+  if (paths.length === 0) {
+    showTransientToast("저장된 선택과 일치하는 항목이 이 폴더에 없습니다.", { tone: "error" });
+    return;
+  }
   setSelection(panelId, paths);
   showTransientToast(`선택 ${paths.length}개 복원됨`);
 };
@@ -145,6 +150,11 @@ const loadSelectionFromFile = async () => {
     // 파일 선택 중 패널이 바뀌었을 수 있어 읽은 뒤의 활성 패널을 쓴다.
     const { panelId, panel, setSelection } = getActivePanel();
     const paths = matchSelectionLines(panel.files, text);
+    // 일치하는 항목이 없으면 지금 선택을 지우지 않는다.
+    if (paths.length === 0) {
+      showTransientToast("파일의 항목과 일치하는 항목이 이 폴더에 없습니다.", { tone: "error" });
+      return;
+    }
     setSelection(panelId, paths);
     showTransientToast(`선택 ${paths.length}개 불러옴`);
   } catch (error) {

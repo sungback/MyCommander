@@ -31,6 +31,40 @@ describe("multiRename", () => {
     expect(session.items.map((item) => item.name)).toEqual(["b.txt", "a.txt"]);
   });
 
+  const panelWith = (selected: string[], cursorIndex: number) => ({
+    id: "left" as const,
+    tabs: [],
+    activeTabId: "tab",
+    currentPath: "/home/user",
+    history: [],
+    historyIndex: -1,
+    files: [
+      { name: "..", path: "/home", kind: "directory" as const },
+      { name: "a.txt", path: "/home/user/a.txt", kind: "file" as const },
+    ],
+    selectedItems: new Set(selected),
+    cursorIndex,
+    sortField: "name" as const,
+    sortDirection: "asc" as const,
+    lastUpdated: 0,
+    pendingCursorName: null,
+  });
+
+  it("선택이 없으면 커서 항목을 대상으로 한다", () => {
+    const session = buildMultiRenameSession("left", panelWith([], 1));
+    expect(session.items.map((item) => item.name)).toEqual(["a.txt"]);
+  });
+
+  it("선택이 전부 펼친 하위 항목이면 커서 항목으로 대체하지 않는다", () => {
+    const session = buildMultiRenameSession("left", panelWith(["/home/user/sub/child.txt"], 1));
+    expect(session.items).toEqual([]);
+  });
+
+  it("커서가 ..이고 선택이 없으면 빈 목록이다", () => {
+    const session = buildMultiRenameSession("left", panelWith([], 0));
+    expect(session.items).toEqual([]);
+  });
+
   it("마스크와 카운터로 새 이름 미리보기를 만든다", () => {
     const preview = buildMultiRenamePreview(
       {

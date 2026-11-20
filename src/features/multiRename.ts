@@ -135,13 +135,12 @@ export const buildMultiRenameSession = (
   panel: PanelState
 ): MultiRenameSession => {
   const visibleEntries = panel.files.filter((entry) => entry.name !== "..");
-  const selectedEntries =
+  // 선택이 있으면 이 폴더(루트)의 선택 항목만 대상으로 한다. 선택이 전부 펼친 하위 항목이면
+  // 커서 항목으로 대체하지 않고 빈 목록을 돌려준다(선택하지 않은 항목이 바뀌는 것을 막는다).
+  const items =
     panel.selectedItems.size > 0
       ? visibleEntries.filter((entry) => panel.selectedItems.has(entry.path))
-      : [];
-  const items = selectedEntries.length > 0 ? selectedEntries : [getCursorCandidate(panel)].filter(
-    (entry): entry is FileEntry => entry !== null
-  );
+      : [getCursorCandidate(panel)].filter((entry): entry is FileEntry => entry !== null);
 
   return {
     panelId,

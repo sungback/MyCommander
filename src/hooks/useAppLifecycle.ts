@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { buildMultiRenameSession } from "../features/multiRename";
 import { isSelectionCommandId, runSelectionCommand } from "../features/selectionCommands";
 import { useDialogStore } from "../store/dialogStore";
+import { showTransientToast } from "../store/toastStore";
 import { usePanelStore } from "../store/panelStore";
 import { useUpdateStore } from "../store/updateStore";
 import { ViewMode } from "../types/file";
@@ -225,7 +226,17 @@ export const useAppCommandListeners = ({
       const state = usePanelStore.getState();
       const panelId = state.activePanel;
       const panel = panelId === "left" ? state.leftPanel : state.rightPanel;
-      openMultiRenameDialog(buildMultiRenameSession(panelId, panel));
+      const session = buildMultiRenameSession(panelId, panel);
+      if (session.items.length === 0) {
+        showTransientToast(
+          panel.selectedItems.size > 0
+            ? "현재 폴더의 선택 항목만 일괄 이름 바꾸기를 할 수 있습니다."
+            : "이름을 바꿀 항목이 없습니다.",
+          { tone: "error" }
+        );
+        return;
+      }
+      openMultiRenameDialog(session);
     },
     [openMultiRenameDialog]
   );

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }));
+import { open } from "@tauri-apps/plugin-dialog";
+import { readTextFile } from "@tauri-apps/plugin-fs";
 vi.mock("../store/panelStore", () => ({
   usePanelStore: { getState: () => mocks.state },
 }));
@@ -59,6 +61,32 @@ describe("runSelectionCommand", () => {
     setPanel([file("a"), file("b")], [], 0);
     await runSelectionCommand("restore-selection");
     expect(mocks.setSelection).toHaveBeenCalledWith("left", ["/d/a"]);
+  });
+
+  it("restore with no matching paths keeps the current selection", async () => {
+    setPanel([file("a")], ["/d/a"], 0);
+    await runSelectionCommand("save-selection");
+    setPanel([file("x"), file("y")], ["/d/x"], 0);
+    await runSelectionCommand("restore-selection");
+    expect(mocks.setSelection).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.any(String), { tone: "error" });
+  });
+
+  it("load from file with no matching lines keeps the current selection", async () => {
+    setPanel([file("x")], ["/d/x"], 0);
+    vi.mocked(open).mockResolvedValue("/tmp/selection.txt");
+    vi.mocked(readTextFile).mockResolvedValue("nothing-here.txt\n");
+    await runSelectionCommand("load-selection-from-file");
+    expect(mocks.setSelection).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.any(String), { tone: "error" });
+  });
+
+  it("load from file selects the matching lines", async () => {
+    setPanel([file("x"), file("y")], [], 0);
+    vi.mocked(open).mockResolvedValue("/tmp/selection.txt");
+    vi.mocked(readTextFile).mockResolvedValue("y\n");
+    await runSelectionCommand("load-selection-from-file");
+    expect(mocks.setSelection).toHaveBeenCalledWith("left", ["/d/y"]);
   });
 
   it("restore without a saved selection changes nothing", async () => {
