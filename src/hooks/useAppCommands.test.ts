@@ -325,3 +325,53 @@ describe("useAppCommands — normalizeSelectionToNfc", () => {
     });
   });
 });
+
+// ── openPreview ───────────────────────────────────────────────────────────────
+
+describe("useAppCommands — openPreview", () => {
+  const file = (name: string) => ({ name, path: `/d/${name}`, kind: "file" as const, size: 1 });
+
+  beforeEach(() => {
+    usePanelStore.setState(usePanelStore.getInitialState());
+    useDialogStore.getState().closeDialog();
+  });
+
+  it("커서 파일을 대상으로 미리보기 대화상자를 연다", () => {
+    usePanelStore.getState().setFiles("left", [file("a.txt"), file("b.txt")]);
+    usePanelStore.getState().setCursor("left", 1);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openPreview();
+
+    const dialog = useDialogStore.getState();
+    expect(dialog.openDialog).toBe("preview");
+    expect(dialog.dialogTarget).toEqual({ panelId: "left", path: "/d/b.txt" });
+  });
+
+  it("선택 항목이 있으면 선택 항목을 대상으로 한다", () => {
+    usePanelStore.getState().setFiles("right", [file("a.txt"), file("b.txt")]);
+    usePanelStore.getState().setSelection("right", ["/d/a.txt"]);
+    usePanelStore.getState().setCursor("right", 1);
+    usePanelStore.getState().setActivePanel("right");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openPreview();
+
+    expect(useDialogStore.getState().dialogTarget).toEqual({
+      panelId: "right",
+      path: "/d/a.txt",
+    });
+  });
+
+  it("대상이 없으면 대화상자를 열지 않는다", () => {
+    usePanelStore.getState().setFiles("left", [{ name: "..", path: "/", kind: "directory" }]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openPreview();
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+  });
+});

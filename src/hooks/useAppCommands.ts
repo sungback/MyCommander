@@ -37,10 +37,18 @@ export const showTransientStatusMessage = (message: string, durationMs: number =
 export function useAppCommands() {
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openPasteDialog = useDialogStore((s) => s.openPasteDialog);
+  const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
   const openDialog = useDialogStore((s) => s.openDialog);
   const fs = useFileSystem();
 
-  const openPreview = () => setOpenDialog("preview");
+  // 미리보기 대화상자는 대상 파일(dialogTarget)이 있어야 열리므로 선택 항목이나 커서 항목을 넘긴다.
+  const openPreview = () => {
+    const path = getPrimaryTargetPath();
+    if (!path) {
+      return;
+    }
+    openPreviewDialog({ panelId: usePanelStore.getState().activePanel, path });
+  };
   const openCopy = () => setOpenDialog("copy");
   const openMove = () => setOpenDialog("move");
   const openMkdir = () => setOpenDialog("mkdir");
