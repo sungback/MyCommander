@@ -59,12 +59,20 @@ export function useAppCommands() {
     }
     openPreviewDialog({ panelId: usePanelStore.getState().activePanel, path: target.path });
   };
-  const openCopy = () => setOpenDialog("copy");
-  const openMove = () => setOpenDialog("move");
+  // 대상이 없으면(빈 폴더, ".." 위) 0개 항목 대화상자 대신 안내만 한다.
+  const openWithTargets = (dialog: "copy" | "move" | "delete" | "permanentDelete") => {
+    if (getActiveSelectedPaths().length === 0) {
+      showTransientStatusMessage("선택된 항목이 없습니다");
+      return;
+    }
+    setOpenDialog(dialog);
+  };
+  const openCopy = () => openWithTargets("copy");
+  const openMove = () => openWithTargets("move");
   const openMkdir = () => setOpenDialog("mkdir");
   const openNewFile = () => setOpenDialog("newfile");
-  const openDelete = () => setOpenDialog("delete");
-  const openPermanentDelete = () => setOpenDialog("permanentDelete");
+  const openDelete = () => openWithTargets("delete");
+  const openPermanentDelete = () => openWithTargets("permanentDelete");
   const openSearch = () => setOpenDialog("search");
   const openSync = () => setOpenDialog("sync");
   const openCommandPalette = () => setOpenDialog("commandPalette");

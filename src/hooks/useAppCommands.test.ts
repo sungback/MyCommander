@@ -328,6 +328,49 @@ describe("useAppCommands — normalizeSelectionToNfc", () => {
 
 // ── openPreview ───────────────────────────────────────────────────────────────
 
+describe("useAppCommands — openCopy / openMove / openDelete 빈 대상", () => {
+  const commandsToCheck = [
+    ["openCopy", "copy"],
+    ["openMove", "move"],
+    ["openDelete", "delete"],
+    ["openPermanentDelete", "permanentDelete"],
+  ] as const;
+
+  beforeEach(() => {
+    usePanelStore.setState(usePanelStore.getInitialState());
+    useDialogStore.getState().closeDialog();
+    mockShowTransientToast.mockClear();
+  });
+
+  it.each(commandsToCheck)("%s: 대상이 없으면 대화상자를 열지 않고 안내한다", (command) => {
+    usePanelStore.getState().setFiles("left", [{ name: "..", path: "/", kind: "directory" }]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current[command]();
+
+    expect(useDialogStore.getState().openDialog).toBeNull();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "선택된 항목이 없습니다",
+      expect.anything()
+    );
+  });
+
+  it.each(commandsToCheck)("%s: 커서 파일이 있으면 대화상자를 연다", (command, dialog) => {
+    usePanelStore.getState().setFiles("left", [
+      { name: "a.txt", path: "/d/a.txt", kind: "file", size: 1 },
+    ]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    result.current[command]();
+
+    expect(useDialogStore.getState().openDialog).toBe(dialog);
+  });
+});
+
 describe("useAppCommands — openEditor", () => {
   beforeEach(() => {
     usePanelStore.setState(usePanelStore.getInitialState());
