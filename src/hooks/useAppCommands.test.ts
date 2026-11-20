@@ -391,6 +391,21 @@ describe("useAppCommands — openEditor", () => {
     expect(mockOpenInEditor).toHaveBeenCalledWith("/d/a.txt");
   });
 
+  it("대상이 없으면 편집기를 열지 않고 안내 토스트를 띄운다", async () => {
+    usePanelStore.getState().setFiles("left", [{ name: "..", path: "/", kind: "directory" }]);
+    usePanelStore.getState().setCursor("left", 0);
+    usePanelStore.getState().setActivePanel("left");
+
+    const { result } = renderHook(() => useAppCommands());
+    await result.current.openEditor();
+
+    expect(mockOpenInEditor).not.toHaveBeenCalled();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "선택된 항목이 없습니다",
+      expect.anything()
+    );
+  });
+
   it("폴더면 편집기를 열지 않고 안내 토스트를 띄운다", async () => {
     usePanelStore.getState().setFiles("left", [
       { name: "Downloads", path: "/d/Downloads", kind: "directory" },
@@ -524,5 +539,9 @@ describe("useAppCommands — openPreview", () => {
     result.current.openPreview();
 
     expect(useDialogStore.getState().openDialog).toBeNull();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "선택된 항목이 없습니다",
+      expect.anything()
+    );
   });
 });

@@ -52,6 +52,7 @@ export function useAppCommands() {
   const openPreview = () => {
     const target = getPrimaryTarget();
     if (!target) {
+      showTransientStatusMessage("선택된 항목이 없습니다");
       return;
     }
     // 폴더는 읽을 파일 내용이 없어 미리보기를 열면 "Is a directory" 오류가 난다.
@@ -89,6 +90,7 @@ export function useAppCommands() {
   const openEditor = async () => {
     const target = getPrimaryTarget();
     if (!target) {
+      showTransientStatusMessage("선택된 항목이 없습니다");
       return;
     }
     // 폴더는 편집할 수 없으므로 시스템 알림 대신 토스트로 안내한다.
