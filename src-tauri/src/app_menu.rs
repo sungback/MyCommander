@@ -32,6 +32,8 @@ pub(crate) const UNSELECT_BY_PATTERN_MENU_ITEM_ID: &str = "unselect_by_pattern";
 pub(crate) const INVERT_SELECTION_MENU_ITEM_ID: &str = "invert_selection";
 pub(crate) const CHECK_UPDATES_MENU_ITEM_ID: &str = "check_updates";
 // 선택 도구 항목 ID는 "selection_command:<명령 ID>" 형식이며, 접두사 뒤 값을 프런트엔드로 그대로 보낸다.
+// 체크섬 메뉴 ID는 "checksum:<generate|verify>" 형식이며 접두사 뒤 값을 프런트엔드로 보낸다.
+pub(crate) const CHECKSUM_MENU_PREFIX: &str = "checksum:";
 pub(crate) const SELECTION_COMMAND_MENU_PREFIX: &str = "selection_command:";
 
 const SELECTION_TOOL_MENU_ITEMS: [(&str, &str, Option<&str>); 9] = [
@@ -213,6 +215,18 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
         "선택 반전",
         Some("CmdOrCtrl+Shift+I"),
     )?;
+    let checksum_generate = app_menu_item(
+        app,
+        &format!("{CHECKSUM_MENU_PREFIX}generate"),
+        "체크섬 생성...",
+        None::<&str>,
+    )?;
+    let checksum_verify = app_menu_item(
+        app,
+        &format!("{CHECKSUM_MENU_PREFIX}verify"),
+        "체크섬 확인...",
+        None::<&str>,
+    )?;
     let selection_tool_items = SELECTION_TOOL_MENU_ITEMS
         .iter()
         .map(|(command_id, label, accelerator)| {
@@ -292,6 +306,9 @@ pub(crate) fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Me
                     &new_file,
                     &multi_rename,
                     &settings,
+                    &PredefinedMenuItem::separator(app)?,
+                    &checksum_generate,
+                    &checksum_verify,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::close_window(app, None)?,
                     #[cfg(not(target_os = "macos"))]

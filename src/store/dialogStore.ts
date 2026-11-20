@@ -3,6 +3,7 @@ import { MultiRenameSession } from "../features/multiRename";
 import { FileEntry } from "../types/file";
 
 export type WildcardSelectMode = "select" | "unselect";
+export type ChecksumDialogMode = "generate" | "verify";
 
 export type DialogType =
   | "copy"
@@ -23,6 +24,7 @@ export type DialogType =
   | "commandPalette"
   | "update"
   | "wildcardSelect"
+  | "checksum"
   | null;
 
 export type CopyMoveDialogType = Extract<DialogType, "copy" | "move">;
@@ -47,8 +49,10 @@ export interface DialogState {
   multiRenameSession: MultiRenameSession | null;
   isPasteMode: boolean;
   wildcardMode: WildcardSelectMode;
+  checksumMode: ChecksumDialogMode;
   setOpenDialog: (dialog: DialogType) => void;
   openWildcardDialog: (mode?: WildcardSelectMode) => void;
+  openChecksumDialog: (mode: ChecksumDialogMode) => void;
   openRenameDialog: (target: DialogTarget) => void;
   openInfoDialog: (target: DialogTarget) => void;
   openMultiRenameDialog: (session: MultiRenameSession) => void;
@@ -77,6 +81,7 @@ export const useDialogStore = create<DialogState>((set) => ({
   multiRenameSession: null,
   isPasteMode: false,
   wildcardMode: "select",
+  checksumMode: "generate",
   setOpenDialog: (dialog) =>
     set({
       openDialog: dialog,
@@ -89,6 +94,15 @@ export const useDialogStore = create<DialogState>((set) => ({
     set({
       openDialog: "wildcardSelect",
       wildcardMode,
+      dialogTarget: null,
+      dragCopyRequest: null,
+      multiRenameSession: null,
+      isPasteMode: false,
+    }),
+  openChecksumDialog: (checksumMode) =>
+    set({
+      openDialog: "checksum",
+      checksumMode,
       dialogTarget: null,
       dragCopyRequest: null,
       multiRenameSession: null,

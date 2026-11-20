@@ -1,4 +1,5 @@
 import { archiveCommands } from "./tauriCommands/archiveCommands";
+import { checksumCommands } from "./tauriCommands/checksumCommands";
 import { fileCommands } from "./tauriCommands/fileCommands";
 import { gitCommands } from "./tauriCommands/gitCommands";
 import { jobCommands } from "./tauriCommands/jobCommands";
@@ -21,6 +22,7 @@ const fileSystem = {
   ...fileCommands,
   ...jobCommands,
   ...archiveCommands,
+  ...checksumCommands,
   ...searchCommands,
   ...syncCommands,
   ...gitCommands,

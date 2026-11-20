@@ -60,6 +60,7 @@ const commandActions = {
   openWildcardSelect: vi.fn(),
   invertSelection: vi.fn(),
   runSelectionCommand: vi.fn(),
+  openChecksum: vi.fn(),
   pasteFromClipboard: vi.fn(),
   swapPanels: vi.fn(),
   syncOtherPanel: vi.fn(),
@@ -291,6 +292,11 @@ describe("commandPaletteActions", () => {
 
     invertSelection?.run();
     expect(commandActions.invertSelection).toHaveBeenCalled();
+
+    items.find((item) => item.id === "checksum-generate")?.run();
+    expect(commandActions.openChecksum).toHaveBeenCalledWith("generate");
+    items.find((item) => item.id === "checksum-verify")?.run();
+    expect(commandActions.openChecksum).toHaveBeenCalledWith("verify");
 
     const sameExtension = items.find((item) => item.id === "select-same-extension");
     const copyNames = items.find((item) => item.id === "copy-selected-names");

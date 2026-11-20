@@ -387,6 +387,21 @@ export const buildCommandPaletteItems = ({
       run: () => actions.runSelectionCommand("copy-selected-path-details"),
     },
     {
+      id: "checksum-generate",
+      title: "Create Checksums...",
+      subtitle: selectionLabel,
+      keywords: ["hash", "md5", "sha1", "sha256", "crc32", "checksum"],
+      disabledReason: selectionReason,
+      run: () => actions.openChecksum("generate"),
+    },
+    {
+      id: "checksum-verify",
+      title: "Verify Checksums...",
+      subtitle: activePanelLabel,
+      keywords: ["hash", "md5", "sha1", "sha256", "sfv", "checksum", "verify"],
+      run: () => actions.openChecksum("verify"),
+    },
+    {
       id: "settings",
       title: "Open Settings",
       subtitle: "Preferences",

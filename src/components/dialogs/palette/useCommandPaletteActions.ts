@@ -239,6 +239,10 @@ export const useCommandPaletteActions = (
         usePanelStore.getState().invertSelection(activePanelId);
         showTransientToast("선택이 반전되었습니다.");
       },
+      openChecksum: (mode: "generate" | "verify") => {
+        closeDialog();
+        useDialogStore.getState().openChecksumDialog(mode);
+      },
       runSelectionCommand: (id) => {
         closeDialog();
         return runSelectionCommand(id);

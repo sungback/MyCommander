@@ -202,6 +202,15 @@ export const useAppCommandListeners = ({
     []
   );
   useTauriEvent<string>(
+    "checksum-requested",
+    (payload) => {
+      if (payload === "generate" || payload === "verify") {
+        useDialogStore.getState().openChecksumDialog(payload);
+      }
+    },
+    []
+  );
+  useTauriEvent<string>(
     "selection-command-requested",
     (payload) => {
       if (isSelectionCommandId(payload)) {

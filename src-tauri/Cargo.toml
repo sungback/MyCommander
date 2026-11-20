@@ -39,6 +39,10 @@ encoding_rs = "0.8.35"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 rayon = "1.11"
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+crc32fast = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"

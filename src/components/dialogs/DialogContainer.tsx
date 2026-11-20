@@ -13,6 +13,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { TextInputOperationDialog } from "./TextInputOperationDialog";
 import { UpdateDialog } from "./UpdateDialog";
 import { WildcardSelectDialog } from "./WildcardSelectDialog";
+import { ChecksumDialog } from "./ChecksumDialog";
 import { showTransientStatusMessage } from "../../hooks/useAppCommands";
 import {
   getDragCopyTargetPath,
@@ -329,6 +330,8 @@ export const DialogContainer: React.FC = () => {
         onSubmit={handleApplyWildcard}
         onInvert={handleInvertSelection}
       />
+
+      <ChecksumDialog />
 
       <QuickPreviewDialog />
       <SettingsDialog />

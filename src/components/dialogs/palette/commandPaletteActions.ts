@@ -50,6 +50,7 @@ export interface CommandPaletteActions {
   openTerminal: () => void | Promise<void>;
   openWildcardSelect: (mode?: "select" | "unselect") => void;
   invertSelection: () => void;
+  openChecksum: (mode: "generate" | "verify") => void;
   runSelectionCommand: (id: SelectionCommandId) => void | Promise<void>;
   pasteFromClipboard: () => void;
   swapPanels: () => void;
