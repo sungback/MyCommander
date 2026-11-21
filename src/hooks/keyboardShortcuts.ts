@@ -3,7 +3,8 @@ import { useDialogStore, type DialogType } from "../store/dialogStore";
 import { useFavoriteStore } from "../store/favoriteStore";
 import { usePanelStore } from "../store/panelStore";
 import { useTransferSpaceWarningStore } from "../store/transferSpaceWarningStore";
-import type { DirectorySizeStatus, PanelId, ViewMode } from "../types/file";
+import type { DirectorySizeStatus, FileEntry, PanelId, ViewMode } from "../types/file";
+import { findFileEntryByPath } from "../components/panel/fileEntryElement";
 import type { DirectorySizeScanResult } from "./tauriCommands/fileCommands";
 import { showTransientStatusMessage, type useAppCommands } from "./useAppCommands";
 import { calculatePanelDirectories } from "./calculatePanelDirectories";
@@ -44,7 +45,7 @@ export interface KeyboardHandlerDependencies
   isMac: boolean;
   goBack: (panelId: PanelId) => void;
   goForward: (panelId: PanelId) => void;
-  openInfoDialog: (target: { panelId: PanelId; path: string }) => void;
+  openInfoDialog: (target: { panelId: PanelId; path: string; entry?: FileEntry }) => void;
   scanDirSize: (path: string, scanId: string) => Promise<DirectorySizeScanResult>;
   setPanelViewMode: (panelId: PanelId, viewMode: ViewMode) => void;
   setEntrySizeStatus: (
@@ -287,11 +288,33 @@ const handleModifiedShortcut = (
 
   if (hasCommandModifier && event.code === "KeyI") {
     const { activePanel, panel } = getActivePanelSnapshot();
-    const current = panel.files[panel.cursorIndex];
+    const selectedPaths = Array.from(panel.selectedItems);
 
+    // Command Palette의 정보 명령과 같은 기준: 선택 항목이 하나면 그 항목, 없으면 커서 항목.
+    if (selectedPaths.length > 1) {
+      event.preventDefault();
+      showTransientStatusMessage("정보는 항목 하나를 선택했을 때만 볼 수 있습니다");
+      return true;
+    }
+
+    if (selectedPaths.length === 1) {
+      const selectedPath = selectedPaths[0];
+      // 펼친 하위 항목은 panel.files에 없으므로 화면 DOM에서 찾는다.
+      const entry =
+        panel.files.find(
+          (file) => file.path.normalize("NFC") === selectedPath.normalize("NFC")
+        ) ?? findFileEntryByPath(selectedPath);
+      if (entry && entry.name !== "..") {
+        event.preventDefault();
+        deps.openInfoDialog({ panelId: activePanel, path: entry.path, entry });
+      }
+      return true;
+    }
+
+    const current = panel.files[panel.cursorIndex];
     if (current && current.name !== "..") {
       event.preventDefault();
-      deps.openInfoDialog({ panelId: activePanel, path: current.path });
+      deps.openInfoDialog({ panelId: activePanel, path: current.path, entry: current });
     }
     return true;
   }

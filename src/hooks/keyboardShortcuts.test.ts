@@ -460,6 +460,59 @@ describe('createKeyboardHandler', () => {
     expect(deps.openWildcardSelect).toHaveBeenCalledWith('unselect');
   });
 
+  describe('Ctrl+I → 정보 대화상자', () => {
+    const files = [
+      { name: '..', path: '/', kind: 'directory' as const },
+      { name: 'a.txt', path: '/home/a.txt', kind: 'file' as const },
+      { name: 'b.txt', path: '/home/b.txt', kind: 'file' as const },
+    ];
+    const setPanel = (selected: string[], cursorIndex: number) => {
+      mockPanelStoreGetState.mockReturnValue({
+        activePanel: 'left',
+        leftPanel: { ...makePanel(files), selectedItems: new Set(selected), cursorIndex },
+        rightPanel: makePanel(),
+      });
+    };
+    const press = (deps: KeyboardHandlerDependencies) =>
+      createKeyboardHandler(deps)(makeEvent('i', { ctrlKey: true, code: 'KeyI' }));
+
+    it('선택이 없으면 커서 항목을 연다', () => {
+      setPanel([], 1);
+      const deps = makeDeps();
+      press(deps);
+      expect(deps.openInfoDialog).toHaveBeenCalledWith({
+        panelId: 'left',
+        path: '/home/a.txt',
+        entry: files[1],
+      });
+    });
+
+    it('선택이 하나면 커서가 아니라 선택 항목을 연다', () => {
+      setPanel(['/home/b.txt'], 1);
+      const deps = makeDeps();
+      press(deps);
+      expect(deps.openInfoDialog).toHaveBeenCalledWith({
+        panelId: 'left',
+        path: '/home/b.txt',
+        entry: files[2],
+      });
+    });
+
+    it('선택이 둘 이상이면 열지 않고 안내한다', () => {
+      setPanel(['/home/a.txt', '/home/b.txt'], 1);
+      const deps = makeDeps();
+      press(deps);
+      expect(deps.openInfoDialog).not.toHaveBeenCalled();
+    });
+
+    it('커서가 ..이고 선택이 없으면 열지 않는다', () => {
+      setPanel([], 0);
+      const deps = makeDeps();
+      press(deps);
+      expect(deps.openInfoDialog).not.toHaveBeenCalled();
+    });
+  });
+
   it('Ctrl+Shift+I / Cmd+Shift+I → calls deps.invertSelection()', () => {
     const deps = makeDeps();
     const handler = createKeyboardHandler(deps);
