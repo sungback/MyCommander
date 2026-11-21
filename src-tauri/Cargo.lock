@@ -2536,7 +2536,7 @@ dependencies = [
 
 [[package]]
 name = "mycommander"
-version = "1.2.97"
+version = "1.2.98"
 dependencies = [
  "cocoa",
  "crc32fast",
