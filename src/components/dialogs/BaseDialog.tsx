@@ -1,5 +1,6 @@
 import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { focusActivePanelList } from "../../utils/panelFocus";
 
 type DialogContentProps = React.ComponentPropsWithoutRef<typeof Dialog.Content>;
 
@@ -33,6 +34,12 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
       <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
       <Dialog.Content
         onOpenAutoFocus={onOpenAutoFocus}
+        onCloseAutoFocus={(event) => {
+          // 기본 동작(열기 전 요소로 복원)은 그 요소가 사라졌거나 포커스를 못 받으면 body에 남아
+          // 방향키가 안 먹는다. 활성 패널의 파일 목록으로 직접 돌려 준다.
+          event.preventDefault();
+          focusActivePanelList();
+        }}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-panel border border-border-color rounded shadow-xl w-[450px] z-50 p-4 focus:outline-none text-text-primary"
       >
         <form
