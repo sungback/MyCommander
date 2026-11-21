@@ -45,11 +45,50 @@ const CLIPBOARD_MODES: Partial<Record<SelectionCommandId, SelectionClipboardMode
   "copy-selected-path-details": "pathDetails",
 };
 
-// 저장한 선택은 앱 실행 중에만 유지한다.
+// 저장한 선택은 메모리에 두고, 앱을 다시 켜도 복원할 수 있게 localStorage에도 남긴다.
+// 저장 형식을 바꾸면 키의 버전(v1)을 올린다. 읽을 수 없거나 형식이 다른 값은 없는 것으로 본다.
+const SAVED_SELECTION_STORAGE_KEY = "mycommander.savedSelection.v1";
+
 let savedSelectionPaths: string[] = [];
+
+const readStoredSelection = (): string[] => {
+  try {
+    const raw = window.localStorage.getItem(SAVED_SELECTION_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string")
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeStoredSelection = (paths: string[]) => {
+  try {
+    window.localStorage.setItem(SAVED_SELECTION_STORAGE_KEY, JSON.stringify(paths));
+  } catch (error) {
+    // 용량 초과 등으로 못 쓰면 이번 실행 중에만 유지된다.
+    console.error("Failed to persist saved selection:", error);
+  }
+};
+
+const getSavedSelection = (): string[] => {
+  if (savedSelectionPaths.length === 0) {
+    savedSelectionPaths = readStoredSelection();
+  }
+  return savedSelectionPaths;
+};
 
 export const resetSavedSelection = () => {
   savedSelectionPaths = [];
+  try {
+    window.localStorage.removeItem(SAVED_SELECTION_STORAGE_KEY);
+  } catch {
+    // 지울 수 없어도 메모리 값은 비웠다.
+  }
 };
 
 const getActivePanel = () => {
@@ -89,16 +128,18 @@ const saveSelection = () => {
     return;
   }
   savedSelectionPaths = Array.from(panel.selectedItems);
+  writeStoredSelection(savedSelectionPaths);
   showTransientToast(`선택 ${savedSelectionPaths.length}개 저장됨`);
 };
 
 const restoreSelection = () => {
-  if (savedSelectionPaths.length === 0) {
+  const savedPaths = getSavedSelection();
+  if (savedPaths.length === 0) {
     showTransientToast("저장된 선택이 없습니다.", { tone: "error" });
     return;
   }
   const { panelId, panel, setSelection } = getActivePanel();
-  const saved = new Set(savedSelectionPaths.map((path) => path.normalize("NFC")));
+  const saved = new Set(savedPaths.map((path) => path.normalize("NFC")));
   const paths = panel.files
     .filter((file) => file.name !== ".." && saved.has(file.path.normalize("NFC")))
     .map((file) => file.path);

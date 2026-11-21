@@ -89,6 +89,53 @@ describe("runSelectionCommand", () => {
     expect(mocks.setSelection).toHaveBeenCalledWith("left", ["/d/y"]);
   });
 
+  describe("저장한 선택의 영속화", () => {
+    const STORAGE_KEY = "mycommander.savedSelection.v1";
+
+    it("save-selection writes the paths to localStorage", async () => {
+      setPanel([file("a"), file("b")], ["/d/a", "/d/b"], 0);
+      await runSelectionCommand("save-selection");
+      expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null")).toEqual([
+        "/d/a",
+        "/d/b",
+      ]);
+    });
+
+    it("restore uses the stored selection when memory is empty (after an app restart)", async () => {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(["/d/b"]));
+      setPanel([file("a"), file("b")], [], 0);
+      await runSelectionCommand("restore-selection");
+      expect(mocks.setSelection).toHaveBeenCalledWith("left", ["/d/b"]);
+    });
+
+    it("ignores corrupted or wrongly shaped stored data", async () => {
+      setPanel([file("a")], [], 0);
+      for (const bad of ["{not json", JSON.stringify({ a: 1 }), JSON.stringify([1, 2])]) {
+        window.localStorage.setItem(STORAGE_KEY, bad);
+        mocks.toast.mockClear();
+        await runSelectionCommand("restore-selection");
+        expect(mocks.setSelection).not.toHaveBeenCalled();
+        expect(mocks.toast).toHaveBeenCalledWith("저장된 선택이 없습니다.", { tone: "error" });
+      }
+    });
+
+    it("still restores in this session when localStorage cannot be written", async () => {
+      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("quota");
+      });
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        setPanel([file("a")], ["/d/a"], 0);
+        await runSelectionCommand("save-selection");
+        setPanel([file("a")], [], 0);
+        await runSelectionCommand("restore-selection");
+        expect(mocks.setSelection).toHaveBeenCalledWith("left", ["/d/a"]);
+      } finally {
+        setItem.mockRestore();
+      }
+    });
+  });
+
   it("restore without a saved selection changes nothing", async () => {
     setPanel([file("a")], [], 0);
     await runSelectionCommand("restore-selection");
