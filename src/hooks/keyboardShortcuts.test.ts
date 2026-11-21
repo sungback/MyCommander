@@ -321,6 +321,17 @@ describe('createKeyboardHandler', () => {
     }
   });
 
+  it('Ctrl/Cmd+F1·F2 → 활성 패널을 간단/상세 보기로 바꾼다', () => {
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+      const deps = makeDeps();
+      const handler = createKeyboardHandler(deps);
+      handler(makeEvent('F1', modifier));
+      handler(makeEvent('F2', modifier));
+      expect(deps.setPanelViewMode).toHaveBeenNthCalledWith(1, expect.any(String), 'brief');
+      expect(deps.setPanelViewMode).toHaveBeenNthCalledWith(2, expect.any(String), 'detailed');
+    }
+  });
+
   it('F2 → 입력창에 포커스가 있으면 이름 바꾸기를 열지 않는다', () => {
     const input = document.createElement('input');
     document.body.appendChild(input);
