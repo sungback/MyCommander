@@ -3,7 +3,9 @@ import type { SyncItem } from "../../../types/sync";
 import {
   excludeSameSyncItems,
   formatSyncExecutionFailures,
+  getDifferingTopLevelNames,
   getPanelAccessPath,
+  pickPanelPathsByName,
   getStatusColor,
   getStatusLabel,
   selectAllPendingSyncItems,
@@ -116,5 +118,43 @@ describe("syncDialogHelpers", () => {
   it("falls back to currentPath when resolvedPath is null in getPanelAccessPath", () => {
     const panel = { currentPath: "/current", resolvedPath: null } as unknown as Parameters<typeof getPanelAccessPath>[0];
     expect(getPanelAccessPath(panel)).toBe("/current");
+  });
+
+  describe("차이 항목 선택", () => {
+    const item = (relPath: string, status: SyncItem["status"]): SyncItem => ({
+      relPath,
+      leftPath: null,
+      rightPath: null,
+      leftKind: "file",
+      rightKind: "file",
+      status,
+      direction: "skip",
+    });
+
+    it("Same을 빼고 최상위 이름만 모은다(하위 경로는 폴더 이름으로)", () => {
+      const names = getDifferingTopLevelNames([
+        item("a.txt", "LeftOnly"),
+        item("docs/report.md", "LeftNewer"),
+        item("docs/other.md", "RightOnly"),
+        item("same.txt", "Same"),
+      ]);
+      expect([...names].sort()).toEqual(["a.txt", "docs"]);
+    });
+
+    it("역슬래시 경로와 NFD 이름도 최상위 이름으로 정규화한다", () => {
+      const names = getDifferingTopLevelNames([item("한글\\x.txt".normalize("NFD"), "RightNewer")]);
+      expect([...names]).toEqual(["한글"]);
+    });
+
+    it("패널 항목에서 이름이 일치하는 경로만 고르고 ..은 제외한다", () => {
+      const files = [
+        { name: "..", path: "/", kind: "directory" as const },
+        { name: "a.txt", path: "/d/a.txt", kind: "file" as const },
+        { name: "b.txt", path: "/d/b.txt", kind: "file" as const },
+        { name: "한글", path: "/d/한글", kind: "directory" as const },
+      ];
+      const picked = pickPanelPathsByName(files, new Set(["a.txt", "..", "한글".normalize("NFC")]));
+      expect(picked).toEqual(["/d/a.txt", "/d/한글"]);
+    });
   });
 });

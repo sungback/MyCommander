@@ -18,6 +18,7 @@ export const SyncDialog: React.FC = () => {
   const rightPanel = usePanelStore((s) => s.rightPanel);
   const showHiddenFiles = usePanelStore((s) => s.showHiddenFiles);
   const refreshPanel = usePanelStore((s) => s.refreshPanel);
+  const setPanelSelection = usePanelStore((s) => s.setSelection);
 
   const {
     stage,
@@ -33,6 +34,7 @@ export const SyncDialog: React.FC = () => {
     handleUpdateDirection,
     handleSelectAll,
     handleExcludeSame,
+    handleSelectDifferences,
     handleExecuteSync,
     handleBack,
   } = useSyncDialogState({
@@ -42,6 +44,7 @@ export const SyncDialog: React.FC = () => {
     showHiddenFiles,
     fs,
     refreshPanel,
+    setPanelSelection,
     closeDialog,
   });
   const isBusy = stage === "analyzing" || stage === "executing" || executing;
@@ -150,6 +153,12 @@ export const SyncDialog: React.FC = () => {
                         className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
                       >
                         Exclude Same
+                      </button>
+                      <button
+                        onClick={handleSelectDifferences}
+                        className="px-3 py-1 text-xs bg-bg-secondary hover:bg-bg-hover rounded border border-border-color transition-colors"
+                      >
+                        Select in Panels
                       </button>
                     </div>
 

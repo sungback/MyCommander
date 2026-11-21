@@ -4,10 +4,13 @@ import type { PanelId, PanelState } from "../../../types/file";
 import type { SyncDirection, SyncItem } from "../../../types/sync";
 import { buildSyncExecutionOperations } from "../../../features/syncExecution";
 import { confirmTransferSpace } from "../../../features/transferSpaceCheck";
+import { showTransientToast } from "../../../store/toastStore";
 import {
   excludeSameSyncItems,
   formatSyncExecutionFailures,
+  getDifferingTopLevelNames,
   getPanelAccessPath,
+  pickPanelPathsByName,
   selectAllPendingSyncItems,
   type SyncExecutionFailure,
   type SyncStage,
@@ -21,6 +24,7 @@ interface UseSyncDialogStateArgs {
   showHiddenFiles: boolean;
   fs: ReturnType<typeof useFileSystem>;
   refreshPanel: (panel: PanelId) => void;
+  setPanelSelection: (panel: PanelId, paths: string[]) => void;
   closeDialog: () => void;
 }
 
@@ -31,6 +35,7 @@ export const useSyncDialogState = ({
   showHiddenFiles,
   fs,
   refreshPanel,
+  setPanelSelection,
   closeDialog,
 }: UseSyncDialogStateArgs) => {
   const [stage, setStage] = useState<SyncStage>("paths");
@@ -100,6 +105,30 @@ export const useSyncDialogState = ({
     setSyncItems((current) =>
       selectAllPendingSyncItems(current, targetDirection)
     );
+  };
+
+  // 비교 결과에서 차이가 있는 항목을 양쪽 패널에서 선택한다. 패널에 열린 폴더를 비교한 경우에만 가능하다.
+  const handleSelectDifferences = () => {
+    if (
+      leftPath !== getPanelAccessPath(leftPanel) ||
+      rightPath !== getPanelAccessPath(rightPanel)
+    ) {
+      setError("Differences can only be selected when comparing the folders open in the panels.");
+      return;
+    }
+
+    const names = getDifferingTopLevelNames(syncItems);
+    const leftPaths = pickPanelPathsByName(leftPanel.files, names);
+    const rightPaths = pickPanelPathsByName(rightPanel.files, names);
+    if (leftPaths.length === 0 && rightPaths.length === 0) {
+      setError("No differing items to select in the panels.");
+      return;
+    }
+
+    setPanelSelection("left", leftPaths);
+    setPanelSelection("right", rightPaths);
+    showTransientToast(`차이 항목 선택됨: 왼쪽 ${leftPaths.length}개, 오른쪽 ${rightPaths.length}개`);
+    closeDialog();
   };
 
   const handleExcludeSame = () => {
@@ -196,6 +225,7 @@ export const useSyncDialogState = ({
     handleUpdateDirection,
     handleSelectAll,
     handleExcludeSame,
+    handleSelectDifferences,
     handleExecuteSync,
     handleBack,
   };

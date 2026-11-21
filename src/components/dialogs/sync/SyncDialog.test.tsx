@@ -9,6 +9,8 @@ const {
   mockCheckTransferSpace,
   mockCopyFiles,
   mockRefreshPanel,
+  mockSetSelection,
+  mockPanelFiles,
   mockShowHiddenFiles,
 } = vi.hoisted(() => ({
   mockCloseDialog: vi.fn(),
@@ -16,6 +18,8 @@ const {
   mockCheckTransferSpace: vi.fn(),
   mockCopyFiles: vi.fn(),
   mockRefreshPanel: vi.fn(),
+  mockSetSelection: vi.fn(),
+  mockPanelFiles: { left: [] as unknown[], right: [] as unknown[] },
   mockShowHiddenFiles: { value: false },
 }));
 
@@ -32,13 +36,16 @@ vi.mock("../../../store/panelStore", () => ({
       leftPanel: {
         currentPath: "/left",
         resolvedPath: "/left",
+        files: mockPanelFiles.left,
       },
       rightPanel: {
         currentPath: "/right",
         resolvedPath: "/right",
+        files: mockPanelFiles.right,
       },
       showHiddenFiles: mockShowHiddenFiles.value,
       refreshPanel: mockRefreshPanel,
+      setSelection: mockSetSelection,
     }),
 }));
 
@@ -60,6 +67,9 @@ describe("SyncDialog", () => {
     mockCheckTransferSpace.mockReset();
     useTransferSpaceWarningStore.setState({ pending: null });
     mockRefreshPanel.mockReset();
+    mockSetSelection.mockReset();
+    mockPanelFiles.left = [];
+    mockPanelFiles.right = [];
     mockShowHiddenFiles.value = false;
     mockCopyFiles.mockResolvedValue([]);
     mockCheckTransferSpace.mockResolvedValue({
@@ -124,6 +134,80 @@ describe("SyncDialog", () => {
         false,
         true
       );
+    });
+  });
+
+  describe("Select in Panels", () => {
+    const differences = [
+      {
+        relPath: "a.txt",
+        leftPath: "/left/a.txt",
+        rightPath: null,
+        leftKind: "file",
+        rightKind: null,
+        status: "LeftOnly",
+        direction: "toRight",
+      },
+      {
+        relPath: "docs/x.md",
+        leftPath: "/left/docs/x.md",
+        rightPath: "/right/docs/x.md",
+        leftKind: "file",
+        rightKind: "file",
+        status: "RightNewer",
+        direction: "toLeft",
+      },
+      {
+        relPath: "same.txt",
+        leftPath: "/left/same.txt",
+        rightPath: "/right/same.txt",
+        leftKind: "file",
+        rightKind: "file",
+        status: "Same",
+        direction: "skip",
+      },
+    ];
+    const entry = (base: string, name: string, kind: string) => ({
+      name,
+      path: `${base}/${name}`,
+      kind,
+    });
+
+    it("selects the differing top-level items in both panels and closes the dialog", async () => {
+      mockPanelFiles.left = [
+        entry("/left", "..", "directory"),
+        entry("/left", "a.txt", "file"),
+        entry("/left", "docs", "directory"),
+        entry("/left", "same.txt", "file"),
+      ];
+      mockPanelFiles.right = [
+        entry("/right", "docs", "directory"),
+        entry("/right", "same.txt", "file"),
+      ];
+      mockCompareDirectories.mockResolvedValue(differences);
+      render(<SyncDialog />);
+      fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+      await screen.findByText("Found 3 item(s) to compare");
+
+      fireEvent.click(screen.getByRole("button", { name: "Select in Panels" }));
+
+      expect(mockSetSelection).toHaveBeenCalledWith("left", ["/left/a.txt", "/left/docs"]);
+      expect(mockSetSelection).toHaveBeenCalledWith("right", ["/right/docs"]);
+      expect(mockCloseDialog).toHaveBeenCalled();
+    });
+
+    it("refuses when the compared paths are not the panel folders", async () => {
+      mockCompareDirectories.mockResolvedValue(differences);
+      render(<SyncDialog />);
+      fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "/elsewhere" } });
+      fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+      await screen.findByText("Found 3 item(s) to compare");
+
+      fireEvent.click(screen.getByRole("button", { name: "Select in Panels" }));
+
+      expect(mockSetSelection).not.toHaveBeenCalled();
+      expect(mockCloseDialog).not.toHaveBeenCalled();
+      expect(screen.getByText(/only be selected when comparing the folders open/)).toBeInTheDocument();
     });
   });
 
