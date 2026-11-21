@@ -7,6 +7,7 @@ import {
   formatChecksumClipboardText,
   formatChecksumFileText,
   getChecksumFileExtension,
+  getChecksumProgressPercent,
   isChecksumFileName,
   summarizeVerifyEntries,
 } from "./checksumFormat";
@@ -77,5 +78,19 @@ describe("checksum format", () => {
     expect(
       summarizeVerifyEntries([entry("ok"), entry("ok"), entry("mismatch"), entry("missing")])
     ).toEqual({ ok: 2, mismatch: 1, missing: 1, error: 0 });
+  });
+});
+
+describe("getChecksumProgressPercent", () => {
+  it("읽은 비율을 정수 퍼센트로 내린다", () => {
+    expect(getChecksumProgressPercent(0, 200)).toBe(0);
+    expect(getChecksumProgressPercent(99, 200)).toBe(49);
+    expect(getChecksumProgressPercent(200, 200)).toBe(100);
+  });
+
+  it("크기가 0이거나 모르면 0, 초과해도 100을 넘지 않는다", () => {
+    expect(getChecksumProgressPercent(0, 0)).toBe(0);
+    expect(getChecksumProgressPercent(5, 0)).toBe(0);
+    expect(getChecksumProgressPercent(300, 200)).toBe(100);
   });
 });

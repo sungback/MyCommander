@@ -4,6 +4,10 @@ import type {
   ChecksumVerifyEntry,
 } from "../hooks/tauriCommands/checksumCommands";
 
+// 읽은 바이트 비율(0~100). 크기를 모르거나 0바이트 파일이면 0이다.
+export const getChecksumProgressPercent = (bytesDone: number, bytesTotal: number): number =>
+  bytesTotal > 0 ? Math.min(100, Math.floor((bytesDone / bytesTotal) * 100)) : 0;
+
 export const CHECKSUM_ALGORITHMS: { id: ChecksumAlgorithm; label: string }[] = [
   { id: "crc32", label: "CRC32" },
   { id: "md5", label: "MD5" },

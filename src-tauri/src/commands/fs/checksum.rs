@@ -9,8 +9,13 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+use tauri::Emitter;
 
 const READ_BUFFER_BYTES: usize = 1024 * 1024;
+// 진행 이벤트는 이 간격보다 자주 보내지 않는다.
+const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_millis(100);
+const CHECKSUM_PROGRESS_EVENT: &str = "checksum-progress";
 // 체크섬 파일은 작은 텍스트이므로 이 크기를 넘으면 읽지 않는다.
 const MAX_CHECKSUM_FILE_BYTES: u64 = 8 * 1024 * 1024;
 pub(crate) const CHECKSUM_CANCELLED: &str = "cancelled";
@@ -140,12 +145,122 @@ impl Drop for CancelGuard {
     }
 }
 
+// 프런트엔드로 보내는 진행 상황. 파일 하나 안의 읽은 바이트와 전체 파일 순번을 함께 담는다.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChecksumProgress {
+    pub job_id: String,
+    pub file_index: usize,
+    pub file_count: usize,
+    pub file_name: String,
+    pub bytes_done: u64,
+    pub bytes_total: u64,
+}
+
+type ProgressSink = Box<dyn Fn(ChecksumProgress) + Send>;
+
+pub(crate) struct ProgressReporter {
+    sink: Option<ProgressSink>,
+    job_id: String,
+    file_count: usize,
+    file_index: usize,
+    file_name: String,
+    bytes_done: u64,
+    bytes_total: u64,
+    last_emit: Option<Instant>,
+}
+
+impl ProgressReporter {
+    // 진행을 보내지 않는 보고자. 테스트에서만 쓴다.
+    #[cfg(test)]
+    pub(crate) fn none() -> Self {
+        Self::with_sink(None, String::new(), 0)
+    }
+
+    fn with_sink(sink: Option<ProgressSink>, job_id: String, file_count: usize) -> Self {
+        Self {
+            sink,
+            job_id,
+            file_count,
+            file_index: 0,
+            file_name: String::new(),
+            bytes_done: 0,
+            bytes_total: 0,
+            last_emit: None,
+        }
+    }
+
+    fn for_app(app: tauri::AppHandle, job_id: String, file_count: usize) -> Self {
+        let sink: ProgressSink = Box::new(move |progress| {
+            let _ = app.emit(CHECKSUM_PROGRESS_EVENT, progress);
+        });
+        Self::with_sink(Some(sink), job_id, file_count)
+    }
+
+    // 다음 파일로 넘어간다. 순번은 1부터 센다.
+    fn next_file(&mut self, name: &str) {
+        self.file_index += 1;
+        self.file_name = name.to_string();
+        self.bytes_done = 0;
+        self.bytes_total = 0;
+    }
+
+    fn begin(&mut self, bytes_total: u64) {
+        self.bytes_total = bytes_total;
+        self.bytes_done = 0;
+        self.emit(true);
+    }
+
+    fn advance(&mut self, bytes: u64) {
+        self.bytes_done += bytes;
+        self.emit(false);
+    }
+
+    fn end(&mut self) {
+        self.emit(true);
+    }
+
+    fn emit(&mut self, force: bool) {
+        let Some(sink) = &self.sink else {
+            return;
+        };
+        let due = self
+            .last_emit
+            .map(|last| last.elapsed() >= PROGRESS_EMIT_INTERVAL)
+            .unwrap_or(true);
+        if !force && !due {
+            return;
+        }
+        self.last_emit = Some(Instant::now());
+        sink(ChecksumProgress {
+            job_id: self.job_id.clone(),
+            file_index: self.file_index,
+            file_count: self.file_count,
+            file_name: self.file_name.clone(),
+            bytes_done: self.bytes_done,
+            bytes_total: self.bytes_total,
+        });
+    }
+}
+
+// 진행 보고 없이 해시만 계산한다. 테스트에서만 쓴다.
+#[cfg(test)]
 fn hash_file(
     path: &Path,
     algorithms: &[ChecksumAlgorithm],
     cancel: &AtomicBool,
 ) -> Result<Vec<(ChecksumAlgorithm, String)>, String> {
+    hash_file_with_progress(path, algorithms, cancel, &mut ProgressReporter::none())
+}
+
+fn hash_file_with_progress(
+    path: &Path,
+    algorithms: &[ChecksumAlgorithm],
+    cancel: &AtomicBool,
+    progress: &mut ProgressReporter,
+) -> Result<Vec<(ChecksumAlgorithm, String)>, String> {
     let mut file = File::open(path).map_err(|error| error.to_string())?;
+    progress.begin(file.metadata().map(|metadata| metadata.len()).unwrap_or(0));
     let mut hashers: Vec<(ChecksumAlgorithm, Hasher)> = algorithms
         .iter()
         .map(|algorithm| (*algorithm, Hasher::new(*algorithm)))
@@ -163,7 +278,9 @@ fn hash_file(
         for (_, hasher) in hashers.iter_mut() {
             hasher.update(&buffer[..read]);
         }
+        progress.advance(read as u64);
     }
+    progress.end();
 
     Ok(hashers
         .into_iter()
@@ -195,15 +312,17 @@ fn compute_checksums_blocking(
     paths: Vec<String>,
     algorithms: Vec<ChecksumAlgorithm>,
     cancel: &AtomicBool,
+    progress: &mut ProgressReporter,
 ) -> Result<Vec<ChecksumFileResult>, String> {
     let mut results = Vec::with_capacity(paths.len());
     for path in paths {
         let path_buf = PathBuf::from(&path);
         let name = file_name_of(&path_buf);
+        progress.next_file(&name);
         let outcome = if path_buf.is_dir() {
             Err("폴더는 체크섬을 계산할 수 없습니다.".to_string())
         } else {
-            hash_file(&path_buf, &algorithms, cancel)
+            hash_file_with_progress(&path_buf, &algorithms, cancel, progress)
         };
 
         match outcome {
@@ -233,6 +352,7 @@ fn compute_checksums_blocking(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn compute_checksums(
+    app: tauri::AppHandle,
     paths: Vec<String>,
     algorithms: Vec<String>,
     job_id: String,
@@ -252,8 +372,9 @@ pub async fn compute_checksums(
     }
 
     let guard = CancelGuard::register(&job_id)?;
+    let mut progress = ProgressReporter::for_app(app, job_id, paths.len());
     tauri::async_runtime::spawn_blocking(move || {
-        compute_checksums_blocking(paths, parsed, &guard.flag)
+        compute_checksums_blocking(paths, parsed, &guard.flag, &mut progress)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -345,6 +466,7 @@ pub struct ChecksumVerifyEntry {
 fn verify_checksum_file_blocking(
     checksum_path: String,
     cancel: &AtomicBool,
+    progress: &mut ProgressReporter,
 ) -> Result<Vec<ChecksumVerifyEntry>, String> {
     let checksum_path = PathBuf::from(checksum_path);
     let metadata = std::fs::metadata(&checksum_path).map_err(|error| error.to_string())?;
@@ -367,7 +489,9 @@ fn verify_checksum_file_blocking(
         .unwrap_or_default();
 
     let mut entries = Vec::with_capacity(lines.len());
+    progress.file_count = lines.len();
     for line in lines {
+        progress.next_file(&line.name);
         let mut entry = ChecksumVerifyEntry {
             name: line.name.clone(),
             path: String::new(),
@@ -384,7 +508,7 @@ fn verify_checksum_file_blocking(
                 if !path.is_file() {
                     entry.status = "missing".to_string();
                 } else {
-                    match hash_file(&path, &[line.algorithm], cancel) {
+                    match hash_file_with_progress(&path, &[line.algorithm], cancel, progress) {
                         Ok(hashes) => {
                             let actual = hashes.into_iter().next().map(|(_, value)| value);
                             entry.status = if actual.as_deref() == Some(line.expected.as_str()) {
@@ -408,12 +532,15 @@ fn verify_checksum_file_blocking(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn verify_checksum_file(
+    app: tauri::AppHandle,
     checksum_path: String,
     job_id: String,
 ) -> Result<Vec<ChecksumVerifyEntry>, String> {
     let guard = CancelGuard::register(&job_id)?;
+    // 항목 수는 체크섬 파일을 읽은 뒤에 정해지므로 verify 안에서 채운다.
+    let mut progress = ProgressReporter::for_app(app, job_id, 0);
     tauri::async_runtime::spawn_blocking(move || {
-        verify_checksum_file_blocking(checksum_path, &guard.flag)
+        verify_checksum_file_blocking(checksum_path, &guard.flag, &mut progress)
     })
     .await
     .map_err(|error| error.to_string())?

@@ -7,6 +7,7 @@ import {
   CHECKSUM_CANCELLED_ERROR,
   type ChecksumAlgorithm,
   type ChecksumFileResult,
+  type ChecksumProgress,
   type ChecksumVerifyEntry,
 } from "../../hooks/tauriCommands/checksumCommands";
 import { useDialogStore } from "../../store/dialogStore";
@@ -19,6 +20,7 @@ import {
   formatChecksumClipboardText,
   formatChecksumFileText,
   getChecksumFileExtension,
+  getChecksumProgressPercent,
   isChecksumFileName,
   summarizeVerifyEntries,
 } from "../../utils/checksumFormat";
@@ -60,6 +62,30 @@ const getActivePanel = (): PanelState => {
 
 const getBaseName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
+// 현재 파일 순번·이름과 읽은 비율을 보여 준다. 첫 이벤트가 오기 전에는 아무것도 그리지 않는다.
+const ProgressLine: React.FC<{ progress: ChecksumProgress | null }> = ({ progress }) => {
+  if (!progress) {
+    return null;
+  }
+  const percent = getChecksumProgressPercent(progress.bytesDone, progress.bytesTotal);
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="break-all text-text-secondary">
+        파일 {progress.fileIndex}/{progress.fileCount} · {progress.fileName} · {percent}%
+      </div>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-1.5 w-full rounded bg-bg-secondary overflow-hidden"
+      >
+        <div className="h-full bg-accent-color" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+};
+
 export const ChecksumDialog: React.FC = () => {
   const isOpen = useDialogStore((state) => state.openDialog === "checksum");
   const mode = useDialogStore((state) => state.checksumMode);
@@ -73,10 +99,40 @@ export const ChecksumDialog: React.FC = () => {
   const [verifyEntries, setVerifyEntries] = useState<ChecksumVerifyEntry[] | null>(null);
   const [verifySource, setVerifySource] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [progress, setProgress] = useState<ChecksumProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const jobIdRef = useRef<string | null>(null);
   // 닫았다가 다시 열 때 이전 실행의 결과가 섞이지 않게 실행 번호로 구분한다.
   const runTokenRef = useRef(0);
+
+  // 실행 중인 작업(jobIdRef)의 진행 이벤트만 받아 표시한다.
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void fs
+      .onChecksumProgress((next) => {
+        if (next.jobId === jobIdRef.current) {
+          setProgress(next);
+        }
+      })
+      .then((dispose) => {
+        if (cancelled) {
+          dispose();
+        } else {
+          unlisten = dispose;
+        }
+      })
+      .catch((listenError) => {
+        console.error("Failed to listen checksum progress:", listenError);
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [fs, isOpen]);
 
   const cancelRunning = useCallback(() => {
     runTokenRef.current += 1;
@@ -103,6 +159,7 @@ export const ChecksumDialog: React.FC = () => {
       setVerifyEntries(null);
       setError(null);
       setIsRunning(true);
+      setProgress(null);
       try {
         const entries = await fs.verifyChecksumFile(checksumPath, jobId);
         if (token === runTokenRef.current) {
@@ -136,6 +193,7 @@ export const ChecksumDialog: React.FC = () => {
     setResults(null);
     setError(null);
     setIsRunning(true);
+    setProgress(null);
     try {
       const computed = await fs.computeChecksums(paths, requested, jobId);
       if (token === runTokenRef.current) {
@@ -151,6 +209,7 @@ export const ChecksumDialog: React.FC = () => {
       if (token === runTokenRef.current) {
         jobIdRef.current = null;
         setIsRunning(false);
+        setProgress(null);
       }
     }
   }, [algorithms, fs, paths]);
@@ -293,7 +352,10 @@ export const ChecksumDialog: React.FC = () => {
             ))}
           </div>
           {isRunning ? (
-            <p className="text-xs text-text-secondary">계산 중입니다. 취소하면 중단됩니다.</p>
+            <>
+              <p className="text-xs text-text-secondary">계산 중입니다. 취소하면 중단됩니다.</p>
+              <ProgressLine progress={progress} />
+            </>
           ) : null}
           {results ? (
             <>
@@ -340,7 +402,12 @@ export const ChecksumDialog: React.FC = () => {
           {verifySource ? (
             <div className="text-xs text-text-secondary break-all">{verifySource}</div>
           ) : null}
-          {isRunning ? <p className="text-xs text-text-secondary">확인 중입니다.</p> : null}
+          {isRunning ? (
+            <>
+              <p className="text-xs text-text-secondary">확인 중입니다.</p>
+              <ProgressLine progress={progress} />
+            </>
+          ) : null}
           {summary ? (
             <>
               <div className="text-xs">

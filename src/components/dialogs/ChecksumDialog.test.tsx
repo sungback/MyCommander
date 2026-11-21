@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   computeChecksums: vi.fn(),
   verifyChecksumFile: vi.fn(),
   cancelChecksum: vi.fn(),
+  onChecksumProgress: vi.fn(),
+  progressHandler: null as null | ((progress: unknown) => void),
   panel: {} as Record<string, unknown>,
   save: vi.fn(),
   open: vi.fn(),
@@ -13,15 +15,20 @@ const mocks = vi.hoisted(() => ({
   writeClipboardText: vi.fn(),
 }));
 
-vi.mock("../../hooks/useFileSystem", () => ({
-  useFileSystem: () => ({
+vi.mock("../../hooks/useFileSystem", () => {
+  // 실제 useFileSystem처럼 매번 같은 객체를 돌려준다. 새 객체를 주면 진행 구독이 렌더마다 다시 걸린다.
+  const fileSystem = {
     computeChecksums: mocks.computeChecksums,
     verifyChecksumFile: mocks.verifyChecksumFile,
     cancelChecksum: mocks.cancelChecksum,
-  }),
-  getErrorMessage: (error: unknown, fallback: string) =>
-    typeof error === "string" ? error : fallback,
-}));
+    onChecksumProgress: mocks.onChecksumProgress,
+  };
+  return {
+    useFileSystem: () => fileSystem,
+    getErrorMessage: (error: unknown, fallback: string) =>
+      typeof error === "string" ? error : fallback,
+  };
+});
 vi.mock("../../store/panelStore", () => ({
   usePanelStore: { getState: () => mocks.panel },
 }));
@@ -51,6 +58,56 @@ describe("ChecksumDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useDialogStore.getState().closeDialog();
+    mocks.progressHandler = null;
+    mocks.onChecksumProgress.mockImplementation(async (handler: (progress: unknown) => void) => {
+      mocks.progressHandler = handler;
+      return () => {
+        mocks.progressHandler = null;
+      };
+    });
+  });
+
+  it("shows progress of the running job and ignores other jobs", async () => {
+    setPanel([file("big.bin")], ["/d/big.bin"]);
+    let finish: (value: unknown[]) => void = () => undefined;
+    mocks.computeChecksums.mockImplementation(
+      () => new Promise((resolve) => (finish = resolve as typeof finish))
+    );
+    render(<ChecksumDialog />);
+    act(() => useDialogStore.getState().openChecksumDialog("generate"));
+    await screen.findByText("파일 1개");
+    await waitFor(() => expect(mocks.progressHandler).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "계산" }));
+    await waitFor(() => expect(mocks.computeChecksums).toHaveBeenCalled());
+    const jobId = mocks.computeChecksums.mock.calls[0][2] as string;
+
+    act(() =>
+      mocks.progressHandler?.({
+        jobId: "other-job",
+        fileIndex: 1,
+        fileCount: 1,
+        fileName: "other.bin",
+        bytesDone: 10,
+        bytesTotal: 10,
+      })
+    );
+    expect(screen.queryByText(/other\.bin/)).toBeNull();
+
+    act(() =>
+      mocks.progressHandler?.({
+        jobId,
+        fileIndex: 1,
+        fileCount: 3,
+        fileName: "big.bin",
+        bytesDone: 50,
+        bytesTotal: 200,
+      })
+    );
+    expect(await screen.findByText(/파일 1\/3 · big\.bin · 25%/)).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("25");
+
+    await act(async () => finish([]));
+    await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
   });
 
   it("generates checksums for selected files only (folders excluded) and shows results", async () => {
