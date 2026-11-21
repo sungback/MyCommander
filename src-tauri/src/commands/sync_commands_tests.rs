@@ -53,6 +53,15 @@ fn compare_directories_skips_shared_directory_metadata_noise() {
     fs::remove_dir_all(right).expect("cleanup right");
 }
 
+// Windows는 http://tauri.localhost, 그 외 플랫폼은 tauri://localhost가 앱의 로컬 출처다.
+fn local_ipc_origin() -> &'static str {
+    if cfg!(windows) {
+        "http://tauri.localhost"
+    } else {
+        "tauri://localhost"
+    }
+}
+
 #[test]
 fn compare_directories_accepts_snake_case_invoke_args() {
     let left = unique_temp_dir("invoke-left");
@@ -72,7 +81,8 @@ fn compare_directories_accepts_snake_case_invoke_args() {
             cmd: "compare_directories".into(),
             callback: tauri::ipc::CallbackFn(0),
             error: tauri::ipc::CallbackFn(1),
-            url: "http://tauri.localhost".parse().expect("parse invoke url"),
+            // 앱 자체 화면의 IPC 출처. tauri 2.12부터는 로컬 URL이 아니면 원격으로 보고 ACL이 거부한다.
+            url: local_ipc_origin().parse().expect("parse invoke url"),
             body: tauri::ipc::InvokeBody::from(serde_json::json!({
                 "left": left.to_string_lossy().to_string(),
                 "right": right.to_string_lossy().to_string(),
