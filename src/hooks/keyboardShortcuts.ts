@@ -32,6 +32,7 @@ export interface KeyboardHandlerDependencies
     | "openMove"
     | "openNewFile"
     | "openPreview"
+    | "openRename"
     | "openSearch"
     | "openSync"
     | "openWildcardSelect"
@@ -113,11 +114,20 @@ const handleFunctionShortcut = (
     | "openMove"
     | "openNewFile"
     | "openPreview"
+    | "openRename"
     | "openSearch"
     | "openSync"
   >
 ) => {
   switch (event.key) {
+    case "F2":
+      // 수정키가 붙은 F2(Cmd/Ctrl+F2 = 상세 보기)는 여기서 처리하지 않는다.
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || isInputFocused()) {
+        return false;
+      }
+      event.preventDefault();
+      commands.openRename();
+      return true;
     case "F3":
       event.preventDefault();
       commands.openPreview();

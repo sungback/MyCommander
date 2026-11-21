@@ -57,6 +57,7 @@ const makeDeps = (overrides: Partial<KeyboardHandlerDependencies> = {}): Keyboar
   openMove: vi.fn(),
   openNewFile: vi.fn(),
   openPreview: vi.fn(),
+  openRename: vi.fn(),
   openSearch: vi.fn(),
   openSync: vi.fn(),
   openCommandPalette: vi.fn(),
@@ -301,6 +302,36 @@ describe('createKeyboardHandler', () => {
     const handler = createKeyboardHandler(deps);
     handler(makeEvent('F4', { altKey: true }));
     expect(deps.closeApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('F2 → calls deps.openRename()', () => {
+    const deps = makeDeps();
+    const handler = createKeyboardHandler(deps);
+    const event = makeEvent('F2');
+    handler(event);
+    expect(deps.openRename).toHaveBeenCalledTimes(1);
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('Ctrl/Cmd+F2 (상세 보기)와 Shift/Alt+F2는 이름 바꾸기를 열지 않는다', () => {
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
+      const deps = makeDeps();
+      createKeyboardHandler(deps)(makeEvent('F2', modifier));
+      expect(deps.openRename).not.toHaveBeenCalled();
+    }
+  });
+
+  it('F2 → 입력창에 포커스가 있으면 이름 바꾸기를 열지 않는다', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    try {
+      const deps = makeDeps();
+      createKeyboardHandler(deps)(makeEvent('F2'));
+      expect(deps.openRename).not.toHaveBeenCalled();
+    } finally {
+      input.remove();
+    }
   });
 
   it('F3 → calls deps.openPreview()', () => {

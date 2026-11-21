@@ -10,6 +10,7 @@ export function useKeyboard() {
   const {
     openDialog,
     openPreview,
+    openRename,
     openEditor,
     openCopy,
     openMove,
@@ -63,6 +64,7 @@ export function useKeyboard() {
       openMove,
       openNewFile,
       openPreview,
+      openRename,
       openSearch,
       openSync,
       openWildcardSelect,
@@ -97,6 +99,7 @@ export function useKeyboard() {
     openMove,
     openNewFile,
     openPreview,
+    openRename,
     openSearch,
     openSync,
     openWildcardSelect,

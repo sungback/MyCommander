@@ -25,7 +25,7 @@ const getPrimaryTarget = () => {
       panel.files.find(
         (entry) => entry.path.normalize("NFC") === selectedPath.normalize("NFC")
       ) ?? findFileEntryByPath(selectedPath);
-    return { path: selectedPath, kind: selectedEntry?.kind };
+    return { path: selectedPath, kind: selectedEntry?.kind, entry: selectedEntry ?? undefined };
   }
 
   const cursorEntry = panel.files[panel.cursorIndex];
@@ -33,7 +33,7 @@ const getPrimaryTarget = () => {
     return null;
   }
 
-  return { path: cursorEntry.path, kind: cursorEntry.kind };
+  return { path: cursorEntry.path, kind: cursorEntry.kind, entry: cursorEntry };
 };
 
 
@@ -45,6 +45,7 @@ export function useAppCommands() {
   const setOpenDialog = useDialogStore((s) => s.setOpenDialog);
   const openPasteDialog = useDialogStore((s) => s.openPasteDialog);
   const openPreviewDialog = useDialogStore((s) => s.openPreviewDialog);
+  const openRenameDialog = useDialogStore((s) => s.openRenameDialog);
   const openDialog = useDialogStore((s) => s.openDialog);
   const fs = useFileSystem();
 
@@ -61,6 +62,21 @@ export function useAppCommands() {
       return;
     }
     openPreviewDialog({ panelId: usePanelStore.getState().activePanel, path: target.path });
+  };
+  // 선택 항목 하나(없으면 커서 항목)의 이름을 바꾼다. 여러 항목은 일괄 이름 변경 도구를 안내한다.
+  const openRename = () => {
+    const state = usePanelStore.getState();
+    const panel = state.activePanel === "left" ? state.leftPanel : state.rightPanel;
+    if (panel.selectedItems.size > 1) {
+      showTransientStatusMessage("여러 항목은 일괄 이름 변경 도구로 바꿀 수 있습니다");
+      return;
+    }
+    const target = getPrimaryTarget();
+    if (!target) {
+      showTransientStatusMessage("선택된 항목이 없습니다");
+      return;
+    }
+    openRenameDialog({ panelId: state.activePanel, path: target.path, entry: target.entry });
   };
   // 대상이 없으면(빈 폴더, ".." 위) 0개 항목 대화상자 대신 안내만 한다.
   const openWithTargets = (dialog: "copy" | "move" | "delete" | "permanentDelete") => {
@@ -258,6 +274,7 @@ export function useAppCommands() {
   return {
     openDialog,
     openPreview,
+    openRename,
     openEditor,
     openCopy,
     openMove,

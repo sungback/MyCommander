@@ -6,7 +6,7 @@ import { useClipboardStore } from '../store/clipboardStore';
 
 // ── hoisted mocks ────────────────────────────────────────────────────────────
 const {
-  mockOpenPreview, mockOpenEditor, mockOpenCopy, mockOpenMove,
+  mockOpenPreview, mockOpenRename, mockOpenEditor, mockOpenCopy, mockOpenMove,
   mockOpenMkdir, mockOpenNewFile, mockOpenDelete, mockOpenSearch,
   mockOpenCommandPalette, mockCloseApp, mockSyncOtherPanel, mockCopyCurrentPath,
   mockOpenWildcardSelect, mockInvertSelection,
@@ -19,6 +19,7 @@ const {
 } = vi.hoisted(() => ({
   mockNormalizeSelectionToNfc: vi.fn().mockResolvedValue(undefined),
   mockOpenPreview:     vi.fn(),
+  mockOpenRename:      vi.fn(),
   mockOpenEditor:      vi.fn().mockResolvedValue(undefined),
   mockOpenCopy:        vi.fn(),
   mockOpenMove:        vi.fn(),
@@ -64,6 +65,7 @@ vi.mock('./useAppCommands', () => ({
   useAppCommands: () => ({
     openDialog:                 mockOpenDialogValue,
     openPreview:                mockOpenPreview,
+    openRename:                 mockOpenRename,
     openEditor:                 mockOpenEditor,
     openCopy:                   mockOpenCopy,
     openMove:                   mockOpenMove,
@@ -145,6 +147,12 @@ describe('useKeyboard', () => {
 
   // ── F키 단축키 ───────────────────────────────────────────────────────────────
   describe('F키 단축키', () => {
+    it('F2 → openRename 호출', () => {
+      renderKeyboard();
+      press('F2');
+      expect(mockOpenRename).toHaveBeenCalledTimes(1);
+    });
+
     it('F3 → openPreview 호출', () => {
       renderKeyboard();
       press('F3');

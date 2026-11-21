@@ -371,6 +371,80 @@ describe("useAppCommands — openCopy / openMove / openDelete 빈 대상", () =>
   });
 });
 
+describe("useAppCommands — openRename", () => {
+  beforeEach(() => {
+    usePanelStore.setState(usePanelStore.getInitialState());
+    useDialogStore.getState().closeDialog();
+    mockShowTransientToast.mockClear();
+  });
+
+  const files = [
+    { name: "..", path: "/", kind: "directory" as const },
+    { name: "a.txt", path: "/d/a.txt", kind: "file" as const, size: 1 },
+    { name: "sub", path: "/d/sub", kind: "directory" as const },
+  ];
+  // setFiles가 폴더를 앞으로 정렬하므로 커서는 이름으로 찾는다.
+  const setup = (selected: string[], cursorName: string) => {
+    usePanelStore.getState().setFiles("left", files);
+    usePanelStore.getState().setSelection("left", selected);
+    const cursorIndex = usePanelStore
+      .getState()
+      .leftPanel.files.findIndex((entry) => entry.name === cursorName);
+    usePanelStore.getState().setCursor("left", cursorIndex);
+    usePanelStore.getState().setActivePanel("left");
+  };
+
+  it("커서 항목의 이름 바꾸기 대화상자를 연다", () => {
+    setup([], "a.txt");
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openRename();
+    const dialog = useDialogStore.getState();
+    expect(dialog.openDialog).toBe("rename");
+    // setFiles가 항목에 필드를 더할 수 있어 핵심 필드만 비교한다.
+    expect(dialog.dialogTarget).toMatchObject({
+      panelId: "left",
+      path: "/d/a.txt",
+      entry: { name: "a.txt", path: "/d/a.txt", kind: "file" },
+    });
+  });
+
+  it("선택 항목이 하나면 커서가 아니라 선택 항목을 대상으로 한다", () => {
+    setup(["/d/sub"], "a.txt");
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openRename();
+    expect(useDialogStore.getState().dialogTarget?.path).toBe("/d/sub");
+  });
+
+  it("폴더도 이름을 바꿀 수 있다", () => {
+    setup([], "sub");
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openRename();
+    expect(useDialogStore.getState().openDialog).toBe("rename");
+  });
+
+  it("여러 항목을 선택했으면 열지 않고 일괄 이름 변경을 안내한다", () => {
+    setup(["/d/a.txt", "/d/sub"], "a.txt");
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openRename();
+    expect(useDialogStore.getState().openDialog).toBeNull();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "여러 항목은 일괄 이름 변경 도구로 바꿀 수 있습니다",
+      expect.anything()
+    );
+  });
+
+  it("커서가 ..이고 선택이 없으면 열지 않고 안내한다", () => {
+    setup([], "..");
+    const { result } = renderHook(() => useAppCommands());
+    result.current.openRename();
+    expect(useDialogStore.getState().openDialog).toBeNull();
+    expect(mockShowTransientToast).toHaveBeenCalledWith(
+      "선택된 항목이 없습니다",
+      expect.anything()
+    );
+  });
+});
+
 describe("useAppCommands — openEditor", () => {
   beforeEach(() => {
     usePanelStore.setState(usePanelStore.getInitialState());
