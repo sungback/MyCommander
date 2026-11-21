@@ -8,6 +8,7 @@ import { TransferSpaceWarningDialog } from "./TransferSpaceWarningDialog";
 import { CommandPalette } from "./palette/CommandPalette";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { FileInfoDialog } from "./FileInfoDialog";
+import { FileAttributesDialog } from "./FileAttributesDialog";
 import { QuickPreviewDialog } from "./preview/QuickPreviewDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { TextInputOperationDialog } from "./TextInputOperationDialog";
@@ -309,7 +310,12 @@ export const DialogContainer: React.FC = () => {
         infoSizeStatus={infoSizeStatus}
         infoLoading={infoLoading}
         infoError={infoError}
+        onEditAttributes={
+          dialogTarget ? () => useDialogStore.getState().openAttributesDialog(dialogTarget) : undefined
+        }
       />
+
+      <FileAttributesDialog />
 
       <CopyConflictDialog
         isOpen={conflictFiles.length > 0}

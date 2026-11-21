@@ -55,6 +55,8 @@ npm run tauri dev
 
 파일 > 체크섬 생성…/확인…(CRC32·MD5·SHA-1·SHA-256, `.md5`·`.sha1`·`.sha256`·`.sfv`)도 Command Palette에서 쓸 수 있습니다.
 
+파일 정보 대화상자의 Edit Attributes(또는 Command Palette의 Edit File Attributes)에서 선택한 항목의 수정 시간과 읽기 전용 표시를 바꿀 수 있습니다. 항목 자체만 바꾸며 폴더 안으로 전파하지 않고, 폴더의 수정 시간 변경은 macOS·Linux에서만 됩니다. 심볼릭 링크는 바꿀 수 없습니다.
+
 명령 > 선택 도구 메뉴(와 Command Palette)에서 선택 저장·복원, 선택을 파일로 저장·불러오기, 선택 항목의 이름·경로·세부정보 클립보드 복사를 쓸 수 있습니다.
 
 PDF·PPTX 미리보기는 왼쪽 썸네일과 현재 페이지를 표시합니다. 화살표·PageUp/PageDown으로 넘기고 Home/End로 처음·끝으로 이동합니다. PPTX의 차트·동영상·일부 이미지는 자리 표시로 보이며, 도구 줄에서 텍스트 보기로 전환할 수 있습니다.

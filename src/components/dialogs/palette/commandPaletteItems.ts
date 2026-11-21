@@ -283,6 +283,14 @@ export const buildCommandPaletteItems = ({
       run: actions.openInfo,
     },
     {
+      id: "attributes",
+      title: "Edit File Attributes",
+      subtitle: primaryTarget?.entry.name ?? "No item selected",
+      keywords: ["modified time", "date", "read-only", "readonly", "touch", "properties"],
+      disabledReason: singleTargetReason,
+      run: actions.openAttributes,
+    },
+    {
       id: "swap-panels",
       title: "Swap Panels",
       subtitle: "Exchange left and right panel state",

@@ -10,6 +10,8 @@ interface FileInfoDialogProps {
   infoSizeStatus?: DirectorySizeStatus;
   infoLoading: boolean;
   infoError: string | null;
+  // 있으면 "속성 편집" 버튼을 보여 주고, 누르면 정보 대화상자를 속성 편집으로 바꾼다.
+  onEditAttributes?: () => void;
 }
 
 // 패널 목록과 같은 기호로 폴더 크기의 정확도를 표시한다.
@@ -39,6 +41,7 @@ export const FileInfoDialog = ({
   infoSizeStatus,
   infoLoading,
   infoError,
+  onEditAttributes,
 }: FileInfoDialogProps) => (
   <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
     <Dialog.Portal>
@@ -96,7 +99,16 @@ export const FileInfoDialog = ({
           <p className="text-sm text-text-secondary">No item selected.</p>
         )}
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end gap-2">
+          {onEditAttributes ? (
+            <button
+              type="button"
+              onClick={onEditAttributes}
+              className="px-4 py-1.5 min-w-[80px] text-sm bg-bg-secondary hover:bg-bg-hover rounded border border-border-color focus:outline-none focus:ring-1 focus:ring-accent-color transition-colors"
+            >
+              Edit Attributes
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}

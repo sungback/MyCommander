@@ -32,6 +32,8 @@
     "allow-create-file",
     "allow-delete-files",
     "allow-rename-file",
+    "allow-get-file-attributes",
+    "allow-set-file-attributes",
     "allow-apply-batch-rename",
     "allow-copy-files",
     "allow-move-files",

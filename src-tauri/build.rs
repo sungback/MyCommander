@@ -20,6 +20,8 @@ fn main() {
         "create_file",
         "delete_files",
         "rename_file",
+        "get_file_attributes",
+        "set_file_attributes",
         "apply_batch_rename",
         "copy_files",
         "move_files",

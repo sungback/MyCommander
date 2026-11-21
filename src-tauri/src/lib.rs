@@ -49,6 +49,8 @@ pub fn run() {
             commands::fs::operations::rename::create_file,
             commands::fs::operations::delete::delete_files,
             commands::fs::operations::rename::rename_file,
+            commands::fs::operations::attributes::get_file_attributes,
+            commands::fs::operations::attributes::set_file_attributes,
             commands::fs::operations::rename::apply_batch_rename,
             commands::fs::operations::copy::copy_files,
             commands::fs::operations::move_ops::move_files,

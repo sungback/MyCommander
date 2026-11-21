@@ -37,6 +37,7 @@ export interface CommandPaletteActions {
   openDelete: () => void;
   openEditor: () => void | Promise<void>;
   openInfo: () => void;
+  openAttributes: () => void;
   openJobCenter: () => void;
   openLocation: (path: string) => void;
   openMkdir: () => void;

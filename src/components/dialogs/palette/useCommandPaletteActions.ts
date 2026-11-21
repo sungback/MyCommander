@@ -32,6 +32,7 @@ export const useCommandPaletteActions = (
   const setOpenDialog = useDialogStore((state) => state.setOpenDialog);
   const openRenameDialog = useDialogStore((state) => state.openRenameDialog);
   const openInfoDialog = useDialogStore((state) => state.openInfoDialog);
+  const openAttributesDialog = useDialogStore((state) => state.openAttributesDialog);
   const openPreviewDialog = useDialogStore((state) => state.openPreviewDialog);
   const activePanelId = usePanelStore((state) => state.activePanel);
   const { leftPanel, rightPanel } = useDialogPanels(isIdle);
@@ -197,6 +198,17 @@ export const useCommandPaletteActions = (
           entry: primaryTarget.entry,
         });
       },
+      openAttributes: () => {
+        if (!primaryTarget) {
+          return;
+        }
+        setActivePanel(primaryTarget.panelId);
+        openAttributesDialog({
+          panelId: primaryTarget.panelId,
+          path: primaryTarget.path,
+          entry: primaryTarget.entry,
+        });
+      },
       openJobCenter: () => setOpenDialog("jobcenter"),
       openLocation: (path: string) => {
         closeDialog();
@@ -318,6 +330,7 @@ export const useCommandPaletteActions = (
       closeDialog,
       fs,
       openInfoDialog,
+      openAttributesDialog,
       openPreviewDialog,
       openRenameDialog,
       primaryTarget,

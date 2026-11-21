@@ -1,3 +1,4 @@
+pub(crate) mod attributes;
 pub(crate) mod copy;
 pub(crate) mod copy_space;
 pub(crate) mod delete;

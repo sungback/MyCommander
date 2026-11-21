@@ -16,6 +16,7 @@ export type DialogType =
   | "search"
   | "preview"
   | "info"
+  | "attributes"
   | "sync"
   | "multirename"
   | "progress"
@@ -55,6 +56,7 @@ export interface DialogState {
   openChecksumDialog: (mode: ChecksumDialogMode) => void;
   openRenameDialog: (target: DialogTarget) => void;
   openInfoDialog: (target: DialogTarget) => void;
+  openAttributesDialog: (target: DialogTarget) => void;
   openMultiRenameDialog: (session: MultiRenameSession) => void;
   openPreviewDialog: (target: DialogTarget) => void;
   openDragCopyDialog: (request: DragCopyRequest) => void;
@@ -112,6 +114,8 @@ export const useDialogStore = create<DialogState>((set) => ({
     set({ openDialog: "rename", dialogTarget, dragCopyRequest: null, isPasteMode: false }),
   openInfoDialog: (dialogTarget) =>
     set({ openDialog: "info", dialogTarget, dragCopyRequest: null, isPasteMode: false }),
+  openAttributesDialog: (dialogTarget) =>
+    set({ openDialog: "attributes", dialogTarget, dragCopyRequest: null, isPasteMode: false }),
   openPreviewDialog: (dialogTarget) =>
     set({ openDialog: "preview", dialogTarget, dragCopyRequest: null, isPasteMode: false }),
   openMultiRenameDialog: (multiRenameSession) =>

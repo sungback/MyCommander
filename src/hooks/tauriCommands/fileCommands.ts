@@ -15,6 +15,27 @@ export type PersistentDirectorySizeStatus = Extract<
 // provider: 파일 제공자 폴더, local: 일반 로컬 폴더, unknown: 판단 불가
 export type StorageKind = "provider" | "local" | "unknown";
 
+export interface FileAttributes {
+  modifiedMs: number | null;
+  readOnly: boolean;
+  isDir: boolean;
+  isSymlink: boolean;
+}
+
+interface RawFileAttributes {
+  modified_ms: number | null;
+  read_only: boolean;
+  is_dir: boolean;
+  is_symlink: boolean;
+}
+
+const toFileAttributes = (raw: RawFileAttributes): FileAttributes => ({
+  modifiedMs: raw.modified_ms,
+  readOnly: raw.read_only,
+  isDir: raw.is_dir,
+  isSymlink: raw.is_symlink,
+});
+
 export interface DirectorySizeEstimate {
   size: number;
   isPartial: boolean;
@@ -177,6 +198,23 @@ export const fileCommands = {
       new_path: newPath,
     });
   },
+
+  getFileAttributes: async (path: string): Promise<FileAttributes> =>
+    toFileAttributes(await invoke<RawFileAttributes>("get_file_attributes", { path })),
+
+  // 바꾸지 않을 값은 null로 보낸다. 항목 자체만 바꾸고 하위 항목에는 적용하지 않는다.
+  setFileAttributes: async (
+    path: string,
+    modifiedMs: number | null,
+    readOnly: boolean | null
+  ): Promise<FileAttributes> =>
+    toFileAttributes(
+      await invoke<RawFileAttributes>("set_file_attributes", {
+        path,
+        modified_ms: modifiedMs,
+        read_only: readOnly,
+      })
+    ),
 
   applyBatchRename: async (operations: BatchRenameOperation[]): Promise<void> => {
     await invoke("apply_batch_rename", {

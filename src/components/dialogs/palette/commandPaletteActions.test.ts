@@ -46,6 +46,7 @@ const commandActions = {
   openDelete: vi.fn(),
   openEditor: vi.fn(),
   openInfo: vi.fn(),
+  openAttributes: vi.fn(),
   openJobCenter: vi.fn(),
   openLocation: vi.fn(),
   openMkdir: vi.fn(),
