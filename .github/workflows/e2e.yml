@@ -1,0 +1,53 @@
+name: "E2E"
+
+# 실제 Tauri 앱(WKWebView)을 띄워 확인하는 E2E. 릴리즈 게이트가 아니며, 안정화될 때까지 별도 워크플로로 둔다.
+on:
+  pull_request:
+    paths:
+      - "e2e/**"
+      - "src/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/e2e.yml"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: 공통 JS 환경 준비
+        uses: ./.github/actions/setup-js
+
+      - name: 공통 CI 환경 준비
+        uses: ./.github/actions/setup-ci
+
+      # E2E 전용 코드(WebDriver 서버 플러그인)가 일반 빌드에 섞이지 않았는지 먼저 확인한다.
+      - name: 일반 빌드에 E2E 코드가 없는지 확인
+        run: |
+          npm run build
+          if grep -rlE 'wdioTauri|__wdio' dist; then
+            echo "일반 프런트 빌드에 WDIO 코드가 들어 있습니다."
+            exit 1
+          fi
+          if cargo tree --manifest-path src-tauri/Cargo.toml -e normal | grep -q wdio; then
+            echo "기본 Cargo 의존성에 WDIO 플러그인이 들어 있습니다."
+            exit 1
+          fi
+
+      - name: E2E 실행
+        run: npm run test:e2e
