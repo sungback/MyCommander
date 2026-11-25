@@ -9,7 +9,8 @@ const PERSIST_DEBOUNCE_MS = 500;
 
 const pendingUpserts = new Map<string, PersistentDirectorySizeCacheUpdate>();
 const pendingDeletes = new Set<string>();
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
+// window.setTimeout을 쓰므로 브라우저 타입(number)으로 고정한다. @types/node가 섞여도 바뀌지 않는다.
+let flushTimer: number | null = null;
 // 앱 시작 시 캐시 로드가 끝날 때까지 쓰기를 미룬다. 로드 전에 쓰면 저장된 정확한 값이 추정값으로 덮어써질 수 있다.
 let initialLoadSettled: Promise<void> | null = null;
 let loadFailureNotified = false;
