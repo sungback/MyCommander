@@ -9,7 +9,15 @@ pub fn run() {
     // 이전 포터블 업데이트에서 남은 실행 파일 백업을 정리한다.
     commands::system::update::cleanup_replaced_executable();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // E2E 빌드에서만 WebDriver 서버 플러그인을 등록한다.
+    #[cfg(feature = "e2e")]
+    let builder = builder
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
+
+    builder
         .manage(commands::file_watch_commands::FileWatcherState::default())
         .manage(commands::fs::metadata::DirSizeScanState::default())
         .menu(app_menu::build_app_menu)

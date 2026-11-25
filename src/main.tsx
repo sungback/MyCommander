@@ -6,6 +6,11 @@ import "./index.css";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+// E2E 빌드(VITE_E2E=true)에서만 WDIO 플러그인을 불러온다. 일반 빌드에서는 분기째 제거된다.
+if (import.meta.env.VITE_E2E === "true") {
+  void import("@wdio/tauri-plugin");
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>

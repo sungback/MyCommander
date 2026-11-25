@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "e2e",
+          "description": "E2E 전용 권한. e2e 빌드에서만 병합된다.",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:window:default",
+            "wdio:default",
+            "wdio-webdriver:default"
+          ]
+        }
+      ]
+    }
+  }
+}
