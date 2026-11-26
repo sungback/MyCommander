@@ -39,6 +39,14 @@ export const config = {
     process.env.E2E_HOME = tempHome;
   },
 
+  // 스펙(앱 실행)마다 앱 데이터를 비운다. 앞 스펙이 남긴 작업 큐가 다음 실행에서 복원되어
+  // "Deleting Files..." 진행 대화상자가 클릭을 막은 적이 있다(CI 실행 45837773620).
+  onWorkerStart() {    fs.rmSync(path.join(tempHome, "Library", "Application Support", "com.mycommander.desktop"), {
+      recursive: true,
+      force: true,
+    });
+  },
+
   // 실패한 테스트의 스크린샷과 화면 상태를 e2e/artifacts에 남긴다(CI에서 아티팩트로 올린다).
   async afterTest(test: { title: string }, _context: unknown, result: { passed: boolean }) {
     if (result.passed) {
