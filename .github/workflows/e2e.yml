@@ -51,3 +51,11 @@ jobs:
 
       - name: E2E 실행
         run: npm run test:e2e
+
+      - name: 실패 진단 산출물 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: e2e/artifacts
+          if-no-files-found: ignore

@@ -39,6 +39,28 @@ export const config = {
     process.env.E2E_HOME = tempHome;
   },
 
+  // 실패한 테스트의 스크린샷과 화면 상태를 e2e/artifacts에 남긴다(CI에서 아티팩트로 올린다).
+  async afterTest(test: { title: string }, _context: unknown, result: { passed: boolean }) {
+    if (result.passed) {
+      return;
+    }
+    const outDir = path.join(rootDir, "e2e", "artifacts");
+    fs.mkdirSync(outDir, { recursive: true });
+    const safeName = test.title.replace(/[^\p{L}\p{N}]+/gu, "_").slice(0, 60);
+    const { browser } = await import("@wdio/globals");
+    await browser.saveScreenshot(path.join(outDir, `${safeName}.png`)).catch(() => undefined);
+    const state = await browser
+      .execute(() => ({
+        activeElement: `${document.activeElement?.tagName}/${document.activeElement?.getAttribute("role")}`,
+        hasFocus: document.hasFocus(),
+        visibility: document.visibilityState,
+        dialogs: document.querySelectorAll('[role="dialog"]').length,
+        entries: Array.from(document.querySelectorAll<HTMLElement>("[data-entry-name]")).slice(0, 30).map((el) => el.dataset.entryName),
+      }))
+      .catch((error: unknown) => ({ error: String(error) }));
+    fs.writeFileSync(path.join(outDir, `${safeName}.json`), JSON.stringify(state, null, 2));
+  },
+
   onComplete() {
     // 디버깅용: E2E_KEEP_HOME=1이면 임시 HOME을 지우지 않고 경로를 출력한다.
     if (process.env.E2E_KEEP_HOME === "1") {

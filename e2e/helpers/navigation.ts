@@ -47,12 +47,64 @@ export function entryIn(panel: ReturnType<typeof $>, name: string): ReturnType<t
   return panel.$(`[data-entry-name="${name}"]`);
 }
 
-// 항목을 클릭해 커서를 놓고 Enter로 연다(폴더 진입, ".."는 상위 이동).
+// 조건이 맞을 때까지 동작을 반복한다. CI 러너처럼 느린 환경에서 클릭·키 입력이 화면 갱신과 겹쳐 유실되는 경우를 흡수한다.
+// 끝 상태 검증(done)은 그대로 유지하므로 실제 동작이 틀리면 시간 초과로 실패한다. done을 먼저 확인하므로 성공 뒤에는 반복하지 않는다.
+export async function repeatUntil(
+  action: () => Promise<void>,
+  done: () => Promise<boolean>,
+  message: string,
+  timeout = 15000,
+): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      if (await done()) {
+        return true;
+      }
+      await action();
+      await browser.pause(300);
+      return done();
+    },
+    { timeout, interval: 200, timeoutMsg: message },
+  );
+}
+
+// 패널에 보이는 항목 경로 목록. 폴더를 열거나 상위로 이동하면 달라진다.
+async function entryPathsSnapshot(panel: ReturnType<typeof $>): Promise<string> {
+  const panelElement = await panel;
+  return browser.execute(
+    (element: HTMLElement) =>
+      Array.from(element.querySelectorAll<HTMLElement>("[data-entry-path]"))
+        .map((entry) => entry.dataset.entryPath)
+        .join("\n"),
+    panelElement as unknown as HTMLElement,
+  );
+}
+
+// 항목을 클릭해 커서를 놓는다. 커서가 놓일 때까지 반복한다.
+export async function selectEntry(panel: ReturnType<typeof $>, name: string): Promise<void> {
+  await entryIn(panel, name).waitForDisplayed({ timeout: 20000, timeoutMsg: `${name} 항목이 보이지 않습니다` });
+  await repeatUntil(
+    () => pointerClick(entryIn(panel, name)),
+    async () => (await cursorEntryName()) === name,
+    `${name}에 커서가 놓이지 않았습니다`,
+  );
+}
+
+// 항목에 커서를 놓고 Enter로 연다(폴더 진입, ".."는 상위 이동). 목록이 바뀔 때까지 반복한다.
+// Enter는 커서가 대상에 있을 때만 보내, 다른 폴더를 잘못 여는 일이 없게 한다.
 export async function openEntry(panel: ReturnType<typeof $>, name: string): Promise<void> {
-  const entry = entryIn(panel, name);
-  await entry.waitForDisplayed({ timeout: 20000, timeoutMsg: `${name} 항목이 보이지 않습니다`});
-  await pointerClick(entry);
-  await browser.keys([Key.Enter]);
+  await entryIn(panel, name).waitForDisplayed({ timeout: 20000, timeoutMsg: `${name} 항목이 보이지 않습니다` });
+  const before = await entryPathsSnapshot(panel);
+  await repeatUntil(
+    async () => {
+      await pointerClick(entryIn(panel, name));
+      if ((await cursorEntryName()) === name) {
+        await browser.keys([Key.Enter]);
+      }
+    },
+    async () => (await entryPathsSnapshot(panel)) !== before,
+    `${name}을(를) 열었는데 목록이 바뀌지 않았습니다`,
+  );
 }
 
 // 이 스펙 전용 픽스처 폴더를 임시 HOME 아래에 만든다.
