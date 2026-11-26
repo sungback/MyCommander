@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { $, browser, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
-import { createFixtureDir, entryIn, goHome, openEntry, pointerClick } from "../helpers/navigation";
+import { createFixtureDir, entryIn, goHome, openEntry, pointerClick, repeatUntil, selectEntry } from "../helpers/navigation";
 
 describe("F5 복사", () => {
   it("선택한 파일을 반대 패널 폴더로 복사한다", async () => {
@@ -14,13 +14,14 @@ describe("F5 복사", () => {
     const right = await goHome(1);
     await openEntry(right, "copy-dst");
 
-    const file = entryIn(left, "file.txt");
-    await file.waitForDisplayed({ timeout: 20000 });
-    await pointerClick(file);
+    await selectEntry(left, "file.txt");
 
-    await browser.keys([Key.F5]);
     const dialog = $('[role="dialog"]');
-    await dialog.waitForDisplayed({ timeout: 10000, timeoutMsg: "F5로 복사 대화상자가 열리지 않았습니다" });
+    await repeatUntil(
+      () => browser.keys([Key.F5]),
+      () => dialog.isDisplayed(),
+      "F5로 복사 대화상자가 열리지 않았습니다",
+    );
     await pointerClick($('[role="dialog"] button[type="submit"]'));
     await dialog.waitForExist({ reverse: true, timeout: 20000, timeoutMsg: "복사 대화상자가 닫히지 않았습니다" });
 
