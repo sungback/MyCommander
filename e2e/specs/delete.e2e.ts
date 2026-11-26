@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { $, browser, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
-import { createFixtureDir, entryIn, goHome, openEntry, pointerClick, repeatUntil, selectEntry } from "../helpers/navigation";
+import { createFixtureDir, entryIn, goHome, openEntry, pointerClick, repeatUntil, selectEntry, waitForJobsSettled } from "../helpers/navigation";
 
 // 휴지통 이동(F8)은 실제 사용자 휴지통에 파일이 쌓이므로, 영구 삭제(Shift+F8)로 검증한다.
 describe("Shift+F8 영구 삭제", () => {
@@ -26,5 +26,6 @@ describe("Shift+F8 영구 삭제", () => {
     expect(fs.existsSync(path.join(dir, "gone.txt"))).toBe(false);
     expect(fs.existsSync(path.join(dir, "keep.txt"))).toBe(true);
     await expect(entryIn(panel, "keep.txt")).toExist();
+    await waitForJobsSettled();
   });
 });

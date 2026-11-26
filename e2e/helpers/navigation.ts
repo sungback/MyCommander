@@ -116,3 +116,22 @@ export function createFixtureDir(name: string, files: Record<string, string> = {
   }
   return dir;
 }
+
+const JOB_FILE = () =>
+  path.join(process.env.E2E_HOME as string, "Library", "Application Support", "com.mycommander.desktop", "job-queue.json");
+
+// 작업(복사·삭제 등)이 끝나고 그 상태가 job-queue.json에 저장될 때까지 기다린다.
+// 저장 전에 앱이 종료되면 다음 실행에서 queued 작업이 복원되어 진행 대화상자가 클릭을 막는다.
+export async function waitForJobsSettled(): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      try {
+        const state = JSON.parse(fs.readFileSync(JOB_FILE(), "utf8")) as { jobs: { record: { status: string } }[] };
+        return state.jobs.length > 0 && state.jobs.every((job) => !["queued", "running"].includes(job.record.status));
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 15000, interval: 200, timeoutMsg: "작업 상태가 job-queue.json에 completed로 저장되지 않았습니다" },
+  );
+}
