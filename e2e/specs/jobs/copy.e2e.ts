@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { $, browser, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
-import { createFixtureDir, entryIn, goHome, openEntry, pointerClick, repeatUntil, selectEntry, waitForJobsSettled } from "../helpers/navigation";
+import { createFixtureDir, entryIn, goHome, openEntry, pointerClick, repeatUntil, selectEntry } from "../../helpers/navigation";
 
 describe("F5 복사", () => {
   it("선택한 파일을 반대 패널 폴더로 복사한다", async () => {
@@ -27,7 +27,5 @@ describe("F5 복사", () => {
 
     await entryIn(right, "file.txt").waitForDisplayed({ timeout: 20000, timeoutMsg: "반대 패널에 복사된 파일이 나타나지 않았습니다" });
     expect(fs.readFileSync(path.join(dst, "file.txt"), "utf8")).toBe("copy-me");
-    expect(fs.existsSync(path.join(src, "file.txt"))).toBe(true);
-    await waitForJobsSettled();
-  });
+    expect(fs.existsSync(path.join(src, "file.txt"))).toBe(true);  });
 });

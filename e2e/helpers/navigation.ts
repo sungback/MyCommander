@@ -16,7 +16,7 @@ export async function goHomeInFirstPanel(): Promise<ReturnType<typeof $>> {
 
 // 임베디드 드라이버의 element.click()은 mousedown·포커스 이벤트를 일으키지 않아 앱이 선택·포커스를 처리하지 않는다.
 // 실제 마우스처럼 동작하는 포인터 액션으로 클릭한다.
-export async function pointerClick(element: ReturnType<typeof $>): Promise<void> {
+export async function pointerClick(element: ReturnType<typeof $> | WebdriverIO.Element): Promise<void> {
   await browser.action("pointer").move({ origin: element }).down().up().perform();
 }
 
@@ -117,21 +117,25 @@ export function createFixtureDir(name: string, files: Record<string, string> = {
   return dir;
 }
 
-const JOB_FILE = () =>
-  path.join(process.env.E2E_HOME as string, "Library", "Application Support", "com.mycommander.desktop", "job-queue.json");
-
-// 작업(복사·삭제 등)이 끝나고 그 상태가 job-queue.json에 저장될 때까지 기다린다.
-// 저장 전에 앱이 종료되면 다음 실행에서 queued 작업이 복원되어 진행 대화상자가 클릭을 막는다.
-export async function waitForJobsSettled(): Promise<void> {
-  await browser.waitUntil(
+// 테스트마다 같은 앱 인스턴스를 쓰므로, 앞 테스트가 남긴 대화상자를 닫고 시작한다.
+// 일반 대화상자는 Esc로 닫힌다. 진행 대화상자는 활성 작업이 있으면 Esc가 막히고 Cancel/Close 버튼으로만 닫힌다.
+// (browser.refresh()는 내장 드라이버 세션을 끊으므로 쓰지 않는다.)
+export async function resetUiState(): Promise<void> {
+  await $(PANEL_SELECTOR).waitForDisplayed({ timeout: 20000 });
+  await repeatUntil(
     async () => {
-      try {
-        const state = JSON.parse(fs.readFileSync(JOB_FILE(), "utf8")) as { jobs: { record: { status: string } }[] };
-        return state.jobs.length > 0 && state.jobs.every((job) => !["queued", "running"].includes(job.record.status));
-      } catch {
-        return false;
+      await browser.keys([Key.Escape]);
+      const buttons = await $$('[role="dialog"] button');
+      for (const button of buttons) {
+        const label = await button.getText();
+        if (label === "Close" || label === "Cancel") {
+          await pointerClick(button);
+          break;
+        }
       }
     },
-    { timeout: 15000, interval: 200, timeoutMsg: "작업 상태가 job-queue.json에 completed로 저장되지 않았습니다" },
+    async () => !(await $('[role="dialog"]').isExisting()),
+    "남아 있는 대화상자를 닫지 못했습니다(진행 대화상자가 활성 작업 때문에 닫히지 않는 상태일 수 있음)",
+    8000,
   );
 }
