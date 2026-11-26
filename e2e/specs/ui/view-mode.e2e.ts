@@ -1,6 +1,6 @@
 import { browser } from "@wdio/globals";
 import { Key } from "webdriverio";
-import { goHome, repeatUntil, selectEntry } from "../helpers/navigation";
+import { goHome, repeatUntil, selectEntry } from "../../helpers/navigation";
 
 // 상세 보기에서만 열 머리글(Name/Size/Date)이 그려진다. 보기 모드는 활성 패널에만 적용된다.
 async function columnHeaderCount(): Promise<number> {

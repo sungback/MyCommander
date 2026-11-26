@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect } from "@wdio/globals";
-import { createFixtureDir, entryIn, goHome, openEntry } from "../helpers/navigation";
+import { createFixtureDir, entryIn, goHome, openEntry } from "../../helpers/navigation";
 
 describe("폴더 이동", () => {
   it("폴더로 들어갔다가 \"..\"로 돌아온다 (한글 폴더 이름 포함)", async () => {

@@ -12,7 +12,8 @@ let tempHome = "";
 
 export const config = {
   runner: "local",
-  specs: ["./specs/**/*.e2e.ts"],
+  // 작업(복사·삭제)을 만드는 스펙은 마지막에 실행한다. 진행 대화상자가 닫히지 않는 상태로 남아도 다른 스펙에 영향이 없게 한다.
+  specs: ["./specs/ui/**/*.e2e.ts", "./specs/jobs/**/*.e2e.ts"],
   maxInstances: 1,
   capabilities: [
     {
@@ -39,12 +40,12 @@ export const config = {
     process.env.E2E_HOME = tempHome;
   },
 
-  // 스펙(앱 실행)마다 앱 데이터를 비운다. 앞 스펙이 남긴 작업 큐가 다음 실행에서 복원되어
-  // "Deleting Files..." 진행 대화상자가 클릭을 막은 적이 있다(CI 실행 45837773620).
-  onWorkerStart() {    fs.rmSync(path.join(tempHome, "Library", "Application Support", "com.mycommander.desktop"), {
-      recursive: true,
-      force: true,
-    });
+  // 스펙 파일이 바뀌어도 앱 프로세스는 재시작되지 않고 같은 인스턴스를 쓴다(performance.timeOrigin으로 확인).
+  // 앞 스펙이 남긴 대화상자(예: "Deleting Files..." 진행 대화상자)가 다음 스펙의 클릭을 막은 적이 있어
+  // (CI 실행 45837773620 등) 테스트마다 화면을 새로고침하고 남은 대화상자를 닫는다.
+  async beforeTest() {
+    const { resetUiState } = await import("./helpers/navigation");
+    await resetUiState();
   },
 
   // 실패한 테스트의 스크린샷과 화면 상태를 e2e/artifacts에 남긴다(CI에서 아티팩트로 올린다).
@@ -66,18 +67,7 @@ export const config = {
         entries: Array.from(document.querySelectorAll<HTMLElement>("[data-entry-name]")).slice(0, 30).map((el) => el.dataset.entryName),
       }))
       .catch((error: unknown) => ({ error: String(error) }));
-    // 앱 데이터 상태(작업 큐 복원 문제 진단용).
-    const appDataDir = path.join(process.env.E2E_HOME ?? "", "Library", "Application Support", "com.mycommander.desktop");
-    const appData: Record<string, unknown> = {};
-    try {
-      for (const name of fs.readdirSync(appDataDir)) {
-        const file = path.join(appDataDir, name);
-        appData[name] = { mtime: fs.statSync(file).mtime.toISOString(), head: fs.readFileSync(file, "utf8").slice(0, 1500) };
-      }
-    } catch (error) {
-      appData.error = String(error);
-    }
-    fs.writeFileSync(path.join(outDir, `${safeName}.json`), JSON.stringify({ state, appData }, null, 2));
+    fs.writeFileSync(path.join(outDir, `${safeName}.json`), JSON.stringify(state, null, 2));
   },
 
   onComplete() {
