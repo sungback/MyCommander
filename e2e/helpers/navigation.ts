@@ -1,4 +1,7 @@
-import { $, browser } from "@wdio/globals";
+import fs from "node:fs";
+import path from "node:path";
+import { $, $$, browser } from "@wdio/globals";
+import { Key } from "webdriverio";
 
 export const PANEL_SELECTOR = '[role="listbox"][data-panel-id]';
 
@@ -24,4 +27,40 @@ export async function cursorEntryName(): Promise<string | null> {
     const cursorRow = rows.find((row) => row.firstElementChild?.classList.contains("ring-accent-color/70"));
     return cursorRow?.dataset.entryName ?? null;
   });
+}
+
+// 왼쪽(0)·오른쪽(1) 패널.
+export async function panelAt(index: number): Promise<ReturnType<typeof $>> {
+  const panels = await $$(PANEL_SELECTOR);
+  return panels[index];
+}
+
+export async function goHome(panelIndex: number): Promise<ReturnType<typeof $>> {
+  const panel = await panelAt(panelIndex);
+  await panel.waitForDisplayed({ timeout: 20000 });
+  const homeButtons = await $$('button[title="Go to home directory"]');
+  await pointerClick(homeButtons[panelIndex]);
+  return panel;
+}
+
+export function entryIn(panel: ReturnType<typeof $>, name: string): ReturnType<typeof $> {
+  return panel.$(`[data-entry-name="${name}"]`);
+}
+
+// 항목을 클릭해 커서를 놓고 Enter로 연다(폴더 진입, ".."는 상위 이동).
+export async function openEntry(panel: ReturnType<typeof $>, name: string): Promise<void> {
+  const entry = entryIn(panel, name);
+  await entry.waitForDisplayed({ timeout: 20000, timeoutMsg: `${name} 항목이 보이지 않습니다`});
+  await pointerClick(entry);
+  await browser.keys([Key.Enter]);
+}
+
+// 이 스펙 전용 픽스처 폴더를 임시 HOME 아래에 만든다.
+export function createFixtureDir(name: string, files: Record<string, string> = {}): string {
+  const dir = path.join(process.env.E2E_HOME as string, name);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [fileName, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(dir, fileName), content);
+  }
+  return dir;
 }
