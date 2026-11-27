@@ -1,4 +1,4 @@
-import { browser, $ } from "@wdio/globals";
+import { browser, $, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
 import { cursorEntryName, goHomeInFirstPanel, repeatUntil, selectEntry } from "../../helpers/navigation";
 
@@ -36,5 +36,9 @@ describe("대화상자를 닫은 뒤 포커스 복구", () => {
     await browser.waitUntil(async () => (await cursorEntryName()) === "bravo.txt", {
       timeoutMsg: "Esc 뒤 ArrowDown으로 커서가 다음 항목(bravo.txt)으로 이동하지 않았습니다",
     });
+
+    // 목록이 뒤늦게 갱신돼도 커서가 같은 항목에 머무는지 확인한다(커서가 인덱스로만 추적되면 이웃 항목으로 튄다).
+    await browser.pause(1000);
+    expect(await cursorEntryName()).toBe("bravo.txt");
   });
 });
