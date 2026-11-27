@@ -64,6 +64,51 @@ describe("jobStore", () => {
     expect(job.progress.currentFile).toBe("a.txt");
   });
 
+  it("ignores a queued or running update that arrives after the job finished", () => {
+    // submit_job의 응답(queued)이 job-updated(completed) 이벤트보다 늦게 도착하는 경우
+    useJobStore.getState().hydrateJobs([]);
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "completed", updatedAt: 5 });
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "queued", updatedAt: 5 });
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "running", updatedAt: 5 });
+
+    const state = useJobStore.getState();
+    expect(state.jobs[0].status).toBe("completed");
+    expect(state.activeJob).toBeNull();
+  });
+
+  it("ignores an older update of the same status", () => {
+    useJobStore.getState().hydrateJobs([]);
+    useJobStore.getState().upsertJob({
+      ...runningJob,
+      updatedAt: 10,
+      progress: { current: 2, total: 2, currentFile: "b.txt", unit: "items" },
+    });
+    useJobStore.getState().upsertJob({
+      ...runningJob,
+      updatedAt: 9,
+      progress: { current: 1, total: 2, currentFile: "a.txt", unit: "items" },
+    });
+
+    expect(useJobStore.getState().jobs[0].progress.currentFile).toBe("b.txt");
+  });
+
+  it("still applies newer updates and status progress", () => {
+    useJobStore.getState().hydrateJobs([]);
+    useJobStore.getState().upsertJob({ ...queuedJob, updatedAt: 1 });
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "running", updatedAt: 2 });
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "completed", updatedAt: 3 });
+
+    expect(useJobStore.getState().jobs[0].status).toBe("completed");
+  });
+
+  it("can still move a queued job to cancelled", () => {
+    useJobStore.getState().hydrateJobs([]);
+    useJobStore.getState().upsertJob({ ...queuedJob, updatedAt: 1 });
+    useJobStore.getState().upsertJob({ ...queuedJob, status: "cancelled", updatedAt: 1 });
+
+    expect(useJobStore.getState().jobs[0].status).toBe("cancelled");
+  });
+
   it("groups active, failed, and finished jobs", () => {
     useJobStore.getState().hydrateJobs([
       queuedJob,
