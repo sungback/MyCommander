@@ -34,7 +34,9 @@ export const setPanelFiles = (
       tab.sortDirection
     );
 
-    let cursorIndex = tab.cursorIndex;
+    // 목록이 다시 로드되며 커서 위쪽 항목이 늘거나 줄어도 커서가 같은 항목(경로)에 머물게 한다.
+    // 인덱스를 그대로 두면 감시 이벤트 등으로 행이 밀릴 때 커서가 이웃 항목으로 튄다.
+    let cursorIndex = preserveCursorIndex(tab.files, tab.cursorIndex, sortedFiles);
     if (tab.pendingCursorName) {
       const idx = sortedFiles.findIndex(
         (file) => file.name === tab.pendingCursorName
