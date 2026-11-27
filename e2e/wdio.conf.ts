@@ -36,6 +36,9 @@ export const config = {
       fs.writeFileSync(path.join(tempHome, name), name);
     }
     fs.mkdirSync(path.join(tempHome, "한글폴더"));
+    // 앱이 첫 실행 직후 HOME/Library/Application Support에 캐시를 쓰면 Library 폴더가 목록에 뒤늦게 끼어들어
+    // 커서 인덱스가 한 칸 밀린다. 목록이 도중에 바뀌지 않도록 미리 만들어 둔다.
+    fs.mkdirSync(path.join(tempHome, "Library", "Application Support", "com.mycommander.desktop"), { recursive: true });
     process.env.HOME = tempHome;
     process.env.E2E_HOME = tempHome;
   },
